@@ -1,6 +1,6 @@
 ---
 name: rival-astra
-version: 3.32.1
+version: 3.33.0
 description: Run Astra through the rival binary, detached and watched in the background. Use only when the user explicitly invokes /rival-astra.
 argument-hint: "[-re low|medium|high|xhigh|ultra] [review [scope] | prompt]"
 allowed-tools: Bash, Read, Write

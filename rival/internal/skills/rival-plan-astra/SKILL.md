@@ -1,6 +1,6 @@
 ---
 name: rival-plan-astra
-version: 3.32.1
+version: 3.33.0
 description: Review a plan/spec markdown document with Astra at xhigh effort via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan-astra.
 argument-hint: "<path-to-plan.md>"
 allowed-tools: Bash, Read, Write

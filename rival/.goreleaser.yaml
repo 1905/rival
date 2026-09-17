@@ -3,7 +3,7 @@ version: 2
 
 release:
   github:
-    owner: 1F47E
+    owner: "1905"
     name: rival
 
 builds:
@@ -32,12 +32,12 @@ archives:
 # rival.rb edits.
 brews:
   - name: rival
-    homepage: https://github.com/1F47E/rival
+    homepage: https://github.com/1905/rival
     description: "Dispatch prompts to AI coding agents with session tracking and TUI/web dashboards"
     license: MIT
     # directory omitted → formula written to the repo root (rival.rb)
     repository:
-      owner: 1F47E
+      owner: "1905"
       name: homebrew-tap
       branch: master
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"

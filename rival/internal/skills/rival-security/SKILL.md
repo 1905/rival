@@ -1,6 +1,6 @@
 ---
 name: rival-security
-version: 3.32.1
+version: 3.33.0
 description: Security review of changed code (or a given scope) via the rival binary — hunts exploitable vulnerabilities across twelve classes, not style and not ordinary logic bugs. The model comes from security.reviewer in ~/.rival/config.yaml. Detached + watched in the background. Use only when the user explicitly invokes /rival-security.
 argument-hint: "[<scope>]"
 allowed-tools: Bash, Read, Write

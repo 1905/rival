@@ -4,16 +4,6 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 
 ## [Unreleased]
 
-### Added — pinned GitLab MR reviews
-
-- Review GitLab MR URLs at the API's exact base/head commits in a temporary checkout.
-- Keep the caller's files and index intact, including runs with inherited Git variables.
-- Include the patch for reviewers without shell access. Reject patches over 512 KiB.
-- Keep K3 credential lookup in the caller's project. Support custom SSH ports.
-- Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
-- Preserve the current Codex installer and model defaults while merging PR #12.
-- Validation: 637 tests passed with the race detector; build, vet, and lint passed. Live GitLab and paid model calls were not tested.
-
 ### Added — /rival-astra
 
 A single-model runner for Astra (`gpt-6-astra`), verified against the codex
@@ -200,6 +190,18 @@ workdir. Two caveats worth knowing:
   `/var/folders/...`). A workdir located inside one of those paths is therefore
   writable during a review.
 - Child-process network access is not blocked on macOS.
+
+## [v3.33.0] — 2026-09-17
+
+### Added — pinned GitLab MR reviews
+
+- Review GitLab MR URLs at the API's exact base/head commits in a temporary checkout.
+- Keep the caller's files and index intact, including runs with inherited Git variables.
+- Include the patch for reviewers without shell access. Reject patches over 512 KiB.
+- Keep K3 credential lookup in the caller's project. Support custom SSH ports.
+- Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
+- Refresh all bundled skills to 3.33.0 and publish through the transferred `1905` repositories.
+- Validation: 637 tests passed with the race detector; build, vet, and lint passed. Live GitLab and paid model calls were not tested.
 
 ## [v3.23.0] — 2026-07-20
 
