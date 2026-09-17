@@ -12,7 +12,7 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 - Keep K3 credential lookup in the caller's project. Support custom SSH ports.
 - Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
 - Preserve the current Codex installer and model defaults while merging PR #12.
-- Validation: local Git/API fixtures and mocked reviewer/judge runs; live GitLab and paid model calls were not tested.
+- Validation: 637 tests passed with the race detector; build, vet, and lint passed. Live GitLab and paid model calls were not tested.
 
 ### Added — /rival-astra
 

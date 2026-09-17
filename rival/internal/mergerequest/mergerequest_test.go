@@ -110,9 +110,10 @@ func TestPrepareIgnoresInheritedGitRepository(t *testing.T) {
 			indexPath := filepath.Join(f.workdir, ".git", "index")
 			index := read(t, indexPath)
 			value := f.workdir
-			if name == "GIT_DIR" {
+			switch name {
+			case "GIT_DIR":
 				value = filepath.Join(f.workdir, ".git")
-			} else if name == "GIT_INDEX_FILE" {
+			case "GIT_INDEX_FILE":
 				value = indexPath
 			}
 			t.Setenv(name, value)
