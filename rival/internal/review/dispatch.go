@@ -46,7 +46,8 @@ func reviewerRunnerFor(cli string) (reviewRunner, bool) {
 		}, true
 	case "opencode":
 		return func(ctx context.Context, sess *session.Session, prompt, effort, workdir, model string) (*executor.Result, error) {
-			return executor.RunOpencode(ctx, sess, prompt, effort, workdir, model, nil)
+			opts := executor.OpencodeRunOpts{APIKey: config.KimiAPIKeyFrom(credentialWorkdir(ctx, workdir))}
+			return executor.RunOpencodeWith(ctx, sess, prompt, effort, workdir, model, opts, nil)
 		}, true
 	case config.GrokLabel:
 		return func(ctx context.Context, sess *session.Session, prompt, effort, workdir, model string) (*executor.Result, error) {

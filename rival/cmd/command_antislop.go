@@ -102,6 +102,9 @@ func commandAntislopAction(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(os.Stdout, antislopUsage)
 		return nil
 	}
+	if err := rejectUnresolvedMR(string(raw)); err != nil {
+		return err
+	}
 
 	if cmd.Flags().Changed("model") && len(parsed.Models) > 0 {
 		err := fmt.Errorf("model selection was provided both as --model command flags and in arguments; use one form")

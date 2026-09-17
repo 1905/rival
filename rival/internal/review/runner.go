@@ -79,7 +79,7 @@ func RunMegaReviewWithModels(ctx context.Context, scope, effort, workdir, groupI
 	for _, target := range targets {
 		var preflightErr error
 		if preflight, ok := preflightFor(target.CLI); ok {
-			preflightErr = preflight(target.Model, workdir)
+			preflightErr = preflight(target.Model, credentialWorkdir(ctx, workdir))
 		} else {
 			preflightErr = fmt.Errorf("unsupported reviewer CLI: %s", target.CLI)
 		}

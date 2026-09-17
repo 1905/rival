@@ -1,6 +1,6 @@
 ---
 name: rival-review
-version: 3.32.1
+version: 3.32.2
 description: Run Astra, K3, and/or opt-in grok code reviews with a consilium judge via the rival binary. Use only when the user explicitly invokes /rival-review.
 argument-hint: "[-m astra|k3|grok[,model...]] [-re high|ultra] [scope]"
 allowed-tools: Bash, Read, Write
@@ -16,6 +16,16 @@ Returns a single combined answer.
 ## Instructions
 
 **Arguments received:** $ARGUMENTS
+
+### GitLab merge requests
+
+Pass the HTTPS MR URL as the entire scope, with optional -m/-re options.
+Use a local repository with a remote for that target project as the workdir.
+The host needs `glab auth login --hostname <URL-host>` and Git fetch access.
+Rival resolves the base/head SHAs and reviews an isolated checkout.
+If resolution or fetch fails, report the failure. Never retry against local HEAD.
+Preserve the URL/base/head header in the delivered report.
+Reviewing does not authorize posting MR comments or approvals.
 
 ### Usage
 

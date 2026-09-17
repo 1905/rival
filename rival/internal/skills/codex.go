@@ -26,7 +26,7 @@ func CodexSkill(name, version string) ([]byte, error) {
 	case "rival-review":
 		description = "Run Rival's independent code review and consilium from Codex. Use for a requested Rival review; use rival-fable for a Fable-only review."
 		command = "megareview"
-		input = "Pass the user's scope and options verbatim. Empty input reviews git-detected changes. The default reviewer is Astra. `-m astra,k3` selects two reviewers; Grok is opt-in. Fable is not supported in this roster: use $rival-fable for Fable."
+		input = "Pass the user's scope and options verbatim. Empty input reviews git-detected changes. The default reviewer is Astra. `-m astra,k3` selects two reviewers; Grok is opt-in. Fable is not supported in this roster: use $rival-fable for Fable. For a GitLab MR, pass its HTTPS URL as the entire scope and use a local repository with a remote for the target project as the workdir. The host needs glab authentication for that host and Git fetch access. Rival resolves the base/head SHAs and reviews an isolated checkout. If resolution fails, report the failure; never retry against local HEAD. Preserve the URL/base/head header in the report. Do not post MR comments or approvals."
 	case "rival-plan", "rival-plan-astra", "rival-plan-fable":
 		description = "Review a plan or specification document through Rival from Codex, returning ratings and findings."
 		command = "plan --model astra --effort xhigh"

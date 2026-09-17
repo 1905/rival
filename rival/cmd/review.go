@@ -77,6 +77,12 @@ func reviewAction(cmd *cobra.Command, args []string) error {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	ctx = review.WithCredentialWorkdir(ctx, workdir)
+	scope, workdir, closeMR, err := prepareReviewScope(ctx, scope, workdir)
+	if err != nil {
+		return err
+	}
+	defer closeMR()
 
 	groupID := uuid.New().String()
 

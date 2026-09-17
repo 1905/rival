@@ -28,10 +28,6 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 		return err
 	}
 
-	if err := spec.preflight(opts.workdir); err != nil {
-		return err
-	}
-
 	// --review wins over --prompt-stdin when both are given.
 	var prompt string
 	mode := "raw"
@@ -54,6 +50,12 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 	}
 	if prompt == "" {
 		return fmt.Errorf("empty prompt")
+	}
+	if err := rejectUnresolvedMR(prompt); err != nil {
+		return err
+	}
+	if err := spec.preflight(opts.workdir); err != nil {
+		return err
 	}
 
 	sess, err := session.NewQueued(spec.cli, mode, spec.model, effort, opts.workdir, prompt, opts.reviewScope, "")

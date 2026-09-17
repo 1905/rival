@@ -109,6 +109,9 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 		_, _ = fmt.Fprintln(os.Stdout, spec.usage)
 		return nil
 	}
+	if err := rejectUnresolvedMR(string(raw)); err != nil {
+		return err
+	}
 
 	if parsed.IsReview && parsed.AutoScope {
 		resolveGitScope(parsed, workdir)

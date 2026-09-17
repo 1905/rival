@@ -150,6 +150,49 @@ reduction. Grok's `review` additionally passes `--sandbox read-only`, but its
 built-in profiles fail open without a kernel sandbox and keep temp dirs
 writable — treat it accordingly.
 
+### GitLab merge requests
+
+```bash
+glab auth login --hostname gitlab.example.com
+rival review --model astra --workdir /path/to/repo \
+  https://gitlab.example.com/group/project/-/merge_requests/42
+```
+
+In Claude Code use `/rival-review -m astra <MR-URL>`; in Codex use
+`$rival-review -m astra <MR-URL>`. The URL must be the entire scope.
+Nested namespaces, `/diffs` and `/commits` links, query strings, and fragments
+are supported. The local repository must have a remote for the target project.
+For a fork MR, add the target remote if only the fork remote exists.
+HTTPS and standard SSH remotes are supported. Credential-bearing HTTPS URLs
+are rejected.
+
+Rival uses `glab api --hostname` with saved credentials for that host.
+Global `GITLAB_TOKEN`, `GITLAB_ACCESS_TOKEN`, `OAUTH_TOKEN`, and `CI_JOB_TOKEN`
+values are ignored to avoid using another instance's credentials.
+Git fetch uses normal Git/SSH authentication. Both API and Git access are required.
+K3 credentials still come from the caller's project environment or `.env`,
+not from the reviewed MR checkout.
+
+The [MR API's `diff_refs`](https://docs.gitlab.com/api/merge_requests/#get-single-mr)
+identify the merge-base and source-head commits. Rival fetches those objects
+into a temporary repository and checks out the exact head.
+All reviewers and the judge use that snapshot. The report includes its URL and SHAs.
+The prompt includes the full patch so reviewers without shell access can inspect it.
+Patches larger than 512 KiB are rejected instead of silently truncated.
+The caller's branch, index, and dirty files remain unchanged.
+The snapshot is removed on completion or normal cancellation.
+
+Missing or stale diff refs, an unavailable API, a mismatched remote, or a failed
+fetch stop the review. Rival never substitutes local HEAD. Preparation has a
+two-minute timeout. Single-model/raw, security, and antislop commands reject
+MR URLs; select one reviewer with `rival review --model astra` instead.
+Rival does not post MR comments or approvals.
+
+The report covers the recorded snapshot even if the MR later changes.
+Submodules and LFS objects are not hydrated. Reviewer restrictions can block
+tests or additional context; those checks must be reported as unavailable.
+An uncatchable kill can leave a `rival-mr-*` temporary directory.
+
 ### Security
 
 ```

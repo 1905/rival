@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/1F47E/rival/internal/gitscope"
 	"github.com/1F47E/rival/internal/procinfo"
 	"github.com/1F47E/rival/internal/session"
 	"github.com/rs/zerolog/log"
@@ -42,7 +43,7 @@ var blockedEnvPrefixes = []string{
 // that could be injected via a repo-local .env file.
 func safeEnv() []string {
 	var result []string
-	for _, kv := range os.Environ() {
+	for _, kv := range gitscope.RepositoryEnv(os.Environ()) {
 		blocked := false
 		for _, prefix := range blockedEnvPrefixes {
 			if strings.HasPrefix(kv, prefix) {

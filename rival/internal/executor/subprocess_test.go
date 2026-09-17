@@ -53,6 +53,21 @@ func TestSafeEnv_BlocksGrokRuntimeVars(t *testing.T) {
 	}
 }
 
+func TestSafeEnvKeepsReviewerInItsOwnRepository(t *testing.T) {
+	for _, key := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"} {
+		t.Setenv(key, "caller-repository")
+	}
+	t.Setenv("GIT_SSH_COMMAND", "ssh -p 2222")
+	for _, item := range safeEnv() {
+		if strings.HasSuffix(item, "=caller-repository") {
+			t.Fatalf("reviewer inherited a caller repository override: %s", item)
+		}
+	}
+	if !strings.Contains(strings.Join(safeEnv(), "\n"), "GIT_SSH_COMMAND=ssh -p 2222") {
+		t.Fatal("removed host SSH authentication settings")
+	}
+}
+
 // TestRunSubprocess_ContextTimeoutKillsChild proves RIVAL_RUN_TIMEOUT's
 // mechanism: a context deadline kills a hung child promptly instead of waiting
 // for it to finish. Uses /bin/sleep so no provider quota is touched.

@@ -126,6 +126,9 @@ func commandSecurityAction(cmd *cobra.Command, args []string) error {
 		rawScope = string(raw)
 	}
 
+	if err := rejectUnresolvedMR(rawScope); err != nil {
+		return err
+	}
 	if err := executor.OpencodePreflightEntry(entry, workdir); err != nil {
 		hint := fmt.Errorf("%w\n\nsecurity.reviewer selects the model; accepted values: %s",
 			err, strings.Join(config.SecurityReviewerNames(), ", "))
