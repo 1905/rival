@@ -2,6 +2,8 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
+Latest release: [v3.33.0](https://github.com/1905/rival/releases/tag/v3.33.0) — 2026-09-17.
+
 ## [Unreleased]
 
 ### Added — /rival-astra
@@ -200,8 +202,16 @@ workdir. Two caveats worth knowing:
 - Include the patch for reviewers without shell access. Reject patches over 512 KiB.
 - Keep K3 credential lookup in the caller's project. Support custom SSH ports.
 - Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
-- Refresh all bundled skills to 3.33.0 and publish through the transferred `1905` repositories.
-- Validation: 637 tests passed with the race detector; build, vet, and lint passed. Live GitLab and paid model calls were not tested.
+- Refresh all ten bundled skills to 3.33.0 for Claude Code and Codex.
+- Publish macOS and Linux binaries for amd64 and arm64 through the transferred `1905` repositories. Update the Homebrew formula to 3.33.0.
+
+### Release verification
+
+- Release CI passed. All four published archive checksums matched.
+- Homebrew upgrade and installation of all ten skills for each host passed.
+- The published and installed macOS arm64 binaries passed version, help, and MR rejection smoke checks without provider calls.
+- All 637 tests passed with the race detector on the release revision. Build, vet, and lint passed.
+- Live GitLab and paid model calls remain untested. Linux and macOS amd64 binaries were built and checksum-verified but were not executed.
 
 ## [v3.23.0] — 2026-07-20
 
