@@ -21,7 +21,7 @@ import (
 // explicit branch in the workflows below, keyed on commandName, rather than
 // becoming a callback field nobody else sets.
 type modelSpec struct {
-	// commandName is the cobra command word: sol, fable, k3, or grok. For K3
+	// commandName is the cobra command word: sol, claude, k3, or grok. For K3
 	// this is NOT the display label, which is kimi-k3.
 	commandName string
 	// cli is the adapter recorded on the session: codex, claude, opencode, or
@@ -52,10 +52,10 @@ func (s modelSpec) resolveEffort(requested string) (string, error) {
 		return "max", nil
 	}
 	fallback := config.DefaultReviewEffort
-	if s.commandName == config.FableLabel || s.commandName == config.AstraLabel {
-		// Fable and Astra resolve their own configured defaults rather than
+	if s.commandName == config.ClaudeLabel || s.commandName == config.CodexLabel {
+		// Claude and Codex resolve their own configured defaults rather than
 		// the shared review one: a non-empty fallback here short-circuits
-		// builtinModelEffort and would silently override Astra's xhigh.
+		// builtinModelEffort and would silently override Codex's xhigh.
 		fallback = ""
 	}
 	effort, err := config.ResolveEffort(s.model, requested, fallback)
@@ -77,9 +77,9 @@ func sessionMode(isReview bool) string {
 }
 
 // authHint returns a provider-specific hint for a failed run, or "" when the
-// provider has none. Only Fable distinguishes auth failures this way.
+// provider has none. Only Claude distinguishes auth failures this way.
 func (s modelSpec) authHint(logFile string) string {
-	if s.commandName != config.FableLabel {
+	if s.commandName != config.ClaudeLabel {
 		return ""
 	}
 	return executor.ClaudeAuthHint(logFile)
@@ -130,7 +130,7 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
-	if spec.commandName == config.FableLabel {
+	if spec.commandName == config.ClaudeLabel {
 		sess.Account = config.ClaudeSubscription()
 	}
 

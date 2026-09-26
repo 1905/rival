@@ -24,7 +24,7 @@ func sess(id, groupID, status, mode, cli, model, effort string) *session.Session
 func TestGroupBucketsAndKeys(t *testing.T) {
 	solo := sess("s1", "", "completed", "review", "codex", config.GPT56SolModel, "high")
 	a := sess("a1", "grp", "completed", "plan", "codex", config.GPT56SolModel, "xhigh")
-	b := sess("b1", "grp", "completed", "plan", "fable", config.FableModel, "xhigh")
+	b := sess("b1", "grp", "completed", "plan", "claude", config.ClaudeModel, "xhigh")
 
 	buckets := Group([]*session.Session{solo, a, b})
 	if len(buckets) != 2 {
@@ -44,7 +44,7 @@ func TestGroupBucketsAndKeys(t *testing.T) {
 func TestGroupPreservesFirstAppearanceOrder(t *testing.T) {
 	first := sess("x", "g2", "completed", "review", "codex", config.GPT56SolModel, "high")
 	second := sess("y", "g1", "completed", "review", "codex", config.GPT56SolModel, "high")
-	third := sess("z", "g2", "completed", "review", "fable", config.FableModel, "high")
+	third := sess("z", "g2", "completed", "review", "claude", config.ClaudeModel, "high")
 
 	buckets := Group([]*session.Session{first, second, third})
 	if len(buckets) != 2 || buckets[0].Key != "g2" || buckets[1].Key != "g1" {
@@ -54,7 +54,7 @@ func TestGroupPreservesFirstAppearanceOrder(t *testing.T) {
 
 func TestGroupDoesNotMutateInput(t *testing.T) {
 	a := sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "high")
-	b := sess("b", "g", "running", "plan", "fable", config.FableModel, "low")
+	b := sess("b", "g", "running", "plan", "claude", config.ClaudeModel, "low")
 	input := []*session.Session{a, b}
 	before := []session.Session{*a, *b}
 
@@ -118,18 +118,18 @@ func TestKindPrecedence(t *testing.T) {
 func TestEngineLabelsDedupInOrder(t *testing.T) {
 	sessions := []*session.Session{
 		sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "high"),
-		sess("b", "g", "completed", "plan", "fable", config.FableModel, "high"),
+		sess("b", "g", "completed", "plan", "claude", config.ClaudeModel, "high"),
 		sess("c", "g", "completed", "plan", "codex", config.GPT56SolModel, "high"),
 	}
 	got := EngineLabels(sessions)
-	want := []string{config.SolLabel, config.FableLabel}
+	want := []string{config.SolLabel, config.ClaudeLabel}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("EngineLabels = %v, want %v", got, want)
 	}
-	if JoinLabels(got, "+") != config.SolLabel+"+"+config.FableLabel {
+	if JoinLabels(got, "+") != config.SolLabel+"+"+config.ClaudeLabel {
 		t.Errorf("JoinLabels with + = %q", JoinLabels(got, "+"))
 	}
-	if JoinLabels(got, " + ") != config.SolLabel+" + "+config.FableLabel {
+	if JoinLabels(got, " + ") != config.SolLabel+" + "+config.ClaudeLabel {
 		t.Errorf("JoinLabels with space = %q", JoinLabels(got, " + "))
 	}
 }
@@ -137,7 +137,7 @@ func TestEngineLabelsDedupInOrder(t *testing.T) {
 func TestEffort(t *testing.T) {
 	same := []*session.Session{
 		sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "xhigh"),
-		sess("b", "g", "completed", "plan", "fable", config.FableModel, "xhigh"),
+		sess("b", "g", "completed", "plan", "claude", config.ClaudeModel, "xhigh"),
 	}
 	if got := Effort(same); got != "xhigh" {
 		t.Errorf("Effort = %q, want xhigh", got)
@@ -145,7 +145,7 @@ func TestEffort(t *testing.T) {
 
 	mixed := []*session.Session{
 		sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "xhigh"),
-		sess("b", "g", "completed", "plan", "fable", config.FableModel, "low"),
+		sess("b", "g", "completed", "plan", "claude", config.ClaudeModel, "low"),
 	}
 	if got := Effort(mixed); got != "mixed" {
 		t.Errorf("Effort = %q, want mixed", got)

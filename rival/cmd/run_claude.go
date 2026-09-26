@@ -5,18 +5,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runFableCmd = &cobra.Command{
-	Use:   config.FableLabel,
-	Short: "Run Fable",
-	RunE:  runFableAction,
+var runClaudeCmd = &cobra.Command{
+	Use:   config.ClaudeLabel,
+	Short: "Run Claude",
+	RunE:  runClaudeAction,
 }
 
 func init() {
-	configureRunFableFlags(runFableCmd)
-	runCmd.AddCommand(runFableCmd)
+	configureRunClaudeFlags(runClaudeCmd)
+	runCmd.AddCommand(runClaudeCmd)
 }
 
-func configureRunFableFlags(cmd *cobra.Command) {
+func configureRunClaudeFlags(cmd *cobra.Command) {
 	cmd.Flags().String("effort", "", "reasoning effort override (low, medium, high, xhigh)")
 	cmd.Flags().String("workdir", ".", "working directory")
 	cmd.Flags().Bool("prompt-stdin", false, "read prompt from stdin")
@@ -24,14 +24,14 @@ func configureRunFableFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("no-queue", false, "bypass the review queue")
 }
 
-func runFableAction(cmd *cobra.Command, args []string) error {
+func runClaudeAction(cmd *cobra.Command, args []string) error {
 	effort, _ := cmd.Flags().GetString("effort")
 	workdir, _ := cmd.Flags().GetString("workdir")
 	promptStdin, _ := cmd.Flags().GetBool("prompt-stdin")
 	reviewScope, _ := cmd.Flags().GetString("review")
 	noQueue, _ := cmd.Flags().GetBool("no-queue")
 
-	return runModelRun(fableSpec(), runOptions{
+	return runModelRun(claudeSpec(), runOptions{
 		workdir:     workdir,
 		noQueue:     noQueue,
 		effort:      effort,

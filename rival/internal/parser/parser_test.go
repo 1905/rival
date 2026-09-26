@@ -402,14 +402,14 @@ func TestParseGrokArgs_Empty(t *testing.T) {
 	}
 }
 
-// One ladder means every surface accepts the same levels. Fable used to reject
+// One ladder means every surface accepts the same levels. Claude used to reject
 // ultra while its own plan skill documented it.
 func TestEverySurfaceAcceptsTheSharedLadder(t *testing.T) {
 	parsers := map[string]func(string) (*ParseResult, error){
-		"fable": ParseFableArgs,
-		"sol":   ParseGPT56SolArgs,
-		"grok":  ParseGrokArgs,
-		"kimi":  ParseKimiArgs,
+		"claude": ParseClaudeArgs,
+		"sol":    ParseGPT56SolArgs,
+		"grok":   ParseGrokArgs,
+		"kimi":   ParseKimiArgs,
 	}
 	for name, parse := range parsers {
 		for _, effort := range config.ValidEfforts {

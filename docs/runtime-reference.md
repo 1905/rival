@@ -35,7 +35,7 @@ rival review --model grok src/api/
 rival review --model grok,sol src/api/
 ```
 
-Fable is available for standalone code review and plan review through the
+Claude is available for standalone code review and plan review through the
 Claude Code runtime; it is not a member of the default code-review roster.
 
 ## Native commands
@@ -53,22 +53,22 @@ printf '%s\n' 'inspect this project' |
 rival run k3 --review src/api/ --workdir .
 
 printf '%s\n' 'explain the auth flow' |
-  rival run fable --prompt-stdin --workdir .
-rival run fable --review src/api/ --workdir .
+  rival run claude --prompt-stdin --workdir .
+rival run claude --review src/api/ --workdir .
 
 printf '%s\n' 'explain the auth flow' |
   rival run grok --prompt-stdin --workdir .
 rival run grok --review src/api/ --workdir .
 ```
 
-Fable's skill-facing command uses the same runtime but reads its argument
+Claude's skill-facing command uses the same runtime but reads its argument
 grammar from stdin:
 
 ```bash
 printf '%s\n' 'review src/api/' |
-  rival command fable --workdir .
+  rival command claude --workdir .
 printf '%s\n' '-re high review src/api/' |
-  rival command fable --workdir .
+  rival command claude --workdir .
 ```
 
 Grok has the same skill-facing command shape:
@@ -118,9 +118,9 @@ separately for each selected model:
 
 ```bash
 printf '%s\n' 'docs/plan.md' |
-  rival command plan --model sol,fable --workdir .
+  rival command plan --model codex,claude --workdir .
 printf '%s\n' 'docs/plan.md' |
-  rival command plan --model fable --effort high --workdir .
+  rival command plan --model claude --effort high --workdir .
 ```
 
 Operational views are available through `rival tui`, `rival sessions`, and
@@ -135,8 +135,8 @@ Rival launches installed provider CLIs; it does not replace their accounts.
 |---|---|
 | Sol | Codex CLI. Run `codex login` for browser-based ChatGPT authentication (preferred), or pipe an OpenAI API key to `codex login --with-api-key`. `codex login status` must succeed. |
 | Kimi K3 | OpenCode plus `MOONSHOT_API_KEY`. Export it or place it in a gitignored project `.env`; Rival searches upward from the workdir. |
-| Fable, native | Claude Code CLI. Subscription login is the default. To opt into API billing, set both `RIVAL_CLAUDE_AUTH=api` and a funded `ANTHROPIC_API_KEY`. |
-| Fable, Docker fallback | `RIVAL_CLAUDE_TOKEN` containing the OAuth access token extracted by the flow in [Fable in Docker](fable-docker-setup.md). |
+| Claude, native | Claude Code CLI. Subscription login is the default. To opt into API billing, set both `RIVAL_CLAUDE_AUTH=api` and a funded `ANTHROPIC_API_KEY`. |
+| Claude, Docker fallback | `RIVAL_CLAUDE_TOKEN` containing the OAuth access token extracted by the flow in [Claude in Docker](claude-docker-setup.md). |
 | Grok | Grok CLI. Run `grok login` for browser OAuth against grok.com. The preflight requires `grok` on `PATH` and `~/.grok/auth.json` to exist. `XAI_API_KEY` is deliberately unsupported. |
 
 For API-key-based Sol authentication, let Codex store the credential and then
@@ -149,7 +149,7 @@ unset OPENAI_API_KEY
 codex login status
 ```
 
-For native Fable runs, Rival strips inherited Anthropic key variables in the
+For native Claude runs, Rival strips inherited Anthropic key variables in the
 default subscription mode so an unrelated shell variable cannot silently
 switch billing to API credits. Docker is selected only when the `claude`
 executable is not on `PATH`.
@@ -172,7 +172,7 @@ Configure stable model labels in `~/.rival/config.yaml`:
 efforts:
   sol: high
   kimi-k3: max
-  fable: medium
+  claude: medium
   grok: high
 ```
 
@@ -193,11 +193,11 @@ unrecognized value is still an error, so a typo cannot silently downgrade a run.
 The clamp is applied before the session is created, so `rival sessions` and the
 dashboards report the level actually sent.
 
-The general built-in defaults are Sol `high`, Fable `medium`, Kimi K3 `max`, and
-Grok `high` — which is also grok-4.6's own built-in default. Plan review preserves its surface-specific fallbacks: Sol is `high`,
-Fable alone is `low`, and a native Sol/Fable pair is `high` for both. The
-installed paired plan skill explicitly requests `ultra`, so that explicit skill
-value wins over configured defaults.
+The general built-in defaults are Sol `high`, Codex `xhigh`, Claude `medium`,
+Kimi K3 `max`, and Grok `high` — which is also grok-4.6's own built-in default.
+Codex (`xhigh`) and Claude (`medium`) pin their effort on plan reviews too; an
+explicit `-re` or a configured effort still wins. Plan review accepts `codex`
+and `claude`.
 
 Invalid model labels or effort values in `~/.rival/config.yaml` stop the command
 before sessions or queue entries are created.

@@ -17,7 +17,7 @@ func TestCLILabelUsesPublicModelNames(t *testing.T) {
 	}{
 		{"codex", config.GPT56SolModel, iconSol + " " + config.SolLabel},
 		{"opencode", config.KimiModel, iconOpencode + " kimi-k3"},
-		{"fable", config.FableModel, iconFable + " " + config.FableLabel},
+		{"claude", config.ClaudeModel, iconClaude + " " + config.ClaudeLabel},
 		{"grok", config.GrokModel, iconGrok + " " + config.GrokLabel},
 	}
 	for _, tc := range tests {
@@ -25,8 +25,8 @@ func TestCLILabelUsesPublicModelNames(t *testing.T) {
 			t.Errorf("cliLabel(%q, %q) = %q, want %q", tc.cli, tc.model, got, tc.want)
 		}
 	}
-	if got := cliLabel("fable", config.FableModel, "plan"); got != iconPlan+" plan" {
-		t.Errorf("live Fable plan label = %q, want %q", got, iconPlan+" plan")
+	if got := cliLabel("claude", config.ClaudeModel, "plan"); got != iconPlan+" plan" {
+		t.Errorf("live Claude plan label = %q, want %q", got, iconPlan+" plan")
 	}
 }
 
@@ -35,7 +35,7 @@ func TestCLILabelUsesPublicModelNames(t *testing.T) {
 func TestCLIIconsAreSingleCellWide(t *testing.T) {
 	icons := map[string]string{
 		"sol":      iconSol,
-		"fable":    iconFable,
+		"claude":   iconClaude,
 		"opencode": iconOpencode,
 		"plan":     iconPlan,
 		"grok":     iconGrok,
@@ -124,7 +124,7 @@ func TestPairedPlanGroupUsesPublicModelsAndPlanIcon(t *testing.T) {
 	later := created.Add(time.Millisecond)
 	items := groupSessions([]*session.Session{
 		// LoadAll returns newest first; grouping must restore requested order.
-		{ID: "b", GroupID: "paired", CLI: "fable", Model: config.FableModel, Mode: "plan", QueuedAt: &later},
+		{ID: "b", GroupID: "paired", CLI: "claude", Model: config.ClaudeModel, Mode: "plan", QueuedAt: &later},
 		{ID: "a", GroupID: "paired", CLI: "codex", Model: config.GPT56SolModel, Mode: "plan", QueuedAt: &created},
 	})
 	if len(items) != 1 || !items[0].IsGroup() {
@@ -134,17 +134,17 @@ func TestPairedPlanGroupUsesPublicModelsAndPlanIcon(t *testing.T) {
 	if got := groupIcon(item); got != iconPlan+" plan" {
 		t.Fatalf("paired plan icon = %q, want %q", got, iconPlan+" plan")
 	}
-	if got := groupCLIs(item); got != config.SolLabel+"+"+config.FableLabel {
+	if got := groupCLIs(item); got != config.SolLabel+"+"+config.ClaudeLabel {
 		t.Fatalf("paired plan reviewers = %q", got)
 	}
-	if got := groupModels(item); got != config.SolLabel+" + "+config.FableLabel {
+	if got := groupModels(item); got != config.SolLabel+" + "+config.ClaudeLabel {
 		t.Fatalf("paired plan models = %q", got)
 	}
 }
 
-func TestSingletonFablePlanRemainsLogicalPlanGroup(t *testing.T) {
+func TestSingletonClaudePlanRemainsLogicalPlanGroup(t *testing.T) {
 	items := groupSessions([]*session.Session{
-		{ID: "fable", GroupID: "degraded-plan", CLI: "fable", Model: config.FableModel, Mode: "plan", Status: "running"},
+		{ID: "claude", GroupID: "degraded-plan", CLI: "claude", Model: config.ClaudeModel, Mode: "plan", Status: "running"},
 	})
 	if len(items) != 1 || !items[0].IsGroup() {
 		t.Fatalf("singleton plan item = %+v, want logical group", items)

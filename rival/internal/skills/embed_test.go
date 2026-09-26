@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestPlanAstraSkillPinsXhighEffort(t *testing.T) {
-	data, err := Files.ReadFile("rival-plan-astra/SKILL.md")
+func TestPlanCodexSkillPinsXhighEffort(t *testing.T) {
+	data, err := Files.ReadFile("rival-plan-codex/SKILL.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,16 +15,16 @@ func TestPlanAstraSkillPinsXhighEffort(t *testing.T) {
 	for _, want := range []string{
 		"version: ",
 		"argument-hint: \"<path-to-plan.md>\"",
-		"rival command plan --model astra --effort xhigh --detach",
+		"rival command plan --model codex --effort xhigh --detach",
 		"Always run at **xhigh**",
 	} {
 		if !strings.Contains(content, want) {
-			t.Errorf("plan-astra skill missing %q", want)
+			t.Errorf("plan-codex skill missing %q", want)
 		}
 	}
 	for _, forbidden := range []string{"defaults to **high**", "[-re high|ultra]"} {
 		if strings.Contains(content, forbidden) {
-			t.Errorf("plan-astra skill still advertises optional effort %q", forbidden)
+			t.Errorf("plan-codex skill still advertises optional effort %q", forbidden)
 		}
 	}
 }
@@ -60,7 +60,7 @@ func TestGrokSkillIsEmbedded(t *testing.T) {
 	}
 }
 
-func TestPlanSkillRunsAstraAtXhigh(t *testing.T) {
+func TestPlanSkillRunsCodexAtXhigh(t *testing.T) {
 	const name = "rival-plan"
 	if !slices.Contains(Names, name) {
 		t.Fatalf("paired plan skill %q is not active", name)
@@ -75,8 +75,8 @@ func TestPlanSkillRunsAstraAtXhigh(t *testing.T) {
 	content := string(data)
 	for _, want := range []string{
 		"name: rival-plan",
-		"Astra",
-		"rival command plan --model astra --effort xhigh --detach",
+		"Codex",
+		"rival command plan --model codex --effort xhigh --detach",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("paired plan skill missing %q", want)

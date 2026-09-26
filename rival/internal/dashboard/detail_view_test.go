@@ -22,7 +22,7 @@ func TestGroupDetailReservesSpaceForEveryPlanLog(t *testing.T) {
 	}
 	item := &displayItem{Sessions: []*session.Session{
 		{ID: "sol", GroupID: "paired-plan", CLI: "codex", Model: config.GPT56SolModel, Mode: "plan", Effort: "ultra", Status: "completed", Prompt: strings.Repeat("long plan context ", 100), LogFile: writeLog("sol.log", "sol output\n")},
-		{ID: "fable", GroupID: "paired-plan", CLI: "fable", Model: config.FableModel, Mode: "plan", Effort: "low", Status: "completed", LogFile: writeLog("fable.log", "fable output\n")},
+		{ID: "claude", GroupID: "paired-plan", CLI: "claude", Model: config.ClaudeModel, Mode: "plan", Effort: "low", Status: "completed", LogFile: writeLog("claude.log", "claude output\n")},
 	}}
 
 	// The viewport scrolls the log, so there is no line budget: every member's
@@ -30,7 +30,7 @@ func TestGroupDetailReservesSpaceForEveryPlanLog(t *testing.T) {
 	got := buildGroupLogContent(item, 80)
 	for _, want := range []string{
 		"SOL REVIEW · EFFORT ultra", "sol output",
-		"FABLE REVIEW · EFFORT low", "fable output",
+		"CLAUDE REVIEW · EFFORT low", "claude output",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("grouped log content omitted %q:\n%s", want, got)
@@ -96,7 +96,7 @@ func TestDetailViewHandlesTinyTerminal(t *testing.T) {
 	defer m.cancel()
 	m.viewMode = viewDetail
 	m.items = []displayItem{{Sessions: []*session.Session{
-		{ID: "tiny", CLI: "fable", Model: config.FableModel, Mode: "plan", Status: "running"},
+		{ID: "tiny", CLI: "claude", Model: config.ClaudeModel, Mode: "plan", Status: "running"},
 	}}}
 	m.allItems = m.items
 

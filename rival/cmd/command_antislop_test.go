@@ -16,8 +16,8 @@ func TestAntislopStdinGrammar(t *testing.T) {
 		models []string
 	}{
 		{"empty input is auto scope", "", "", nil},
-		{"options before scope", "-re high -m fable src/api/", "high", []string{"fable"}},
-		{"scope with model list", "-m sol,fable src/", "", []string{"sol", "fable"}},
+		{"options before scope", "-re high -m claude src/api/", "high", []string{"claude"}},
+		{"scope with model list", "-m sol,claude src/", "", []string{"sol", "claude"}},
 		{"escaped dash scope", "-- -weird/dir", "", nil},
 	}
 	for _, tt := range tests {
@@ -36,13 +36,13 @@ func TestAntislopStdinGrammar(t *testing.T) {
 	}
 }
 
-func TestAntislopDefaultModelIsAstraOnly(t *testing.T) {
+func TestAntislopDefaultModelIsCodexOnly(t *testing.T) {
 	clis, err := parsePlanModels(defaultAntislopModels)
 	if err != nil {
 		t.Fatalf("parsePlanModels: %v", err)
 	}
-	if len(clis) != 1 || clis[0] != "astra" {
-		t.Fatalf("got %v, want astra only", clis)
+	if len(clis) != 1 || clis[0] != "codex" {
+		t.Fatalf("got %v, want codex only", clis)
 	}
 }
 

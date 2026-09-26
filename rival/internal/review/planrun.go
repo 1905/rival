@@ -79,9 +79,9 @@ func defaultPlanExecutor() planExecutor {
 	return planExecutor{
 		preflight: func(cli string) error {
 			switch cli {
-			case "codex", "astra":
+			case "codex":
 				return executor.CodexPreflightFor(planModelForCLI(cli))
-			case "fable":
+			case "claude":
 				return executor.ClaudePreflight()
 			default:
 				return fmt.Errorf("unsupported plan cli: %s", cli)
@@ -91,10 +91,10 @@ func defaultPlanExecutor() planExecutor {
 			var result *executor.Result
 			var err error
 			switch cli {
-			case "codex", "astra":
+			case "codex":
 				result, err = executor.RunCodexModel(ctx, sess, prompt, effort, workdir, planModelForCLI(cli), nil)
-			case "fable":
-				result, err = executor.RunFable(ctx, sess, prompt, effort, workdir, nil)
+			case "claude":
+				result, err = executor.RunClaude(ctx, sess, prompt, effort, workdir, nil)
 			default:
 				return "", 1, fmt.Errorf("unsupported plan cli: %s", cli)
 			}
@@ -114,11 +114,9 @@ func defaultPlanExecutor() planExecutor {
 func planModelForCLI(cli string) string {
 	switch cli {
 	case "codex":
-		return config.GPT56SolModel
-	case "astra":
-		return config.AstraModel
-	case "fable":
-		return config.FableModel
+		return config.CodexModel
+	case "claude":
+		return config.ClaudeModel
 	default:
 		return cli
 	}
@@ -139,7 +137,7 @@ func RunPlanReview(ctx context.Context, absPath, effort, workdir, groupID string
 // with a caller-built prompt. target is recorded as the sessions' review scope.
 // fallbackEffort is the surface's default when neither the invocation nor
 // ~/.rival/config.yaml names an effort; empty keeps the plan-review defaults
-// (DefaultPlanEffort, low for a lone Fable). Antislop resolves its own high default.
+// (DefaultPlanEffort). Antislop resolves its own high default.
 // mode is the session mode and the queue ticket label ("plan" or "antislop").
 // Queue behavior does not depend on it: the concurrency limit is global.
 func RunDocReview(ctx context.Context, mode, prompt, target, effort, fallbackEffort, workdir, groupID string, noQueue bool, clis []string) (*PlanRunResult, error) {
@@ -188,11 +186,8 @@ func runDocReview(ctx context.Context, ex planExecutor, mode, prompt, target, ef
 		modelFallback := fallbackEffort
 		if modelFallback == "" {
 			modelFallback = config.DefaultPlanEffort
-			if cli == "astra" {
+			if cli == "codex" {
 				modelFallback = "xhigh"
-			}
-			if len(clis) == 1 && cli == "fable" {
-				modelFallback = "low"
 			}
 		}
 		var effectiveEffort string
@@ -209,7 +204,7 @@ func runDocReview(ctx context.Context, ex planExecutor, mode, prompt, target, ef
 		if err != nil {
 			return nil, fmt.Errorf("create %s plan session: %w", config.EngineLabel(cli, model), err)
 		}
-		if cli == "fable" {
+		if cli == "claude" {
 			sess.Account = config.ClaudeSubscription()
 		}
 		plans = append(plans, plan{cli: cli, sess: sess})
@@ -274,7 +269,7 @@ func runPlanCLI(ctx context.Context, ex planExecutor, sess *session.Session, cli
 	raw, exitCode, err := ex.run(ctx, sess, cli, prompt, sess.Effort, workdir)
 
 	// Keep this defensive restoration for injected/custom executors. The built-in
-	// Fable executor preserves the session mode throughout the live run.
+	// Claude executor preserves the session mode throughout the live run.
 	sess.Mode = mode
 
 	if err != nil {

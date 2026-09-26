@@ -26,9 +26,9 @@ func ParseGPT56SolArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
 }
 
-// ParseFableArgs parses raw arguments for the fable command (claude-fable-5-1).
+// ParseClaudeArgs parses raw arguments for the claude command (claude-opus-5-5).
 // Identical grammar to claude.
-func ParseFableArgs(raw string) (*ParseResult, error) {
+func ParseClaudeArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
 }
 
@@ -98,9 +98,9 @@ func parseArgsWithEffort(raw, defaultEffort string, validEffort func(string) boo
 	return result, nil
 }
 
-// ParseAstraArgs parses raw arguments for the astra command (gpt-6-astra).
+// ParseCodexArgs parses raw arguments for the codex command (gpt-6-astra).
 // Identical grammar to Sol: an omitted effort stays empty so the command can
-// apply Astra's configured default.
-func ParseAstraArgs(raw string) (*ParseResult, error) {
+// apply Codex's configured default.
+func ParseCodexArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
 }

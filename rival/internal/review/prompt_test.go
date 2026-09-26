@@ -53,14 +53,14 @@ func TestBuildConsiliumPrompt_UsesGPTModelName(t *testing.T) {
 func TestBuildConsiliumPrompt_UsesConcreteOpencodeLabels(t *testing.T) {
 	inputs := []ReviewInput{
 		{CLI: "opencode", Model: config.KimiModel, Parsed: &ReviewerOutput{}},
-		{CLI: "fable", Model: config.FableModel, Parsed: &ReviewerOutput{}},
+		{CLI: "claude", Model: config.ClaudeModel, Parsed: &ReviewerOutput{}},
 	}
 	prompt := BuildConsiliumPrompt(inputs, "src/", 6)
 	for _, want := range []string{
 		"REVIEW FROM kimi-k3",
-		"REVIEW FROM fable",
+		"REVIEW FROM claude",
 		`"found_by": ["kimi-k3"]`,
-		"Allowed found_by labels for this run: kimi-k3, fable",
+		"Allowed found_by labels for this run: kimi-k3, claude",
 		`never the generic label "opencode"`,
 	} {
 		if !strings.Contains(prompt, want) {
@@ -76,7 +76,7 @@ func TestBuildConsiliumPrompt_FoundBySchemaMatchesExactSubset(t *testing.T) {
 	if !strings.Contains(prompt, `"found_by": ["kimi-k3"]`) {
 		t.Fatalf("single-model found_by schema does not match selection:\n%s", prompt)
 	}
-	if strings.Contains(prompt, `"found_by": ["fable"`) {
+	if strings.Contains(prompt, `"found_by": ["claude"`) {
 		t.Fatal("single-model schema contains an unselected reviewer")
 	}
 }

@@ -273,7 +273,7 @@ func groupModelRank(s *Session) int {
 		return 0
 	case "kimi-k3":
 		return 1
-	case config.FableLabel:
+	case config.ClaudeLabel:
 		return 2
 	case config.GrokLabel:
 		return 3

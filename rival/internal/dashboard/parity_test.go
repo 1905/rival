@@ -20,7 +20,7 @@ func TestTUIRowValuesMatchSharedDerivations(t *testing.T) {
 
 	members := []*session.Session{
 		{ID: "a", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "codex", Model: config.GPT56SolModel, Effort: "xhigh", StartTime: base, EndTime: &firstEnd},
-		{ID: "b", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "fable", Model: config.FableModel, Effort: "xhigh", StartTime: secondStart, EndTime: &secondEnd},
+		{ID: "b", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "claude", Model: config.ClaudeModel, Effort: "xhigh", StartTime: secondStart, EndTime: &secondEnd},
 	}
 	item := &displayItem{Sessions: members}
 

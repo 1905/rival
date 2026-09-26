@@ -13,7 +13,7 @@ import (
 	"github.com/1F47E/rival/internal/session"
 )
 
-func TestFableReviewTransportRestrictions(t *testing.T) {
+func TestClaudeReviewTransportRestrictions(t *testing.T) {
 	for _, mode := range []string{"review", "plan", "antislop", "raw"} {
 		t.Run(mode, func(t *testing.T) {
 			home, bin, repo := t.TempDir(), t.TempDir(), t.TempDir()
@@ -26,12 +26,12 @@ func TestFableReviewTransportRestrictions(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(fake), 0700); err != nil {
 				t.Fatal(err)
 			}
-			sess, err := session.NewQueued("claude", mode, config.FableModel, "medium", repo, "review", "", "")
+			sess, err := session.NewQueued("claude", mode, config.ClaudeModel, "medium", repo, "review", "", "")
 			if err != nil {
 				t.Fatal(err)
 			}
 			var out bytes.Buffer
-			result, err := RunFable(context.Background(), sess, "review", "medium", repo, &out)
+			result, err := RunClaude(context.Background(), sess, "review", "medium", repo, &out)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -39,8 +39,8 @@ func TestFableReviewTransportRestrictions(t *testing.T) {
 				t.Fatalf("child exit %d", result.ExitCode)
 			}
 			args := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
-			if !slices.Contains(args, config.FableModel) {
-				t.Fatal("Fable model not selected")
+			if !slices.Contains(args, config.ClaudeModel) {
+				t.Fatal("Claude model not selected")
 			}
 			if mode == "raw" {
 				if !slices.Contains(args, "--dangerously-skip-permissions") || slices.Contains(args, "--tools") {
@@ -64,7 +64,7 @@ func TestFableReviewTransportRestrictions(t *testing.T) {
 	}
 }
 
-func TestFableDockerReviewMountIsReadOnly(t *testing.T) {
+func TestClaudeDockerReviewMountIsReadOnly(t *testing.T) {
 	bin, home, repo := t.TempDir(), t.TempDir(), t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", bin)
@@ -72,12 +72,12 @@ func TestFableDockerReviewMountIsReadOnly(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	sess, err := session.NewQueued("claude", "review", config.FableModel, "medium", repo, "review", "", "")
+	sess, err := session.NewQueued("claude", "review", config.ClaudeModel, "medium", repo, "review", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	result, err := RunFable(context.Background(), sess, "review", "medium", repo, &out)
+	result, err := RunClaude(context.Background(), sess, "review", "medium", repo, &out)
 	if err != nil {
 		t.Fatal(err)
 	}

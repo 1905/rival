@@ -115,7 +115,7 @@ func renderGroupDetailMeta(item *displayItem, width int, promptExpanded bool, pr
 	essential.WriteString("\n\n")
 
 	// Shared metadata from primary session — derived from the group's sessions so
-	// a Sol + Fable plan group is not mislabelled a megareview.
+	// a Sol + Claude plan group is not mislabelled a megareview.
 	addField(&essential, "Models", groupCLIs(item), width)
 	addField(&essential, "Effort", groupEffort(item), width)
 	addField(&essential, "Mode", groupKindLabel(item), width)

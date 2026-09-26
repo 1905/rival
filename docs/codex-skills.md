@@ -11,7 +11,7 @@
   permission. MCP tools require separate restrictions. `--safe-mode` suppresses
   customizations while preserving authentication, unlike `--bare`, whose local
   help explicitly excludes subscription/keychain authentication.
-- Local Claude Code 2.1.263 help and a live Fable 5.1 run verified the selected
+- Local Claude Code 2.1.263 help and a live Opus 5.5 run verified the selected
   flags. Native review restrictions use Read/Glob/Grep, dontAsk, no MCP servers,
   safe mode, empty settings sources, and disabled hooks. Raw prompts retain
   their previous full-auto behavior. Docker reviews also mount the repo `:ro`.
@@ -41,8 +41,8 @@ also refreshes skills for hosts installed since the last release.
   mount and tool restrictions.
 - Codex CLI 0.153.4 app-server `skills/list` discovered all 11 installed Rival
   skills, enabled, with no Rival parsing errors. The skill-creator validator
-  accepted the installed Fable skill.
-- A detached live Fable 5.1 review through Rival completed in 15 seconds using
+  accepted the installed Claude skill.
+- A detached live Opus 5.5 review through Rival completed in 15 seconds using
   subscription authentication. It found the planted unconditional authorization
   bypass in `access.py` and reported only Read, Glob, and Grep tools.
   `rival wait` returned exit 0 and the full output reached this Codex session.

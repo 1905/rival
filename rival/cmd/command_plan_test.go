@@ -24,7 +24,7 @@ func TestCommandPlanDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(models, ",") != config.AstraLabel {
+	if strings.Join(models, ",") != config.CodexLabel {
 		t.Fatalf("default plan models = %v, want public model roster", models)
 	}
 }
@@ -113,16 +113,17 @@ func TestParsePlanModels(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		{"exact models", []string{"gpt-5.6-sol", "claude-fable-5-1"}, []string{"codex", "fable"}, false},
-		{"friendly aliases", []string{"sol", "fable"}, []string{"codex", "fable"}, false},
-		{"astra alias", []string{"astra"}, []string{"astra"}, false},
-		{"astra exact id deduplicated", []string{"astra", "gpt-6-astra"}, []string{"astra"}, false},
-		{"same runtime distinct models", []string{"astra,sol,fable"}, []string{"astra", "codex", "fable"}, false},
-		{"comma separated", []string{"sol,fable"}, []string{"codex", "fable"}, false},
-		{"dedup preserves order", []string{"fable", "sol", "gpt-5.6-sol"}, []string{"fable", "codex"}, false},
-		{"trims and lowercases", []string{" GPT-5.6-SOL ", "FABLE"}, []string{"codex", "fable"}, false},
+		{"exact models", []string{"gpt-6-astra", "claude-opus-5-5"}, []string{"codex", "claude"}, false},
+		{"friendly aliases", []string{"codex", "claude"}, []string{"codex", "claude"}, false},
+		{"codex exact id deduplicated", []string{"codex", "gpt-6-astra"}, []string{"codex"}, false},
+		{"comma separated", []string{"codex,claude"}, []string{"codex", "claude"}, false},
+		{"dedup preserves order", []string{"claude", "codex", "claude-opus-5-5"}, []string{"claude", "codex"}, false},
+		{"trims and lowercases", []string{" GPT-6-ASTRA ", "CLAUDE"}, []string{"codex", "claude"}, false},
+		{"sol is not a plan model", []string{"sol"}, nil, true},
+		{"retired names rejected", []string{"astra"}, nil, true},
+		{"fable rejected", []string{"fable"}, nil, true},
 		{"unknown model", []string{"unsupported"}, nil, true},
-		{"empty model", []string{"sol,"}, nil, true},
+		{"empty model", []string{"codex,"}, nil, true},
 		{"no models", nil, nil, true},
 	}
 	for _, tc := range cases {

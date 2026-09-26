@@ -71,7 +71,7 @@ func TestCurrentVersionRefreshesSkillsForNewCodexInstall(t *testing.T) {
 	if err := updateToVersion(cmd, "current", "current"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "rival-fable", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "rival-claude", "SKILL.md")); err != nil {
 		t.Fatal(err)
 	}
 }

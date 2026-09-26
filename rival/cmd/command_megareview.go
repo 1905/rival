@@ -16,16 +16,16 @@ import (
 )
 
 const megareviewUsage = `Usage:
-  /rival-review — review changed files with Astra
-  /rival-review -m astra src/api/ — review a scope with Astra only
+  /rival-review — review changed files with Codex
+  /rival-review -m codex src/api/ — review a scope with Codex only
   /rival-review -m k3 src/api/ — review a scope with Kimi K3 only
-  /rival-review -m astra,k3 src/api/ — use exactly those two models
+  /rival-review -m codex,k3 src/api/ — use exactly those two models
   /rival-review -m grok src/api/ — review a scope with grok only (opt-in)
   /rival-review -re ultra src/api/ — override compatible model defaults
 
-Models (-m/--model): astra, kimi-k3 (k3), grok
+Models (-m/--model): codex, kimi-k3 (k3), grok
 grok is opt-in: it is never added implicitly, only when named.
-An explicit model list replaces the default Astra roster.
+An explicit model list replaces the default Codex roster.
 Reasoning effort (-re/--effort): low, medium, high, ultra; omitted uses ~/.rival/config.yaml model defaults`
 
 var commandMegareviewCmd = &cobra.Command{

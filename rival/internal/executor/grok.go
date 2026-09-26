@@ -84,7 +84,7 @@ func RunGrokModel(ctx context.Context, sess *session.Session, prompt, effort, wo
 }
 
 // grokFullPrompt composes the prompt exactly as the other executors do, so a
-// grok run sees the same system prompt and workdir preamble as Sol or Fable.
+// grok run sees the same system prompt and workdir preamble as Sol or Claude.
 func grokFullPrompt(prompt, workdir string) string {
 	return config.SystemPrompt + "\n\n" + config.BuildWorkdirPreamble(workdir) + "\n" + prompt
 }

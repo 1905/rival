@@ -16,7 +16,7 @@ func TestSpecLabelsAndCommandNames(t *testing.T) {
 		cli         string
 	}{
 		{solSpec(), "sol", config.SolLabel, "codex"},
-		{fableSpec(), "fable", config.FableLabel, "claude"},
+		{claudeSpec(), "claude", config.ClaudeLabel, "claude"},
 		{k3Spec(), "k3", config.K3Label, "opencode"},
 		{grokSpec(), "grok", config.GrokLabel, config.GrokLabel},
 	}
@@ -74,8 +74,8 @@ func TestSolEffortIsNotAliased(t *testing.T) {
 	}
 }
 
-// Only Fable reports an auth hint, and only from its own log.
-func TestOnlyFableReportsAnAuthHint(t *testing.T) {
+// Only Claude reports an auth hint, and only from its own log.
+func TestOnlyClaudeReportsAnAuthHint(t *testing.T) {
 	for _, spec := range []modelSpec{solSpec(), k3Spec(), grokSpec()} {
 		if hint := spec.authHint("/nonexistent.log"); hint != "" {
 			t.Errorf("%s returned an auth hint %q", spec.commandName, hint)

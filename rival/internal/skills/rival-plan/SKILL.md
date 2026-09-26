@@ -1,19 +1,19 @@
 ---
 name: rival-plan
 version: 3.33.0
-description: Review a plan/spec markdown document with Astra at xhigh effort via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan.
+description: Review a plan/spec markdown document with Codex at xhigh effort via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan.
 argument-hint: "<path-to-plan.md>"
 allowed-tools: Bash, Read, Write
 ---
 
 # Paired plan reviewer
 
-Review one plan/spec markdown file with Astra at **xhigh**
+Review one plan/spec markdown file with Codex at **xhigh**
 effort. The model rates the plan 1-10 and returns numbered findings
-(crit/high/med/low). Show the result. If Astra is unavailable, report the failure. The run is detached and watched in
+(crit/high/med/low). Show the result. If Codex is unavailable, report the failure. The run is detached and watched in
 the background, so this skill does not block the session.
 
-For a single-model review, use `/rival-plan-astra` or `/rival-plan-fable`.
+For a single-model review, use `/rival-plan-codex` or `/rival-plan-claude`.
 
 ## Instructions
 
@@ -24,10 +24,10 @@ For a single-model review, use `/rival-plan-astra` or `/rival-plan-fable`.
 If `$ARGUMENTS` is empty or blank, respond with this usage message and STOP:
 
 > **Usage:**
-> - `/rival-plan path/to/plan.md` — review with Astra at xhigh effort
+> - `/rival-plan path/to/plan.md` — review with Codex at xhigh effort
 > - `/rival-plan` — show this usage info
 >
-> Input is a single path to a markdown plan/spec file. Astra runs at xhigh.
+> Input is a single path to a markdown plan/spec file. Codex runs at xhigh.
 
 ### Execute — launch detached, then watch in the background
 
@@ -41,7 +41,7 @@ when the watcher notifies you, possibly several turns later.
 ```bash
 RIVAL_IN="/tmp/rival_in_<8-random-hex>.txt"   # the file you created with the Write tool
 RIVAL_OUT="$(mktemp -t rival_out.XXXXXX)"; RIVAL_ERR="$(mktemp -t rival_err.XXXXXX)"
-rival command plan --model astra --effort xhigh --detach --workdir "$(pwd)" <"$RIVAL_IN" >"$RIVAL_OUT" 2>"$RIVAL_ERR"
+rival command plan --model codex --effort xhigh --detach --workdir "$(pwd)" <"$RIVAL_IN" >"$RIVAL_OUT" 2>"$RIVAL_ERR"
 rm -f "$RIVAL_IN"
 echo "rival_out=$RIVAL_OUT rival_err=$RIVAL_ERR"
 RIVAL_PID="$(sed -n 's/^rival: detached pid=\([0-9]*\)$/\1/p' "$RIVAL_ERR" | head -1)"

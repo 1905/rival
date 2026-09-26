@@ -37,8 +37,8 @@ func TestFormatAntislopResultSingle(t *testing.T) {
 
 func TestFormatAntislopResultNoFindings(t *testing.T) {
 	result := &PlanRunResult{Results: []PlanCLIResult{{
-		CLI:    "fable",
-		Model:  "fable",
+		CLI:    "claude",
+		Model:  "claude",
 		Parsed: &PlanOutput{Summary: "Lean.", Rating: 10},
 	}}}
 
@@ -57,7 +57,7 @@ func TestFormatAntislopResultMulti(t *testing.T) {
 	result := &PlanRunResult{
 		Results: []PlanCLIResult{
 			{CLI: "codex", Model: "gpt-5.6-sol", Parsed: &PlanOutput{Summary: "s", Rating: 7}},
-			{CLI: "fable", Model: "fable", Parsed: &PlanOutput{Summary: "f", Rating: 9}},
+			{CLI: "claude", Model: "claude", Parsed: &PlanOutput{Summary: "f", Rating: 9}},
 		},
 		Skipped: []SkippedCLI{{CLI: "grok", Model: "grok", Reason: "unavailable"}},
 	}

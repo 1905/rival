@@ -46,7 +46,7 @@ Severity levels:
 
 ## Reviewer Findings (3 reviewers)
 
-=== REVIEW FROM fable (claude-fable-5) [role: code_quality] ===
+=== REVIEW FROM claude (claude-claude-5) [role: code_quality] ===
 
 {
   "summary": "parse.go is well-structured with excellent comments explaining the 'last valid JSON' strategy. Two DX issues stand out: ParseReviewerOutput and ParseConsiliumOutput are near-identical copy-paste, and the heuristic in extractJSON silently degrades on edge cases without giving callers any signal.",
@@ -152,7 +152,7 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
       "body": "concrete explanation tied to code",
       "suggestion": "concrete fix",
       "confidence": 8,
-      "found_by": ["sol", "kimi-k3", "fable"]
+      "found_by": ["sol", "kimi-k3", "claude"]
     }
   ],
   "recommendation": {
@@ -341,9 +341,9 @@ internal/review/parse_test.go:40:	out, err := ParseReviewerOutput(codexStyleRevi
 internal/review/parse_test.go:42:		t.Fatalf("ParseReviewerOutput: %v", err)
 internal/review/parse_test.go:48:		t.Fatalf("findings = %+v, want the real finding at rival/main.go", out.Findings)
 internal/review/parse_test.go:50:	if out.Findings[0].File == "path/to/file" {
-internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "fable"]}],
-internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
+internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
 internal/review/parse_test.go:76:func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {
 internal/review/parse_test.go:77:	out, err := ParseConsiliumOutput(codexStyleConsiliumLog)
 internal/review/parse_test.go:79:		t.Fatalf("ParseConsiliumOutput: %v", err)
@@ -406,9 +406,9 @@ exec
 ./internal/review/parse_test.go:35:{"summary":"Found a real issue.","findings":[{"file":"rival/main.go","line":10,"severity":"high","category":"bug","title":"real bug","body":"real explanation","confidence":9}]}
 ./internal/review/parse_test.go:48:		t.Fatalf("findings = %+v, want the real finding at rival/main.go", out.Findings)
 ./internal/review/parse_test.go:50:	if out.Findings[0].File == "path/to/file" {
-./internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "fable"]}],
-./internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-./internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+./internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
+./internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+./internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
 ./internal/review/parse_test.go:88:		t.Fatalf("findings = %+v, want the real finding", out.Findings)
 ./internal/review/parse_test.go:93:	raw := `prefix noise {"summary":"ok","findings":[]} trailing`
 ./internal/review/format.go:30:		sb.WriteString("No findings above confidence threshold.\n\n")
@@ -484,14 +484,14 @@ exec
     63	` + "```json" + `
     64	{
     65	  "summary": "1-3 sentence overall review summary",
-    66	  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "fable"]}],
+    66	  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
     67	  "recommendation": {"status": "approve|request_changes|comment", "summary": "1-2 sentence recommendation"}
     68	}
     69	` + "```" + `
     70	
     71	codex
-    72	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-    73	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+    72	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+    73	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
     74	`
     75	
     76	func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {

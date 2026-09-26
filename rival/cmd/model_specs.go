@@ -18,40 +18,40 @@ func solSpec() modelSpec {
 	return modelSpec{
 		commandName: config.SolLabel,
 		cli:         "codex",
-		model:       config.CodexModel,
+		model:       config.GPT56SolModel,
 		usage:       solUsage,
 		parse:       parser.ParseGPT56SolArgs,
 		preflight:   func(string) error { return executor.CodexPreflight() },
+		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
+			return executor.RunCodexModel(ctx, sess, prompt, effort, workdir, config.GPT56SolModel, out)
+		},
+	}
+}
+
+func codexSpec() modelSpec {
+	return modelSpec{
+		commandName: config.CodexLabel,
+		cli:         "codex",
+		model:       config.CodexModel,
+		usage:       codexUsage,
+		parse:       parser.ParseCodexArgs,
+		preflight:   func(string) error { return executor.CodexPreflightFor(config.CodexModel) },
 		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
 			return executor.RunCodexModel(ctx, sess, prompt, effort, workdir, config.CodexModel, out)
 		},
 	}
 }
 
-func astraSpec() modelSpec {
+func claudeSpec() modelSpec {
 	return modelSpec{
-		commandName: config.AstraLabel,
-		cli:         "codex",
-		model:       config.AstraModel,
-		usage:       astraUsage,
-		parse:       parser.ParseAstraArgs,
-		preflight:   func(string) error { return executor.CodexPreflightFor(config.AstraModel) },
-		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
-			return executor.RunCodexModel(ctx, sess, prompt, effort, workdir, config.AstraModel, out)
-		},
-	}
-}
-
-func fableSpec() modelSpec {
-	return modelSpec{
-		commandName: config.FableLabel,
+		commandName: config.ClaudeLabel,
 		cli:         "claude",
-		model:       config.FableModel,
-		usage:       fableUsage,
-		parse:       parser.ParseFableArgs,
+		model:       config.ClaudeModel,
+		usage:       claudeUsage,
+		parse:       parser.ParseClaudeArgs,
 		preflight:   func(string) error { return executor.ClaudePreflight() },
 		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
-			return executor.RunFable(ctx, sess, prompt, effort, workdir, out)
+			return executor.RunClaude(ctx, sess, prompt, effort, workdir, out)
 		},
 	}
 }

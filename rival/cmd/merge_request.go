@@ -29,7 +29,7 @@ func prepareReviewScope(ctx context.Context, scope, workdir string) (string, str
 // Route them to the entry points that prepare the checkout before dispatch.
 func rejectUnresolvedMR(prompt string) error {
 	if mergerequest.Contains(prompt) {
-		return fmt.Errorf("GitLab MR URLs require a pinned review: use rival review --model astra <MR-URL> --workdir <repository>, or /rival-review <MR-URL>; no reviewer was started")
+		return fmt.Errorf("GitLab MR URLs require a pinned review: use rival review --model codex <MR-URL> --workdir <repository>, or /rival-review <MR-URL>; no reviewer was started")
 	}
 	return nil
 }

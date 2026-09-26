@@ -14,7 +14,7 @@ import (
 // realPlanJSON is a minimal valid plan payload ParsePlanOutput accepts.
 const realPlanJSON = `{"summary":"ok plan","rating":7,"findings":[]}`
 
-func TestAstraPlanUsesAstraRuntimeAndStructuredOutput(t *testing.T) {
+func TestCodexPlanUsesCodexRuntimeAndStructuredOutput(t *testing.T) {
 	loadPlanTestConfig(t, "")
 	bin, repo := t.TempDir(), t.TempDir()
 	t.Setenv("PATH", bin)
@@ -24,24 +24,24 @@ func TestAstraPlanUsesAstraRuntimeAndStructuredOutput(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "codex"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	result, err := RunPlanReview(context.Background(), filepath.Join(repo, "plan.md"), "", repo, "astra-proof", true, []string{"astra"})
+	result, err := RunPlanReview(context.Background(), filepath.Join(repo, "plan.md"), "", repo, "codex-proof", true, []string{"codex"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Results) != 1 || result.Results[0].Model != config.AstraModel || result.Results[0].Parsed == nil || result.Results[0].Parsed.Rating != 7 {
-		t.Fatalf("wrong Astra result: %+v", result)
+	if len(result.Results) != 1 || result.Results[0].Model != config.CodexModel || result.Results[0].Parsed == nil || result.Results[0].Parsed.Rating != 7 {
+		t.Fatalf("wrong Codex result: %+v", result)
 	}
 	args, err := os.ReadFile(argsFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"-m\n" + config.AstraModel, "model_reasoning_effort=xhigh", "--sandbox\nread-only"} {
+	for _, want := range []string{"-m\n" + config.CodexModel, "model_reasoning_effort=xhigh", "--sandbox\nread-only"} {
 		if !strings.Contains(string(args), want) {
 			t.Fatalf("runtime arguments missing %q: %s", want, args)
 		}
 	}
 	if strings.Contains(string(args), config.GPT56SolModel) {
-		t.Fatal("Astra plan ran Sol")
+		t.Fatal("Codex plan ran Sol")
 	}
 	if !strings.Contains(FormatPlanResult(result, "plan.md"), "7/10") {
 		t.Fatal("plan result lost structured rating")
@@ -51,7 +51,7 @@ func TestAstraPlanUsesAstraRuntimeAndStructuredOutput(t *testing.T) {
 func TestAssemblePlanResults_AllFailed(t *testing.T) {
 	batch := []planCLIRun{
 		{CLI: "codex", ExitCode: 1},
-		{CLI: "fable", Err: errString("boom")},
+		{CLI: "claude", Err: errString("boom")},
 	}
 	if _, err := assemblePlanResults(batch, nil); err == nil {
 		t.Fatal("expected error when every CLI fails")
@@ -62,8 +62,8 @@ func TestAssemblePlanResults_OneSkippedOneOK(t *testing.T) {
 	batch := []planCLIRun{
 		{CLI: "codex", Model: config.GPT56SolModel, Raw: realPlanJSON, ExitCode: 0},
 	}
-	// fable was unavailable at preflight → pre-run skipped list.
-	pre := []SkippedCLI{{CLI: "fable", Reason: "claude not found"}}
+	// claude was unavailable at preflight → pre-run skipped list.
+	pre := []SkippedCLI{{CLI: "claude", Reason: "claude not found"}}
 
 	res, err := assemblePlanResults(batch, pre)
 	if err != nil {
@@ -75,15 +75,15 @@ func TestAssemblePlanResults_OneSkippedOneOK(t *testing.T) {
 	if res.Results[0].Parsed == nil || res.Results[0].Parsed.Rating != 7 {
 		t.Fatalf("codex result not parsed: %+v", res.Results[0])
 	}
-	if len(res.Skipped) != 1 || res.Skipped[0].CLI != "fable" {
-		t.Fatalf("want fable skipped preserved, got %+v", res.Skipped)
+	if len(res.Skipped) != 1 || res.Skipped[0].CLI != "claude" {
+		t.Fatalf("want claude skipped preserved, got %+v", res.Skipped)
 	}
 }
 
 func TestAssemblePlanResults_NonzeroExitSkips(t *testing.T) {
 	batch := []planCLIRun{
 		{CLI: "codex", Model: config.GPT56SolModel, Raw: realPlanJSON, ExitCode: 0},
-		{CLI: "fable", Model: config.FableModel, Raw: "partial", ExitCode: 2},
+		{CLI: "claude", Model: config.ClaudeModel, Raw: "partial", ExitCode: 2},
 	}
 	res, err := assemblePlanResults(batch, nil)
 	if err != nil {
@@ -93,21 +93,21 @@ func TestAssemblePlanResults_NonzeroExitSkips(t *testing.T) {
 		t.Fatalf("want only codex kept, got %+v", res.Results)
 	}
 	if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, "exited with code 2") {
-		t.Fatalf("want fable skipped with exit reason, got %+v", res.Skipped)
+		t.Fatalf("want claude skipped with exit reason, got %+v", res.Skipped)
 	}
 }
 
 func TestAssemblePlanResults_QuotaSkips(t *testing.T) {
 	batch := []planCLIRun{
 		{CLI: "codex", Model: config.GPT56SolModel, Raw: "error: insufficient_quota", ExitCode: 0},
-		{CLI: "fable", Model: config.FableModel, Raw: realPlanJSON, ExitCode: 0},
+		{CLI: "claude", Model: config.ClaudeModel, Raw: realPlanJSON, ExitCode: 0},
 	}
 	res, err := assemblePlanResults(batch, nil)
 	if err != nil {
 		t.Fatalf("assemblePlanResults: %v", err)
 	}
-	if len(res.Results) != 1 || res.Results[0].CLI != "fable" {
-		t.Fatalf("want only fable kept (codex quota'd), got %+v", res.Results)
+	if len(res.Results) != 1 || res.Results[0].CLI != "claude" {
+		t.Fatalf("want only claude kept (codex quota'd), got %+v", res.Results)
 	}
 	if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, "429") {
 		t.Fatalf("want codex quota-skipped, got %+v", res.Skipped)
@@ -138,7 +138,7 @@ func TestAssemblePlanResults_EmptyOutputSkips(t *testing.T) {
 	// An exit-0 run that wrote nothing must be skipped, not treated as a
 	// successful (but empty) plan review.
 	batch := []planCLIRun{
-		{CLI: "fable", Model: config.FableModel, Raw: "   \n  ", ExitCode: 0},
+		{CLI: "claude", Model: config.ClaudeModel, Raw: "   \n  ", ExitCode: 0},
 		{CLI: "codex", Model: config.GPT56SolModel, Raw: realPlanJSON, ExitCode: 0},
 	}
 	res, err := assemblePlanResults(batch, nil)
@@ -146,10 +146,10 @@ func TestAssemblePlanResults_EmptyOutputSkips(t *testing.T) {
 		t.Fatalf("assemblePlanResults: %v", err)
 	}
 	if len(res.Results) != 1 || res.Results[0].CLI != "codex" {
-		t.Fatalf("want only codex kept (fable empty), got %+v", res.Results)
+		t.Fatalf("want only codex kept (claude empty), got %+v", res.Results)
 	}
-	if len(res.Skipped) != 1 || res.Skipped[0].CLI != "fable" {
-		t.Fatalf("want fable skipped for empty output, got %+v", res.Skipped)
+	if len(res.Skipped) != 1 || res.Skipped[0].CLI != "claude" {
+		t.Fatalf("want claude skipped for empty output, got %+v", res.Skipped)
 	}
 }
 
@@ -157,23 +157,22 @@ func TestPlanEngineLabel(t *testing.T) {
 	if got := config.EngineLabel("codex", config.GPT56SolModel); got != config.SolLabel {
 		t.Errorf("sol label = %q, want %q", got, config.SolLabel)
 	}
-	if got := config.EngineLabel("fable", config.FableModel); got != config.FableLabel {
-		t.Errorf("fable label = %q, want %q", got, config.FableLabel)
+	if got := config.EngineLabel("claude", config.ClaudeModel); got != config.ClaudeLabel {
+		t.Errorf("claude label = %q, want %q", got, config.ClaudeLabel)
 	}
 }
 
 func TestPlanFailureReasonUsesModelName(t *testing.T) {
-	got := planFailureReason("codex", "Codex CLI not installed; run codex login")
-	if !strings.Contains(strings.ToLower(got), config.SolLabel) {
+	got := planFailureReason("codex", "Codex CLI not installed; run codex login; gpt-6-astra")
+	if !strings.Contains(got, "Codex runtime") {
 		t.Fatalf("failure reason missing model name: %q", got)
 	}
-	if strings.Contains(strings.ToLower(got), "codex") {
-		t.Fatalf("failure reason leaked adapter name: %q", got)
+	if strings.Contains(got, "Codex CLI") || strings.Contains(got, config.CodexModel) {
+		t.Fatalf("failure reason leaked adapter text or model id: %q", got)
 	}
-	fable := planFailureReason("fable", config.FableModel+" failed in Claude CLI")
-	lowerFable := strings.ToLower(fable)
-	if strings.Count(lowerFable, config.FableLabel) != 2 || strings.Contains(lowerFable, "claude") {
-		t.Fatalf("model-facing normalization did not use public fable name: %q", fable)
+	claude := planFailureReason("claude", config.ClaudeModel+" failed in Claude CLI")
+	if claude != "claude failed in Claude runtime" {
+		t.Fatalf("model-facing normalization did not use public claude name: %q", claude)
 	}
 }
 
@@ -205,23 +204,23 @@ func TestFormatPlanResult_MultiBlocksAndSkipped(t *testing.T) {
 	res := &PlanRunResult{
 		Results: []PlanCLIResult{
 			{CLI: "codex", Model: config.GPT56SolModel, Parsed: &PlanOutput{Summary: "cx", Rating: 6}},
-			{CLI: "fable", Model: config.FableModel, Parsed: nil, Raw: "Claude raw dump"},
+			{CLI: "claude", Model: config.ClaudeModel, Parsed: nil, Raw: "Claude raw dump"},
 		},
 		Skipped: []SkippedCLI{{CLI: "opencode", Model: config.KimiModel, Reason: "n/a"}},
 	}
 	out := FormatPlanResult(res, "/tmp/plan.md")
-	if !strings.Contains(out, "RIVAL PLAN REVIEW ("+config.SolLabel+" + "+config.FableLabel+")") {
+	if !strings.Contains(out, "RIVAL PLAN REVIEW ("+config.SolLabel+" + "+config.ClaudeLabel+")") {
 		t.Errorf("multi header missing engines:\n%s", out)
 	}
 	if !strings.Contains(out, "── "+config.SolLabel+" ──") {
 		t.Errorf("sol block header missing:\n%s", out)
 	}
-	if !strings.Contains(out, "── "+config.FableLabel+" ──") {
-		t.Errorf("fable block header missing:\n%s", out)
+	if !strings.Contains(out, "── "+config.ClaudeLabel+" ──") {
+		t.Errorf("claude block header missing:\n%s", out)
 	}
-	// Fable block had no parsed output → raw fallback shown.
-	if !strings.Contains(out, "Fable runtime raw dump") {
-		t.Errorf("fable raw fallback missing:\n%s", out)
+	// Claude block had no parsed output → raw fallback shown.
+	if !strings.Contains(out, "Claude runtime raw dump") {
+		t.Errorf("claude raw fallback missing:\n%s", out)
 	}
 	if !strings.Contains(out, "Skipped: kimi-k3 — n/a") {
 		t.Errorf("skipped line missing:\n%s", out)
@@ -235,7 +234,7 @@ func TestAssemblePlanResults_ErrUsesReason(t *testing.T) {
 	// A timeout-style failure carries a Reason that must surface in Skipped,
 	// instead of the bare error text.
 	batch := []planCLIRun{
-		{CLI: "fable", Err: errString("context deadline exceeded"), Reason: config.FableModel + " run timeout after 30m (RIVAL_RUN_TIMEOUT) — model did not finish", ExitCode: -1},
+		{CLI: "claude", Err: errString("context deadline exceeded"), Reason: config.ClaudeModel + " run timeout after 30m (RIVAL_RUN_TIMEOUT) — model did not finish", ExitCode: -1},
 		{CLI: "codex", Model: config.GPT56SolModel, Raw: realPlanJSON, ExitCode: 0},
 	}
 	res, err := assemblePlanResults(batch, nil)
@@ -243,7 +242,7 @@ func TestAssemblePlanResults_ErrUsesReason(t *testing.T) {
 		t.Fatalf("assemblePlanResults: %v", err)
 	}
 	if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, "RIVAL_RUN_TIMEOUT") {
-		t.Fatalf("want fable skipped with RIVAL_RUN_TIMEOUT reason, got %+v", res.Skipped)
+		t.Fatalf("want claude skipped with RIVAL_RUN_TIMEOUT reason, got %+v", res.Skipped)
 	}
 }
 
@@ -252,9 +251,9 @@ func TestRunPlanCLI_RestoresPlanMode(t *testing.T) {
 	// writes into the user's real ~/.rival/sessions.
 	t.Setenv("HOME", t.TempDir())
 
-	// The fable executor overwrites sess.Mode to the transport ("native"); the
+	// The claude executor overwrites sess.Mode to the transport ("native"); the
 	// terminal session must be recorded as a plan session regardless.
-	sess, err := session.NewQueued("fable", "plan", config.FableModel, "high", t.TempDir(), "p", "/tmp/plan.md", "g")
+	sess, err := session.NewQueued("claude", "plan", config.ClaudeModel, "high", t.TempDir(), "p", "/tmp/plan.md", "g")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,12 +267,12 @@ func TestRunPlanCLI_RestoresPlanMode(t *testing.T) {
 			return realPlanJSON, 0, nil
 		},
 	}
-	out := runPlanCLI(context.Background(), ex, sess, "fable", "p", t.TempDir(), "plan")
+	out := runPlanCLI(context.Background(), ex, sess, "claude", "p", t.TempDir(), "plan")
 	if out.ExitCode != 0 {
 		t.Fatalf("run failed: %+v", out)
 	}
 	if sess.Mode != "plan" {
-		t.Fatalf("sess.Mode = %q, want plan (restored after fable transport overwrote it)", sess.Mode)
+		t.Fatalf("sess.Mode = %q, want plan (restored after claude transport overwrote it)", sess.Mode)
 	}
 }
 
@@ -286,43 +285,43 @@ func TestRunPlanReviewResolvesPerModelEfforts(t *testing.T) {
 		want       map[string]string
 	}{
 		{
-			name: "astra native fallback",
-			clis: []string{"astra"},
-			want: map[string]string{"astra": "xhigh"},
-		},
-		{
-			name:       "astra configured effort",
-			configYAML: "efforts:\n  astra: low\n",
-			clis:       []string{"astra"},
-			want:       map[string]string{"astra": "low"},
-		},
-		{
-			name: "sol uses native fallback",
+			name: "codex native fallback",
 			clis: []string{"codex"},
-			want: map[string]string{"codex": "high"},
+			want: map[string]string{"codex": "xhigh"},
 		},
 		{
-			name: "fable alone uses low native fallback",
-			clis: []string{"fable"},
-			want: map[string]string{"fable": "low"},
+			name:       "codex configured effort",
+			configYAML: "efforts:\n  codex: low\n",
+			clis:       []string{"codex"},
+			want:       map[string]string{"codex": "low"},
 		},
 		{
-			name: "paired native plan uses high for both",
-			clis: []string{"codex", "fable"},
-			want: map[string]string{"codex": "high", "fable": "high"},
+			name: "codex uses its xhigh pin",
+			clis: []string{"codex"},
+			want: map[string]string{"codex": "xhigh"},
+		},
+		{
+			name: "claude alone uses its medium pin",
+			clis: []string{"claude"},
+			want: map[string]string{"claude": "medium"},
+		},
+		{
+			name: "paired native plan keeps each pin",
+			clis: []string{"codex", "claude"},
+			want: map[string]string{"codex": "xhigh", "claude": "medium"},
 		},
 		{
 			name:       "configured defaults resolve independently",
-			configYAML: "efforts:\n  sol: low\n  fable: ultra\n",
-			clis:       []string{"codex", "fable"},
-			want:       map[string]string{"codex": "low", "fable": "ultra"},
+			configYAML: "efforts:\n  codex: low\n  claude: ultra\n",
+			clis:       []string{"codex", "claude"},
+			want:       map[string]string{"codex": "low", "claude": "ultra"},
 		},
 		{
 			name:       "explicit override wins for every model",
-			configYAML: "efforts:\n  sol: low\n  fable: medium\n",
+			configYAML: "efforts:\n  codex: low\n  claude: medium\n",
 			override:   "ultra",
-			clis:       []string{"codex", "fable"},
-			want:       map[string]string{"codex": "ultra", "fable": "ultra"},
+			clis:       []string{"codex", "claude"},
+			want:       map[string]string{"codex": "ultra", "claude": "ultra"},
 		},
 	}
 
@@ -372,25 +371,25 @@ func TestRunPlanReviewResolvesPerModelEfforts(t *testing.T) {
 	}
 }
 
-func TestRunPlanReviewPreservesRequestedOrderWhenFableFinishesFirst(t *testing.T) {
+func TestRunPlanReviewPreservesRequestedOrderWhenClaudeFinishesFirst(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	fableDone := make(chan struct{})
+	claudeDone := make(chan struct{})
 	ex := planExecutor{
 		preflight: func(string) error { return nil },
 		run: func(_ context.Context, _ *session.Session, cli, _, _, _ string) (string, int, error) {
-			if cli == "fable" {
-				close(fableDone)
+			if cli == "claude" {
+				close(claudeDone)
 			} else {
-				<-fableDone
+				<-claudeDone
 			}
 			return realPlanJSON, 0, nil
 		},
 	}
-	result, err := runPlanReview(context.Background(), ex, "/tmp/plan.md", "ultra", t.TempDir(), "ordered", true, []string{"codex", "fable"})
+	result, err := runPlanReview(context.Background(), ex, "/tmp/plan.md", "ultra", t.TempDir(), "ordered", true, []string{"codex", "claude"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Results) != 2 || result.Results[0].CLI != "codex" || result.Results[1].CLI != "fable" {
+	if len(result.Results) != 2 || result.Results[0].CLI != "codex" || result.Results[1].CLI != "claude" {
 		t.Fatalf("plan results lost requested order: %+v", result.Results)
 	}
 }
@@ -427,7 +426,7 @@ func (e errString) Error() string { return string(e) }
 // Antislop calls runDocReview directly with its own prompt and a high
 // fallback effort (config override still wins); the target must land as the
 // session's review scope. An empty fallback keeps plan semantics — covered by
-// TestRunPlanReviewResolvesPerModelEfforts's lone-fable low case.
+// TestRunPlanReviewResolvesPerModelEfforts's lone-claude low case.
 func TestRunDocReviewAppliesFallbackEffortAndTarget(t *testing.T) {
 	loadPlanTestConfig(t, "")
 
@@ -445,13 +444,13 @@ func TestRunDocReviewAppliesFallbackEffortAndTarget(t *testing.T) {
 		},
 	}
 
-	_, err := runDocReview(context.Background(), ex, "antislop", "ANTISLOP PROMPT", "src/api/", "", config.DefaultAntislopEffort, t.TempDir(), "doc", true, []string{"fable"})
+	_, err := runDocReview(context.Background(), ex, "antislop", "ANTISLOP PROMPT", "src/api/", "", config.DefaultAntislopEffort, t.TempDir(), "doc", true, []string{"claude"})
 	if err != nil {
 		t.Fatalf("runDocReview: %v", err)
 	}
 	got := <-observed
-	if got.effort != "high" {
-		t.Errorf("single-fable effort = %q, want the high fallback", got.effort)
+	if got.effort != "medium" {
+		t.Errorf("single-claude effort = %q, want the medium pin", got.effort)
 	}
 	if got.scope != "src/api/" {
 		t.Errorf("session review scope = %q, want the antislop target", got.scope)
@@ -475,7 +474,7 @@ func TestRunDocReviewRecordsTheRequestedMode(t *testing.T) {
 		},
 	}
 
-	_, err := runDocReview(context.Background(), ex, "antislop", "PROMPT", "src/", "", "xhigh", t.TempDir(), "mode", true, []string{"fable"})
+	_, err := runDocReview(context.Background(), ex, "antislop", "PROMPT", "src/", "", "xhigh", t.TempDir(), "mode", true, []string{"claude"})
 	if err != nil {
 		t.Fatalf("runDocReview: %v", err)
 	}
@@ -497,7 +496,7 @@ func TestRunPlanReviewStillRecordsPlanMode(t *testing.T) {
 		},
 	}
 
-	_, err := runPlanReview(context.Background(), ex, "/tmp/plan.md", "", t.TempDir(), "mode", true, []string{"fable"})
+	_, err := runPlanReview(context.Background(), ex, "/tmp/plan.md", "", t.TempDir(), "mode", true, []string{"claude"})
 	if err != nil {
 		t.Fatalf("runPlanReview: %v", err)
 	}
@@ -506,11 +505,11 @@ func TestRunPlanReviewStillRecordsPlanMode(t *testing.T) {
 	}
 }
 
-func TestAntislopAstraEffortReachesRuntime(t *testing.T) {
+func TestAntislopCodexEffortReachesRuntime(t *testing.T) {
 	for _, tt := range []struct{ name, config, override, want string }{
 		{"default", "", "", "high"},
-		{"configured", "efforts:\n  astra: medium\n", "", "medium"},
-		{"explicit", "efforts:\n  astra: medium\n", "xhigh", "xhigh"},
+		{"configured", "efforts:\n  codex: medium\n", "", "medium"},
+		{"explicit", "efforts:\n  codex: medium\n", "xhigh", "xhigh"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			loadPlanTestConfig(t, tt.config)
@@ -525,7 +524,7 @@ func TestAntislopAstraEffortReachesRuntime(t *testing.T) {
 					return realPlanJSON, 0, nil
 				},
 			}
-			_, err := runDocReview(context.Background(), ex, session.ModeAntislop, "review", "src/", tt.override, config.DefaultAntislopEffort, t.TempDir(), "effort", true, []string{"astra"})
+			_, err := runDocReview(context.Background(), ex, session.ModeAntislop, "review", "src/", tt.override, config.DefaultAntislopEffort, t.TempDir(), "effort", true, []string{"codex"})
 			if err != nil {
 				t.Fatal(err)
 			}

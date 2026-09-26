@@ -57,12 +57,12 @@ func TestGroupSessions(t *testing.T) {
 		{
 			name: "plan group is labelled with concrete model names",
 			sessions: []*session.Session{
-				{ID: "a", GroupID: "gp", CLI: "codex", Mode: "plan", Model: config.CodexModel, Status: "completed"},
-				{ID: "b", GroupID: "gp", CLI: "fable", Mode: "plan", Model: config.FableModel, Status: "completed"},
+				{ID: "a", GroupID: "gp", CLI: "codex", Mode: "plan", Model: config.GPT56SolModel, Status: "completed"},
+				{ID: "b", GroupID: "gp", CLI: "claude", Mode: "plan", Model: config.ClaudeModel, Status: "completed"},
 			},
 			wantGroups:  1,
 			wantIsGroup: []bool{true},
-			wantCLI:     []string{config.SolLabel + "+" + config.FableLabel},
+			wantCLI:     []string{config.SolLabel + "+" + config.ClaudeLabel},
 			wantKind:    []string{"plan"},
 		},
 		{
@@ -70,11 +70,11 @@ func TestGroupSessions(t *testing.T) {
 			sessions: []*session.Session{
 				{ID: "a", GroupID: "g1", CLI: "codex", Mode: "megareview", Model: config.GPT56SolModel, Status: "completed"},
 				{ID: "b", GroupID: "g1", CLI: "opencode", Mode: "megareview", Model: config.KimiModel, Status: "completed"},
-				{ID: "c", CLI: "claude", Model: config.FableModel, Status: "running"},
+				{ID: "c", CLI: "claude", Model: config.ClaudeModel, Status: "running"},
 			},
 			wantGroups:  2,
 			wantIsGroup: []bool{true, false},
-			wantCLI:     []string{config.SolLabel + "+" + config.K3Label, config.FableLabel},
+			wantCLI:     []string{config.SolLabel + "+" + config.K3Label, config.ClaudeLabel},
 			wantKind:    []string{"megareview", ""},
 		},
 	}
@@ -104,7 +104,7 @@ func TestPairedPlanGroupUsesPublicModels(t *testing.T) {
 	created := time.Now()
 	later := created.Add(time.Millisecond)
 	groups := groupSessions([]*session.Session{
-		{ID: "b", GroupID: "paired", CLI: "fable", Mode: "plan", Model: config.FableModel, Status: "completed", QueuedAt: &later},
+		{ID: "b", GroupID: "paired", CLI: "claude", Mode: "plan", Model: config.ClaudeModel, Status: "completed", QueuedAt: &later},
 		{ID: "a", GroupID: "paired", CLI: "codex", Mode: "plan", Model: config.GPT56SolModel, Status: "completed", QueuedAt: &created},
 	})
 	if len(groups) != 1 {
@@ -114,23 +114,23 @@ func TestPairedPlanGroupUsesPublicModels(t *testing.T) {
 	if group.ID != "paired" {
 		t.Fatalf("paired plan stable id = %q, want group id", group.ID)
 	}
-	if group.Kind != "plan" || group.CLI != "sol+fable" || group.Models != "sol + fable" {
+	if group.Kind != "plan" || group.CLI != "sol+claude" || group.Models != "sol + claude" {
 		t.Fatalf("paired plan group labels = kind %q cli %q models %q", group.Kind, group.CLI, group.Models)
 	}
-	if len(group.Sessions) != 2 || group.Sessions[0].CLI != "sol" || group.Sessions[0].Model != "sol" || group.Sessions[1].CLI != "fable" || group.Sessions[1].Model != "fable" {
+	if len(group.Sessions) != 2 || group.Sessions[0].CLI != "sol" || group.Sessions[0].Model != "sol" || group.Sessions[1].CLI != "claude" || group.Sessions[1].Model != "claude" {
 		t.Fatalf("paired plan public sessions = %+v", group.Sessions)
 	}
 }
 
 func TestSingletonPlanKeepsLogicalGroupIdentity(t *testing.T) {
 	groups := groupSessions([]*session.Session{
-		{ID: "fable", GroupID: "degraded-plan", CLI: "fable", Mode: "plan", Model: config.FableModel, Status: "failed", ErrorMsg: "fable failed"},
+		{ID: "claude", GroupID: "degraded-plan", CLI: "claude", Mode: "plan", Model: config.ClaudeModel, Status: "failed", ErrorMsg: "claude failed"},
 	})
 	if len(groups) != 1 {
 		t.Fatalf("singleton plan group count = %d, want 1", len(groups))
 	}
 	group := groups[0]
-	if !group.IsGroup || group.ID != "degraded-plan" || group.Kind != "plan" || group.CLI != "fable" || group.Sessions[0].ErrorMsg != "fable failed" {
+	if !group.IsGroup || group.ID != "degraded-plan" || group.Kind != "plan" || group.CLI != "claude" || group.Sessions[0].ErrorMsg != "claude failed" {
 		t.Fatalf("singleton plan group = %+v", group)
 	}
 }
@@ -188,7 +188,7 @@ func TestIndexIncludesCuratedModelIcons(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := string(data)
-	for _, label := range []string{config.SolLabel, config.K3Label, config.FableLabel, config.GrokLabel} {
+	for _, label := range []string{config.SolLabel, config.K3Label, config.ClaudeLabel, config.GrokLabel} {
 		if !strings.Contains(html, label+"': '") && !strings.Contains(html, label+": '") {
 			t.Errorf("web dashboard has no icon mapping for %q", label)
 		}
@@ -246,12 +246,12 @@ func TestGroupStatus(t *testing.T) {
 func TestGroupModels_Dedupes(t *testing.T) {
 	sessions := []*session.Session{
 		{Model: config.GPT56SolModel},
-		{Model: config.FableModel},
+		{Model: config.ClaudeModel},
 		{Model: config.GPT56SolModel}, // duplicate
 		{Model: ""},                   // skipped
 	}
 	got := sessionview.JoinLabels(sessionview.EngineLabels(sessions), " + ")
-	want := config.SolLabel + " + " + config.FableLabel
+	want := config.SolLabel + " + " + config.ClaudeLabel
 	if got != want {
 		t.Errorf("EngineLabels joined = %q, want %q", got, want)
 	}
@@ -652,7 +652,7 @@ func TestListPageValidationAndCap(t *testing.T) {
 func TestGroupKindReportsAntislop(t *testing.T) {
 	sessions := []*session.Session{
 		{ID: "a", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "codex", Model: config.GPT56SolModel},
-		{ID: "b", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "fable", Model: config.FableModel},
+		{ID: "b", GroupID: "g", Mode: session.ModeAntislop, Status: "completed", CLI: "claude", Model: config.ClaudeModel},
 	}
 	groups := groupSessions(sessions)
 	if len(groups) != 1 {

@@ -39,15 +39,15 @@ func TestSolUsageUsesOnlyPublicModelNaming(t *testing.T) {
 	}
 }
 
-func TestFableCommandsArePublic(t *testing.T) {
-	if commandFableCmd.Use != config.FableLabel || commandFableCmd.Hidden {
-		t.Fatalf("command metadata = use %q hidden %v", commandFableCmd.Use, commandFableCmd.Hidden)
+func TestClaudeCommandsArePublic(t *testing.T) {
+	if commandClaudeCmd.Use != config.ClaudeLabel || commandClaudeCmd.Hidden {
+		t.Fatalf("command metadata = use %q hidden %v", commandClaudeCmd.Use, commandClaudeCmd.Hidden)
 	}
-	if runFableCmd.Use != config.FableLabel || runFableCmd.Hidden {
-		t.Fatalf("run metadata = use %q hidden %v", runFableCmd.Use, runFableCmd.Hidden)
+	if runClaudeCmd.Use != config.ClaudeLabel || runClaudeCmd.Hidden {
+		t.Fatalf("run metadata = use %q hidden %v", runClaudeCmd.Use, runClaudeCmd.Hidden)
 	}
-	if lower := strings.ToLower(fableUsage); !strings.Contains(lower, "/rival-fable") || !strings.Contains(lower, "built-in default: medium") {
-		t.Fatalf("fable usage lacks public name or effort fallback: %q", lower)
+	if lower := strings.ToLower(claudeUsage); !strings.Contains(lower, "/rival-claude") || !strings.Contains(lower, "built-in default: medium") {
+		t.Fatalf("claude usage lacks public name or effort fallback: %q", lower)
 	}
 }
 

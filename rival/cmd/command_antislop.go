@@ -21,7 +21,7 @@ import (
 const antislopUsage = `Usage:
   /rival-antislop — quality-only review of the changed files (git auto-detect)
   /rival-antislop src/api/ — review a specific scope
-  /rival-antislop -m fable -re high src/ — pick model and reasoning effort
+  /rival-antislop -m claude -re high src/ — pick model and reasoning effort
   rival command antislop --help — show native command options
 
 Antislop hunts slop and over-engineering — reuse/DRY, simplification,
@@ -31,10 +31,10 @@ never reports bugs; use the code review commands for that.
 
 Input is a code-review scope. "--" ends option parsing and takes the rest
 verbatim, so a scope beginning with a dash is still reviewable. Default model
-is astra; -m accepts astra and fable (comma-separated). Default reasoning effort
+is codex; -m accepts codex and claude (comma-separated). Default reasoning effort
 is high; override with -re/--effort or per model in ~/.rival/config.yaml.`
 
-var defaultAntislopModels = []string{config.AstraLabel}
+var defaultAntislopModels = []string{config.CodexLabel}
 
 var commandAntislopCmd = &cobra.Command{
 	Use:   "antislop",
@@ -45,7 +45,7 @@ var commandAntislopCmd = &cobra.Command{
 func init() {
 	commandAntislopCmd.Flags().String("workdir", ".", "working directory")
 	commandAntislopCmd.Flags().Bool("no-queue", false, "bypass the review queue")
-	commandAntislopCmd.Flags().StringSliceP("model", "m", defaultAntislopModels, "antislop model(s): astra, fable (comma-separated)")
+	commandAntislopCmd.Flags().StringSliceP("model", "m", defaultAntislopModels, "antislop model(s): codex, claude (comma-separated)")
 	commandAntislopCmd.Flags().String("effort", "", "override reasoning effort for every selected model: low, medium, high, ultra")
 	commandCmd.AddCommand(commandAntislopCmd)
 }

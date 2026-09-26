@@ -2,7 +2,7 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v3.33.0](https://github.com/1905/rival/releases/tag/v3.33.0) — 2026-09-17.
+Latest release: [v3.34.0](https://github.com/1905/rival/releases/tag/v3.34.0) — 2026-09-26.
 
 ## [Unreleased]
 
@@ -192,6 +192,19 @@ workdir. Two caveats worth knowing:
   `/var/folders/...`). A workdir located inside one of those paths is therefore
   writable during a review.
 - Child-process network access is not blocked on macOS.
+
+## [v3.34.0] — 2026-09-26
+
+### Changed — Fable removed, Astra renamed to Codex
+
+- **Breaking:** Fable (`claude-fable-5-1`) is removed. The Claude Code runtime now runs **Opus 5.5** (`claude-opus-5-5`) under the name `claude`.
+- Claude pins **medium** effort on every surface: code review, plan review, and antislop. An explicit `-re` or `efforts.claude` still wins.
+- **Breaking:** Astra is renamed to **Codex**. The model stays `gpt-6-astra` at xhigh. Use `-m codex` and `efforts.codex`.
+- Skills renamed: `/rival-astra` → `/rival-codex`, `/rival-plan-astra` → `/rival-plan-codex`, `/rival-fable` → `/rival-claude`, `/rival-plan-fable` → `/rival-plan-claude`. `rival install` removes the old skills.
+- Commands renamed: `rival command|run astra` → `codex`, `rival command|run fable` → `claude`. The Docker image is now `rival-claude`.
+- `rival command plan` accepts only `codex` and `claude`. Undocumented Sol plan support is gone.
+- Old `efforts.astra` / `efforts.fable` keys in `~/.rival/config.yaml` now fail validation. Rename them.
+- Sessions written by older releases still render. Old Fable sessions show as `retired-model`.
 
 ## [v3.33.0] — 2026-09-17
 

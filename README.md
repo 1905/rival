@@ -17,7 +17,7 @@ brew install 1F47E/tap/rival
 rival install          # Claude skills + Codex skills when Codex is detected
 ```
 
-Then set up at least one model. Astra is the usual first one:
+Then set up at least one model. Codex is the usual first one:
 
 ```bash
 npm install -g @openai/codex && codex login
@@ -25,15 +25,15 @@ npm install -g @openai/codex && codex login
 
 **2. Use it from Codex or Claude Code**
 
-In Codex, use `$rival-fable` to get a Fable 5.1 review of your changes:
+In Codex, use `$rival-claude` to get an Opus 5.5 review of your changes:
 
 ```text
-$rival-fable
-$rival-fable src/api/
-$rival-fable -re high src/api/
+$rival-claude
+$rival-claude src/api/
+$rival-claude -re high src/api/
 ```
 
-Install and authenticate the Claude Code CLI (`claude auth login`) for Fable.
+Install and authenticate the Claude Code CLI (`claude auth login`) for Claude.
 Codex launches Rival, waits with progress updates, and presents the result in
 the same turn. All ten skills are available with `$rival-...` names.
 
@@ -57,13 +57,13 @@ watcher; Codex keeps the turn active and waits for the result.
 
 | Skill | What it does | Why it's useful |
 |-------|--------------|-----------------|
-| `/rival-review` | Astra reviews your changes; add `-m k3` for a second reviewer that hunts vulnerabilities, and a consilium judge merges both | The default review gate. One independent model with full repo access, or two with different lenses |
+| `/rival-review` | Codex reviews your changes; add `-m k3` for a second reviewer that hunts vulnerabilities, and a consilium judge merges both | The default review gate. One independent model with full repo access, or two with different lenses |
 | `/rival-security` | Dedicated security review: injection, authorization and IDOR, crypto, SSRF, traversal, deserialization, secrets, CSRF, and more | Bug reviews barely touch security. This one hunts exploitable vulnerabilities and refuses to run rather than skip silently |
 | `/rival-antislop` | Quality-only review of changed code: over-engineering, reinvented libraries, compat hoarding, AI-slop patterns. Returns a leanness rating (1-10) and a cut list | Bug reviews can't tell you the code shouldn't exist. This one names what to delete, merge, or replace — the counterweight to AI-generated bloat |
-| `/rival-plan` | Astra rates a plan 1-10 and lists findings at xhigh | Native structured plan review |
-| `/rival-plan-astra` / `/rival-plan-fable` | Single-model plan review | When you want one specific second opinion — Astra for independence from a Claude-based session, Fable when Astra is unavailable |
-| `/rival-astra` | Any prompt or `review [scope]` via Astra (`gpt-6-astra`), at xhigh by default | Independent code review through Codex CLI |
-| `/rival-fable` | Code review of changed files via Fable (Claude Code CLI) | A separate Claude reviewer whose exploration stays out of your session's context |
+| `/rival-plan` | Codex rates a plan 1-10 and lists findings at xhigh | Native structured plan review |
+| `/rival-plan-codex` / `/rival-plan-claude` | Single-model plan review | When you want one specific second opinion — Codex for independence from a Claude-based session, Claude when Codex is unavailable |
+| `/rival-codex` | Any prompt or `review [scope]` via Codex (`gpt-6-astra`), at xhigh by default | Independent code review through Codex CLI |
+| `/rival-claude` | Code review of changed files via Claude (Opus 5.5 at medium, Claude Code CLI) | A separate Claude reviewer whose exploration stays out of your session's context |
 | `/rival-k3` | Any prompt via Kimi K3 (max reasoning, OpenCode) | A cheap opinion from a thinking-only model on a different provider |
 | `/rival-grok` | Any prompt, or `review [scope]`, via Grok (xAI CLI); opt-in only | Never in the default roster; there when you explicitly want the fourth opinion |
 
@@ -98,7 +98,7 @@ To refresh only Codex, use `rival install --target codex --force`.
 You only need the runtimes for the models you use; an unavailable model is
 skipped, not fatal.
 
-- **Astra** — [Codex CLI](https://github.com/openai/codex):
+- **Codex** (`gpt-6-astra`) — [Codex CLI](https://github.com/openai/codex):
   `npm install -g @openai/codex && codex login` (browser ChatGPT login
   preferred; `codex login --with-api-key` for usage-based billing). Do not put
   the OpenAI key in the reviewed repository — Rival only needs the Codex login.
@@ -107,11 +107,11 @@ skipped, not fatal.
   `brew install anomalyco/tap/opencode`) plus a
   [Kimi API key](https://platform.kimi.ai/console/api-keys) in
   `MOONSHOT_API_KEY` (project `.env` or shell export; keep `.env` gitignored).
-- **Fable 5.1** — the [Claude Code](https://code.claude.com/docs/en/overview)
+- **Claude** (`claude-opus-5-5`, medium effort) — the [Claude Code](https://code.claude.com/docs/en/overview)
   CLI, authenticated with `claude auth login` or `/login`, even when Codex is
   the host. Review restrictions were verified with Claude Code 2.1.263; update
   the CLI if it rejects `--safe-mode` or another review flag. See
-  [Fable auth](#fable-auth) for subscription-vs-API billing.
+  [Claude auth](#claude-auth) for subscription-vs-API billing.
 - **Grok** (optional) — [Grok CLI](https://docs.x.ai/) with `grok login`
   (browser OAuth; `XAI_API_KEY` is deliberately unsupported — Rival blocks the
   `GROK_`/`XAI_` env prefixes so a reviewed repo's `.env` cannot re-point the
@@ -122,29 +122,29 @@ skipped, not fatal.
 ### Reviews
 
 ```
-/rival-review                              — Astra; auto-detect changed files
-/rival-review -m astra,k3 src/api/           — add the security lens
+/rival-review                              — Codex; auto-detect changed files
+/rival-review -m codex,k3 src/api/           — add the security lens
 /rival-review -re xhigh src/api/           — override effort
-/rival-astra review                          — single-model review
-/rival-fable                               — Fable review of changed files
+/rival-codex review                          — single-model review
+/rival-claude                               — Claude review of changed files
 /rival-k3 review src/api/
 /rival-grok review src/api/                — opt-in
 ```
 
-Fable code, plan, and antislop reviews expose only Read, Glob, and Grep.
+Claude code, plan, and antislop reviews expose only Read, Glob, and Grep.
 Shell execution, edits, MCP tools, and user/project hooks and plugins are disabled;
-the Docker transport additionally mounts the repository read-only. Fable can
+the Docker transport additionally mounts the repository read-only. Claude can
 read source and follow imports, but cannot run tests or git commands itself.
 Rival performs git scope detection before starting the reviewer. These are CLI
-tool restrictions, not an OS sandbox for the native Claude process. Raw Fable
+tool restrictions, not an OS sandbox for the native Claude process. Raw Claude
 prompts retain their existing full-auto behavior.
 
 Scope auto-detection via git: dirty files first, else last commit, else the
 full project. The scope is a focus hint, not a restriction — reviewers have
 mechanical read-only access to the whole repo and follow imports as needed, so
-natural-language scopes work: `/rival-astra review the authentication middleware`.
+natural-language scopes work: `/rival-codex review the authentication middleware`.
 
-Raw prompts (`/rival-astra explain the auth flow`) run full-auto in the workdir;
+Raw prompts (`/rival-codex explain the auth flow`) run full-auto in the workdir;
 rival strips known credential env vars from the child as blast-radius
 reduction. Grok's `review` additionally passes `--sandbox read-only`, but its
 built-in profiles fail open without a kernel sandbox and keep temp dirs
@@ -154,12 +154,12 @@ writable — treat it accordingly.
 
 ```bash
 glab auth login --hostname gitlab.example.com
-rival review --model astra --workdir /path/to/repo \
+rival review --model codex --workdir /path/to/repo \
   https://gitlab.example.com/group/project/-/merge_requests/42
 ```
 
-In Claude Code use `/rival-review -m astra <MR-URL>`; in Codex use
-`$rival-review -m astra <MR-URL>`. The URL must be the entire scope.
+In Claude Code use `/rival-review -m codex <MR-URL>`; in Codex use
+`$rival-review -m codex <MR-URL>`. The URL must be the entire scope.
 Nested namespaces, `/diffs` and `/commits` links, query strings, and fragments
 are supported. The local repository must have a remote for the target project.
 For a fork MR, add the target remote if only the fork remote exists.
@@ -185,7 +185,7 @@ The snapshot is removed on completion or normal cancellation.
 Missing or stale diff refs, an unavailable API, a mismatched remote, or a failed
 fetch stop the review. Rival never substitutes local HEAD. Preparation has a
 two-minute timeout. Single-model/raw, security, and antislop commands reject
-MR URLs; select one reviewer with `rival review --model astra` instead.
+MR URLs; select one reviewer with `rival review --model codex` instead.
 Rival does not post MR comments or approvals.
 
 The report covers the recorded snapshot even if the MR later changes.
@@ -214,7 +214,7 @@ fails if the chosen model has no key rather than falling back, because a
 security review that quietly skips is worse than one that refuses to start.
 Output that does not parse is reported as unusable, never as a clean review.
 
-`-m k3` in a megareview carries the same security lens, so `-m astra,k3` gives
+`-m k3` in a megareview carries the same security lens, so `-m codex,k3` gives
 you one reviewer hunting bugs and one hunting vulnerabilities. The judge is
 told which reviewer used which lens, so a finding only the security reviewer
 could have made is not discounted for lacking a second vote.
@@ -224,7 +224,7 @@ could have made is not discounted for lacking a second vote.
 ```
 /rival-antislop                             — cut list for the changed files (auto-detect)
 /rival-antislop src/api/                    — cut list for a specific scope
-/rival-antislop -m fable src/               — with Fable instead of Astra
+/rival-antislop -m claude src/               — with Claude instead of Codex
 ```
 
 Every other rival command hunts bugs. Antislop hunts the opposite failure
@@ -232,25 +232,25 @@ mode: code (or a plan) that *works* but shouldn't exist in that shape. Angles:
 reuse/DRY, simplification, efficiency, altitude (fixes at the wrong depth),
 backward-compat hoarding, library reinvention, and AI-slop signatures (comment
 slop, silent fallbacks, pass-through wrappers, speculative generality; scope
-speculative generality). Default model **astra**, default effort **high**.
+speculative generality). Default model **codex**, default effort **high**.
 Report-only: it proposes, your session applies. Native form:
 `rival command antislop`, where `--` takes a scope verbatim.
 
 ### Plan review
 
 ```
-/rival-plan path/to/plan.md                 — Astra at xhigh
-/rival-plan-astra path/to/plan.md             — Astra only, xhigh
-/rival-plan-fable path/to/plan.md           — Fable only (configured effort, low fallback)
+/rival-plan path/to/plan.md                 — Codex at xhigh
+/rival-plan-codex path/to/plan.md             — Codex only, xhigh
+/rival-plan-claude path/to/plan.md           — Claude only (configured effort, medium fallback)
 ```
 
 Each model rates the plan 1-10 and returns numbered findings (bugs, gaps,
 ambiguity, scope, verification). Native:
-`rival command plan --model astra --effort xhigh`.
+`rival command plan --model codex --effort xhigh`.
 
 ### Model selection & effort
 
-`-m/--model`: `astra`, `k3`, `grok` for code reviews; `astra`, `fable` for plan
+`-m/--model`: `codex`, `k3`, `grok` for code reviews; `codex`, `claude` for plan
 and antislop commands. An explicit list replaces the roster — naming `grok` is
 the only way it joins a review. `-re/--effort`: `low`/`medium`/`high`/`xhigh`.
 
@@ -258,9 +258,9 @@ Per-model defaults live in `~/.rival/config.yaml`:
 
 ```yaml
 efforts:
-  astra: xhigh
+  codex: xhigh
   kimi-k3: max
-  fable: medium
+  claude: medium
   grok: high
 ```
 
@@ -289,21 +289,21 @@ Summary: ...
 [CRITICAL] file.go:42 — Title
   Description...
   Fix: ...
-  Found by: astra, kimi-k3
+  Found by: codex, kimi-k3
 
 Recommendation: request_changes — ...
 
-Reviewed by: astra (bug_hunter), kimi-k3 (bug_hunter)
-Judge: astra (consilium)
+Reviewed by: codex (bug_hunter), kimi-k3 (bug_hunter)
+Judge: codex (consilium)
 Findings: 5 (threshold: 6)
 ```
 
 ### Terminal CLI
 
 ```bash
-echo 'explain the auth flow' | rival run astra --prompt-stdin --workdir .
+echo 'explain the auth flow' | rival run codex --prompt-stdin --workdir .
 rival review src/api/                        # default two-model roster
-rival review --model astra src/api/
+rival review --model codex src/api/
 echo 'docs/plan.md' | rival command plan --workdir .
 echo 'the entire project' | rival command antislop --workdir .
 ```
@@ -381,9 +381,9 @@ tempfiles; child env is sanitized; a failed reviewer never
 kills the run; unparseable reviewer output reaches the judge as a stub with a
 2KB debug tail instead of overflowing the prompt.
 
-## Fable auth
+## Claude auth
 
-Fable runs through the authenticated Claude Code CLI and bills your
+Claude runs through the authenticated Claude Code CLI and bills your
 **subscription login** by default — an exported `ANTHROPIC_API_KEY` is
 stripped from the child env so the CLI can't silently switch to API billing.
 
@@ -407,8 +407,8 @@ appends an actionable hint (not logged in → run `claude` and `/login`).
 
 | Model | Default effort | Used by |
 |-------|----------------|---------|
-| Astra | xhigh (code review); xhigh pinned in plan skills, high antislop fallback | `/rival-review`, `/rival-astra`, `/rival-plan`, `/rival-plan-astra`, `/rival-antislop` |
-| Fable | medium (code review); plan low fallback; high antislop fallback | `/rival-fable`, `/rival-plan-fable`, antislop with `-m fable` |
+| Codex | xhigh (code review); xhigh pinned in plan skills, high antislop fallback | `/rival-review`, `/rival-codex`, `/rival-plan`, `/rival-plan-codex`, `/rival-antislop` |
+| Claude | medium on every surface (code, plan, antislop) | `/rival-claude`, `/rival-plan-claude`, antislop with `-m claude` |
 | Kimi K3 | max (only level the provider supports) | `/rival-k3`, `/rival-review` |
 | Grok | high (clamped ladder) | `/rival-grok`, reviews with `-m grok` |
 

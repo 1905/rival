@@ -1,6 +1,6 @@
-# Fable in Docker
+# Claude in Docker
 
-Run Fable through its Claude Code runtime inside a Docker container. Rival
+Run Claude through its Claude Code runtime inside a Docker container. Rival
 always prefers a native `claude` executable on `PATH`; Docker is the automatic
 fallback when that executable is unavailable.
 
@@ -8,13 +8,13 @@ fallback when that executable is unavailable.
 
 ```
 Host: rival binary
-└── Fable runtime (Docker container)
+└── Claude runtime (Docker container)
     ├── workdir mounted read-write as /workspace
     └── OAuth token passed via env var
 ```
 
 The container runs Claude Code with `--dangerously-skip-permissions`. Treat a
-Fable invocation as a write-capable agent: it can modify the mounted project
+Claude invocation as a write-capable agent: it can modify the mounted project
 and run commands with the container user's access. Review changes before
 committing, and do not mount a broader directory than the intended workdir.
 
@@ -26,7 +26,7 @@ Rival builds the image automatically on the first Docker-fallback run after
 authentication is configured. To build the same image manually:
 
 ```bash
-docker build -t rival-fable -f - . <<'EOF'
+docker build -t rival-claude -f - . <<'EOF'
 FROM node:22-slim
 RUN npm install -g @anthropic-ai/claude-code && \
     useradd -m -s /bin/bash claude
@@ -44,11 +44,11 @@ The image runs as the non-root `claude` user because the runtime refuses
 Start a temporary container and run interactive login:
 
 ```bash
-docker run -d --name rival-fable-login \
+docker run -d --name rival-claude-login \
   --user claude \
-  --entrypoint sh rival-fable -c "sleep 3600"
+  --entrypoint sh rival-claude -c "sleep 3600"
 
-docker exec -it rival-fable-login claude login
+docker exec -it rival-claude-login claude login
 ```
 
 This prints an auth URL. Open it in your browser, authorize, and paste the
@@ -57,7 +57,7 @@ This prints an auth URL. Open it in your browser, authorize, and paste the
 Extract the OAuth token:
 
 ```bash
-docker exec rival-fable-login cat /home/claude/.claude/.credentials.json
+docker exec rival-claude-login cat /home/claude/.claude/.credentials.json
 # Copy the accessToken field.
 ```
 
@@ -67,7 +67,7 @@ leave it in a project file.
 Clean up:
 
 ```bash
-docker rm -f rival-fable-login
+docker rm -f rival-claude-login
 ```
 
 ### 3. Export the token
@@ -79,19 +79,19 @@ export RIVAL_CLAUDE_TOKEN=sk-ant-oat01-YOUR-TOKEN-HERE
 ### 4. Run
 
 ```bash
-# Arbitrary Fable prompt
+# Arbitrary Claude prompt
 printf '%s\n' 'explain the auth flow' |
-  rival run fable --prompt-stdin --workdir /path/to/project
+  rival run claude --prompt-stdin --workdir /path/to/project
 
-# Fable review
-rival run fable --review src/api/ --workdir /path/to/project
+# Claude review
+rival run claude --review src/api/ --workdir /path/to/project
 
-# Fable plan review
+# Claude plan review
 printf '%s\n' 'docs/plan.md' |
-  rival command plan --model fable --workdir /path/to/project
+  rival command plan --model claude --workdir /path/to/project
 ```
 
-The installed `/rival-fable`, `/rival-plan`, and `/rival-plan-fable` skills use
+The installed `/rival-claude`, `/rival-plan`, and `/rival-plan-claude` skills use
 the same runtime selection and Docker fallback.
 
 ### 5. Optional effort defaults
@@ -100,11 +100,11 @@ Set per-model defaults in `~/.rival/config.yaml`:
 
 ```yaml
 efforts:
-  fable: medium
+  claude: medium
 ```
 
 An explicit `--effort` or skill `-re` value wins, followed by this file and then
-the command-specific fallback. In Fable's Claude Code runtime, Rival maps
+the command-specific fallback. In Claude's Claude Code runtime, Rival maps
 `high`, `xhigh`, and `ultra` to the runtime's `max`; `low` and `medium` stay
 distinct.
 

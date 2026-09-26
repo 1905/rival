@@ -21,17 +21,16 @@ func ClaudePreflight() error {
 	return ClaudeDockerPreflight()
 }
 
-// RunFable executes a prompt through the Claude CLI using the Fable model.
-// Claude Code remains an implementation transport, while Fable is the only
-// public model on this path.
-func RunFable(ctx context.Context, sess *session.Session, prompt, effort, workdir string, mirror io.Writer) (*Result, error) {
-	return runClaudeModel(ctx, sess, prompt, effort, workdir, config.FableModel, mirror)
+// RunClaude executes a prompt through the Claude Code CLI on Opus 5.5, the
+// only model on this path.
+func RunClaude(ctx context.Context, sess *session.Session, prompt, effort, workdir string, mirror io.Writer) (*Result, error) {
+	return runClaudeModel(ctx, sess, prompt, effort, workdir, config.ClaudeModel, mirror)
 }
 
-// runClaudeModel runs Fable through the Claude Code CLI,
+// runClaudeModel runs Claude through the Claude Code CLI,
 // auto-selecting native (claude on PATH) vs docker.
 func runClaudeModel(ctx context.Context, sess *session.Session, prompt, effort, workdir, model string, mirror io.Writer) (*Result, error) {
-	if model != config.FableModel {
+	if model != config.ClaudeModel {
 		return nil, fmt.Errorf("unsupported Claude Code model %q", model)
 	}
 	readOnly := sess.Mode == "review" || session.IsTaskMode(sess.Mode)

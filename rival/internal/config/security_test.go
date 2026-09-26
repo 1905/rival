@@ -147,11 +147,11 @@ func TestK3KeyStillReadsTheLegacyEnvAlias(t *testing.T) {
 // rewrites an already-correct label into "grok-openrouter".
 func TestRuntimeLogNormalizationIsIdempotent(t *testing.T) {
 	cases := []struct {
-		name string
-		cli  string
+		name  string
+		cli   string
 		model string
-		raw  string
-		want string
+		raw   string
+		want  string
 	}{
 		{"openrouter id becomes its label", "opencode", GrokOpenRouterModel,
 			"banner from " + GrokOpenRouterModel + " done", GrokOpenRouterLabel},
@@ -174,19 +174,19 @@ func TestRuntimeLogNormalizationIsIdempotent(t *testing.T) {
 	}
 }
 
-// The Fable id gained a "-1" suffix on 2026-09-02. "claude-fable-5" is a
-// prefix of "claude-fable-5-1", which is the same substring hazard that
+// The Claude id gained a "-1" suffix on 2026-09-02. "claude-claude-5" is a
+// prefix of "claude-opus-5-5", which is the same substring hazard that
 // corrupted the Grok label, so pin both directions.
-func TestFableIDNormalizesToItsLabel(t *testing.T) {
-	raw := "banner from " + FableModel + " done"
-	once := PublicRuntimeLog("claude", FableModel, raw)
-	if !contains(once, FableLabel) {
-		t.Errorf("fable id not normalized: %q", once)
+func TestClaudeIDNormalizesToItsLabel(t *testing.T) {
+	raw := "banner from " + ClaudeModel + " done"
+	once := PublicRuntimeLog("claude", ClaudeModel, raw)
+	if !contains(once, ClaudeLabel) {
+		t.Errorf("claude id not normalized: %q", once)
 	}
-	if contains(once, FableModel) {
-		t.Errorf("concrete fable id leaked: %q", once)
+	if contains(once, ClaudeModel) {
+		t.Errorf("concrete claude id leaked: %q", once)
 	}
-	if twice := PublicRuntimeLog("claude", FableModel, once); twice != once {
+	if twice := PublicRuntimeLog("claude", ClaudeModel, once); twice != once {
 		t.Errorf("not idempotent:\nonce:  %q\ntwice: %q", once, twice)
 	}
 }

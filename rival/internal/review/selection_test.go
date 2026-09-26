@@ -31,13 +31,13 @@ func TestPickJudge(t *testing.T) {
 		wantModel string
 	}{
 		{
-			"default judge picks Astra regardless of completion order",
+			"default judge picks Codex regardless of completion order",
 			[]ReviewInput{
 				{CLI: "opencode", Model: config.KimiModel},
-				{CLI: "codex", Model: config.AstraModel},
+				{CLI: "codex", Model: config.CodexModel},
 			},
 			config.DefaultReviewTargets(),
-			"codex", config.AstraModel,
+			"codex", config.CodexModel,
 		},
 		{
 			"requested order can select K3 before Sol",

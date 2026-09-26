@@ -17,28 +17,28 @@ import (
 )
 
 const planUsage = `Usage:
-  /rival-plan path/to/plan.md — review with Astra at xhigh effort
-  /rival-plan-astra path/to/plan.md — review with Astra at xhigh effort
-  /rival-plan-fable path/to/plan.md — review with Fable
+  /rival-plan path/to/plan.md — review with Codex at xhigh effort
+  /rival-plan-codex path/to/plan.md — review with Codex at xhigh effort
+  /rival-plan-claude path/to/plan.md — review with Claude
   rival command plan --help — show native command options
 
 Input is a single path to a markdown plan/spec file. The /rival-plan and
-/rival-plan-astra skills always use xhigh. Native Astra effort defaults to xhigh
-(low for Fable alone), unless overridden per model in ~/.rival/config.yaml.
---model accepts astra and fable. An unavailable model is skipped, not fatal.`
+/rival-plan-codex skills always use xhigh. Native Codex effort defaults to xhigh
+and Claude to medium, unless overridden per model in ~/.rival/config.yaml.
+--model accepts codex and claude. An unavailable model is skipped, not fatal.`
 
-var defaultPlanModels = []string{config.AstraLabel}
+var defaultPlanModels = []string{config.CodexLabel}
 
 var commandPlanCmd = &cobra.Command{
 	Use:   "plan",
-	Short: "Review a plan/spec with Astra and/or Fable",
+	Short: "Review a plan/spec with Codex and/or Claude",
 	RunE:  commandPlanAction,
 }
 
 func init() {
 	commandPlanCmd.Flags().String("workdir", ".", "working directory")
 	commandPlanCmd.Flags().Bool("no-queue", false, "bypass the review queue")
-	commandPlanCmd.Flags().StringSliceP("model", "m", defaultPlanModels, "plan review model(s): astra, fable (comma-separated)")
+	commandPlanCmd.Flags().StringSliceP("model", "m", defaultPlanModels, "plan review model(s): codex, claude (comma-separated)")
 	commandCmd.AddCommand(commandPlanCmd)
 	commandPlanCmd.Flags().String("effort", config.DefaultPlanEffort, "override reasoning effort for every selected model: low, medium, high, ultra")
 }
@@ -54,16 +54,14 @@ func parsePlanModels(raw []string) ([]string, error) {
 			model := strings.ToLower(strings.TrimSpace(part))
 			var cli string
 			switch model {
-			case config.SolLabel, config.GPT56SolModel:
+			case config.CodexLabel, config.CodexModel:
 				cli = "codex"
-			case config.AstraLabel, config.AstraModel:
-				cli = "astra"
-			case config.FableLabel, config.FableModel:
-				cli = "fable"
+			case config.ClaudeLabel, config.ClaudeModel:
+				cli = "claude"
 			case "":
 				return nil, fmt.Errorf("model selector cannot be empty")
 			default:
-				return nil, fmt.Errorf("unknown plan model %q; use one of: astra, fable", part)
+				return nil, fmt.Errorf("unknown plan model %q; use one of: codex, claude", part)
 			}
 			if !seen[cli] {
 				seen[cli] = true

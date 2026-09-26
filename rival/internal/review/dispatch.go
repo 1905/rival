@@ -78,7 +78,7 @@ func grokReviewEffort(effort string) (string, error) {
 // effort the provider was not actually sent.
 func reviewerEffortFor(cli, model, override string) (string, error) {
 	fallback := config.DefaultReviewEffort
-	if model == config.AstraModel {
+	if model == config.CodexModel {
 		fallback = "xhigh"
 	}
 	effort, err := config.ResolveEffort(model, override, fallback)

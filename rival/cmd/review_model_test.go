@@ -37,7 +37,7 @@ func TestReviewCommandDefersToConfiguredModelEfforts(t *testing.T) {
 }
 
 func TestMegareviewUsageNamesModelsAndEffortConfig(t *testing.T) {
-	for _, want := range []string{"Astra", "Kimi K3", "model defaults", "ultra", "grok"} {
+	for _, want := range []string{"Codex", "Kimi K3", "model defaults", "ultra", "grok"} {
 		if !strings.Contains(megareviewUsage, want) {
 			t.Errorf("megareview usage missing %q", want)
 		}

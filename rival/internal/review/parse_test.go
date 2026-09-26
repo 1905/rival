@@ -64,14 +64,14 @@ user
 ` + "```json" + `
 {
   "summary": "1-3 sentence overall review summary",
-  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "fable"]}],
+  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
   "recommendation": {"status": "approve|request_changes|comment", "summary": "1-2 sentence recommendation"}
 }
 ` + "```" + `
 
 codex
-{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","fable"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
 `
 
 func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {

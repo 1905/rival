@@ -150,7 +150,7 @@ func TestClaudeAuth(t *testing.T) {
 
 // The default roster dropped K3 on 2026-08-14. K3 stays selectable with
 // -m k3, but it no longer bug-hunts alongside Sol by default.
-func TestResolveReviewTargets_DefaultIsAstraAlone(t *testing.T) {
+func TestResolveReviewTargets_DefaultIsCodexAlone(t *testing.T) {
 	got, err := ResolveReviewTargets(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -158,11 +158,11 @@ func TestResolveReviewTargets_DefaultIsAstraAlone(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("default target count = %d, want 1: %+v", len(got), got)
 	}
-	if got[0].CLI != "codex" || got[0].Model != AstraModel {
-		t.Fatalf("default target = %+v, want %s", got[0], AstraModel)
+	if got[0].CLI != "codex" || got[0].Model != CodexModel {
+		t.Fatalf("default target = %+v, want %s", got[0], CodexModel)
 	}
 	if got[0].Prompt != PromptBugHunter {
-		t.Errorf("Astra runs the %s lens by default, want bug hunting", got[0].Prompt)
+		t.Errorf("Codex runs the %s lens by default, want bug hunting", got[0].Prompt)
 	}
 }
 
@@ -241,7 +241,7 @@ func TestResolveReviewTargets_ExactOrderAndDedup(t *testing.T) {
 }
 
 func TestResolveReviewTargets_RejectsModelsOutsideCuratedSet(t *testing.T) {
-	for _, selector := range []string{"codex", "retired-model", "custom/model", "all", ""} {
+	for _, selector := range []string{"astra", "fable", "claude", "retired-model", "custom/model", "all", ""} {
 		t.Run(selector, func(t *testing.T) {
 			if _, err := ResolveReviewTargets([]string{selector}); err == nil {
 				t.Fatalf("expected %q to be rejected", selector)
@@ -312,12 +312,12 @@ func TestEngineLabel(t *testing.T) {
 		{"codex", GPT56SolModel, SolLabel},
 		{"codex", "retired-sol-id", SolLabel},
 		{"codex", "", SolLabel},
-		{"claude", FableModel, FableLabel},
-		{"claude", "retired-fable-id", "retired-model"},
+		{"claude", ClaudeModel, ClaudeLabel},
+		{"claude", "retired-claude-id", "retired-model"},
 		{"claude", "", "retired-model"},
 		{"claude", "retired-model-id", "retired-model"},
-		{"fable", FableModel, FableLabel},
-		{"fable", "", "retired-model"},
+		{"claude", ClaudeModel, ClaudeLabel},
+		{"claude", "", "retired-model"},
 		{"opencode", KimiModel, K3Label},
 		{"opencode", "provider/retired-model-id", "retired-model"},
 		{"opencode", "", "retired-model"},
@@ -335,8 +335,8 @@ func TestModelLabelOnlyExposesSupportedModels(t *testing.T) {
 	cases := []struct{ model, want string }{
 		{GPT56SolModel, SolLabel},
 		{SolLabel, SolLabel},
-		{FableModel, FableLabel},
-		{FableLabel, FableLabel},
+		{ClaudeModel, ClaudeLabel},
+		{ClaudeLabel, ClaudeLabel},
 		{KimiModel, K3Label},
 		{K3Label, K3Label},
 		{GrokModel, GrokLabel},
@@ -383,8 +383,8 @@ func TestPublicRuntimeLogHidesRetiredRuntimeIdentities(t *testing.T) {
 		{
 			name:  "claude",
 			cli:   "claude",
-			model: "retired-fable-id",
-			raw:   "Claude Code v1\n--------\nmodel: retired-fable-id\n--------\n=== REVIEW FROM claude (retired-fable-id) [role: bug_hunter] ===\n",
+			model: "retired-claude-id",
+			raw:   "Claude Code v1\n--------\nmodel: retired-claude-id\n--------\n=== REVIEW FROM claude (retired-claude-id) [role: bug_hunter] ===\n",
 		},
 		{
 			name:  "opencode",
@@ -436,7 +436,7 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 	}{
 		{GPT56SolModel, "high"},
 		{KimiModel, "max"},
-		{FableModel, "medium"},
+		{ClaudeModel, "medium"},
 	}
 	for _, tc := range defaults {
 		got, err := ResolveEffort(tc.model, "", "")
@@ -449,9 +449,9 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 	}
 
 	userConfig = &UserConfig{Efforts: map[string]string{
-		SolLabel:   "ultra",
-		"kimi-k3":  "max",
-		FableLabel: "high",
+		SolLabel:    "ultra",
+		"kimi-k3":   "max",
+		ClaudeLabel: "high",
 	}}
 	if got, _ := ResolveEffort(GPT56SolModel, "", "low"); got != "ultra" {
 		t.Errorf("configured Sol effort = %q, want ultra", got)
@@ -464,8 +464,15 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 	}
 
 	userConfig = &UserConfig{}
-	if got, _ := ResolveEffort(FableModel, "", "low"); got != "low" {
+	if got, _ := ResolveEffort(GPT56SolModel, "", "low"); got != "low" {
 		t.Errorf("surface fallback = %q, want low", got)
+	}
+	// Claude's medium pin outranks a surface fallback; -re still wins.
+	if got, _ := ResolveEffort(ClaudeModel, "", "high"); got != "medium" {
+		t.Errorf("claude pinned effort = %q, want medium", got)
+	}
+	if got, _ := ResolveEffort(ClaudeModel, "xhigh", "high"); got != "xhigh" {
+		t.Errorf("claude explicit effort = %q, want xhigh", got)
 	}
 }
 
@@ -573,7 +580,7 @@ func TestLoadUserConfigValidatesEffortMap(t *testing.T) {
 	}{
 		{
 			name: "valid",
-			body: "efforts:\n  sol: ultra\n  kimi-k3: max\n  fable: medium\n",
+			body: "efforts:\n  sol: ultra\n  kimi-k3: max\n  claude: medium\n",
 		},
 		{
 			name:    "unknown model",

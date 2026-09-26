@@ -36,7 +36,7 @@ low, medium, high, xhigh, ultra. Keep scope text intact and let Rival parse opti
 timeout. On nonzero status or empty output, read stderr and explain the failure;
 an empty file is not a clean review. Include any usable partial output. Report
 authentication, model access, or quota errors without silently choosing another
-model. Fable uses Claude's subscription login by default; do not switch to API
+model. Claude uses Claude's subscription login by default; do not switch to API
 billing without the user's instruction.
 
 For cancellation use the captured Rival PID, then wait and report its result.

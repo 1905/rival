@@ -62,7 +62,7 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
-	if spec.commandName == config.FableLabel {
+	if spec.commandName == config.ClaudeLabel {
 		sess.Account = config.ClaudeSubscription()
 	}
 

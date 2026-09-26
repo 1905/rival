@@ -19,7 +19,7 @@ func CodexPreflight() error {
 }
 
 // CodexPreflightFor is CodexPreflight with the model named in its errors.
-// Sol and Astra share this runtime, so a hardcoded label would tell an Astra
+// Sol and Codex share this runtime, so a hardcoded label would tell an Codex
 // user that Sol is broken.
 func CodexPreflightFor(model string) error {
 	label := config.EngineLabel("codex", model)
@@ -48,7 +48,7 @@ func RunCodexModel(ctx context.Context, sess *session.Session, prompt, effort, w
 	if model == "" {
 		model = config.GPT56SolModel
 	}
-	if model != config.GPT56SolModel && model != config.AstraModel {
+	if model != config.GPT56SolModel && model != config.CodexModel {
 		return nil, fmt.Errorf("unsupported codex model %q", model)
 	}
 	args := codexRunArgs(model, effort, workdir)

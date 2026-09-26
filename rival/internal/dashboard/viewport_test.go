@@ -238,7 +238,7 @@ func TestDetailSelectionSurvivesReorder(t *testing.T) {
 		LogFile: writeTempLog(t, "watched.log", strings.Repeat("watched output\n", 50)),
 	}
 	other := &session.Session{
-		ID: "22222222-2222-2222-2222-222222222222", CLI: "claude", Model: config.FableModel,
+		ID: "22222222-2222-2222-2222-222222222222", CLI: "claude", Model: config.ClaudeModel,
 		Mode: "review", Status: "queued", StartTime: time.Now().Add(-2 * time.Minute), PID: 9999,
 		LogFile: writeTempLog(t, "other.log", strings.Repeat("other output\n", 50)),
 	}

@@ -17,23 +17,24 @@ import (
 
 const (
 	GPT56SolModel = "gpt-5.6-sol"
-	CodexModel    = GPT56SolModel // legacy internal alias
-	// AstraModel is a sibling of Sol: a different model on the same codex
+	// CodexModel is a sibling of Sol: a different model on the same codex
 	// runtime, so EngineLabel must match it before the "codex" adapter
-	// fallback below, which would otherwise label every Astra run "sol".
-	AstraModel = "gpt-6-astra"
-	AstraLabel = "astra"
-	FableModel = "claude-fable-5-1"
-	SolLabel   = "sol"
-	FableLabel = "fable"
-	K3Label    = "kimi-k3"
+	// fallback below, which would otherwise label every Codex run "sol".
+	// The public label equals the adapter name, so identity checks below
+	// key on the model id, never on the bare word "codex".
+	CodexModel  = "gpt-6-astra"
+	CodexLabel  = "codex"
+	ClaudeModel = "claude-opus-5-5"
+	SolLabel    = "sol"
+	ClaudeLabel = "claude"
+	K3Label     = "kimi-k3"
 	// K3CommandName is the cobra command word for K3. It differs from
 	// K3Label, which is the public display and error name.
 	K3CommandName        = "k3"
 	KimiModel            = "moonshotai/kimi-k3" // Kimi K3 via OpenCode's built-in Moonshot AI provider
 	GrokModel            = "grok-4.6"
 	GrokLabel            = "grok"
-	ClaudeDockerImage    = "rival-fable"
+	ClaudeDockerImage    = "rival-claude"
 	ClaudeDockerTokenEnv = "RIVAL_CLAUDE_TOKEN"
 
 	DefaultReviewEffort        = "high"
@@ -85,10 +86,10 @@ func ModelLabel(model string) string {
 	switch model {
 	case GPT56SolModel, SolLabel:
 		return SolLabel
-	case AstraModel, AstraLabel:
-		return AstraLabel
-	case FableModel, FableLabel:
-		return FableLabel
+	case CodexModel, CodexLabel:
+		return CodexLabel
+	case ClaudeModel, ClaudeLabel:
+		return ClaudeLabel
 	case KimiModel, K3Label:
 		return K3Label
 	case GrokModel, GrokLabel:
@@ -109,12 +110,12 @@ func EngineLabel(cli, model string) string {
 	switch model {
 	case GPT56SolModel:
 		return SolLabel
-	case AstraModel:
-		// Checked before the adapter fallback: Astra and Sol both run on
-		// codex, so falling through would label Astra as Sol.
-		return AstraLabel
-	case FableModel:
-		return FableLabel
+	case CodexModel:
+		// Checked before the adapter fallback: Codex and Sol both run on
+		// codex, so falling through would label Codex as Sol.
+		return CodexLabel
+	case ClaudeModel:
+		return ClaudeLabel
 	case KimiModel:
 		return K3Label
 	case GrokModel:
@@ -149,6 +150,7 @@ func PublicRuntimeError(cli, model, message string) string {
 	label := EngineLabel(cli, model)
 	switch cli {
 	case "codex", "astra":
+		// "astra" is read-compat for plan sessions written before 3.34.
 		title := titleLabel(label)
 		return strings.NewReplacer(
 			"OpenAI Codex", title+" runtime",
@@ -161,6 +163,7 @@ func PublicRuntimeError(cli, model, message string) string {
 			"Codex", title,
 		).Replace(message)
 	case "claude", "fable":
+		// "fable" is read-compat for plan sessions written before 3.34.
 		title := strings.ToUpper(label[:1]) + label[1:]
 		return strings.NewReplacer(
 			"Claude Code CLI", title+" runtime",
@@ -168,7 +171,6 @@ func PublicRuntimeError(cli, model, message string) string {
 			"claude CLI", label+" runtime",
 			"claude requires Docker", title+" runtime requires Docker",
 			"claude exited", label+" exited",
-			"rival-claude", "rival-fable",
 			"start claude:", "start "+title+" runtime:",
 			"subprocess claude:", title+" runtime:",
 		).Replace(message)
@@ -208,7 +210,7 @@ func PublicRuntimeLog(cli, model, raw string) string {
 		switch cli {
 		case "codex", "astra":
 			if strings.HasPrefix(trimmed, "OpenAI Codex") {
-				// Sol and Astra share this runtime, so the banner takes the
+				// Sol and Codex share this runtime, so the banner takes the
 				// resolved label rather than a hardcoded "Sol". Title-cased to
 				// match the display form the banner has always used.
 				trimmed = titleLabel(EngineLabel(cli, model)) + " runtime" + strings.TrimPrefix(trimmed, "OpenAI Codex")
@@ -260,8 +262,8 @@ func replaceConcreteModelIDs(cli, model, text string) string {
 	type pair struct{ id, label string }
 	pairs := []pair{
 		{GPT56SolModel, SolLabel},
-		{AstraModel, AstraLabel},
-		{FableModel, FableLabel},
+		{CodexModel, CodexLabel},
+		{ClaudeModel, ClaudeLabel},
 		{KimiModel, K3Label},
 		{GrokOpenRouterModel, GrokOpenRouterLabel},
 		{GrokModel, GrokLabel},
@@ -283,7 +285,7 @@ func replaceConcreteModelIDs(cli, model, text string) string {
 	// label — a re-normalized log, or a model naming itself — and
 	// "grok-4.6-openrouter" contains the id "grok-4.6", so an unprotected
 	// label would be rewritten into "grok-openrouter".
-	protected := []string{GrokOpenRouterLabel, K3Label, SolLabel, FableLabel, GrokLabel, AstraLabel}
+	protected := []string{GrokOpenRouterLabel, K3Label, SolLabel, ClaudeLabel, GrokLabel, CodexLabel}
 	sort.SliceStable(protected, func(i, j int) bool {
 		return len(protected[i]) > len(protected[j])
 	})
@@ -343,16 +345,19 @@ func publicReviewHeader(line string) string {
 	}
 	switch strings.ToLower(reviewer) {
 	case "codex":
-		// Sol and Astra share this adapter, so disambiguate by identity
-		// before defaulting to Sol.
-		if strings.Contains(lowerIdentity, AstraLabel) {
-			reviewer = AstraLabel
+		// Sol and Codex share this adapter, so disambiguate by identity
+		// before defaulting to Sol. The label is the adapter word itself, so
+		// only a bare "codex" identity or the Codex model id means Codex.
+		if lowerIdentity == CodexLabel || strings.Contains(lowerIdentity, CodexModel) || strings.Contains(lowerIdentity, "astra") {
+			reviewer = CodexLabel
 		} else {
 			reviewer = SolLabel
 		}
 	case "claude":
-		if strings.Contains(lowerIdentity, FableLabel) {
-			reviewer = FableLabel
+		// Same collision as codex: a bare "claude" or the current id is the
+		// Claude reviewer, anything else is a retired Claude-runtime model.
+		if lowerIdentity == ClaudeLabel || strings.Contains(lowerIdentity, ClaudeModel) {
+			reviewer = ClaudeLabel
 		} else {
 			reviewer = "retired-model"
 		}
@@ -364,8 +369,8 @@ func publicReviewHeader(line string) string {
 		}
 	case GPT56SolModel:
 		reviewer = SolLabel
-	case FableModel:
-		reviewer = FableLabel
+	case ClaudeModel:
+		reviewer = ClaudeLabel
 	case KimiModel:
 		reviewer = K3Label
 	case GrokLabel, GrokModel:
@@ -391,7 +396,7 @@ func DefaultReviewTargets() []ReviewTarget {
 	// K3 left the default roster on 2026-08-14. It stays selectable with
 	// -m k3, where it always carries the security lens.
 	return []ReviewTarget{
-		{CLI: "codex", Model: AstraModel},
+		{CLI: "codex", Model: CodexModel},
 	}
 }
 
@@ -439,8 +444,8 @@ func ResolveReviewTargets(selectors []string) ([]ReviewTarget, error) {
 		switch alias {
 		case SolLabel, GPT56SolModel:
 			expanded = []ReviewTarget{{CLI: "codex", Model: GPT56SolModel}}
-		case AstraLabel, AstraModel:
-			expanded = []ReviewTarget{{CLI: "codex", Model: AstraModel}}
+		case CodexLabel, CodexModel:
+			expanded = []ReviewTarget{{CLI: "codex", Model: CodexModel}}
 		case "k3", "kimi-k3":
 			// K3 only ever runs the security lens, in any roster.
 			// Kimi K3 runs through the Moonshot AI provider and needs its API key.
@@ -449,7 +454,7 @@ func ResolveReviewTargets(selectors []string) ([]ReviewTarget, error) {
 			// Opt-in only: grok never joins the default roster.
 			expanded = []ReviewTarget{{CLI: GrokLabel, Model: GrokModel}}
 		default:
-			return nil, fmt.Errorf("unknown review model %q; use one of: sol, astra, kimi-k3, grok", raw)
+			return nil, fmt.Errorf("unknown review model %q; use one of: sol, codex, kimi-k3, grok", raw)
 		}
 		for _, target := range expanded {
 			appendTarget(target)
@@ -848,7 +853,7 @@ const (
 	ClaudeAuthAPI          = "api"          // explicit ANTHROPIC_API_KEY billing
 )
 
-// ClaudeAuth returns the auth mode for native claude/fable runs.
+// ClaudeAuth returns the auth mode for native claude/claude runs.
 // Default is subscription: the claude CLI is already authed via /login, and an
 // inherited ANTHROPIC_API_KEY must never silently switch billing to API
 // credits. API billing is opt-in via RIVAL_CLAUDE_AUTH=api and then requires
@@ -982,7 +987,7 @@ func LoadUserConfig() {
 	for label, raw := range cfg.Efforts {
 		effort := strings.ToLower(strings.TrimSpace(raw))
 		if !knownEffortModel(label) {
-			userConfigErr = fmt.Errorf("invalid effort model %q in %s; use one of: sol, kimi-k3, fable, grok", label, path)
+			userConfigErr = fmt.Errorf("invalid effort model %q in %s; use one of: sol, codex, kimi-k3, claude, grok", label, path)
 			return
 		}
 		if !validConfiguredModelEffort(label, effort) {
@@ -1056,13 +1061,17 @@ func titleLabel(label string) string {
 
 // pinnedModelEffort reports models whose effort is a property of the model
 // rather than of the surface invoking it. K3's provider exposes exactly one
-// level; Astra defaults to xhigh for correctness and plan reviews.
+// level; Codex defaults to xhigh for correctness and plan reviews; Claude
+// runs at medium.
 func pinnedModelEffort(label string) (string, bool) {
 	switch label {
 	case "kimi-k3":
 		return "max", true
-	case AstraLabel:
+	case CodexLabel:
 		return "xhigh", true
+	case ClaudeLabel:
+		// Claude runs Opus 5.5 at medium on every surface.
+		return "medium", true
 	default:
 		return "", false
 	}
@@ -1072,12 +1081,12 @@ func builtinModelEffort(label string) string {
 	switch label {
 	case SolLabel:
 		return DefaultReviewEffort
-	case AstraLabel:
-		// Astra is the deep-reasoning sibling of Sol and is pinned to xhigh.
+	case CodexLabel:
+		// Codex is the deep-reasoning sibling of Sol and is pinned to xhigh.
 		return "xhigh"
 	case "kimi-k3":
 		return "max"
-	case FableLabel:
+	case ClaudeLabel:
 		return "medium"
 	case GrokLabel:
 		// grok-4.6's menu is low/medium/high, and high is its own default.
@@ -1089,7 +1098,7 @@ func builtinModelEffort(label string) string {
 
 func knownEffortModel(label string) bool {
 	switch label {
-	case SolLabel, AstraLabel, "kimi-k3", FableLabel, GrokLabel:
+	case SolLabel, CodexLabel, "kimi-k3", ClaudeLabel, GrokLabel:
 		return true
 	default:
 		return false
@@ -1111,13 +1120,13 @@ func ResolveEffort(model, override, fallback string) (string, error) {
 	return resolveEffort(model, override, fallback, true)
 }
 
-// ResolveAntislopEffort uses the task's cheaper default instead of Astra's
+// ResolveAntislopEffort uses the task's cheaper default instead of Codex's
 // correctness-review pin. Explicit overrides and configured efforts still win.
 func ResolveAntislopEffort(model, override string) (string, error) {
 	return resolveEffort(model, override, DefaultAntislopEffort, false)
 }
 
-func resolveEffort(model, override, fallback string, pinAstra bool) (string, error) {
+func resolveEffort(model, override, fallback string, pinCodex bool) (string, error) {
 	label := ModelLabel(model)
 	override = strings.ToLower(strings.TrimSpace(override))
 	if override != "" {
@@ -1138,8 +1147,8 @@ func resolveEffort(model, override, fallback string, pinAstra bool) (string, err
 	// A model that pins its own effort outranks a surface-specific fallback.
 	// Without this, every caller that passes a non-empty fallback (the
 	// megareview and plan paths both pass one) silently overrides the pin,
-	// which is how Astra ran at high instead of xhigh.
-	if pinned, ok := pinnedModelEffort(label); ok && (label != AstraLabel || pinAstra) {
+	// which is how Codex ran at high instead of xhigh.
+	if pinned, ok := pinnedModelEffort(label); ok && (label != CodexLabel || pinCodex) {
 		return pinned, nil
 	}
 	if fallback == "" {

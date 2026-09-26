@@ -27,7 +27,7 @@ ENTRYPOINT ["claude"]
 // ClaudeDockerPreflight checks docker is available, token is set, and image exists (auto-builds if missing).
 func ClaudeDockerPreflight() error {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("fable runtime requires Docker but docker is not installed")
+		return fmt.Errorf("claude runtime requires Docker but docker is not installed")
 	}
 
 	// Check docker daemon is running.
@@ -35,17 +35,17 @@ func ClaudeDockerPreflight() error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("fable runtime requires Docker but the daemon is not running — start Docker Desktop and retry")
+		return fmt.Errorf("claude runtime requires Docker but the daemon is not running — start Docker Desktop and retry")
 	}
 
 	token := os.Getenv(config.ClaudeDockerTokenEnv)
 	if token == "" {
 		return fmt.Errorf("%s env var not set. To authenticate:\n"+
-			"  1. docker run -d --name rival-fable-login --user claude --entrypoint sh %s -c 'sleep 3600'\n"+
-			"  2. docker exec -it rival-fable-login claude login\n"+
-			"  3. docker exec rival-fable-login cat /home/claude/.claude/.credentials.json\n"+
+			"  1. docker run -d --name rival-claude-login --user claude --entrypoint sh %s -c 'sleep 3600'\n"+
+			"  2. docker exec -it rival-claude-login claude login\n"+
+			"  3. docker exec rival-claude-login cat /home/claude/.claude/.credentials.json\n"+
 			"  4. export %s=<accessToken from step 3>\n"+
-			"  5. docker rm -f rival-fable-login",
+			"  5. docker rm -f rival-claude-login",
 			config.ClaudeDockerTokenEnv, claudeDockerImage, config.ClaudeDockerTokenEnv)
 	}
 
@@ -54,11 +54,11 @@ func ClaudeDockerPreflight() error {
 	inspectCmd.Stdout = nil
 	inspectCmd.Stderr = nil
 	if err := inspectCmd.Run(); err != nil {
-		log.Info().Msg("Fable Docker image not found, building...")
+		log.Info().Msg("Claude Docker image not found, building...")
 		if buildErr := buildClaudeDockerImage(); buildErr != nil {
 			return fmt.Errorf("failed to build %s docker image: %w", claudeDockerImage, buildErr)
 		}
-		log.Info().Msg("Fable Docker image built successfully")
+		log.Info().Msg("Claude Docker image built successfully")
 	}
 
 	return nil
@@ -66,7 +66,7 @@ func ClaudeDockerPreflight() error {
 
 func buildClaudeDockerImage() error {
 	// Write embedded Dockerfile to temp file.
-	tmpFile, err := os.CreateTemp("", "rival-fable-dockerfile-*")
+	tmpFile, err := os.CreateTemp("", "rival-claude-dockerfile-*")
 	if err != nil {
 		return fmt.Errorf("create temp dockerfile: %w", err)
 	}
@@ -90,9 +90,9 @@ func buildClaudeDockerImage() error {
 	return nil
 }
 
-// runClaudeDocker executes Fable through the Claude Code CLI inside Docker.
+// runClaudeDocker executes Claude through the Claude Code CLI inside Docker.
 func runClaudeDocker(ctx context.Context, sess *session.Session, prompt, effort, workdir, model string, readOnly bool, mirror io.Writer) (*Result, error) {
-	if model != config.FableModel {
+	if model != config.ClaudeModel {
 		return nil, fmt.Errorf("unsupported Claude Code model %q", model)
 	}
 	token := os.Getenv(config.ClaudeDockerTokenEnv)
