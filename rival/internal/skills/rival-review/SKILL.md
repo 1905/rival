@@ -1,6 +1,6 @@
 ---
 name: rival-review
-version: 3.33.0
+version: 3.34.0
 description: Run Codex, K3, and/or opt-in grok code reviews with a consilium judge via the rival binary. Use only when the user explicitly invokes /rival-review.
 argument-hint: "[-m codex|k3|grok[,model...]] [-re high|ultra] [scope]"
 allowed-tools: Bash, Read, Write
