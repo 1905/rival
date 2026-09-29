@@ -11,6 +11,8 @@ import (
 	"github.com/1905/rival/internal/session"
 	"github.com/1905/rival/internal/telemetry"
 	"github.com/1905/rival/internal/update"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -52,6 +54,9 @@ var rootCmd = &cobra.Command{
 		// watcher picks up every session the reaper fails. Every other
 		// command reaps before it runs, as before.
 		if cmd == tuiCmd {
+			// The TUI owns the terminal: a log line on stderr (the background
+			// reaper logs each orphan it fails) draws over the screen.
+			log.Logger = zerolog.Nop()
 			startReap()
 		} else {
 			reap()

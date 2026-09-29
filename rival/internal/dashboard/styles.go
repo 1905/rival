@@ -10,35 +10,39 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Phosphor palette. Colours are truecolor; lipgloss downsamples them on
-// 256/16-colour terminals, so no fallback table is kept here.
+// Dim-phosphor palette, the same values as Rival.app's Theme.swift. Colour
+// marks state only: running amber, failed red; completed stays quiet.
+// Colours are truecolor; lipgloss downsamples them on 256/16-colour
+// terminals, so no fallback table is kept here.
 var (
-	colFg      color.Color = lipgloss.Color("#B8FFB8") // body text
-	colDim     color.Color = lipgloss.Color("#3E6B4A") // secondary text, borders, help
-	colAccent  color.Color = lipgloss.Color("#39FF14") // selection bar, active tab, focus border
-	colRunning color.Color = lipgloss.Color("#FFB000") // amber: spinner, running status
-	colQueued  color.Color = lipgloss.Color("#6B8F7A") // grey-green: waiting in line
-	colOK      color.Color = lipgloss.Color("#39FF14") // completed
-	colFail    color.Color = lipgloss.Color("#FF3B3B") // failed
+	colFg      color.Color = lipgloss.Color("#B4C2B7") // body text
+	colDim     color.Color = lipgloss.Color("#4F6154") // secondary text, borders, help
+	colAccent  color.Color = lipgloss.Color("#6FC985") // active marks: tab, focus border, cursor
+	colRunning color.Color = lipgloss.Color("#D6A34E") // amber: spinner, running status
+	colQueued  color.Color = lipgloss.Color("#6A7F70") // grey-green: waiting in line
+	colDone    color.Color = lipgloss.Color("#7F9483") // completed: quiet, the normal case
+	colFail    color.Color = lipgloss.Color("#DB6B6B") // failed
+	colSelBg   color.Color = lipgloss.Color("#16241A") // cursor bar fill
+	colSelFg   color.Color = lipgloss.Color("#E2EDE4") // text on the cursor bar
 )
 
 // logoStops are the gradient stops for the ASCII logo: violet → cyan → green.
 var logoStops = []color.Color{
-	lipgloss.Color("#7C3AED"),
-	lipgloss.Color("#22D3EE"),
-	lipgloss.Color("#39FF14"),
+	lipgloss.Color("#8B6CD9"),
+	lipgloss.Color("#4FB8CC"),
+	lipgloss.Color("#6FC985"),
 }
 
 var (
 	textStyle = lipgloss.NewStyle().Foreground(colFg)
 	dimStyle  = lipgloss.NewStyle().Foreground(colDim)
 
-	// selectedStyle is the cursor bar. Black on accent reads on every
-	// background, and bold keeps it legible once lipgloss downsamples.
+	// selectedStyle is the cursor bar: a dark green tint with light bold
+	// text, not a neon fill. Bold keeps it legible once lipgloss downsamples.
 	selectedStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#000000")).
-			Background(colAccent)
+			Foreground(colSelFg).
+			Background(colSelBg)
 
 	borderStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -46,13 +50,13 @@ var (
 
 	// Column titles and section rows in the list.
 	headerStyle  = lipgloss.NewStyle().Foreground(colDim).Bold(true)
-	sectionStyle = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
+	sectionStyle = lipgloss.NewStyle().Foreground(colDim).Bold(true)
 
 	activeTabStyle   = lipgloss.NewStyle().Foreground(colAccent).Bold(true).Underline(true)
 	inactiveTabStyle = dimStyle
 
 	runningStyle   = lipgloss.NewStyle().Foreground(colRunning).Bold(true)
-	completedStyle = lipgloss.NewStyle().Foreground(colOK)
+	completedStyle = lipgloss.NewStyle().Foreground(colDone)
 	failedStyle    = lipgloss.NewStyle().Foreground(colFail)
 	queuedStyle    = lipgloss.NewStyle().Foreground(colQueued)
 

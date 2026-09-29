@@ -6,6 +6,12 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 
 ## [Unreleased]
 
+### Changed
+- `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
+
+### Fixed
+- `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+
 ## [v4.1.1] — 2026-09-29
 
 ### Added
