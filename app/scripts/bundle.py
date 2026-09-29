@@ -5,8 +5,10 @@
 
 Steps: `swift build -c release --product RivalApp` (arm64 + x86_64 for
 universal), assemble DIR/Rival.app (bundle id dev.1905.rival), codesign -s -,
-codesign --verify, ditto-zip to DIR/Rival-app.zip. Prints `sha256=<hex>` and
-`zip=<path>` on the last two lines.
+codesign --verify, ditto-zip to DIR/Rival-app.zip (for the cask), and a
+drag-to-Applications DIR/Rival-X.Y.Z.dmg (for direct downloads). Prints
+`dmg=<path>`, then `sha256=<hex>` (of the zip) and `zip=<path>` on the last
+two lines.
 """
 
 import argparse
@@ -35,6 +37,21 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def make_dmg(app: Path, dmg: Path) -> None:
+    """A compressed DMG holding the app and an /Applications shortcut, the
+    usual drag-to-install window. Not notarized: a browser download is
+    quarantined and macOS asks the user to allow it once."""
+    stage = dmg.parent / "dmg-stage"
+    if stage.exists():
+        appbundle.trash(stage)
+    stage.mkdir()
+    subprocess.run(["ditto", str(app), str(stage / app.name)], check=True)
+    (stage / "Applications").symlink_to("/Applications")
+    subprocess.run(["hdiutil", "create", "-volname", "Rival", "-srcfolder", str(stage),
+                    "-ov", "-format", "UDZO", str(dmg)], check=True, stdout=subprocess.DEVNULL)
+    appbundle.trash(stage)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", required=True, help="X.Y.Z, no leading v")
@@ -47,7 +64,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     app = out / "Rival.app"
     zip_path = out / "Rival-app.zip"
-    for stale in (app, zip_path):
+    dmg_path = out / f"Rival-{version}.dmg"
+    for stale in (app, zip_path, dmg_path):
         if stale.exists():
             appbundle.trash(stale)
 
@@ -55,7 +73,9 @@ def main() -> None:
     appbundle.assemble(app, binary, appbundle.info_plist(version, appbundle.RELEASE_ID))
     appbundle.adhoc_sign(app, verify=True)
     subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app), str(zip_path)], check=True)
+    make_dmg(app, dmg_path)
 
+    print(f"dmg={dmg_path}")
     print(f"sha256={sha256(zip_path)}")
     print(f"zip={zip_path}")
 

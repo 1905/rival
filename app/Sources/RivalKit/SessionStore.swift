@@ -149,6 +149,10 @@ public final class SessionStore {
                 // land after this; noteProgress drops them once loaded.
                 loadProgress = LoadProgress(done: result.fileCount, total: result.fileCount)
                 isLoading = false
+                // The first scan decodes every session file and leaves ~15 MB
+                // of freed malloc pages behind (measured on 6100 sessions).
+                // Hand them back once; later scans only touch changed files.
+                Task.detached(priority: .utility) { _ = malloc_zone_pressure_relief(nil, 0) }
             }
         }
         rearmWatcher()
@@ -293,7 +297,9 @@ actor SessionScanner {
             changed = true
         }
 
-        let sessions = files.values.map(\.session).sorted {
+        // Unchanged: the store ignores `sessions`, so skip the copy and sort
+        // of every session (6000+ on a real ~/.rival) on each 2s poll.
+        let sessions = !changed ? [] : files.values.map(\.session).sorted {
             $0.startTime != $1.startTime ? $0.startTime > $1.startTime : $0.id < $1.id
         }
         return ScanResult(generation: generation, changed: changed, directoryExists: true,

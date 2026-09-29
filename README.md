@@ -14,7 +14,7 @@ rival install                               # skills for Claude Code (and Codex,
 brew install --cask 1905/tap/rival-app      # Rival.app, the macOS menu bar and window viewer
 ```
 
-Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`.
+Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`. A DMG is also attached to each release; see [Rival.app](#rivalapp).
 
 **The five most used skills**
 
@@ -440,6 +440,8 @@ A native macOS viewer for the sessions directory. It needs macOS 14 (Sonoma) or 
 ```bash
 brew install --cask 1905/tap/rival-app
 ```
+
+Without Homebrew, download `Rival-X.Y.Z.dmg` from the [latest release](https://github.com/1905/rival/releases/latest), open it and drag Rival to Applications. The app is not notarized, so macOS blocks the first launch. To allow it, open System Settings → Privacy & Security and click **Open Anyway** next to the Rival message. This is needed only once. The Homebrew cask does not need this step.
 
 - **Menu bar:** the icon shows the number of live runs. The popover lists up to 10 live runs (then `+N more — open Rival`), the last 5 finished runs, a "Notify on finish" checkbox, Open Rival and Quit.
 - **Window:** the run list on the left, with ALL, RUNNING, FAILED and DONE tabs, a filter field (same rules as the TUI filter) and day sections. The selected run shows on the right, with Result, Raw, Prompt and Info tabs and a member picker for groups. Result shows the model's answer as finding cards grouped by severity, or as formatted text. Raw shows the log. Finished runs open on Result and live runs on Raw. If the answer cannot be parsed, Result says why and links to Raw.

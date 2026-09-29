@@ -33,8 +33,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
-  # Rival.app: universal, ad-hoc signed, uploaded to the release goreleaser
-  # just made, then the rival-app cask in 1905/homebrew-tap is updated.
+  # Rival.app: universal, ad-hoc signed, uploaded (zip + DMG) to the release
+  # goreleaser just made, then the rival-app cask in 1905/homebrew-tap is updated.
   app:
     needs: release
     # macos-15 ships Xcode 16 (Swift 6) as default; Package.swift needs tools 6.0.
@@ -56,11 +56,12 @@ jobs:
         run: |
           python3 app/scripts/bundle.py --version "${GITHUB_REF_NAME#v}" | tee bundle.out
           echo "sha256=$(sed -n 's/^sha256=//p' bundle.out)" >> "$GITHUB_OUTPUT"
+          echo "dmg=$(sed -n 's/^dmg=//p' bundle.out)" >> "$GITHUB_OUTPUT"
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" app/dist/Rival-app.zip --clobber
+        run: gh release upload "$GITHUB_REF_NAME" app/dist/Rival-app.zip "${{ steps.bundle.outputs.dmg }}" --clobber
 
       - name: Update cask
         env:

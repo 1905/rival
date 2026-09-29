@@ -6,6 +6,12 @@ Latest release: [v4.1.0](https://github.com/1905/rival/releases/tag/v4.1.0) — 
 
 ## [Unreleased]
 
+### Added
+- Each release has a `Rival-X.Y.Z.dmg` for installing Rival.app without Homebrew. It is not notarized; the README explains how to allow the first launch.
+
+### Changed
+- Rival.app uses less memory: measured 78 MB → 65-67 MB on 6100 sessions. It returns the first scan's freed memory to macOS and no longer re-sorts every session on each 2 s poll when nothing changed.
+
 ## [v4.1.0] — 2026-09-29
 
 First 4.x release. v4.0.0 was tagged locally but never published; its changes ship here.
