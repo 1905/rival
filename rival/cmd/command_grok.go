@@ -1,14 +1,14 @@
 package cmd
 
 import (
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 	"github.com/spf13/cobra"
 )
 
 const grokUsage = `Usage:
   /rival-grok 'explain the auth flow' — run any prompt with Grok
   /rival-grok -re high 'find bugs in src/main.go' — pick the reasoning level
-  /rival-grok review — ruthless code review of the entire project
+  /rival-grok review — bug-hunting review of the changed files (git auto-detect)
   /rival-grok review src/api/ — review specific scope
   /rival-grok -re high review src/api/ — review with high reasoning
   /rival-grok — show this usage info

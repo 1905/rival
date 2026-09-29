@@ -3,6 +3,7 @@ package review
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -38,32 +39,6 @@ func ParseReviewerOutput(raw string) (*ReviewerOutput, error) {
 	return nil, fmt.Errorf("no reviewer JSON payload found in output")
 }
 
-// ParseConsiliumOutput extracts the consilium judge's structured JSON.
-func ParseConsiliumOutput(raw string) (*ConsiliumOutput, error) {
-	objs := jsonObjects(raw)
-	var lastErr error
-	for i := len(objs) - 1; i >= 0; i-- {
-		c := objs[i]
-		if !hasJSONKey(c, "findings") || !hasJSONKey(c, "recommendation") {
-			continue
-		}
-		var out ConsiliumOutput
-		if err := json.Unmarshal([]byte(c), &out); err != nil {
-			lastErr = err
-			continue
-		}
-		if isExampleSummary(out.Summary) || out.Recommendation.Status == "approve|request_changes|comment" {
-			continue // the echoed schema example, not a real verdict
-		}
-		out.Findings = dropPlaceholderFindings(out.Findings)
-		return &out, nil
-	}
-	if lastErr != nil {
-		return nil, fmt.Errorf("no valid consilium JSON payload (last decode error: %w)", lastErr)
-	}
-	return nil, fmt.Errorf("no consilium JSON payload found in output")
-}
-
 // hasJSONKey reports whether candidate is a JSON object with the given top-level
 // key actually present (not merely defaulting to a zero value on unmarshal).
 // This rejects unrelated JSON such as a {"event":"done"} tool/telemetry line.
@@ -76,16 +51,12 @@ func hasJSONKey(candidate, key string) bool {
 	return ok
 }
 
-// isExampleSummary matches the schema example summaries from the prompt contract
-// (reviewerJSONContract / consiliumJSONContract). A real summary is never one of
-// these exact strings. The clean-review example uses a real sentence ("No issues
-// found.") so a genuine clean review is not mistaken for the example.
+// isExampleSummary matches the schema example summary from the prompt contract
+// (reviewerJSONContract). A real summary is never this exact string. The
+// clean-review example uses a real sentence ("No issues found.") so a genuine
+// clean review is not mistaken for the example.
 func isExampleSummary(s string) bool {
-	switch strings.TrimSpace(s) {
-	case "1-3 sentence reviewer summary", "1-3 sentence overall review summary":
-		return true
-	}
-	return false
+	return strings.TrimSpace(s) == "1-3 sentence reviewer summary"
 }
 
 // isPlaceholderFinding matches a finding copied from the schema example: the enum
@@ -109,17 +80,6 @@ func isPlaceholderFinding(file, severity, category string) bool {
 // dropPlaceholderReviewerFindings removes individual schema-example findings so a
 // single echoed placeholder item does not discard an otherwise real review.
 func dropPlaceholderReviewerFindings(in []ReviewerFinding) []ReviewerFinding {
-	out := in[:0:0]
-	for _, f := range in {
-		if isPlaceholderFinding(f.File, f.Severity, f.Category) {
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
-}
-
-func dropPlaceholderFindings(in []Finding) []Finding {
 	out := in[:0:0]
 	for _, f := range in {
 		if isPlaceholderFinding(f.File, f.Severity, f.Category) {
@@ -192,4 +152,20 @@ func jsonObjects(s string) []string {
 		}
 	}
 	return out
+}
+
+// codexAnswerHeader is the line codex prints before the assistant's final
+// message. Everything above it is the echoed prompt and tool output.
+var codexAnswerHeader = regexp.MustCompile(`(?m)^codex$`)
+
+// FinalAnswer returns the part of a provider log that holds the model's final
+// answer. For codex that is the text after the last "codex" header line, so
+// review-shaped JSON a tool printed earlier (a file the model read) can never
+// be taken for the review. Logs without that header are returned whole.
+func FinalAnswer(raw string) string {
+	locs := codexAnswerHeader.FindAllStringIndex(raw, -1)
+	if len(locs) == 0 {
+		return raw
+	}
+	return raw[locs[len(locs)-1][1]:]
 }

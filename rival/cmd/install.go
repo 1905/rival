@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/1F47E/rival/internal/skills"
+	"github.com/1905/rival/internal/skills"
 	"github.com/spf13/cobra"
 )
 

@@ -38,3 +38,24 @@ func TestAlive(t *testing.T) {
 		t.Error("Alive(non-positive pid) = true, want false")
 	}
 }
+
+// Codex finding 1: stop authorization never degrades to an existence check.
+func TestSameProcess(t *testing.T) {
+	pid := os.Getpid()
+	start, ok := StartNanos(pid)
+	if !ok {
+		t.Skip("start time unsupported on this platform")
+	}
+	if !SameProcess(pid, start) {
+		t.Error("SameProcess(self, correct start) = false, want true")
+	}
+	if SameProcess(pid, start+1) {
+		t.Error("SameProcess(self, wrong start) = true, want false")
+	}
+	if SameProcess(pid, 0) {
+		t.Error("SameProcess(self, 0) = true, want false: no recorded start never authorizes")
+	}
+	if SameProcess(1<<24, start) || SameProcess(0, start) {
+		t.Error("SameProcess(dead or non-positive pid) = true, want false")
+	}
+}

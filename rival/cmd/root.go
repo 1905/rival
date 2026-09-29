@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/queue"
-	"github.com/1F47E/rival/internal/session"
-	"github.com/1F47E/rival/internal/telemetry"
-	"github.com/1F47E/rival/internal/update"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/queue"
+	"github.com/1905/rival/internal/session"
+	"github.com/1905/rival/internal/telemetry"
+	"github.com/1905/rival/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -48,9 +48,14 @@ var rootCmd = &cobra.Command{
 		if detach, _ := cmd.Flags().GetBool("detach"); detach {
 			detachIfRequested(true)
 		}
-		// Sessions first: queue ticket liveness reads session state.
-		session.ReapOrphans()
-		queue.New().ReapDead()
+		// The TUI draws its loader at once and reaps in the background; the
+		// watcher picks up every session the reaper fails. Every other
+		// command reaps before it runs, as before.
+		if cmd == tuiCmd {
+			startReap()
+		} else {
+			reap()
+		}
 		startUpdateCheck()
 		return nil
 	},
@@ -60,6 +65,37 @@ var rootCmd = &cobra.Command{
 		cmd.SetOut(os.Stdout)
 		_ = cmd.Usage()
 	},
+}
+
+// reap fails orphaned sessions, then drops dead queue tickets. Sessions
+// first: queue ticket liveness reads session state.
+func reap() {
+	session.ReapOrphans()
+	queue.New().ReapDead()
+}
+
+// reapDone is closed when a background reap finishes. It is nil when the reap
+// ran in the foreground.
+var reapDone chan struct{}
+
+// startReap runs reap off the startup path. On a large session dir it costs
+// as much as the TUI's own first scan (0.35-0.6 s on 3000 sessions), and the
+// terminal stayed blank for all of it.
+func startReap() {
+	done := make(chan struct{})
+	reapDone = done
+	go func() {
+		defer close(done)
+		reap()
+	}()
+}
+
+// waitForReap lets a background reap finish before the process exits, so
+// os.Exit never cuts a session save short and strands its temp file.
+func waitForReap() {
+	if reapDone != nil {
+		<-reapDone
+	}
 }
 
 // updateCheckDone is closed when the background update check finishes. It is
@@ -96,7 +132,8 @@ const updateCheckWait = 2 * time.Second
 func Execute() {
 	defer telemetry.RecoverPanic()
 	err := rootCmd.Execute()
-	// Both exit paths below call os.Exit, so the join has to happen first.
+	// Both exit paths below call os.Exit, so the joins have to happen first.
+	waitForReap()
 	waitForUpdateCheck()
 	if err != nil {
 		var exitErr *ExitCodeError

@@ -3,7 +3,6 @@ package skills
 import "embed"
 
 //go:embed all:rival-codex
-//go:embed all:rival-review
 //go:embed all:rival-plan
 //go:embed all:rival-plan-codex
 //go:embed all:rival-plan-claude
@@ -15,7 +14,7 @@ import "embed"
 var Files embed.FS
 
 // Names lists all embedded skill directory names.
-var Names = []string{"rival-codex", "rival-review", "rival-plan", "rival-plan-codex", "rival-plan-claude", "rival-claude", "rival-k3", "rival-grok", "rival-antislop", "rival-security"}
+var Names = []string{"rival-codex", "rival-plan", "rival-plan-codex", "rival-plan-claude", "rival-claude", "rival-k3", "rival-grok", "rival-antislop", "rival-security"}
 
 // Deprecated lists legacy or superseded skills that should be removed on
 // install. Re-enable a skill by adding it back to Names and the //go:embed list.
@@ -33,4 +32,5 @@ var Deprecated = []string{
 	"rival-plan-fable",    // Fable retired in 3.34; see rival-plan-claude
 	"rival-kimi",          // renamed to rival-k3 before release
 	"rival-antislop-plan", // plan mode dropped on 2026-08-20
+	"rival-review",        // megareview removed 2026-09-26
 }

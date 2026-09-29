@@ -16,16 +16,18 @@ import (
 )
 
 const (
-	GPT56SolModel = "gpt-5.6-sol"
-	// CodexModel is a sibling of Sol: a different model on the same codex
-	// runtime, so EngineLabel must match it before the "codex" adapter
-	// fallback below, which would otherwise label every Codex run "sol".
+	// GPT56SolModel and SolLabel name a removed model (2026-09-26). Nothing
+	// runs it; the executor rejects it.
+	GPT56SolModel = "gpt-5.6-sol" // read-compat: display of sessions recorded before Sol's removal
+	// CodexModel shares the codex runtime with the removed Sol model, so
+	// EngineLabel must match it before the "codex" adapter fallback below,
+	// which labels old sessions "sol".
 	// The public label equals the adapter name, so identity checks below
 	// key on the model id, never on the bare word "codex".
 	CodexModel  = "gpt-6-astra"
 	CodexLabel  = "codex"
 	ClaudeModel = "claude-opus-5-5"
-	SolLabel    = "sol"
+	SolLabel    = "sol" // read-compat: display of sessions recorded before Sol's removal
 	ClaudeLabel = "claude"
 	K3Label     = "kimi-k3"
 	// K3CommandName is the cobra command word for K3. It differs from
@@ -37,14 +39,13 @@ const (
 	ClaudeDockerImage    = "rival-claude"
 	ClaudeDockerTokenEnv = "RIVAL_CLAUDE_TOKEN"
 
-	DefaultReviewEffort        = "high"
-	DefaultPlanEffort          = "high"
-	DefaultAntislopEffort      = "high"
-	DefaultConfidenceThreshold = 6
-	SessionDir                 = ".rival/sessions"
-	QueueDir                   = ".rival/queue"
-	PromptPreviewLen           = 100
-	PromptDetailMaxLines       = 10
+	DefaultReviewEffort   = "high"
+	DefaultPlanEffort     = "high"
+	DefaultAntislopEffort = "high"
+	SessionDir            = ".rival/sessions"
+	QueueDir              = ".rival/queue"
+	PromptPreviewLen      = 100
+	PromptDetailMaxLines  = 10
 
 	DefaultMaxConcurrent = 2
 	DefaultQueueTimeout  = 30 * time.Minute
@@ -55,7 +56,7 @@ const (
 // ValidEfforts is the one effort ladder every surface accepts and advertises.
 //
 // xhigh and ultra are NOT interchangeable: the codex runtime passes the value
-// through verbatim and Sol treats ultra as its own reasoning level, so neither
+// through verbatim and treats ultra as its own reasoning level, so neither
 // may be aliased to the other. Runtimes that expose a shorter menu clamp at
 // their own boundary (see ClaudeEffortLevel and GrokEffort).
 var ValidEfforts = []string{"low", "medium", "high", "xhigh", "ultra"}
@@ -84,7 +85,7 @@ func OpencodeVariant(model, _ string) string {
 // Rival's short model names consistently.
 func ModelLabel(model string) string {
 	switch model {
-	case GPT56SolModel, SolLabel:
+	case GPT56SolModel, SolLabel: // read-compat: display of sessions recorded before Sol's removal
 		return SolLabel
 	case CodexModel, CodexLabel:
 		return CodexLabel
@@ -108,11 +109,11 @@ func ModelLabel(model string) string {
 func EngineLabel(cli, model string) string {
 	// Exact current ids win first.
 	switch model {
-	case GPT56SolModel:
+	case GPT56SolModel: // read-compat: display of sessions recorded before Sol's removal
 		return SolLabel
 	case CodexModel:
-		// Checked before the adapter fallback: Codex and Sol both run on
-		// codex, so falling through would label Codex as Sol.
+		// Checked before the adapter fallback: Codex and the removed Sol both
+		// ran on codex, so falling through would label Codex as Sol.
 		return CodexLabel
 	case ClaudeModel:
 		return ClaudeLabel
@@ -129,7 +130,7 @@ func EngineLabel(cli, model string) string {
 	// Adapter identity is the reliable fallback for sessions written by older
 	// releases with now-obsolete model ids.
 	switch cli {
-	case "codex":
+	case "codex": // read-compat: display of sessions recorded before Sol's removal
 		return SolLabel
 	case GrokLabel:
 		return GrokLabel
@@ -210,13 +211,14 @@ func PublicRuntimeLog(cli, model, raw string) string {
 		switch cli {
 		case "codex", "astra":
 			if strings.HasPrefix(trimmed, "OpenAI Codex") {
-				// Sol and Codex share this runtime, so the banner takes the
+				// Codex and old Sol sessions share this runtime, so the banner takes the
 				// resolved label rather than a hardcoded "Sol". Title-cased to
 				// match the display form the banner has always used.
 				trimmed = titleLabel(EngineLabel(cli, model)) + " runtime" + strings.TrimPrefix(trimmed, "OpenAI Codex")
 				body = leading + trimmed
 				bannerSeen = true
 			} else if i == 0 && strings.HasPrefix(trimmed, "Codex ") {
+				// read-compat: display of sessions recorded before Sol's removal
 				trimmed = "Sol runtime " + strings.TrimPrefix(trimmed, "Codex ")
 				body = leading + trimmed
 				bannerSeen = true
@@ -261,7 +263,7 @@ func replaceConcreteModelIDs(cli, model, text string) string {
 	// only expands to its label once every id is consumed.
 	type pair struct{ id, label string }
 	pairs := []pair{
-		{GPT56SolModel, SolLabel},
+		{GPT56SolModel, SolLabel}, // read-compat: display of sessions recorded before Sol's removal
 		{CodexModel, CodexLabel},
 		{ClaudeModel, ClaudeLabel},
 		{KimiModel, K3Label},
@@ -285,6 +287,7 @@ func replaceConcreteModelIDs(cli, model, text string) string {
 	// label — a re-normalized log, or a model naming itself — and
 	// "grok-4.6-openrouter" contains the id "grok-4.6", so an unprotected
 	// label would be rewritten into "grok-openrouter".
+	// SolLabel stays protected — read-compat: display of sessions recorded before Sol's removal.
 	protected := []string{GrokOpenRouterLabel, K3Label, SolLabel, ClaudeLabel, GrokLabel, CodexLabel}
 	sort.SliceStable(protected, func(i, j int) bool {
 		return len(protected[i]) > len(protected[j])
@@ -351,7 +354,7 @@ func publicReviewHeader(line string) string {
 		if lowerIdentity == CodexLabel || strings.Contains(lowerIdentity, CodexModel) || strings.Contains(lowerIdentity, "astra") {
 			reviewer = CodexLabel
 		} else {
-			reviewer = SolLabel
+			reviewer = SolLabel // read-compat: display of sessions recorded before Sol's removal
 		}
 	case "claude":
 		// Same collision as codex: a bare "claude" or the current id is the
@@ -367,7 +370,7 @@ func publicReviewHeader(line string) string {
 		} else {
 			reviewer = "retired-model"
 		}
-	case GPT56SolModel:
+	case GPT56SolModel: // read-compat: display of sessions recorded before Sol's removal
 		reviewer = SolLabel
 	case ClaudeModel:
 		reviewer = ClaudeLabel
@@ -377,94 +380,6 @@ func publicReviewHeader(line string) string {
 		reviewer = GrokLabel
 	}
 	return prefix + reviewer + role
-}
-
-// ReviewTarget is one concrete reviewer selected for a megareview run. CLI is
-// the internal executable adapter and Model is the concrete model id.
-// User-facing output always uses Model.
-type ReviewTarget struct {
-	CLI   string
-	Model string
-	// Prompt selects the lens this reviewer runs. The zero value is the bug
-	// hunter, so only targets that need a different lens set it.
-	Prompt PromptKind
-}
-
-// DefaultReviewTargets returns the curated two-model megareview roster. The
-// order is also the consilium judge preference order.
-func DefaultReviewTargets() []ReviewTarget {
-	// K3 left the default roster on 2026-08-14. It stays selectable with
-	// -m k3, where it always carries the security lens.
-	return []ReviewTarget{
-		{CLI: "codex", Model: CodexModel},
-	}
-}
-
-// ResolveReviewTargets resolves per-invocation model selectors to an exact,
-// ordered reviewer roster. With no selectors the curated default roster is
-// returned. With selectors, ONLY the named reviewers are returned. Selectors
-// may be repeated or comma-separated.
-//
-// Friendly aliases:
-//   - sol (the exact runtime model id remains accepted for compatibility)
-//   - k3, kimi-k3
-//   - grok (opt-in; absent from the default roster)
-//
-// Per-run selection intentionally stays on this curated set.
-func ResolveReviewTargets(selectors []string) ([]ReviewTarget, error) {
-	var flat []string
-	for _, value := range selectors {
-		for _, selector := range strings.Split(value, ",") {
-			selector = strings.TrimSpace(selector)
-			if selector == "" {
-				return nil, fmt.Errorf("model selector cannot be empty")
-			}
-			flat = append(flat, selector)
-		}
-	}
-	if len(flat) == 0 {
-		return DefaultReviewTargets(), nil
-	}
-
-	var targets []ReviewTarget
-	seen := map[string]bool{}
-	appendTarget := func(target ReviewTarget) {
-		key := target.CLI + "\x00" + target.Model
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		targets = append(targets, target)
-	}
-
-	for _, raw := range flat {
-		alias := strings.ToLower(strings.TrimSpace(raw))
-
-		var expanded []ReviewTarget
-		switch alias {
-		case SolLabel, GPT56SolModel:
-			expanded = []ReviewTarget{{CLI: "codex", Model: GPT56SolModel}}
-		case CodexLabel, CodexModel:
-			expanded = []ReviewTarget{{CLI: "codex", Model: CodexModel}}
-		case "k3", "kimi-k3":
-			// K3 only ever runs the security lens, in any roster.
-			// Kimi K3 runs through the Moonshot AI provider and needs its API key.
-			expanded = []ReviewTarget{{CLI: "opencode", Model: KimiModel, Prompt: PromptSecurity}}
-		case GrokLabel:
-			// Opt-in only: grok never joins the default roster.
-			expanded = []ReviewTarget{{CLI: GrokLabel, Model: GrokModel}}
-		default:
-			return nil, fmt.Errorf("unknown review model %q; use one of: sol, codex, kimi-k3, grok", raw)
-		}
-		for _, target := range expanded {
-			appendTarget(target)
-		}
-	}
-
-	if len(targets) == 0 {
-		return nil, fmt.Errorf("no review models selected")
-	}
-	return targets, nil
 }
 
 // KimiAPIKeyFrom returns the Moonshot AI API key for K3 runs.
@@ -518,7 +433,7 @@ func BuildWorkdirPreamble(workdir string) string {
 	return strings.ReplaceAll(WorkdirPreamble, "{WORKDIR}", abs)
 }
 
-// DiffReviewPreamble is prepended to ReviewPrompt when git auto-detects changed files.
+// DiffReviewPreamble is prepended to the reviewer prompt when git auto-detects changed files.
 // {FILES} is replaced with the newline-separated file list at runtime.
 const DiffReviewPreamble = `The following files have uncommitted changes (or were changed in the last commit). Focus your review on these files, but read other project files as needed for context.
 
@@ -529,32 +444,12 @@ Changed files:
 {DIFFSTAT}
 `
 
-// ReviewPrompt is the language-agnostic review template. {SCOPE} is replaced at runtime.
-const ReviewPrompt = `You are a ruthless senior staff engineer doing a code review. Your job is to find real problems — not nitpick style.
-
-Review scope: {SCOPE}
-
-Read the code in the review scope. Then produce a review covering:
-
-1. **Critical bugs** — logic errors, race conditions, data loss risks, unhandled edge cases
-2. **Security vulnerabilities** — injection, auth bypass, secret exposure, SSRF, path traversal
-3. **Architecture issues** — tight coupling, missing abstractions, scalability bottlenecks
-4. **Performance problems** — N+1 queries, unnecessary allocations, missing indexes, blocking I/O
-5. **Error handling gaps** — swallowed errors, missing retries, unclear failure modes
-
-Rules:
-- Only report issues you are confident about. No speculative nitpicks.
-- For each issue: file path, line number (or range), severity (CRITICAL/HIGH/MEDIUM), one-line description, and a concrete fix suggestion.
-- Group by severity, highest first.
-- If the code is solid, say so briefly. Do not invent problems.
-- Skip style, formatting, naming, and documentation unless they mask a real bug.`
-
 // PlanReviewPrompt is the plan/spec review template used by `rival command plan`.
 // It targets a single planning/spec markdown document (NOT source code) and asks
 // codex to rate it and surface bugs + gaps. {FILE} is replaced with the absolute
 // path at the call site. The model must emit ONE JSON object matching the contract
 // below so the output can be parsed structurally (see review.ParsePlanOutput).
-const PlanReviewPrompt = `You are a ruthless senior staff engineer reviewing an engineering PLAN / SPEC document (not source code). Your job is to find real problems that would make this plan fail, mislead an implementer, or ship the wrong thing — not to nitpick wording.
+const PlanReviewPrompt = `You review an engineering PLAN / SPEC document (not source code). Find the real problems that would make this plan fail, mislead an implementer, or ship the wrong thing. Do not report wording nitpicks.
 
 Plan document to review: {FILE}
 
@@ -563,7 +458,9 @@ Read the file in full (use your tools). Judge it as an implementation blueprint.
 1. **Bugs / logic flaws** — steps that are wrong, contradictory, out of order, or that would break when implemented as written.
 2. **Gaps** — missing steps, unhandled edge cases, undefined error/failure behavior, absent rollback/migration/auth/validation, things the plan silently assumes.
 3. **Ambiguity** — instructions vague enough that two engineers would build different things; unstated assumptions; undefined terms.
-4. **Scope / feasibility** — unrealistic claims, hidden dependencies, under-estimated work, or parts that conflict with how the rest of the system (as described) works.
+4. **Scope / feasibility** — unrealistic claims, hidden dependencies, under-estimated work, or parts that conflict with how the existing system actually works.
+
+When the plan makes claims about existing code (files, functions, schemas, config, commands), open the repo and check them. A claim the code contradicts is a bug finding: cite the plan section in ` + "`file`" + ` and put the contradicting code location in ` + "`body`" + `.
 5. **Verification gaps** — no way to tell if the plan succeeded; missing tests, acceptance criteria, or rollback checks.
 
 Rules:
@@ -623,7 +520,7 @@ const antislopJSONContract = `Output: respond with EXACTLY ONE JSON object and n
 // Derived from Claude Code's built-in /simplify skill (reuse, simplification,
 // efficiency, altitude), extended with over-engineering and AI-slop angles.
 // Report-only: the reviewer proposes cuts; the caller applies them.
-const AntislopCodePrompt = `You are a ruthless senior staff engineer doing a QUALITY-ONLY review: hunt slop and over-engineering, not bugs. Do NOT report correctness bugs, security issues, or missing features — other reviews cover those. Skip style and formatting nitpicks entirely.
+const AntislopCodePrompt = `You do a QUALITY-ONLY code review: hunt slop and over-engineering, not bugs. Do NOT report correctness bugs, security issues, or missing features — other reviews cover those. Skip style and formatting nitpicks entirely.
 
 Review scope: {SCOPE}
 
@@ -654,23 +551,18 @@ Rules:
 
 ` + antislopJSONContract
 
-// PromptKind selects which reviewer prompt a target runs. The zero value is
-// the bug hunter, so an unset field keeps the existing behavior.
+// WholeProject is the review scope used when none is given and git detects no
+// changed files.
+const WholeProject = "the entire project"
+
+// PromptKind selects which reviewer prompt BuildReviewerPrompt renders: the
+// bug hunter or the security lens.
 type PromptKind int
 
 const (
 	PromptBugHunter PromptKind = iota
 	PromptSecurity
 )
-
-// String names the lens for the consilium judge, which needs to know that
-// reviewers looked for different things.
-func (k PromptKind) String() string {
-	if k == PromptSecurity {
-		return "security"
-	}
-	return "bug hunting"
-}
 
 // SecurityModel describes one model that can run the security review. Both
 // entries run through the OpenCode adapter, so the differences between them
@@ -771,9 +663,9 @@ func ConfiguredSecurityReviewer() string {
 	return strings.TrimSpace(userConfig.Security.Reviewer)
 }
 
-// OpenCodeEntryFor looks up a registry entry by concrete model id. The
-// megareview uses it so an explicit -m selection never consults the security
-// config: with security.reviewer set to grok, `-m k3` must still run K3.
+// OpenCodeEntryFor looks up a registry entry by concrete model id, without
+// consulting the security config: with security.reviewer set to grok, a run
+// that names K3 must still run K3.
 func OpenCodeEntryFor(model string) (SecurityModel, bool) {
 	for _, entry := range securityModels {
 		if entry.Model == model {
@@ -894,8 +786,8 @@ func QueueTimeout() time.Duration {
 }
 
 // MaxRunWait returns a safe upper bound on how long a detached run can legitimately
-// take end-to-end: the full queue wait plus the worst-case run budget (megareview
-// runs two phases, so 2× RunTimeout), plus a small margin for process startup,
+// take end-to-end: the full queue wait plus 2× RunTimeout (every current run
+// holds a 1× budget; the second is headroom), plus a small margin for process startup,
 // stdout flush, and reaper cycles. `rival wait` uses this as its default timeout
 // so it never gives up on a run that is still within its configured limits.
 // When RunTimeout is disabled (0), only the queue wait + margin is bounded.
@@ -926,7 +818,7 @@ func RunTimeout() time.Duration {
 }
 
 // WithRunTimeout derives a context bounded by mult×RunTimeout(). mult scales the
-// budget for multi-phase pipelines (e.g. megareview = 2: reviewers + judge).
+// budget for multi-phase pipelines; every current caller passes 1.
 // When RunTimeout() is 0 (disabled) it returns ctx with a no-op cancel.
 func WithRunTimeout(ctx context.Context, mult int) (context.Context, context.CancelFunc) {
 	d := RunTimeout()
@@ -984,10 +876,13 @@ func LoadUserConfig() {
 		userConfigErr = fmt.Errorf("parse %s: %w", path, err)
 		return
 	}
+	// Sol was removed on 2026-09-26. An old efforts.sol entry configures
+	// nothing that can run, so drop it instead of failing every command.
+	delete(cfg.Efforts, SolLabel)
 	for label, raw := range cfg.Efforts {
 		effort := strings.ToLower(strings.TrimSpace(raw))
 		if !knownEffortModel(label) {
-			userConfigErr = fmt.Errorf("invalid effort model %q in %s; use one of: sol, codex, kimi-k3, claude, grok", label, path)
+			userConfigErr = fmt.Errorf("invalid effort model %q in %s; use one of: codex, kimi-k3, claude, grok", label, path)
 			return
 		}
 		if !validConfiguredModelEffort(label, effort) {
@@ -1079,10 +974,8 @@ func pinnedModelEffort(label string) (string, bool) {
 
 func builtinModelEffort(label string) string {
 	switch label {
-	case SolLabel:
-		return DefaultReviewEffort
 	case CodexLabel:
-		// Codex is the deep-reasoning sibling of Sol and is pinned to xhigh.
+		// Codex is the deep-reasoning model and is pinned to xhigh.
 		return "xhigh"
 	case "kimi-k3":
 		return "max"
@@ -1098,7 +991,7 @@ func builtinModelEffort(label string) string {
 
 func knownEffortModel(label string) bool {
 	switch label {
-	case SolLabel, CodexLabel, "kimi-k3", ClaudeLabel, GrokLabel:
+	case CodexLabel, "kimi-k3", ClaudeLabel, GrokLabel:
 		return true
 	default:
 		return false
@@ -1146,7 +1039,7 @@ func resolveEffort(model, override, fallback string, pinCodex bool) (string, err
 	fallback = strings.ToLower(strings.TrimSpace(fallback))
 	// A model that pins its own effort outranks a surface-specific fallback.
 	// Without this, every caller that passes a non-empty fallback (the
-	// megareview and plan paths both pass one) silently overrides the pin,
+	// review and plan paths both pass one) silently overrides the pin,
 	// which is how Codex ran at high instead of xhigh.
 	if pinned, ok := pinnedModelEffort(label); ok && (label != CodexLabel || pinCodex) {
 		return pinned, nil

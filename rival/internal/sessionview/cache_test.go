@@ -131,3 +131,30 @@ func TestCacheGetReturnsCachedSession(t *testing.T) {
 		t.Error("Get returned a session that was never cached")
 	}
 }
+
+func TestCacheProgressIsThrottledAndReachesTotal(t *testing.T) {
+	dir := t.TempDir()
+	const n = 250
+	for i := 0; i < n; i++ {
+		writeSession(t, dir, fmt.Sprintf("s%03d", i), "completed", time.Now())
+	}
+	var calls [][2]int
+	sessions, _ := New(dir).LoadWithProgress(func(done, total int) {
+		calls = append(calls, [2]int{done, total})
+	})
+	if len(sessions) != n {
+		t.Fatalf("got %d sessions, want %d", len(sessions), n)
+	}
+	want := [][2]int{{100, n}, {200, n}, {n, n}}
+	if fmt.Sprint(calls) != fmt.Sprint(want) {
+		t.Fatalf("progress calls = %v, want %v", calls, want)
+	}
+}
+
+func TestCacheProgressSilentOnEmptyDir(t *testing.T) {
+	called := false
+	New(t.TempDir()).LoadWithProgress(func(int, int) { called = true })
+	if called {
+		t.Fatal("progress called with no session files")
+	}
+}

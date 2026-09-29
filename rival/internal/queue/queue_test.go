@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/1F47E/rival/internal/procinfo"
+	"github.com/1905/rival/internal/procinfo"
 )
 
 // deadPID is far above any real PID on macOS/Linux defaults.

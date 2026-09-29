@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/skills"
+	"github.com/1905/rival/internal/skills"
 )
 
 func TestSkillTargets(t *testing.T) {
@@ -205,5 +205,29 @@ func TestRemoveSkillDirsByHashRemovesOnlyExactMatches(t *testing.T) {
 func TestRetiredSkillCleanupHashesStayConfigured(t *testing.T) {
 	if len(retiredSkillNameHashes) != 2 {
 		t.Fatalf("retired skill cleanup hash count = %d, want 2", len(retiredSkillNameHashes))
+	}
+}
+
+// An installed rival-review (megareview, removed 2026-09-26) is cleaned up by
+// install on both hosts.
+func TestInstallRemovesRetiredReviewSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	targets, err := skillTargets(home, "all", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range targets {
+		stale := filepath.Join(target.base, "rival-review", "SKILL.md")
+		if err := writeSkill(filepath.Dir(stale), stale, []byte("---\nname: rival-review\n---\n")); err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		if err := installSkills(target, false, bufio.NewReader(strings.NewReader("")), &out); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Dir(stale)); !os.IsNotExist(err) {
+			t.Fatalf("%s: rival-review was not removed by install (stat err %v)", target.host, err)
+		}
 	}
 }

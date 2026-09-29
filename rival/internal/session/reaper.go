@@ -1,7 +1,7 @@
 package session
 
 import (
-	"github.com/1F47E/rival/internal/procinfo"
+	"github.com/1905/rival/internal/procinfo"
 	"github.com/rs/zerolog/log"
 )
 

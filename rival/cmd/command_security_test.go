@@ -4,12 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/review"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/review"
 )
 
-// The security command must never borrow the bug-hunter prompt. resolveGitScope
-// overwrites the prompt with config.ReviewPrompt, so using it here would have
+// The security command must never borrow the bug-hunter prompt: that would
 // run a bug hunt on the default empty-stdin invocation while reporting a
 // security review.
 func TestSecurityPromptIsAlwaysTheSecurityLens(t *testing.T) {

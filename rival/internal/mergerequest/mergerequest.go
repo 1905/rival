@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/1F47E/rival/internal/gitscope"
+	"github.com/1905/rival/internal/gitscope"
 )
 
 const marker = "/-/merge_requests/"

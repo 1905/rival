@@ -1,9 +1,8 @@
 // Package logfmt makes raw CLI logs safe to display. Runtime logs are captured
 // verbatim, so they carry ANSI escapes, carriage-return progress frames and
 // stray control bytes that neither a terminal pane nor a browser renders
-// sensibly. Both the TUI (internal/dashboard) and the web server
-// (internal/server) share this one implementation; only the TUI additionally
-// expands tabs, because the web page lets CSS tab-size do that job.
+// sensibly. The TUI (internal/dashboard) uses Sanitize and then expands tabs,
+// because a tab is one rune but many terminal cells.
 package logfmt
 
 import (

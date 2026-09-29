@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/review"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/review"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +40,7 @@ func init() {
 	commandPlanCmd.Flags().Bool("no-queue", false, "bypass the review queue")
 	commandPlanCmd.Flags().StringSliceP("model", "m", defaultPlanModels, "plan review model(s): codex, claude (comma-separated)")
 	commandCmd.AddCommand(commandPlanCmd)
-	commandPlanCmd.Flags().String("effort", config.DefaultPlanEffort, "override reasoning effort for every selected model: low, medium, high, ultra")
+	commandPlanCmd.Flags().String("effort", "", "override reasoning effort for every selected model: "+strings.Join(config.ValidEfforts, ", ")+" (default: each model's own)")
 }
 
 // parsePlanModels validates model-facing selectors and maps them to the
@@ -194,7 +194,7 @@ func parsePlanInput(raw string) (path, effort string, err error) {
 		return "", "", fmt.Errorf("option %s requires a value", name)
 	}
 	if !config.IsValidEffort(effort) {
-		return "", "", fmt.Errorf("invalid effort %q, must be one of: low, medium, high, ultra", effort)
+		return "", "", fmt.Errorf("invalid effort %q, must be one of: %s", effort, strings.Join(config.ValidEfforts, ", "))
 	}
 	path = strings.TrimSpace(rest)
 	if path == "" {

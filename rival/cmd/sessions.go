@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 	"github.com/spf13/cobra"
 )
 

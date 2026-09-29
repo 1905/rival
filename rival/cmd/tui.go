@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/1F47E/rival/internal/dashboard"
+	"github.com/1905/rival/internal/dashboard"
 	"github.com/spf13/cobra"
 )
 

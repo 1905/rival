@@ -1,0 +1,32 @@
+## Review: `web/src/checkout/` — cart totals refactor
+
+Three real problems, one nit. The refactor is otherwise clean and the new
+`useCartTotals` hook is easier to test than the old reducer.
+
+### High
+
+- **`web/src/checkout/useCartTotals.ts:42`** — discounts are applied after tax.
+  VAT is charged on the pre-discount amount: a 100.00 cart with a 10% coupon
+  shows VAT 20.00 instead of 18.00. Apply the discount to the net amount first.
+- **`web/src/checkout/api.ts:118`** — `submitOrder` retries on any 5xx with no
+  idempotency key. A slow 504 from the gateway followed by a retry creates two
+  orders.
+
+### Medium
+
+- **`web/src/checkout/CartSummary.tsx:77`** — the currency is hard-coded to
+  `EUR` in `Intl.NumberFormat`. Accounts billed in GBP see the wrong symbol.
+
+```ts
+// CartSummary.tsx:77
+const fmt = new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" });
+// should be: currency: cart.currency
+```
+
+### Low
+
+- **`web/src/checkout/useCartTotals.test.ts:15`** — the fixture cart has one
+  line item, so the rounding bug above never shows. Add a three-item cart with
+  a percentage coupon.
+
+**Verdict:** fix the two High items before merge. The rest can follow.

@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 )
 

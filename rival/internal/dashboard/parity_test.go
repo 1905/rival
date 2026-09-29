@@ -4,14 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
-	"github.com/1F47E/rival/internal/sessionview"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
+	"github.com/1905/rival/internal/sessionview"
 )
 
-// The TUI and the web dashboard must report the same derived values for the
-// same sessions. Both now read through internal/sessionview, so this asserts
-// the TUI's row helpers return exactly what the shared package produces.
+// The TUI row helpers must report exactly the values internal/sessionview
+// derives for the same sessions, and those values are pinned directly below.
 func TestTUIRowValuesMatchSharedDerivations(t *testing.T) {
 	base := time.Now().Add(-20 * time.Minute)
 	firstEnd := base.Add(4 * time.Minute)
@@ -30,23 +29,31 @@ func TestTUIRowValuesMatchSharedDerivations(t *testing.T) {
 	if got, want := groupEffort(item), sessionview.Effort(members); got != want {
 		t.Errorf("effort: TUI %q, shared %q", got, want)
 	}
-	if got, want := groupKindLabel(item), sessionview.Kind(members); got != want {
+	if got, want := kindLabel(item), shortKind(sessionview.Kind(members)); got != want {
 		t.Errorf("kind: TUI %q, shared %q", got, want)
 	}
-	if got, want := groupModels(item), sessionview.JoinLabels(sessionview.EngineLabels(members), " + "); got != want {
-		t.Errorf("models: TUI %q, shared %q", got, want)
+	// The TUI shows raw model ids, not the shared public labels: the first
+	// requested model plus a count of the other distinct ids.
+	if got, want := groupModelName(item), config.GPT56SolModel+" +1"; got != want {
+		t.Errorf("models: TUI %q, want %q", got, want)
 	}
 	if got, want := groupElapsed(item), sessionview.Elapsed(members); got != want {
 		t.Errorf("elapsed: TUI %q, shared %q", got, want)
 	}
 
 	// The span covers both members. The old TUI reported the longest single
-	// member instead, which is how the two dashboards drifted apart.
+	// member instead.
 	if got := groupElapsed(item); got != "7m0s" {
 		t.Errorf("group elapsed = %q, want the 7m0s span rather than a 4m member", got)
 	}
+	if got := groupStatus(item); got != "completed" {
+		t.Errorf("group status = %q, want completed", got)
+	}
+	if got := groupEffort(item); got != "xhigh" {
+		t.Errorf("group effort = %q, want xhigh", got)
+	}
 	// An antislop group must not be labelled a plan review.
-	if got := groupIcon(item); got != iconAntislop+" slop" {
-		t.Errorf("group icon = %q, want the antislop icon", got)
+	if got := kindLabel(item); got != "slop" {
+		t.Errorf("group kind = %q, want slop", got)
 	}
 }

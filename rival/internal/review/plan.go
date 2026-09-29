@@ -3,15 +3,14 @@ package review
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // PlanOutput is the structured JSON emitted by `rival command plan`. It mirrors
 // ReviewerOutput but carries a 1-10 Rating and is parsed independently so the
-// plan command stays decoupled from the multi-CLI consilium types.
+// plan command stays decoupled from the code-review types.
 type PlanOutput struct {
 	Summary  string            `json:"summary"`
 	Rating   int               `json:"rating"`
@@ -58,23 +57,6 @@ func ParsePlanOutput(raw string) (*PlanOutput, error) {
 	return nil, fmt.Errorf("no plan JSON payload found in output")
 }
 
-// displaySeverity maps the canonical severity word to the short label shown in
-// plan output (crit/high/med/low). Unknown values pass through unchanged.
-func displaySeverity(canonical string) string {
-	switch strings.ToLower(canonical) {
-	case "critical":
-		return "crit"
-	case "high":
-		return "high"
-	case "medium":
-		return "med"
-	case "low":
-		return "low"
-	default:
-		return strings.ToLower(canonical)
-	}
-}
-
 // FormatPlanConsole renders a single-CLI PlanOutput for the caller: the header,
 // the file, the 1-10 rating, the summary, then every finding grouped by severity
 // bucket (crit→high→med→low) and numbered globally 1..N. No confidence filtering —
@@ -101,21 +83,11 @@ const (
 // renderers; ratingLabel and emptyLine are the only flavor-specific strings.
 func formatPlanBody(out *PlanOutput, sb *strings.Builder, ratingLabel, emptyLine string) {
 	fmt.Fprintf(sb, "%s: %d/10\n\n", ratingLabel, out.Rating)
-	if s := strings.TrimSpace(out.Summary); s != "" {
-		fmt.Fprintf(sb, "Summary: %s\n\n", s)
-	}
+	writeSummary(sb, out.Summary)
 
-	// Stable sort by severity (crit first), then confidence (highest first), so
+	// Sorted by severity (crit first), then confidence (highest first), so
 	// findings come out grouped without a separate bucketing pass.
-	findings := make([]ReviewerFinding, len(out.Findings))
-	copy(findings, out.Findings)
-	sort.SliceStable(findings, func(i, j int) bool {
-		ri, rj := severityRank(findings[i].Severity), severityRank(findings[j].Severity)
-		if ri != rj {
-			return ri < rj
-		}
-		return findings[i].Confidence > findings[j].Confidence
-	})
+	findings := sortedFindings(out.Findings)
 
 	if len(findings) == 0 {
 		sb.WriteString(emptyLine + "\n")
@@ -123,45 +95,14 @@ func formatPlanBody(out *PlanOutput, sb *strings.Builder, ratingLabel, emptyLine
 	}
 
 	for i, f := range findings {
-		loc := f.File
-		if f.Line > 0 {
-			loc = fmt.Sprintf("%s:%d", f.File, f.Line)
-		}
-		fmt.Fprintf(sb, "%d. [%s] %s", i+1, displaySeverity(f.Severity), f.Title)
-		if loc != "" {
-			fmt.Fprintf(sb, " — %s", loc)
-		}
-		sb.WriteString("\n")
-		if b := strings.TrimSpace(f.Body); b != "" {
-			fmt.Fprintf(sb, "   %s\n", b)
-		}
-		if s := strings.TrimSpace(f.Suggestion); s != "" {
-			fmt.Fprintf(sb, "   Fix: %s\n", s)
-		}
-		if f.Category != "" {
-			fmt.Fprintf(sb, "   (%s, confidence %d)\n", f.Category, f.Confidence)
-		} else {
-			fmt.Fprintf(sb, "   (confidence %d)\n", f.Confidence)
-		}
-		sb.WriteString("\n")
+		// The plan/antislop schema has no failure_scenario; drop one a model
+		// volunteers so doc reviews never print a Scenario line.
+		f.FailureScenario = ""
+		writeFinding(sb, i+1, f)
 	}
 
 	// Severity tally for a quick read.
-	var crit, high, med, low int
-	for _, f := range findings {
-		switch severityRank(f.Severity) {
-		case 0:
-			crit++
-		case 1:
-			high++
-		case 2:
-			med++
-		default:
-			low++
-		}
-	}
-	fmt.Fprintf(sb, "Findings: %d total — %d crit, %d high, %d med, %d low\n",
-		len(findings), crit, high, med, low)
+	sb.WriteString(severityTally(findings) + "\n")
 }
 
 // FormatPlanResult renders a PlanRunResult for the caller. A single successful

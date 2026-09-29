@@ -1,11 +1,10 @@
 package review
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // BuildReviewerPrompt builds the reviewer prompt by combining scope context
@@ -13,7 +12,7 @@ import (
 func BuildReviewerPrompt(scope string, kind config.PromptKind) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Review scope: %s\n\n", scope))
+	fmt.Fprintf(&sb, "Review scope: %s\n\n", scope)
 
 	// Both prompts stay overridable through ~/.rival/config.yaml. An empty
 	// override falls through rather than producing an empty prompt.
@@ -28,41 +27,6 @@ func BuildReviewerPrompt(scope string, kind config.PromptKind) string {
 	}
 
 	sb.WriteString(reviewerJSONContract())
-	return sb.String()
-}
-
-// BuildConsiliumPrompt builds the judge prompt with all reviewer findings + scope context.
-func BuildConsiliumPrompt(inputs []ReviewInput, scope string, threshold int) string {
-	var sb strings.Builder
-	reviewerLabels := make([]string, 0, len(inputs))
-	for _, input := range inputs {
-		reviewerLabels = append(reviewerLabels, config.EngineLabel(input.CLI, input.Model))
-	}
-
-	sb.WriteString("# Consilium Judge — Final Code Review Verdict\n\n")
-	sb.WriteString(fmt.Sprintf("Review scope: %s\n\n", scope))
-
-	sb.WriteString(consiliumInstructions(threshold, reviewerLabels))
-	sb.WriteString(reviewerLensMap(inputs))
-
-	// Reviewer findings
-	sb.WriteString(fmt.Sprintf("## Reviewer Findings (%d reviewers)\n\n", len(inputs)))
-	for _, input := range inputs {
-		label := config.EngineLabel(input.CLI, input.Model)
-		sb.WriteString(fmt.Sprintf("=== REVIEW FROM %s ===\n\n", label))
-		if input.Parsed != nil {
-			if data, err := json.MarshalIndent(input.Parsed, "", "  "); err == nil {
-				sb.WriteString(string(data))
-			} else {
-				sb.WriteString(failedReviewerStub(label, input.RawOutput))
-			}
-		} else {
-			sb.WriteString(failedReviewerStub(label, input.RawOutput))
-		}
-		sb.WriteString("\n\n=== END REVIEW ===\n\n")
-	}
-
-	sb.WriteString(consiliumJSONContract(reviewerLabels))
 	return sb.String()
 }
 
@@ -101,66 +65,12 @@ Rules:
 - if a behavior looks incomplete but not clearly broken, do not upgrade it beyond medium
 - if you are not confident, omit it
 - read the code in the review scope before producing findings
+- ` + failureScenarioRule + `
 
-You are not the final judge. Optimize for true positives, not completeness.
+` + severityRubric + `
+Optimize for true positives, not completeness.
+
 `
-}
-
-// reviewerLensMap tells the judge which reviewer looked for what. Without it
-// the judge cannot tell a finding that nobody corroborated from one that only
-// a single reviewer was equipped to find.
-func reviewerLensMap(inputs []ReviewInput) string {
-	var sb strings.Builder
-	sb.WriteString("## Reviewer lenses\n\n")
-	for _, input := range inputs {
-		fmt.Fprintf(&sb, "- %s reviewed for: %s\n", config.EngineLabel(input.CLI, input.Model), input.Prompt)
-	}
-	sb.WriteString(`
-Reviewers can carry different lenses. Absence of corroboration from a reviewer
-that was not looking for a class of defect is NOT evidence against a finding.
-Do not lower confidence, and do not drop a finding, merely because only the
-reviewer equipped to find it reported it.
-
-The consensus bonus still applies whenever two reviewers independently report
-the same issue, whatever lens each of them used.
-
-`)
-	return sb.String()
-}
-
-func consiliumInstructions(threshold int, reviewerLabels []string) string {
-	return fmt.Sprintf(`## Instructions
-
-You are the final judge for this code review.
-
-You are given independent findings from different reviewer models in structured JSON.
-
-Your job is to:
-- merge duplicate findings (same file + same line + same problem = one finding, all reporters in found_by)
-- keep true high-signal issues
-- drop weak, speculative, or redundant findings
-- assign final severity and confidence
-- produce a concise final review
-
-Rules:
-- Do not invent new findings that are absent from reviewer inputs.
-- In found_by, use only the exact concrete reviewer labels shown in the REVIEW FROM headers, never the generic label "opencode".
-- Allowed found_by labels for this run: %s.
-- For each finding, include only reviewers that independently reported that specific issue; never copy the complete allowed-label list by default.
-- Prefer findings supported by multiple reviewers. Consensus bonus: findings reported by 2+ reviewers independently get +2 confidence.
-- If only one reviewer reported an issue, keep it only if the evidence is concrete and confidence >= %d.
-- Prioritize product regressions, correctness, build-breaks, security, and broken critical flows.
-- De-prioritize cleanup, style, and low-value noise.
-- Every finding MUST reference an exact file path and line number.
-- Keep the final output short and dense.
-
-Severity levels:
-- critical: Data loss, security vulnerability, crash in production
-- high: Significant bug, race condition, missing error handling
-- medium: Logic issue, performance problem, architectural concern
-- low: Minor issue, edge case, improvement suggestion
-
-`, strings.Join(reviewerLabels, ", "), threshold)
 }
 
 // securityInstructions is the vulnerability-hunting lens. It shares the JSON
@@ -175,8 +85,8 @@ func securityInstructions() string {
 You are the security reviewer for this code review. Hunt exploitable
 vulnerabilities, not style and not ordinary logic bugs.
 
-Work through every class below. For each finding, state the attack: what an
-attacker controls, what they reach, and what they get.
+Work through every class below. Put the attack (what the attacker controls,
+what they reach, what they get) in failure_scenario.
 
 1. **Injection** — SQL, shell, template, LDAP, XPath, or NoSQL built from
    untrusted input; interpolation where a parameterized API exists.
@@ -217,8 +127,23 @@ Rules:
 - If the code is genuinely sound, say so and return no findings.
 - Do not report style, naming, or ordinary logic bugs. Another reviewer
   covers those.
+- ` + failureScenarioRule + `
+
+` + severityRubric + `
 `
 }
+
+// severityRubric is the one severity scale both code-review lenses use.
+const severityRubric = `Severity:
+- critical: data loss, a security hole an attacker can reach, or a crash/outage on a normal path
+- high: wrong result or broken flow on a realistic path; a race that can corrupt state
+- medium: wrong result only on an edge case, or a real performance problem on a hot path
+- low: minor defect with a cheap workaround
+`
+
+// failureScenarioRule makes every finding carry a concrete trigger and
+// result. A finding the model cannot ground this way is dropped, not guessed.
+const failureScenarioRule = "Each finding needs a concrete failure_scenario: the input or state that triggers it and the wrong result. If you cannot state one, drop the finding."
 
 func reviewerJSONContract() string {
 	return `## Output Format
@@ -236,6 +161,7 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
       "category": "bug|security|performance|concurrency|architecture|tests|ux",
       "title": "brief title",
       "body": "concrete explanation tied to code",
+      "failure_scenario": "input/state that triggers it → the wrong result",
       "suggestion": "concrete fix",
       "confidence": 8
     }
@@ -243,63 +169,10 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
 }
 ` + "```" + `
 
-If the code is solid, return: {"summary": "No issues found.", "findings": []}
+` + cleanReviewExampleLine + `
 `
 }
 
-const maxDebugTail = 2048
-
-func failedReviewerStub(cli, rawOutput string) string {
-	tail := rawOutput
-	if len(tail) > maxDebugTail {
-		tail = tail[len(tail)-maxDebugTail:]
-	}
-	stub := struct {
-		Summary   string `json:"summary"`
-		Findings  []any  `json:"findings"`
-		DebugTail string `json:"debug_tail,omitempty"`
-	}{
-		Summary:   fmt.Sprintf("%s failed to produce structured JSON output", cli),
-		Findings:  []any{},
-		DebugTail: strings.TrimSpace(tail),
-	}
-	data, err := json.MarshalIndent(stub, "", "  ")
-	if err != nil {
-		return fmt.Sprintf(`{"summary":"%s failed: internal marshal error","findings":[]}`, cli)
-	}
-	return string(data)
-}
-
-func consiliumJSONContract(reviewerLabels []string) string {
-	if len(reviewerLabels) == 0 {
-		reviewerLabels = []string{"reviewer-label"}
-	}
-	labelsJSON, _ := json.Marshal(reviewerLabels[:1])
-	return `## Output Format
-
-Return JSON only. No prose, no markdown, no explanation outside the JSON. Your entire response must be a single valid JSON object matching this schema:
-
-` + "```json" + `
-{
-  "summary": "1-3 sentence overall review summary",
-  "findings": [
-    {
-      "file": "path/to/file",
-      "line": 42,
-      "severity": "critical|high|medium|low",
-      "category": "bug|security|performance|concurrency|architecture|tests|ux",
-      "title": "brief title",
-      "body": "concrete explanation tied to code",
-      "suggestion": "concrete fix",
-      "confidence": 8,
-	  "found_by": ` + string(labelsJSON) + `
-    }
-  ],
-  "recommendation": {
-    "status": "approve|request_changes|comment",
-    "summary": "1-2 sentence recommendation"
-  }
-}
-` + "```" + `
-`
-}
+// cleanReviewExampleLine is the contract's clean-review example. Echo
+// detection looks for it in the raw output, so it is one constant.
+const cleanReviewExampleLine = `If the code is solid, return: {"summary": "No issues found.", "findings": []}`

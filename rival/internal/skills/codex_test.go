@@ -72,3 +72,18 @@ func TestEverySkillHasValidCodexVariant(t *testing.T) {
 		t.Fatal("missing command accepted")
 	}
 }
+
+// megareview was removed on 2026-09-26. Its skill must stay deprecated so
+// rival install removes copies already on disk, for both hosts.
+func TestReviewSkillIsRetired(t *testing.T) {
+	const name = "rival-review"
+	if slices.Contains(Names, name) || !slices.Contains(Deprecated, name) {
+		t.Fatalf("%s must be retired and cleaned on install", name)
+	}
+	if _, err := Files.ReadFile(name + "/SKILL.md"); err == nil {
+		t.Fatalf("retired skill %s remains embedded", name)
+	}
+	if _, err := CodexSkill(name, "test"); err == nil {
+		t.Fatalf("retired Codex skill %s remains available", name)
+	}
+}

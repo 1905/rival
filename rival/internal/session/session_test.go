@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 func TestSortGroupMembersUsesCreationOrderAndPutsJudgeLast(t *testing.T) {

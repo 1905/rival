@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/1F47E/rival/cmd"
-	"github.com/1F47E/rival/internal/telemetry"
+	"github.com/1905/rival/cmd"
+	"github.com/1905/rival/internal/telemetry"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

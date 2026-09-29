@@ -3,6 +3,7 @@ package review
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -50,43 +51,6 @@ func TestParseReviewerOutput_IgnoresEchoedSchemaExample(t *testing.T) {
 	}
 	if out.Findings[0].File == "path/to/file" {
 		t.Fatal("parsed the schema placeholder instead of the real answer")
-	}
-}
-
-// codexStyleConsiliumLog mimics a Codex consilium-judge log: it echoes the
-// consilium prompt (with the schema example, including the found_by field) and
-// then emits the real verdict last — sometimes twice (streamed + final).
-const codexStyleConsiliumLog = `OpenAI Codex
-user
-# Consilium Judge
-
-## Output Format
-` + "```json" + `
-{
-  "summary": "1-3 sentence overall review summary",
-  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
-  "recommendation": {"status": "approve|request_changes|comment", "summary": "1-2 sentence recommendation"}
-}
-` + "```" + `
-
-codex
-{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
-`
-
-func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {
-	out, err := ParseConsiliumOutput(codexStyleConsiliumLog)
-	if err != nil {
-		t.Fatalf("ParseConsiliumOutput: %v", err)
-	}
-	if out.Summary != "Real verdict." {
-		t.Fatalf("summary = %q, want the real verdict (not the schema example)", out.Summary)
-	}
-	if out.Recommendation.Status != "request_changes" {
-		t.Fatalf("recommendation = %q, want request_changes (real), got the schema placeholder", out.Recommendation.Status)
-	}
-	if len(out.Findings) != 1 || out.Findings[0].File != "rival/cmd/root.go" {
-		t.Fatalf("findings = %+v, want the real finding", out.Findings)
 	}
 }
 
@@ -194,18 +158,19 @@ codex
 	}
 }
 
-// Regression test against a real Codex consilium log captured in the wild: the
-// CLI echoed the prompt (schema example with "path/to/file") and the cat'd
-// source files (which contain braces and JSON fixtures), then emitted the real
-// verdict last. The parser must return the real verdict, not the schema.
-func TestParseConsiliumOutput_RealCapturedLog(t *testing.T) {
+// Regression test against a real Codex log captured in the wild (from the
+// removed consilium judge, kept as a fixture): the CLI echoed the prompt
+// (schema example with "path/to/file") and the cat'd source files (which
+// contain braces and JSON fixtures), then emitted the real answer last. The
+// reviewer parser must return the real answer, not the schema.
+func TestParseReviewerOutput_RealCapturedLog(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "consilium_echoed_schema.log"))
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	out, err := ParseConsiliumOutput(string(data))
+	out, err := ParseReviewerOutput(string(data))
 	if err != nil {
-		t.Fatalf("ParseConsiliumOutput: %v", err)
+		t.Fatalf("ParseReviewerOutput: %v", err)
 	}
 	if len(out.Findings) == 0 {
 		t.Fatal("got 0 findings — parser likely returned the schema/empty, not the real verdict")
@@ -215,8 +180,8 @@ func TestParseConsiliumOutput_RealCapturedLog(t *testing.T) {
 			t.Fatalf("parsed the schema placeholder (path/to/file) as a finding: %+v", f)
 		}
 	}
-	if out.Recommendation.Status != "request_changes" {
-		t.Fatalf("recommendation = %q, want the real verdict request_changes", out.Recommendation.Status)
+	if isExampleSummary(out.Summary) {
+		t.Fatalf("parsed the schema example summary: %q", out.Summary)
 	}
 }
 
@@ -251,5 +216,29 @@ func TestParsePlanOutput_DropsPartiallyEchoedAntislopExample(t *testing.T) {
 	}
 	if len(out.Findings) != 1 || out.Findings[0].Title != "real finding" {
 		t.Fatalf("got %+v, want only the real finding kept", out.Findings)
+	}
+}
+
+// Review-shaped JSON printed by a tool (a file the model read) must not
+// become the review when the final codex answer is prose. Found by the
+// 2026-09-26 branch review.
+func TestToolOutputJSONIsNotTheReview(t *testing.T) {
+	raw := "user\nprompt…\nexec cat saved-review.json\n" +
+		`{"summary": "Saved: nothing wrong.", "findings": []}` +
+		"\ncodex\nI could not finish the review.\ntokens used\n1234\n"
+	if out, err := ParseReviewerOutput(FinalAnswer(raw)); err == nil {
+		t.Fatalf("tool-output JSON accepted as the review: %+v", out)
+	}
+	got := FormatReviewResult(nil, raw, "codex", "gpt-6-astra", "src/", "/tmp/x.log")
+	if !strings.Contains(got, "UNPARSED OUTPUT") {
+		t.Fatalf("want UNPARSED:\n%s", got)
+	}
+	// Without the codex header the whole log is the answer.
+	if FinalAnswer("plain log") != "plain log" {
+		t.Fatal("FinalAnswer changed a log without a codex header")
+	}
+	// The last header wins.
+	if got := FinalAnswer("codex\nfirst\ncodex\nsecond"); strings.TrimSpace(got) != "second" {
+		t.Fatalf("FinalAnswer = %q", got)
 	}
 }

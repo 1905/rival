@@ -6,19 +6,19 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/review"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/review"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 )
 
 // runModelRun is the shared run-surface workflow. It differs from the command
 // surface in ways that are deliberate, not incidental: the prompt comes from
 // flags rather than parsed stdin args, output mirrors to stdout as it
-// arrives, there is no log readback afterwards, and a nonzero exit returns
+// arrives, only a successful review reads the log back (to print the
+// formatted findings after the mirror), and a nonzero exit returns
 // immediately instead of falling through.
 func runModelRun(spec modelSpec, opts runOptions) error {
 	// Effort first. It is pure validation, so a bad value must fail fast
@@ -30,35 +30,46 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 
 	// --review wins over --prompt-stdin when both are given.
 	var prompt string
-	mode := "raw"
 	switch {
 	case opts.isReview:
-		mode = "review"
-		scope := opts.reviewScope
-		if scope == "" {
-			scope = "the entire project"
-		}
-		prompt = strings.ReplaceAll(config.ReviewPrompt, "{SCOPE}", scope)
+		// Built below, once an MR scope has its checkout.
 	case opts.promptStdin:
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		prompt = string(data)
+		if prompt == "" {
+			return fmt.Errorf("empty prompt")
+		}
+		if err := rejectUnresolvedMR(prompt); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("provide --prompt-stdin or --review")
 	}
-	if prompt == "" {
-		return fmt.Errorf("empty prompt")
-	}
-	if err := rejectUnresolvedMR(prompt); err != nil {
-		return err
-	}
+	// Preflight in the caller's workdir: that is where credentials live, even
+	// when an MR review later runs in a temporary checkout.
 	if err := spec.preflight(opts.workdir); err != nil {
 		return err
 	}
 
-	sess, err := session.NewQueued(spec.cli, mode, spec.model, effort, opts.workdir, prompt, opts.reviewScope, "")
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	mode, scope, runWorkdir := "raw", opts.reviewScope, opts.workdir
+	if opts.isReview {
+		mode = "review"
+		var closeReview func()
+		var prepErr error
+		prompt, scope, runWorkdir, closeReview, prepErr = prepareReview(ctx, scope, scope == "", opts.workdir)
+		if prepErr != nil {
+			return prepErr
+		}
+		defer closeReview()
+	}
+
+	sess, err := session.NewQueued(spec.cli, mode, spec.model, effort, runWorkdir, prompt, scope, "")
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -75,11 +86,8 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 	log.Info().Str("session", sess.ID).Str("effort", effort).Str("mode", mode).
 		Msgf("starting %s", spec.commandName)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	sessions := []*session.Session{sess}
-	release, err := review.WaitForGroupSlot(ctx, opts.noQueue, sessions, sessions, opts.workdir, sess.GroupID, mode)
+	release, err := review.WaitForGroupSlot(ctx, opts.noQueue, sessions, sessions, runWorkdir, sess.GroupID, mode)
 	if err != nil {
 		return err
 	}
@@ -89,7 +97,7 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 	defer cancelRun()
 
 	// The run surface is terminal-facing, so output mirrors to stdout live.
-	result, err := spec.run(runCtx, sess, prompt, effort, opts.workdir, opts.isReview, os.Stdout)
+	result, err := spec.run(runCtx, sess, prompt, effort, runWorkdir, opts.workdir, opts.isReview, os.Stdout)
 	if err != nil {
 		failSession(sess, 1, review.RunTimeoutReason(runCtx, spec.label(), err.Error()))
 		return err
@@ -109,8 +117,26 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 		return &ExitCodeError{Code: result.ExitCode, Err: fmt.Errorf("%s", exitMsg)}
 	}
 
-	if saveErr := sess.Complete(result.ExitCode, result.OutputBytes, result.OutputLines); saveErr != nil {
-		log.Warn().Err(saveErr).Str("session", sess.ID).Msg("failed to save session completion")
+	if !opts.isReview {
+		completeSession(sess, result)
+		return nil
+	}
+	logData, err := os.ReadFile(sess.LogFile)
+	if err != nil {
+		failSession(sess, 1, "read log file: "+err.Error())
+		return fmt.Errorf("read log file: %w", err)
+	}
+	// A zero exit is not a review: quota errors and empty output also exit 0.
+	out, reason := finishReview(spec, sess, string(logData), scope, sess.LogFile)
+	if reason != "" {
+		_, _ = fmt.Fprintln(os.Stderr, reason)
+		return &ExitCodeError{Code: 1, Err: fmt.Errorf("%s", reason)}
+	}
+	completeSession(sess, result)
+	// The live mirror already showed the transcript; the formatted review
+	// follows it.
+	if _, err := io.WriteString(os.Stdout, "\n"+out); err != nil {
+		return fmt.Errorf("write stdout: %w", err)
 	}
 	return nil
 }

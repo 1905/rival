@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/session"
 )
 
 // The TUI list is built from summaries, which never carry the full prompt.

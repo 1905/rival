@@ -15,3 +15,8 @@ oauth_link.txt
 
 # local feature worktrees
 worktrees/
+
+# swift package build output
+app/.build/
+app/dist/
+__pycache__/

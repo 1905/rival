@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/1F47E/rival/internal/queue"
+	"github.com/1905/rival/internal/queue"
 	"github.com/spf13/cobra"
 )
 

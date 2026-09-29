@@ -1,6 +1,6 @@
 ---
 name: rival-plan
-version: 3.34.0
+version: 4.1.0
 description: Review a plan/spec markdown document with Codex at xhigh effort via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan.
 argument-hint: "<path-to-plan.md>"
 allowed-tools: Bash, Read, Write
@@ -67,23 +67,41 @@ running in the background. Relay a queue position if one is already present in
 ### Present output
 
 When the background `rival wait` exits you receive a task notification (this may
-be several turns later). **Presenting the result is the FIRST thing you do — and
-it must be the final text of a message with NO tool calls after it.** Text
-emitted between tool calls can be dropped by the harness; a review the user
-never sees is a failed run. Do not triage, verify, or implement anything before
-the result has been presented.
+be several turns later). Handle it in ONE turn: read, verify, plan, then write
+ONE final message. **Everything the user must see goes in that final message,
+with NO tool calls after it.** Text emitted between tool calls can be dropped by
+the harness; a review the user never sees is a failed run. So do not print
+partial results while you work — they belong in the final message.
 
 1. Read the `rival_out` file (literal path).
-2. In that same response, present — as the message's final text, no tool calls
-   after it:
+2. **Verify every finding, one by one, against the plan document and the code it references.** Reviewers are
+   often wrong. Open what each finding cites (file:line, or the closest match if
+   it moved) and give it one verdict:
+   - `CONFIRMED` — the plan really has this gap or error;
+   - `FALSE POSITIVE` — it does not; say what the reviewer missed;
+   - `UNCLEAR` — reading cannot settle it; say what would.
+   Never mark a finding CONFIRMED without reading what it cites. Evidence is one
+   line with a `file:line`. This step is read-only.
+3. **Plan a plan edit for each CONFIRMED finding only**, highest severity first:
+   one line each — what changes, and where. FALSE POSITIVE and UNCLEAR findings
+   get no plan edit.
+4. **Apply plan edits only if the user asked for them.** Asked means: the
+   request that started this run said so ("review and fix"), a standing
+   full-auto instruction is active, or the user replies asking for it later. If
+   asked: edit the plan document for CONFIRMED findings only (a new version file if the project versions its plans). If not asked: do not edit anything.
+5. The final message — its final text, no tool calls after it:
    - a 2-4 line **stats summary first**: finding counts by severity (e.g.
      "1 HIGH, 3 MEDIUM, 0 LOW"), plus one line per HIGH/CRITICAL finding title,
      and the session id/runtime if visible;
+   - `Verified: N confirmed, N false positive, N unclear`;
+   - a verdict table: `# | severity | title | verdict | evidence`;
+   - the plan edit plan — or, if step 4 applied them, what changed and the
+     build/test result. If not applied, end the plan with one line: say "fix"
+     to apply the CONFIRMED ones;
    - then the **full contents verbatim** in a fenced code block.
-3. Only in a LATER message may you act on the findings (fix, verify, dispute).
-   This is not an approval gate — do not wait for a reply — but the summary
-   must reach the user before implementation starts.
-4. If `rival_out` is empty: the run failed before producing output — read
+6. If the output has no findings (a plain prompt answer or a clean review),
+   skip steps 2-4 and present the stats summary plus the verbatim output.
+7. If `rival_out` is empty: the run failed before producing output — read
    `rival_err` (last ~10 lines) and the `rival wait` summary line, and present
    that so the user sees why (queue timeout, run timeout, quota, crash).
 

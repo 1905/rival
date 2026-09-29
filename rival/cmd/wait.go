@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/procinfo"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/procinfo"
 	"github.com/spf13/cobra"
 )
 
@@ -32,8 +32,8 @@ var (
 	detachedPIDRe = regexp.MustCompile(`rival: detached pid=(\d+)`)
 	// zerolog: ..."session":"<uuid>"...
 	sessionIDRe = regexp.MustCompile(`"session":"([0-9a-fA-F-]{36})"`)
-	// Only THIS run's start lines (message:"starting codex|reviewer|consilium
-	// judge|…"); excludes reaper/maintenance lines that carry old session IDs.
+	// Only THIS run's start lines (message:"starting codex|…"); excludes
+	// reaper/maintenance lines that carry old session IDs.
 	startingMarkerRe = regexp.MustCompile(`"message":"starting `)
 	// A bare UUID — used to validate user-supplied positional IDs so they can
 	// never escape the session dir via path separators (`rival wait ../x`).
@@ -66,7 +66,7 @@ Exit codes: 0 all completed · 2 some failed · 3 rival crashed · 4 timed out.`
 func init() {
 	waitCmd.Flags().String("log", "", "stderr file of a detached run to parse pid + session IDs from")
 	// Default derived from the queue + run timeouts so it can't expire while a
-	// run is still within its configured budget (megareview = queue wait + 2× run).
+	// run is still within its configured budget (see config.MaxRunWait).
 	waitCmd.Flags().Duration("timeout", config.MaxRunWait(), "give up waiting after this long")
 	waitCmd.Flags().Duration("poll", config.QueuePollInterval, "poll interval")
 	rootCmd.AddCommand(waitCmd)
@@ -160,8 +160,9 @@ func (w *waiter) run(ctx context.Context) int {
 	firstPoll := true
 
 	for {
-		// In --log mode, re-scan the file each tick: megareview logs the
-		// consilium session ID only after the reviewers finish.
+		// In --log mode, re-scan the file each tick: a run logs its "starting"
+		// session lines only after it leaves the queue, so the IDs can appear
+		// after wait has started.
 		if w.logFile != "" {
 			if _, _, ids, err := parseLogFile(w.logFile); err == nil && len(ids) > len(w.ids) {
 				w.ids = ids

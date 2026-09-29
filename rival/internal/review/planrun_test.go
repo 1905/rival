@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 )
 
 // realPlanJSON is a minimal valid plan payload ParsePlanOutput accepts.
@@ -532,5 +532,31 @@ func TestAntislopCodexEffortReachesRuntime(t *testing.T) {
 				t.Fatalf("runtime effort = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// Quota wording inside a real review (e.g. reviewing quota.go) must not fail
+// the run: the check applies only when no review parsed. Found by the
+// 2026-09-26 branch review.
+func TestRunFailureReasonIgnoresQuotaTextInARealReview(t *testing.T) {
+	reason := func(raw string) string {
+		_, err := ParseReviewerOutput(FinalAnswer(raw))
+		return RunFailureReason("codex", raw, err == nil)
+	}
+	raw := "exec cat quota.go\n\"insufficient_quota\"\ncodex\n" + `{"summary": "One bug.", "findings": []}`
+	if got := reason(raw); got != "" {
+		t.Fatalf("real review failed as %q", got)
+	}
+	if got := reason("Error 429 (Too Many Requests)\n"); got != "codex hit provider quota/rate limit (429)" {
+		t.Fatalf("quota-only output: %q", got)
+	}
+	if got := reason("   \n"); got != "codex produced no output (empty result); likely an auth/session failure" {
+		t.Fatalf("empty output: %q", got)
+	}
+	if got := reason("just some prose\n"); got != "" {
+		t.Fatalf("unparsed prose must stay UNPARSED, not fail: %q", got)
+	}
+	if got := RunFailureReason("", "", false); got != "produced no output (empty result); likely an auth/session failure" {
+		t.Fatalf("empty label: %q", got)
 	}
 }

@@ -57,20 +57,6 @@ func TestCodexCommandPathKeepsXhigh(t *testing.T) {
 	}
 }
 
-// -m codex must select the codex adapter with Codex's concrete id.
-func TestCodexSelectableInMegareview(t *testing.T) {
-	targets, err := ResolveReviewTargets([]string{"codex"})
-	if err != nil {
-		t.Fatalf("ResolveReviewTargets: %v", err)
-	}
-	if len(targets) != 1 || targets[0].Model != CodexModel || targets[0].CLI != "codex" {
-		t.Fatalf("got %+v", targets)
-	}
-	if targets[0].Prompt != PromptBugHunter {
-		t.Errorf("codex should run the bug-hunter lens, got %v", targets[0].Prompt)
-	}
-}
-
 // The pin must not outrank an explicit override or user config — silently
 // ignoring what the user asked for would be worse than the bug it fixes.
 func TestCodexPinDoesNotOverrideUserIntent(t *testing.T) {
@@ -87,7 +73,7 @@ func TestCodexPinDoesNotOverrideUserIntent(t *testing.T) {
 }
 
 // Every surface must reach xhigh, not just the single-model command. The
-// megareview and plan paths each pass their own non-empty fallback.
+// review and plan paths each pass their own non-empty fallback.
 func TestCodexXhighOnEverySurface(t *testing.T) {
 	for _, fallback := range []string{"", DefaultReviewEffort, DefaultPlanEffort} {
 		got, err := ResolveEffort(CodexModel, "", fallback)

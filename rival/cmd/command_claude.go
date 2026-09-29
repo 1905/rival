@@ -7,7 +7,7 @@ import (
 const claudeUsage = `Usage:
   /rival-claude 'explain the auth flow' — run any prompt with Claude
   /rival-claude -re high 'find bugs in src/main.go' — run with a higher reasoning effort
-  /rival-claude review — ruthless code review of the entire project
+  /rival-claude review — bug-hunting review of the changed files (git auto-detect)
   /rival-claude review src/api/ — review specific scope
   /rival-claude -re high review src/api/ — review with high reasoning
   /rival-claude — show this usage info

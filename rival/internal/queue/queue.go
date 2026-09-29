@@ -25,8 +25,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/procinfo"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/procinfo"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )

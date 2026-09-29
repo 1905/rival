@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/session"
 )
 
 // TestSafeEnv_BlocksOpencodePermission proves a reviewed repo's .env cannot inject

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/parser"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/parser"
 )
 
 func TestAntislopStdinGrammar(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAntislopStdinGrammar(t *testing.T) {
 	}{
 		{"empty input is auto scope", "", "", nil},
 		{"options before scope", "-re high -m claude src/api/", "high", []string{"claude"}},
-		{"scope with model list", "-m sol,claude src/", "", []string{"sol", "claude"}},
+		{"scope with model list", "-m codex,claude src/", "", []string{"codex", "claude"}},
 		{"escaped dash scope", "-- -weird/dir", "", nil},
 	}
 	for _, tt := range tests {
@@ -36,18 +36,35 @@ func TestAntislopStdinGrammar(t *testing.T) {
 	}
 }
 
-func TestAntislopDefaultModelIsCodexOnly(t *testing.T) {
+func TestAntislopDefaultModelsAreCodexAndClaude(t *testing.T) {
+	flag := commandAntislopCmd.Flags().Lookup("model")
+	if flag == nil {
+		t.Fatal("antislop has no --model flag")
+	}
+	if flag.DefValue != "[codex,claude]" {
+		t.Fatalf("--model default = %s, want [codex,claude]", flag.DefValue)
+	}
 	clis, err := parsePlanModels(defaultAntislopModels)
 	if err != nil {
 		t.Fatalf("parsePlanModels: %v", err)
 	}
-	if len(clis) != 1 || clis[0] != "codex" {
-		t.Fatalf("got %v, want codex only", clis)
+	if strings.Join(clis, ",") != "codex,claude" {
+		t.Fatalf("default clis = %v, want [codex claude]", clis)
+	}
+}
+
+func TestAntislopModelClaudeRunsClaudeOnly(t *testing.T) {
+	clis, err := parsePlanModels([]string{"claude"})
+	if err != nil {
+		t.Fatalf("parsePlanModels: %v", err)
+	}
+	if strings.Join(clis, ",") != "claude" {
+		t.Fatalf("-m claude clis = %v, want [claude]", clis)
 	}
 }
 
 func TestBuildAntislopCodePromptExplicitScope(t *testing.T) {
-	prompt, target, display := buildAntislopCodePrompt("src/api/", false, t.TempDir())
+	prompt, target, display := buildReviewPrompt(antislopCodePrompt, "src/api/", false, t.TempDir())
 	if !strings.Contains(prompt, "Review scope: src/api/") {
 		t.Fatalf("scope not substituted:\n%s", prompt[:200])
 	}
@@ -61,7 +78,7 @@ func TestBuildAntislopCodePromptExplicitScope(t *testing.T) {
 
 func TestBuildAntislopCodePromptNoChangesFallsBackToProject(t *testing.T) {
 	// A fresh temp dir is not a git repo, so auto-detect finds nothing.
-	prompt, target, display := buildAntislopCodePrompt("the entire project", true, t.TempDir())
+	prompt, target, display := buildReviewPrompt(antislopCodePrompt, "the entire project", true, t.TempDir())
 	if !strings.Contains(prompt, "Review scope: the entire project") {
 		t.Fatalf("full-project fallback missing:\n%s", prompt[:200])
 	}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/1F47E/rival/internal/update"
+	"github.com/1905/rival/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -49,13 +49,13 @@ func updateToVersion(cmd *cobra.Command, current, latest string) error {
 
 	// Upgrade via brew
 	fmt.Println("Upgrading via Homebrew...")
-	brew := exec.CommandContext(cmd.Context(), "brew", "upgrade", "1f47e/tap/rival")
+	brew := exec.CommandContext(cmd.Context(), "brew", "upgrade", "1905/tap/rival")
 	brew.Stdout = cmd.OutOrStdout()
 	brew.Stderr = cmd.ErrOrStderr()
 	if err := brew.Run(); err != nil {
 		// If brew upgrade fails (e.g. already latest), try reinstall
 		fmt.Println("brew upgrade failed, trying reinstall...")
-		reinstall := exec.CommandContext(cmd.Context(), "brew", "reinstall", "1f47e/tap/rival")
+		reinstall := exec.CommandContext(cmd.Context(), "brew", "reinstall", "1905/tap/rival")
 		reinstall.Stdout = cmd.OutOrStdout()
 		reinstall.Stderr = cmd.ErrOrStderr()
 		if err := reinstall.Run(); err != nil {

@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/executor"
-	"github.com/1F47E/rival/internal/parser"
-	"github.com/1F47E/rival/internal/review"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/executor"
+	"github.com/1905/rival/internal/parser"
+	"github.com/1905/rival/internal/review"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,7 +21,7 @@ import (
 // explicit branch in the workflows below, keyed on commandName, rather than
 // becoming a callback field nobody else sets.
 type modelSpec struct {
-	// commandName is the cobra command word: sol, claude, k3, or grok. For K3
+	// commandName is the cobra command word: codex, claude, k3, or grok. For K3
 	// this is NOT the display label, which is kimi-k3.
 	commandName string
 	// cli is the adapter recorded on the session: codex, claude, opencode, or
@@ -34,9 +34,12 @@ type modelSpec struct {
 	parse func(string) (*parser.ParseResult, error)
 	// preflight verifies the runtime is usable. Only K3 needs the workdir.
 	preflight func(workdir string) error
-	// run invokes the provider. review reports whether the run is a review, so
-	// grok can apply its sandbox; out is the stdout mirror, nil in command mode.
-	run func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, review bool, out io.Writer) (*executor.Result, error)
+	// run invokes the provider. workdir is where it runs; credWorkdir is the
+	// caller's project, where a .env credential is looked up (they differ only
+	// for a GitLab MR review in a temporary checkout). review reports whether
+	// the run is a review, so grok can apply its sandbox; out is the stdout
+	// mirror, nil in command mode.
+	run func(ctx context.Context, sess *session.Session, prompt, effort, workdir, credWorkdir string, review bool, out io.Writer) (*executor.Result, error)
 }
 
 // label is the public name used in every message and log field.
@@ -86,8 +89,10 @@ func (s modelSpec) authHint(logFile string) string {
 }
 
 // runModelCommand is the shared command-surface workflow: read args from
-// stdin, run the provider, then print the log for the calling skill to
-// capture. Every model's `rival command <name>` goes through it.
+// stdin, run the provider, then print the result for the calling skill to
+// capture. A successful review prints the formatted findings and the log
+// path; a raw prompt, or any failed run, prints the log. Every model's
+// `rival command <name>` goes through it.
 func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 	// A terminal stdin means no piped args, so show usage instead of hanging.
 	if stat, statErr := os.Stdin.Stat(); statErr == nil && (stat.Mode()&os.ModeCharDevice) != 0 {
@@ -109,24 +114,42 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 		_, _ = fmt.Fprintln(os.Stdout, spec.usage)
 		return nil
 	}
-	if err := rejectUnresolvedMR(string(raw)); err != nil {
-		return err
-	}
-
-	if parsed.IsReview && parsed.AutoScope {
-		resolveGitScope(parsed, workdir)
+	// A review resolves an MR scope into a pinned checkout below; a raw
+	// prompt cannot, so it is rejected before anything starts.
+	if !parsed.IsReview {
+		if err := rejectUnresolvedMR(string(raw)); err != nil {
+			return err
+		}
 	}
 
 	effort, err := spec.resolveEffort(parsed.Effort)
 	if err != nil {
 		return err
 	}
+	// Preflight in the caller's workdir: that is where credentials live, even
+	// when an MR review later runs in a temporary checkout.
 	if err := spec.preflight(workdir); err != nil {
 		return err
 	}
 
+	// Cancel the MR resolve, the queue wait and the child on SIGINT/SIGTERM so
+	// the deferred cleanup runs.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	prompt, scope, runWorkdir := parsed.Prompt, parsed.ReviewScope, workdir
+	if parsed.IsReview {
+		var closeReview func()
+		var prepErr error
+		prompt, scope, runWorkdir, closeReview, prepErr = prepareReview(ctx, scope, parsed.AutoScope, workdir)
+		if prepErr != nil {
+			return prepErr
+		}
+		defer closeReview()
+	}
+
 	mode := sessionMode(parsed.IsReview)
-	sess, err := session.NewQueued(spec.cli, mode, spec.model, effort, workdir, parsed.Prompt, parsed.ReviewScope, "")
+	sess, err := session.NewQueued(spec.cli, mode, spec.model, effort, runWorkdir, prompt, scope, "")
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -143,13 +166,8 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 	log.Info().Str("session", sess.ID).Str("effort", effort).Str("mode", mode).
 		Msgf("starting %s (command mode)", spec.commandName)
 
-	// Cancel the queue wait and the child on SIGINT/SIGTERM so the deferred
-	// Fail runs.
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	sessions := []*session.Session{sess}
-	release, err := review.WaitForGroupSlot(ctx, noQueue, sessions, sessions, workdir, sess.GroupID, mode)
+	release, err := review.WaitForGroupSlot(ctx, noQueue, sessions, sessions, runWorkdir, sess.GroupID, mode)
 	if err != nil {
 		return err
 	}
@@ -161,34 +179,45 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 	defer cancelRun()
 
 	// No stdout mirror in command mode; the skill reads the final output.
-	result, err := spec.run(runCtx, sess, parsed.Prompt, effort, workdir, parsed.IsReview, nil)
+	result, err := spec.run(runCtx, sess, prompt, effort, runWorkdir, workdir, parsed.IsReview, nil)
 	if err != nil {
 		failSession(sess, 1, review.RunTimeoutReason(runCtx, spec.label(), err.Error()))
 		return err
 	}
 
-	exitMsg := fmt.Sprintf("%s exited with code %d", spec.label(), result.ExitCode)
-	if result.ExitCode != 0 {
-		failSession(sess, result.ExitCode, review.RunTimeoutReason(runCtx, spec.label(), exitMsg))
-	} else if saveErr := sess.Complete(result.ExitCode, result.OutputBytes, result.OutputLines); saveErr != nil {
-		log.Warn().Err(saveErr).Str("session", sess.ID).Msg("failed to save session completion")
+	exitCode := result.ExitCode
+	exitMsg := fmt.Sprintf("%s exited with code %d", spec.label(), exitCode)
+	logData, readErr := os.ReadFile(sess.LogFile)
+	out := config.PublicRuntimeLog(sess.CLI, sess.Model, string(logData))
+	switch {
+	case exitCode != 0:
+		failSession(sess, exitCode, review.RunTimeoutReason(runCtx, spec.label(), exitMsg))
+	case parsed.IsReview && readErr == nil:
+		// A zero exit is not a review: quota errors and empty output also exit 0.
+		formatted, reason := finishReview(spec, sess, string(logData), scope, sess.LogFile)
+		if reason != "" {
+			exitCode, exitMsg = 1, reason
+		} else {
+			completeSession(sess, result)
+			out = formatted
+		}
+	default:
+		completeSession(sess, result)
 	}
-
-	logData, err := os.ReadFile(sess.LogFile)
-	if err != nil {
-		return fmt.Errorf("read log file: %w", err)
+	if readErr != nil {
+		return fmt.Errorf("read log file: %w", readErr)
 	}
-	if _, err := io.WriteString(os.Stdout, config.PublicRuntimeLog(sess.CLI, sess.Model, string(logData))); err != nil {
+	if _, err := io.WriteString(os.Stdout, out); err != nil {
 		return fmt.Errorf("write stdout: %w", err)
 	}
 
-	if result.ExitCode != 0 {
+	if exitCode != 0 {
 		// The hint follows the log on stdout, so a skill capturing output sees
 		// the failure before the explanation.
 		if hint := spec.authHint(sess.LogFile); hint != "" {
 			_, _ = fmt.Fprintln(os.Stdout, "\n"+hint)
 		}
-		return &ExitCodeError{Code: result.ExitCode, Err: fmt.Errorf("%s", exitMsg)}
+		return &ExitCodeError{Code: exitCode, Err: fmt.Errorf("%s", exitMsg)}
 	}
 	return nil
 }
@@ -197,5 +226,49 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 func failSession(sess *session.Session, exitCode int, reason string) {
 	if err := sess.Fail(exitCode, reason); err != nil {
 		log.Warn().Err(err).Str("session", sess.ID).Msg("failed to save session failure")
+	}
+}
+
+// prepareReview resolves a review's scope and builds its bug-hunter prompt.
+// A GitLab MR scope is pinned to a snapshot checkout, which closeFn removes;
+// call it after the run on every path. displayScope is what the session
+// records and the output shows: the MR URL, the auto-detected file list, or
+// the scope as given.
+func prepareReview(ctx context.Context, scope string, autoScope bool, workdir string) (prompt, displayScope, runWorkdir string, closeFn func(), err error) {
+	target, err := prepareReviewTarget(ctx, scope, workdir)
+	if err != nil {
+		return "", "", "", nil, err
+	}
+	// Bug-hunter records and shows the detected file list, not the display
+	// placeholder the other commands use.
+	prompt, recorded, _ := buildReviewPrompt(lensPrompt(config.PromptBugHunter), target.scope, autoScope, target.workdir)
+	displayScope = target.display
+	if autoScope {
+		displayScope = recorded
+	}
+	return prompt, displayScope, target.workdir, target.close, nil
+}
+
+// finishReview turns a zero-exit review log into the formatted review. When
+// the run produced no review (empty log, or only a quota error) it records the
+// failure on sess and returns the reason instead; output that merely does not
+// parse still formats, as UNPARSED.
+func finishReview(spec modelSpec, sess *session.Session, raw, scope, logPath string) (out, failReason string) {
+	parsed, err := review.ParseReviewerOutput(review.FinalAnswer(raw))
+	if reason := review.RunFailureReason(spec.label(), raw, err == nil); reason != "" {
+		failSession(sess, 1, reason)
+		return "", reason
+	}
+	if err != nil {
+		log.Warn().Err(err).Msg("review output did not parse")
+	}
+	return review.FormatReviewResult(parsed, raw, spec.cli, spec.model, scope, logPath), ""
+}
+
+// completeSession records a successful run and logs when the record cannot be
+// saved.
+func completeSession(sess *session.Session, result *executor.Result) {
+	if err := sess.Complete(result.ExitCode, result.OutputBytes, result.OutputLines); err != nil {
+		log.Warn().Err(err).Str("session", sess.ID).Msg("failed to save session completion")
 	}
 }

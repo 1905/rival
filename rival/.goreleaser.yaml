@@ -24,7 +24,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
 # Generates a Homebrew *Formula* (class Rival < Formula) at the tap repo root —
-# matching the existing 1F47E/homebrew-tap layout (formulae at root, no Formula/
+# matching the existing 1905/homebrew-tap layout (formulae at root, no Formula/
 # or Casks/ subdir). `brews:` is marked deprecated by goreleaser in favor of
 # homebrew_casks:, but a cask is the wrong artifact type for this tap, so we keep
 # the formula generator. CI (release.yml) runs this on tag push with the
@@ -33,7 +33,7 @@ archives:
 brews:
   - name: rival
     homepage: https://github.com/1905/rival
-    description: "Dispatch prompts to AI coding agents with session tracking and TUI/web dashboards"
+    description: "Dispatch prompts to AI coding agents with session tracking and a TUI dashboard"
     license: MIT
     # directory omitted → formula written to the repo root (rival.rb)
     repository:
@@ -43,7 +43,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     commit_author:
       name: goreleaserbot
-      email: "[email protected]"
+      email: "bot@goreleaser.com"
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
 
 checksum:

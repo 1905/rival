@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 func TestParseArgs_Empty(t *testing.T) {
 	for _, input := range []string{"", "  ", "\t\n"} {
-		r, err := ParseGPT56SolArgs(input)
+		r, err := ParseCodexArgs(input)
 		if err != nil {
 			t.Fatalf("unexpected error for %q: %v", input, err)
 		}
@@ -23,7 +23,7 @@ func TestParseArgs_Empty(t *testing.T) {
 }
 
 func TestParseArgs_RawPrompt(t *testing.T) {
-	r, err := ParseGPT56SolArgs("explain the auth flow")
+	r, err := ParseCodexArgs("explain the auth flow")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestParseArgs_RawPrompt(t *testing.T) {
 }
 
 func TestParseArgs_EffortWithPrompt(t *testing.T) {
-	r, err := ParseGPT56SolArgs("-re xhigh find bugs in main.go")
+	r, err := ParseCodexArgs("-re xhigh find bugs in main.go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestParseArgs_EffortWithPrompt(t *testing.T) {
 }
 
 func TestParseArgs_UltraEffort(t *testing.T) {
-	r, err := ParseGPT56SolArgs("-re ultra review")
+	r, err := ParseCodexArgs("-re ultra review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestParseArgs_UltraEffort(t *testing.T) {
 }
 
 func TestParseArgs_InvalidEffort(t *testing.T) {
-	_, err := ParseGPT56SolArgs("-re maximum review")
+	_, err := ParseCodexArgs("-re maximum review")
 	if err == nil {
 		t.Fatal("expected error for invalid effort")
 	}
@@ -72,7 +72,7 @@ func TestParseArgs_InvalidEffort(t *testing.T) {
 }
 
 func TestParseArgs_ReviewAlone(t *testing.T) {
-	r, err := ParseGPT56SolArgs("review")
+	r, err := ParseCodexArgs("review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,13 +82,13 @@ func TestParseArgs_ReviewAlone(t *testing.T) {
 	if r.ReviewScope != "the entire project" {
 		t.Errorf("expected default scope, got %q", r.ReviewScope)
 	}
-	if !strings.Contains(r.Prompt, "Review scope: the entire project") {
-		t.Error("prompt should contain review scope")
+	if r.Prompt != "" {
+		t.Errorf("a review must leave Prompt empty (cmd builds it), got %q", r.Prompt)
 	}
 }
 
 func TestParseArgs_ReviewWithScope(t *testing.T) {
-	r, err := ParseGPT56SolArgs("review src/")
+	r, err := ParseCodexArgs("review src/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,10 +98,13 @@ func TestParseArgs_ReviewWithScope(t *testing.T) {
 	if r.ReviewScope != "src/" {
 		t.Errorf("unexpected scope: %q", r.ReviewScope)
 	}
+	if r.AutoScope || r.Prompt != "" {
+		t.Errorf("explicit-scope review: AutoScope=%v Prompt=%q, want false and empty", r.AutoScope, r.Prompt)
+	}
 }
 
 func TestParseArgs_ReviewQuotedScope(t *testing.T) {
-	r, err := ParseGPT56SolArgs(`review "only THIS file xxx"`)
+	r, err := ParseCodexArgs(`review "only THIS file xxx"`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +117,7 @@ func TestParseArgs_ReviewQuotedScope(t *testing.T) {
 }
 
 func TestParseArgs_EffortWithReview(t *testing.T) {
-	r, err := ParseGPT56SolArgs("-re high review")
+	r, err := ParseCodexArgs("-re high review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +133,7 @@ func TestParseArgs_EffortWithReview(t *testing.T) {
 }
 
 func TestParseArgs_EffortWithReviewAndScope(t *testing.T) {
-	r, err := ParseGPT56SolArgs("-re high review src/api/")
+	r, err := ParseCodexArgs("-re high review src/api/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +149,7 @@ func TestParseArgs_EffortWithReviewAndScope(t *testing.T) {
 }
 
 func TestParseArgs_EffortAlone(t *testing.T) {
-	r, err := ParseGPT56SolArgs("-re high")
+	r, err := ParseCodexArgs("-re high")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +163,7 @@ func TestParseArgs_EffortAlone(t *testing.T) {
 
 func TestParseArgs_AutoScope(t *testing.T) {
 	// "review" alone → AutoScope=true
-	r, err := ParseGPT56SolArgs("review")
+	r, err := ParseCodexArgs("review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +172,7 @@ func TestParseArgs_AutoScope(t *testing.T) {
 	}
 
 	// "review src/" → AutoScope=false
-	r, err = ParseGPT56SolArgs("review src/")
+	r, err = ParseCodexArgs("review src/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +181,7 @@ func TestParseArgs_AutoScope(t *testing.T) {
 	}
 
 	// "-re high review" → AutoScope=true
-	r, err = ParseGPT56SolArgs("-re high review")
+	r, err = ParseCodexArgs("-re high review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,15 +220,18 @@ func TestParseReviewArgs_AutoScope(t *testing.T) {
 	if r.AutoScope {
 		t.Error("expected AutoScope=false when explicit scope given")
 	}
+	if r.Prompt != "" {
+		t.Errorf("a review must leave Prompt empty, got %q", r.Prompt)
+	}
 }
 
 func TestParseReviewArgs_ModelSelection(t *testing.T) {
-	t.Run("GPT-5.6-Sol full model name", func(t *testing.T) {
-		r, err := ParseReviewArgs("-m gpt-5.6-sol -re ultra")
+	t.Run("full model id", func(t *testing.T) {
+		r, err := ParseReviewArgs("-m gpt-6-astra -re ultra")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.AutoScope || r.Effort != "ultra" || len(r.Models) != 1 || r.Models[0] != "gpt-5.6-sol" {
+		if !r.AutoScope || r.Effort != "ultra" || len(r.Models) != 1 || r.Models[0] != "gpt-6-astra" {
 			t.Fatalf("unexpected parse result: %+v", r)
 		}
 	})
@@ -241,22 +247,22 @@ func TestParseReviewArgs_ModelSelection(t *testing.T) {
 	})
 
 	t.Run("flags in either order and comma list", func(t *testing.T) {
-		r, err := ParseReviewArgs("--model=k3,sol --effort high src/api and reports")
+		r, err := ParseReviewArgs("--model=k3,codex --effort high src/api and reports")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if r.Effort != "high" || r.AutoScope || r.ReviewScope != "src/api and reports" {
 			t.Fatalf("unexpected parse result: %+v", r)
 		}
-		if len(r.Models) != 2 || r.Models[0] != "k3" || r.Models[1] != "sol" {
+		if len(r.Models) != 2 || r.Models[0] != "k3" || r.Models[1] != "codex" {
 			t.Fatalf("unexpected models: %v", r.Models)
 		}
 
-		r, err = ParseReviewArgs("-re low -m k3 -m sol src/")
+		r, err = ParseReviewArgs("-re low -m k3 -m codex src/")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Effort != "low" || len(r.Models) != 2 || r.Models[1] != "sol" {
+		if r.Effort != "low" || len(r.Models) != 2 || r.Models[1] != "codex" {
 			t.Fatalf("unexpected repeated model parse: %+v", r)
 		}
 
@@ -281,7 +287,7 @@ func TestParseReviewArgs_ModelSelection(t *testing.T) {
 }
 
 func TestParseReviewArgs_ModelOptionErrors(t *testing.T) {
-	for _, raw := range []string{"-m", "--model=", "-m -re high", "--model k3,,sol", "--unknown value"} {
+	for _, raw := range []string{"-m", "--model=", "-m -re high", "--model k3,,codex", "--unknown value"} {
 		t.Run(raw, func(t *testing.T) {
 			if _, err := ParseReviewArgs(raw); err == nil {
 				t.Fatalf("expected %q to fail", raw)
@@ -329,8 +335,8 @@ func TestParseGrokArgs_ReviewAlone(t *testing.T) {
 	if r.ReviewScope != "the entire project" {
 		t.Errorf("expected default scope, got %q", r.ReviewScope)
 	}
-	if !strings.Contains(r.Prompt, "Review scope: the entire project") {
-		t.Error("prompt should contain review scope")
+	if r.Prompt != "" {
+		t.Errorf("a review must leave Prompt empty (cmd builds it), got %q", r.Prompt)
 	}
 }
 
@@ -407,7 +413,7 @@ func TestParseGrokArgs_Empty(t *testing.T) {
 func TestEverySurfaceAcceptsTheSharedLadder(t *testing.T) {
 	parsers := map[string]func(string) (*ParseResult, error){
 		"claude": ParseClaudeArgs,
-		"sol":    ParseGPT56SolArgs,
+		"codex":  ParseCodexArgs,
 		"grok":   ParseGrokArgs,
 		"kimi":   ParseKimiArgs,
 	}

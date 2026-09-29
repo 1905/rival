@@ -1,9 +1,17 @@
 # Releasing Rival
 
-Rival's GitHub Actions release workflow is the only publisher. A pushed `v*`
-tag triggers GoReleaser, which creates the GitHub release, uploads four platform
-archives plus `checksums.txt`, and updates `rival.rb` in
-`1F47E/homebrew-tap`.
+Rival's GitHub Actions release workflow (`.github/workflows/release.yml`) is
+the only publisher. A pushed `v*` tag runs two jobs:
+
+- `release`: GoReleaser creates the GitHub release, uploads four platform
+  archives plus `checksums.txt`, and updates `rival.rb` in `1905/homebrew-tap`.
+- `app` (needs `release`, runs on `macos-15`): runs `swift test` in `app/`,
+  builds a universal, ad-hoc signed `Rival.app` with
+  `app/scripts/bundle.py --version <tag without v>`, uploads
+  `app/dist/Rival-app.zip` to the same release, and renders
+  `Casks/rival-app.rb` into `1905/homebrew-tap` with
+  `app/scripts/render_cask.py`. Homebrew loads casks only from `Casks/`.
+  It skips the tap commit when the cask did not change.
 
 Do not run `goreleaser release` locally for the same tag. A second publisher
 collides with the CI-created assets and can leave an otherwise valid release
@@ -74,16 +82,18 @@ VERSION=3.23.0
    gh release view "v${VERSION}"
    ```
 
-   It must contain archives for Darwin and Linux on both amd64 and arm64, plus
-   `checksums.txt`. Also confirm the latest `1F47E/homebrew-tap` commit updated
-   the formula for the same tag.
+   It must contain archives for Darwin and Linux on both amd64 and arm64,
+   `checksums.txt`, and `Rival-app.zip`. Also confirm that `1905/homebrew-tap`
+   has commits for the same tag that update both `rival.rb` and
+   `Casks/rival-app.rb` (the app commit message is
+   `Cask update for rival-app version v${VERSION}`).
 
 7. Verify the user installation after the tap update:
 
    ```bash
    brew update
    brew uninstall rival
-   brew install 1F47E/tap/rival
+   brew install 1905/tap/rival
    rival install --force
    rival version
    ```
@@ -91,3 +101,28 @@ VERSION=3.23.0
    If Rival was not already installed, omit the uninstall command. The reported
    version must match `v${VERSION}`. Restart or reload Claude Code after
    refreshing the embedded skills.
+
+8. Verify the app.
+
+   Before tagging, check the app locally from the release commit, in the
+   repository root (not `rival/`):
+
+   ```bash
+   make test       # swift test in app/
+   make install    # native release build into /Applications/Rival.app
+   ```
+
+   `make install` moves an existing `/Applications/Rival.app` to `/tmp/trash`
+   and opens the new build. Confirm the menu bar icon appears and the window
+   lists your runs.
+
+   After the `app` job finishes, verify the cask:
+
+   ```bash
+   brew update
+   brew install --cask 1905/tap/rival-app    # or: brew upgrade --cask rival-app
+   ```
+
+   The app is ad-hoc signed, not notarized. The cask removes the quarantine
+   flag in `postflight`. If Homebrew refuses the tap, run
+   `brew trust --tap 1905/tap` and retry.

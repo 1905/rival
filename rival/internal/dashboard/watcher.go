@@ -3,11 +3,12 @@ package dashboard
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
-	"github.com/1F47E/rival/internal/sessionview"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
+	"github.com/1905/rival/internal/sessionview"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
 )
@@ -17,9 +18,23 @@ type SessionEvent struct {
 	Sessions []*session.Session
 }
 
+// LoadProgress reports the initial session scan: Done of Total session files
+// read. The dashboard shows it as the startup loader.
+type LoadProgress struct {
+	Done, Total int
+}
+
 // WatchSessions watches the session directory and sends events on changes.
 // The goroutine exits when ctx is cancelled.
-func WatchSessions(ctx context.Context, events chan<- SessionEvent) error {
+//
+// progress, when not nil, gets LoadProgress messages during the initial scan
+// and is closed once that scan is done. Sends never block: a full channel
+// drops the update, because the next one (or the first SessionEvent)
+// supersedes it.
+func WatchSessions(ctx context.Context, events chan<- SessionEvent, progress chan<- LoadProgress) error {
+	if progress != nil {
+		defer close(progress)
+	}
 	dir := config.SessionDirPath()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -41,7 +56,16 @@ func WatchSessions(ctx context.Context, events chan<- SessionEvent) error {
 	cache := sessionview.New(dir)
 
 	// Send initial state.
-	sessions, _ := cache.Load()
+	var report func(done, total int)
+	if progress != nil {
+		report = func(done, total int) {
+			select {
+			case progress <- LoadProgress{Done: done, Total: total}:
+			default:
+			}
+		}
+	}
+	sessions, _ := cache.LoadWithProgress(report)
 	select {
 	case events <- SessionEvent{Sessions: sessions}:
 	case <-ctx.Done():
@@ -61,7 +85,7 @@ func WatchSessions(ctx context.Context, events chan<- SessionEvent) error {
 					return
 				}
 				if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Remove) {
-					isJSON := strings.HasSuffix(event.Name, ".json") && !strings.HasSuffix(event.Name, ".json.tmp")
+					isJSON := session.IsSessionFile(filepath.Base(event.Name))
 					isLog := strings.HasSuffix(event.Name, ".log")
 					if isJSON || isLog {
 						sessions, revision := cache.Load()

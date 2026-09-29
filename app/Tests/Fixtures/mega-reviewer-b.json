@@ -1,0 +1,21 @@
+{
+  "id": "b0000000-0002-4000-8000-00000000000b",
+  "group_id": "8a138d95-3176-4afb-aad1-a59e12b879c8",
+  "cli": "opencode",
+  "mode": "megareview",
+  "model": "moonshotai/kimi-k3",
+  "effort": "xhigh",
+  "review_scope": "internal/core/core.billing_extension.go",
+  "prompt_preview": "# Megareview",
+  "status": "completed",
+  "start_time": "2026-05-28T14:20:00.200000+08:00",
+  "queued_at": "2026-05-28T14:19:59.950000+08:00",
+  "end_time": "2026-05-28T14:27:50+08:00",
+  "exit_code": 0,
+  "duration": "7m50s",
+  "work_dir": "/Users/dev/src/acme-api",
+  "log_file": "/Users/dev/.rival/sessions/b0000000-0002-4000-8000-00000000000b.log",
+  "output_bytes": 18000,
+  "output_lines": 250,
+  "pid": 60200
+}

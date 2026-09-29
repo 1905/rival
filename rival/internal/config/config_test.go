@@ -148,165 +148,6 @@ func TestClaudeAuth(t *testing.T) {
 	}
 }
 
-// The default roster dropped K3 on 2026-08-14. K3 stays selectable with
-// -m k3, but it no longer bug-hunts alongside Sol by default.
-func TestResolveReviewTargets_DefaultIsCodexAlone(t *testing.T) {
-	got, err := ResolveReviewTargets(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("default target count = %d, want 1: %+v", len(got), got)
-	}
-	if got[0].CLI != "codex" || got[0].Model != CodexModel {
-		t.Fatalf("default target = %+v, want %s", got[0], CodexModel)
-	}
-	if got[0].Prompt != PromptBugHunter {
-		t.Errorf("Codex runs the %s lens by default, want bug hunting", got[0].Prompt)
-	}
-}
-
-// K3 always carries the security lens, wherever it is selected.
-func TestResolveReviewTargets_K3AlwaysCarriesSecurity(t *testing.T) {
-	for _, alias := range []string{"k3", "kimi-k3"} {
-		got, err := ResolveReviewTargets([]string{alias})
-		if err != nil {
-			t.Fatalf("%s: %v", alias, err)
-		}
-		if len(got) != 1 || got[0].Model != KimiModel {
-			t.Fatalf("%s resolved to %+v", alias, got)
-		}
-		if got[0].Prompt != PromptSecurity {
-			t.Errorf("%s runs the %s lens, want security", alias, got[0].Prompt)
-		}
-	}
-}
-
-// A mixed roster carries two different lenses, which is the point.
-func TestResolveReviewTargets_MixedLenses(t *testing.T) {
-	got, err := ResolveReviewTargets([]string{"sol,k3"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("got %d targets, want 2: %+v", len(got), got)
-	}
-	if got[0].Prompt != PromptBugHunter || got[1].Prompt != PromptSecurity {
-		t.Errorf("lenses = %s, %s; want bug hunting then security", got[0].Prompt, got[1].Prompt)
-	}
-}
-
-func TestResolveReviewTargets_AliasesAndRoles(t *testing.T) {
-	cases := []struct {
-		selector string
-		model    string
-	}{
-		{"sol", GPT56SolModel},
-		{GPT56SolModel, GPT56SolModel},
-		{"k3", KimiModel},
-		{"kimi-k3", KimiModel},
-		{GrokLabel, GrokModel},
-	}
-	for _, tc := range cases {
-		t.Run(tc.selector, func(t *testing.T) {
-			got, err := ResolveReviewTargets([]string{tc.selector})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(got) != 1 || got[0].Model != tc.model {
-				t.Fatalf("ResolveReviewTargets(%q) = %+v", tc.selector, got)
-			}
-			wantCLI := "opencode"
-			switch tc.model {
-			case GPT56SolModel:
-				wantCLI = "codex"
-			case GrokModel:
-				wantCLI = GrokLabel
-			}
-			if got[0].CLI != wantCLI {
-				t.Fatalf("ResolveReviewTargets(%q) CLI = %q, want %q", tc.selector, got[0].CLI, wantCLI)
-			}
-		})
-	}
-}
-
-func TestResolveReviewTargets_ExactOrderAndDedup(t *testing.T) {
-	got, err := ResolveReviewTargets([]string{"k3,sol", "k3"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 || got[0].Model != KimiModel || got[1].Model != GPT56SolModel {
-		t.Fatalf("unexpected exact roster: %+v", got)
-	}
-}
-
-func TestResolveReviewTargets_RejectsModelsOutsideCuratedSet(t *testing.T) {
-	for _, selector := range []string{"astra", "fable", "claude", "retired-model", "custom/model", "all", ""} {
-		t.Run(selector, func(t *testing.T) {
-			if _, err := ResolveReviewTargets([]string{selector}); err == nil {
-				t.Fatalf("expected %q to be rejected", selector)
-			}
-		})
-	}
-}
-
-// The unknown-selector error is the only place a user learns the valid set, so
-// it must name every opt-in selector including grok.
-func TestResolveReviewTargets_UnknownSelectorListsGrok(t *testing.T) {
-	_, err := ResolveReviewTargets([]string{"retired-model"})
-	if err == nil {
-		t.Fatal("expected an unknown-selector error")
-	}
-	for _, want := range []string{"sol", "kimi-k3", GrokLabel} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("unknown-selector error %q does not list %q", err, want)
-		}
-	}
-}
-
-// grok is opt-in: it never joins the default roster, and selector order decides
-// which reviewer judges (preferredJudgeForTargets takes targets[0]).
-func TestResolveReviewTargets_GrokIsOptInAndOrderPreserved(t *testing.T) {
-	for _, target := range DefaultReviewTargets() {
-		if target.CLI == GrokLabel {
-			t.Fatalf("grok must stay out of the default roster: %+v", DefaultReviewTargets())
-		}
-	}
-
-	solFirst, err := ResolveReviewTargets([]string{"sol", GrokLabel})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(solFirst) != 2 || solFirst[0].Model != GPT56SolModel || solFirst[1].CLI != GrokLabel || solFirst[1].Model != GrokModel {
-		t.Fatalf("sol,grok roster = %+v", solFirst)
-	}
-
-	grokFirst, err := ResolveReviewTargets([]string{GrokLabel, "sol"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(grokFirst) != 2 {
-		t.Fatalf("grok,sol roster = %+v", grokFirst)
-	}
-	// Explicit: grok listed first makes it the preferred judge.
-	if grokFirst[0].CLI != GrokLabel || grokFirst[0].Model != GrokModel {
-		t.Fatalf("grok,sol must put grok first (preferred judge), got %+v", grokFirst)
-	}
-	if grokFirst[1].CLI != "codex" || grokFirst[1].Model != GPT56SolModel {
-		t.Fatalf("grok,sol second target = %+v, want sol", grokFirst[1])
-	}
-}
-
-func TestResolveReviewTargets_GrokDedup(t *testing.T) {
-	got, err := ResolveReviewTargets([]string{"grok,sol", GrokLabel})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 || got[0].CLI != GrokLabel || got[1].Model != GPT56SolModel {
-		t.Fatalf("duplicate grok selectors were not deduped: %+v", got)
-	}
-}
-
 func TestEngineLabel(t *testing.T) {
 	cases := []struct{ cli, model, want string }{
 		{"codex", GPT56SolModel, SolLabel},
@@ -434,7 +275,7 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 		model string
 		want  string
 	}{
-		{GPT56SolModel, "high"},
+		{CodexModel, "xhigh"},
 		{KimiModel, "max"},
 		{ClaudeModel, "medium"},
 	}
@@ -449,14 +290,14 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 	}
 
 	userConfig = &UserConfig{Efforts: map[string]string{
-		SolLabel:    "ultra",
+		GrokLabel:   "low",
 		"kimi-k3":   "max",
 		ClaudeLabel: "high",
 	}}
-	if got, _ := ResolveEffort(GPT56SolModel, "", "low"); got != "ultra" {
-		t.Errorf("configured Sol effort = %q, want ultra", got)
+	if got, _ := ResolveEffort(GrokModel, "", "high"); got != "low" {
+		t.Errorf("configured grok effort = %q, want low", got)
 	}
-	if got, _ := ResolveEffort(GPT56SolModel, "medium", "low"); got != "medium" {
+	if got, _ := ResolveEffort(GrokModel, "medium", "low"); got != "medium" {
 		t.Errorf("explicit effort = %q, want medium", got)
 	}
 	if got, _ := ResolveEffort(KimiModel, "low", "low"); got != "max" {
@@ -464,7 +305,7 @@ func TestResolveEffortPrecedenceAndModelDefaults(t *testing.T) {
 	}
 
 	userConfig = &UserConfig{}
-	if got, _ := ResolveEffort(GPT56SolModel, "", "low"); got != "low" {
+	if got, _ := ResolveEffort(GrokModel, "", "low"); got != "low" {
 		t.Errorf("surface fallback = %q, want low", got)
 	}
 	// Claude's medium pin outranks a surface fallback; -re still wins.
@@ -580,7 +421,8 @@ func TestLoadUserConfigValidatesEffortMap(t *testing.T) {
 	}{
 		{
 			name: "valid",
-			body: "efforts:\n  sol: ultra\n  kimi-k3: max\n  claude: medium\n",
+			// sol is a removed model: its old entry is dropped, not an error.
+			body: "efforts:\n  sol: low\n  codex: ultra\n  kimi-k3: max\n  claude: medium\n",
 		},
 		{
 			name:    "unknown model",
@@ -616,8 +458,11 @@ func TestLoadUserConfigValidatesEffortMap(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
-				if got := DefaultEffortForModel(GPT56SolModel); got != "ultra" {
-					t.Errorf("loaded Sol effort = %q, want ultra", got)
+				if got := DefaultEffortForModel(CodexModel); got != "ultra" {
+					t.Errorf("loaded codex effort = %q, want ultra", got)
+				}
+				if _, ok := userConfig.Efforts[SolLabel]; ok {
+					t.Error("removed sol effort entry was kept")
 				}
 				return
 			}
@@ -648,5 +493,32 @@ func TestLoadUserConfigReportsUnreadableConfigPath(t *testing.T) {
 	}
 	if message := err.Error(); !strings.Contains(message, "read "+path) {
 		t.Fatalf("error = %q, want config path", message)
+	}
+}
+
+// A config.yaml written for the removed megareview (a roster key, a judge role
+// override) must keep loading: obsolete keys are ignored, never a hard failure.
+func TestLoadUserConfigIgnoresObsoleteMegareviewKeys(t *testing.T) {
+	oldConfig, oldErr := userConfig, userConfigErr
+	t.Cleanup(func() {
+		userConfig, userConfigErr = oldConfig, oldErr
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".rival")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	body := "review:\n  models: [codex, k3]\nroles:\n  consilium: judge prompt\n  bug_hunter: custom hunter\n"
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	LoadUserConfig()
+	if err := UserConfigError(); err != nil {
+		t.Fatalf("obsolete megareview keys broke config loading: %v", err)
+	}
+	if got, ok := RolePromptOverride("bug_hunter"); !ok || got != "custom hunter" {
+		t.Fatalf("bug_hunter override = %q, %v; want the configured prompt", got, ok)
 	}
 }

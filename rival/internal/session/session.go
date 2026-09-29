@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/procinfo"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/procinfo"
 	"github.com/google/uuid"
 )
 
@@ -71,7 +71,7 @@ type Session struct {
 	OwnerPIDStart int64 `json:"owner_pid_start,omitempty"`
 }
 
-// NewQueued creates a session in "queued" state — visible in the TUI/web while
+// NewQueued creates a session in "queued" state — visible in the TUI while
 // the process waits for a queue slot. Call MarkRunning when the slot is acquired.
 func NewQueued(cli, mode, model, effort, workdir, prompt, reviewScope, groupID string) (*Session, error) {
 	return create(cli, mode, model, effort, workdir, prompt, reviewScope, groupID, "queued")
@@ -149,7 +149,12 @@ func (s *Session) SetQueuePosition(pos int) error {
 	return s.Save()
 }
 
-// Save writes the session JSON atomically (tmp file + rename).
+// Save writes the session JSON atomically: a unique <id>.json.tmp-* file,
+// then rename. The unique name matters because several processes save the same
+// session (the owning rival, the TUI stop, the reaper, the Mac app); with one
+// shared temp name, two concurrent writers could interleave into a partial
+// file and rename it into place. The temp name never ends in ".json", so
+// readers that glob or suffix-match "*.json" skip it.
 func (s *Session) Save() error {
 	dir := config.SessionDirPath()
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -157,13 +162,20 @@ func (s *Session) Save() error {
 		return fmt.Errorf("marshal session: %w", err)
 	}
 
-	tmp := filepath.Join(dir, s.ID+".json.tmp")
-	final := filepath.Join(dir, s.ID+".json")
-
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return fmt.Errorf("write session tmp: %w", err)
+	f, err := os.CreateTemp(dir, s.ID+".json.tmp-*") // mode 0600
+	if err != nil {
+		return fmt.Errorf("create session tmp: %w", err)
 	}
-	if err := os.Rename(tmp, final); err != nil {
+	tmp := f.Name()
+	_, werr := f.Write(data)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("write session tmp: %w", werr)
+	}
+	if err := os.Rename(tmp, filepath.Join(dir, s.ID+".json")); err != nil {
 		_ = os.Remove(tmp) // clean up orphaned temp file
 		return fmt.Errorf("rename session: %w", err)
 	}
@@ -193,6 +205,18 @@ func (s *Session) Fail(exitCode int, errMsg string) error {
 	return s.Save()
 }
 
+// isTempName reports whether name is a Save temp file: the legacy
+// "<id>.json.tmp" or the unique "<id>.json.tmp-*".
+func isTempName(name string) bool {
+	return strings.Contains(name, ".json.tmp")
+}
+
+// IsSessionFile reports whether name (a base name) is a finished session
+// record, not a temp file or anything else in the sessions dir.
+func IsSessionFile(name string) bool {
+	return strings.HasSuffix(name, ".json") && !isTempName(name)
+}
+
 // LoadAll reads and returns all sessions, sorted newest first.
 func LoadAll() []*Session {
 	dir := config.SessionDirPath()
@@ -203,7 +227,7 @@ func LoadAll() []*Session {
 
 	var sessions []*Session
 	for _, path := range matches {
-		if strings.HasSuffix(path, ".json.tmp") {
+		if isTempName(filepath.Base(path)) {
 			continue
 		}
 		data, err := os.ReadFile(path)
@@ -269,7 +293,7 @@ func groupModeRank(mode string) int {
 
 func groupModelRank(s *Session) int {
 	switch config.EngineLabel(s.CLI, s.Model) {
-	case config.SolLabel:
+	case config.SolLabel: // read-compat: display of sessions recorded before Sol's removal
 		return 0
 	case "kimi-k3":
 		return 1

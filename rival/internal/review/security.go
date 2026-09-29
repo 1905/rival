@@ -2,40 +2,19 @@ package review
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
-// ValidateSecurityOutput reports whether a parsed payload is a usable security
-// review.
-//
-// ParseReviewerOutput only checks that the JSON decodes and carries the
-// expected keys, so `{"summary":"","findings":null}` parses cleanly and would
-// otherwise format as a clean review. For a security gate that is the worst
-// possible failure: it reports "no vulnerabilities" when nothing was
-// reviewed. A caller must treat a validation failure exactly like a parse
-// failure.
-func ValidateSecurityOutput(out *ReviewerOutput) error {
-	return ValidateSecurityResult(out, "")
-}
-
-// ValidateSecurityResult validates a payload against the raw output it came
-// from. The raw text matters: the reviewer prompt contains a parseable clean
-// example, `{"summary": "No issues found.", "findings": []}`, so a run that
-// merely echoes the prompt without reviewing anything parses successfully and
-// looks like a clean review. For a security gate that is the worst failure
-// available, so an echoed prompt is rejected rather than trusted.
+// ValidateSecurityResult validates a security payload against the raw output
+// it came from. A caller must treat a validation failure exactly like a parse
+// failure: `{"summary":"","findings":null}` parses cleanly, and the prompt
+// carries a parseable clean example, so an empty payload or an echoed prompt
+// would otherwise format as "no vulnerabilities" when nothing was reviewed.
 func ValidateSecurityResult(out *ReviewerOutput, raw string) error {
-	if out == nil {
-		return fmt.Errorf("no structured output")
-	}
-	if raw != "" && looksLikeEchoedPrompt(out, raw) {
-		return fmt.Errorf("output repeats the prompt's own example rather than a review")
-	}
-	if strings.TrimSpace(out.Summary) == "" {
-		return fmt.Errorf("summary is empty")
+	if err := validateOutput(out, raw, securityEcho); err != nil {
+		return err
 	}
 	for i, f := range out.Findings {
 		if strings.TrimSpace(f.File) == "" {
@@ -44,27 +23,30 @@ func ValidateSecurityResult(out *ReviewerOutput, raw string) error {
 		if strings.TrimSpace(f.Title) == "" {
 			return fmt.Errorf("finding %d has no title", i+1)
 		}
-		if severityRank(f.Severity) > 3 {
+		if !knownSeverity(f.Severity) {
 			return fmt.Errorf("finding %d has an unknown severity %q", i+1, f.Severity)
 		}
 	}
 	return nil
 }
 
-// promptEchoMarkers are phrases that appear in the security prompt itself. A
-// review quoting one is possible, so they are only evidence alongside the
-// example summary.
+// promptEchoMarkers are phrases from the security prompt. Security runs on
+// opencode, whose log never contains the prompt, so a marker in a clean
+// security result means the model echoed its instructions. A false
+// "unusable" is the safe failure for a security gate, so this stays strict.
 var promptEchoMarkers = []string{
 	"## Role: Security Reviewer",
 	"Work through every class below",
 }
 
-// looksLikeEchoedPrompt reports whether the output is the prompt reflected
-// back. A genuine clean review carries the same summary text, so the summary
-// alone is not enough: the raw output must also contain the prompt's own
-// instructions, which a reviewer has no reason to reproduce.
-func looksLikeEchoedPrompt(out *ReviewerOutput, raw string) bool {
-	if strings.TrimSpace(out.Summary) != "No issues found." || len(out.Findings) > 0 {
+// isCleanExample reports whether out is exactly the prompt's clean example.
+func isCleanExample(out *ReviewerOutput) bool {
+	return strings.TrimSpace(out.Summary) == "No issues found." && len(out.Findings) == 0
+}
+
+// securityEcho is the strict echo check for security reviews.
+func securityEcho(out *ReviewerOutput, raw string) bool {
+	if !isCleanExample(out) {
 		return false
 	}
 	for _, marker := range promptEchoMarkers {
@@ -75,85 +57,52 @@ func looksLikeEchoedPrompt(out *ReviewerOutput, raw string) bool {
 	return false
 }
 
+// bugHunterEcho is the echo check for bug-hunter reviews. Codex writes the
+// whole prompt into its log, and a reviewer may quote prompt.go (security
+// markers included) in tool output, so no marker is evidence. The output is
+// an echo only when no reviewer payload follows the last copy of the
+// prompt's clean example.
+func bugHunterEcho(out *ReviewerOutput, raw string) bool {
+	if !isCleanExample(out) {
+		return false
+	}
+	i := strings.LastIndex(raw, cleanReviewExampleLine)
+	if i < 0 {
+		return false
+	}
+	_, err := ParseReviewerOutput(raw[i+len(cleanReviewExampleLine):])
+	return err != nil
+}
+
 // FormatSecurityResult renders a security review, or falls back to the raw log
 // when the payload is unusable. It owns that choice because the inner
-// formatter has neither the raw output nor the CLI the normalizer needs.
-func FormatSecurityResult(parsed *ReviewerOutput, raw, cli, model, scope string) string {
+// formatter has neither the raw output nor the CLI the normalizer needs. The
+// returned error is the validation failure: a security gate must not exit 0
+// on output it cannot trust.
+func FormatSecurityResult(parsed *ReviewerOutput, raw, cli, model, scope, logPath string) (string, error) {
+	label := config.EngineLabel(cli, model)
 	if err := ValidateSecurityResult(parsed, raw); err != nil {
-		var sb strings.Builder
-		fmt.Fprintf(&sb, "\n═══ RIVAL SECURITY REVIEW — UNUSABLE OUTPUT ═══\n\n")
-		fmt.Fprintf(&sb, "Model: %s\nScope: %s\nProblem: %s\n\n", config.EngineLabel(cli, model), scope, err)
-		sb.WriteString("The model ran but did not return a review this can trust.\n")
-		sb.WriteString("Raw output follows for diagnosis.\n\n")
-		sb.WriteString(config.PublicRuntimeLog(cli, model, raw))
-		return sb.String()
+		return formatUnusable("RIVAL SECURITY REVIEW — UNUSABLE OUTPUT", label, scope, err,
+			"The model ran but did not return a review this can trust.\nRaw output follows for diagnosis.\n\n",
+			config.PublicRuntimeLog(cli, model, raw), logPath), err
 	}
-	return FormatSecurityConsole(parsed, config.EngineLabel(cli, model), scope)
+	return FormatSecurityConsole(parsed, label, scope), nil
 }
 
 // FormatSecurityConsole renders a validated security review.
 func FormatSecurityConsole(out *ReviewerOutput, model, scope string) string {
 	var sb strings.Builder
-	sb.WriteString("\n═══ RIVAL SECURITY REVIEW ═══\n\n")
-	fmt.Fprintf(&sb, "Model: %s\n", model)
-	fmt.Fprintf(&sb, "Scope: %s\n\n", scope)
-	if summary := strings.TrimSpace(out.Summary); summary != "" {
-		fmt.Fprintf(&sb, "Summary: %s\n\n", summary)
-	}
+	writeHeader(&sb, "RIVAL SECURITY REVIEW", model, scope, out.Summary)
 
 	if len(out.Findings) == 0 {
 		sb.WriteString("No vulnerabilities found.\n")
 		return sb.String()
 	}
 
-	findings := make([]ReviewerFinding, len(out.Findings))
-	copy(findings, out.Findings)
-	sort.SliceStable(findings, func(i, j int) bool {
-		ri, rj := severityRank(findings[i].Severity), severityRank(findings[j].Severity)
-		if ri != rj {
-			return ri < rj
-		}
-		return findings[i].Confidence > findings[j].Confidence
-	})
-
+	findings := sortedFindings(out.Findings)
 	for i, f := range findings {
-		loc := f.File
-		if f.Line > 0 {
-			loc = fmt.Sprintf("%s:%d", f.File, f.Line)
-		}
-		fmt.Fprintf(&sb, "%d. [%s] %s", i+1, displaySeverity(f.Severity), f.Title)
-		if loc != "" {
-			fmt.Fprintf(&sb, " — %s", loc)
-		}
-		sb.WriteString("\n")
-		if body := strings.TrimSpace(f.Body); body != "" {
-			fmt.Fprintf(&sb, "   %s\n", body)
-		}
-		if fix := strings.TrimSpace(f.Suggestion); fix != "" {
-			fmt.Fprintf(&sb, "   Fix: %s\n", fix)
-		}
-		if f.Category != "" {
-			fmt.Fprintf(&sb, "   (%s, confidence %d)\n", f.Category, f.Confidence)
-		} else {
-			fmt.Fprintf(&sb, "   (confidence %d)\n", f.Confidence)
-		}
-		sb.WriteString("\n")
+		writeFinding(&sb, i+1, f)
 	}
-
-	var crit, high, med, low int
-	for _, f := range findings {
-		switch severityRank(f.Severity) {
-		case 0:
-			crit++
-		case 1:
-			high++
-		case 2:
-			med++
-		default:
-			low++
-		}
-	}
-	fmt.Fprintf(&sb, "Findings: %d total — %d crit, %d high, %d med, %d low\n",
-		len(findings), crit, high, med, low)
+	sb.WriteString(severityTally(findings) + "\n")
 	return sb.String()
 }

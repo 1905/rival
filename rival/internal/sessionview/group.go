@@ -1,16 +1,13 @@
-// Package sessionview derives display data from stored sessions. The TUI and
-// the web dashboard both read through it, so they cannot disagree about how a
-// group is bucketed, labelled, or timed. It sits between internal/session
-// (file parsing) and the two front ends, and never mutates the sessions it
-// receives.
+// Package sessionview derives display data from stored sessions: how a group
+// is bucketed, labelled, and timed. The TUI reads through it, and the Mac app
+// ports the same rules. It sits between internal/session (file parsing) and
+// the front end, and never mutates the sessions it receives.
 package sessionview
 
 import (
-	"strings"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/session"
 )
 
 // Bucket is one row in a dashboard: either a multi-session group or a single
@@ -97,21 +94,6 @@ func Kind(sessions []*session.Session) string {
 	return "megareview"
 }
 
-// EngineLabels lists each distinct model label, in the order the members first
-// use it. Callers join the result with their own separator.
-func EngineLabels(sessions []*session.Session) []string {
-	seen := make(map[string]bool, len(sessions))
-	var labels []string
-	for _, s := range sessions {
-		label := config.EngineLabel(s.CLI, s.Model)
-		if label != "" && !seen[label] {
-			seen[label] = true
-			labels = append(labels, label)
-		}
-	}
-	return labels
-}
-
 // Effort returns the shared effort of the members, or "mixed" when they
 // differ.
 func Effort(sessions []*session.Session) string {
@@ -168,10 +150,4 @@ func Elapsed(sessions []*session.Session) string {
 		return latest.Sub(earliest).Round(time.Second).String()
 	}
 	return "-"
-}
-
-// JoinLabels joins engine labels with sep. It exists so both front ends format
-// the same list without repeating the join.
-func JoinLabels(labels []string, sep string) string {
-	return strings.Join(labels, sep)
 }

@@ -94,9 +94,10 @@ When multiple agents work in parallel (worktrees, branches), these bugs appear o
 
 ### Role prompt checklists
 
-The current curated code-review roster assigns the bug-hunter role to both Sol
-and Kimi K3. That role's prompt includes the implementation-focused patterns
-most useful for high-confidence findings:
+Every single-model code review (`/rival-codex review`, `/rival-claude review`,
+`/rival-k3 review`, `/rival-grok review`) uses the bug-hunter role. That role's
+prompt includes the implementation-focused patterns most useful for
+high-confidence findings:
 
 **Bug Hunter role** checks:
 
@@ -105,36 +106,26 @@ most useful for high-confidence findings:
 - Look for N+1 patterns (queries/API calls inside loops)
 - Verify test assertions check specific values, not just truthiness
 
+Every finding must also carry a `failure_scenario`: the input or state that
+triggers it and the wrong result. Security patterns (pattern 3) have their own
+lens, `/rival-security`, and over-abstraction (pattern 4) has `/rival-antislop`.
+
 ### Diff context in review preamble
 
-When Rival auto-detects a Git review scope, it includes `git diff --stat`
-output in the review preamble alongside the file list. This gives reviewers
-scope awareness:
+When Rival auto-detects a Git review scope, the preamble lists the changed
+files and adds `git diff --stat` output. This gives reviewers scope awareness:
 
 ```
-Changed files (3 files, +45 -12):
-  src/api/handler.go    | 30 ++++++--
-  src/api/handler_test.go | 25 +++++++
-  internal/auth/middleware.go | 2 +-
+Changed files:
+src/api/handler.go
+src/api/handler_test.go
+internal/auth/middleware.go
+
+Diff stats:
+ src/api/handler.go          | 30 ++++++--
+ src/api/handler_test.go     | 25 +++++++
+ internal/auth/middleware.go |  2 +-
 ```
-
-### Possible future extension: retry guidance
-
-Rival's current recommendation contains `status` and `summary`. A future schema
-could add a `retry_guidance` field:
-
-```json
-{
-  "recommendation": {
-    "status": "request_changes",
-    "summary": "Two critical issues in auth flow",
-    "retry_guidance": "localized — send failing test for the auth bypass on line 42"
-  }
-}
-```
-
-That extension could tell the user or automation whether to fix inline,
-re-prompt an agent, or start over. It is not part of the v3.23 output contract.
 
 ---
 

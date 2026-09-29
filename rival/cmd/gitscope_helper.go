@@ -3,9 +3,9 @@ package cmd
 import (
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/gitscope"
-	"github.com/1F47E/rival/internal/parser"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/gitscope"
+	"github.com/1905/rival/internal/review"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,19 +27,32 @@ func buildDiffPreamble(workdir string) (preamble, files string) {
 	return preamble, files
 }
 
-// resolveGitScope auto-detects changed files via git and updates the parsed result.
-// If git finds files, it rebuilds the prompt with DiffReviewPreamble + ReviewPrompt.
-// If git finds nothing, it falls back to "the entire project".
-func resolveGitScope(parsed *parser.ParseResult, workdir string) {
-	preamble, files := buildDiffPreamble(workdir)
-	if files == "" {
+// buildReviewPrompt builds a review prompt with build, which renders the
+// prompt for one scope string. With autoScope it asks git for the changed
+// files and ignores scope: when there are some, the prompt is
+// DiffReviewPreamble + build("the changed files listed above"), target is the
+// file list and display is "changed files (git auto-detect)"; when there are
+// none it reviews config.WholeProject. Otherwise it reviews scope as given.
+// target is what a session records; display is the output's Scope line.
+func buildReviewPrompt(build func(scope string) string, scope string, autoScope bool, workdir string) (prompt, target, display string) {
+	if autoScope {
+		preamble, files := buildDiffPreamble(workdir)
+		if files != "" {
+			log.Info().Str("files", files).Msg("git scope: auto-detected changed files")
+			return preamble + build("the changed files listed above"), files, "changed files (git auto-detect)"
+		}
 		log.Debug().Msg("git scope: no changes detected, falling back to full project")
-		return // keep "the entire project" default
+		scope = config.WholeProject
 	}
+	return build(scope), scope, scope
+}
 
-	log.Info().Str("files", files).Msg("git scope: auto-detected changed files")
-	parsed.AutoScope = false
-	parsed.ReviewScope = files
-	review := strings.ReplaceAll(config.ReviewPrompt, "{SCOPE}", "the changed files listed above")
-	parsed.Prompt = preamble + review
+// lensPrompt returns the reviewer prompt builder for one lens.
+func lensPrompt(kind config.PromptKind) func(string) string {
+	return func(scope string) string { return review.BuildReviewerPrompt(scope, kind) }
+}
+
+// antislopCodePrompt renders the code-mode antislop prompt for scope.
+func antislopCodePrompt(scope string) string {
+	return strings.ReplaceAll(config.AntislopCodePrompt, "{SCOPE}", scope)
 }

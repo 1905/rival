@@ -7,20 +7,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 )
 
-// CodexPreflight checks that codex is installed and authenticated, reporting
-// failures under the default Sol label. Callers running another model on this
-// runtime should use CodexPreflightFor so the diagnostic names their model.
-func CodexPreflight() error {
-	return CodexPreflightFor(config.GPT56SolModel)
-}
-
-// CodexPreflightFor is CodexPreflight with the model named in its errors.
-// Sol and Codex share this runtime, so a hardcoded label would tell an Codex
-// user that Sol is broken.
+// CodexPreflightFor checks that codex is installed and authenticated, naming
+// the given model in its errors.
 func CodexPreflightFor(model string) error {
 	label := config.EngineLabel("codex", model)
 	if _, err := exec.LookPath("codex"); err != nil {
@@ -35,20 +27,11 @@ func CodexPreflightFor(model string) error {
 	return nil
 }
 
-// RunCodex executes a prompt with the default GPT model. It remains as a
-// compatibility wrapper for standalone callers.
-func RunCodex(ctx context.Context, sess *session.Session, prompt, effort, workdir string, mirror io.Writer) (*Result, error) {
-	return RunCodexModel(ctx, sess, prompt, effort, workdir, config.GPT56SolModel, mirror)
-}
-
 // RunCodexModel executes a prompt with one explicit model. Review pipelines use
 // this entry point so the model recorded in the session is also the model sent
-// to the runtime.
+// to the runtime. Codex is the only model it runs.
 func RunCodexModel(ctx context.Context, sess *session.Session, prompt, effort, workdir, model string, mirror io.Writer) (*Result, error) {
-	if model == "" {
-		model = config.GPT56SolModel
-	}
-	if model != config.GPT56SolModel && model != config.CodexModel {
+	if model != config.CodexModel {
 		return nil, fmt.Errorf("unsupported codex model %q", model)
 	}
 	args := codexRunArgs(model, effort, workdir)
@@ -64,8 +47,8 @@ func RunCodexModel(ctx context.Context, sess *session.Session, prompt, effort, w
 }
 
 func codexRunArgs(model, effort, workdir string) []string {
-	// gpt-5.6-sol exposes ultra as a native runtime effort (distinct from max),
-	// so preserve the requested value instead of normalizing it.
+	// The codex runtime takes ultra as its own reasoning level (distinct from
+	// xhigh), so preserve the requested value instead of normalizing it.
 	return []string{
 		"exec",
 		"-C", workdir,

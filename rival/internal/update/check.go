@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	releasesURL = "https://api.github.com/repos/1F47E/rival/releases/latest"
+	releasesURL = "https://api.github.com/repos/1905/rival/releases/latest"
 	cacheTTL    = 24 * time.Hour
 	httpTimeout = 2 * time.Second
 )

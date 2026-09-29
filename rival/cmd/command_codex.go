@@ -1,14 +1,14 @@
 package cmd
 
 import (
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 	"github.com/spf13/cobra"
 )
 
 const codexUsage = `Usage:
   /rival-codex 'explain the auth flow' — run any prompt with Codex
-  /rival-codex -re high 'find bugs in src/main.go' — run with a lower reasoning effort
-  /rival-codex review — ruthless code review of the entire project
+  /rival-codex -re high 'find bugs in src/main.go' — run with a different reasoning effort (default xhigh)
+  /rival-codex review — bug-hunting review of the changed files (git auto-detect)
   /rival-codex review src/api/ — review specific scope
   /rival-codex -re high review src/api/ — review with high reasoning
   /rival-codex — show this usage info

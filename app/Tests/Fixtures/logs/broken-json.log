@@ -1,0 +1,32 @@
+OpenAI Codex v0.153.4
+--------
+workdir: /Users/dev/src/orbit-web
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a7c3f2-8e10-7c55-9a02-7d3b4e6f8c19
+--------
+user
+Review internal/sync/ for bugs. Answer with JSON: {"summary": "...", "findings": [...]}
+
+exec
+/bin/zsh -lc "nl -ba internal/sync/merge.go | sed -n '1,80p'" in /Users/dev/src/orbit-web
+ succeeded in 8ms:
+     1	package sync
+     2	
+     3	func Merge(a, b []Entry) []Entry {
+
+codex
+{
+  "summary": "Merge drops entries with equal timestamps from the second batch, so concurrent writes from two devices lose data.",
+  "findings": [
+    {
+      "file": "internal/sync/merge.go",
+      "line": 31,
+      "severity": "high",
+      "category": "bug",
+      "title": "Equal timestamps drop the second entry",
+      "body": "The loop advances both cursors when a.Time == b.Time, so b's entry is never appended

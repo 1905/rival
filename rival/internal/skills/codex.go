@@ -23,10 +23,6 @@ func CodexSkill(name, version string) ([]byte, error) {
 		description = fmt.Sprintf("Run a requested %s prompt or code review through Rival from Codex.", model)
 		command = model
 		input = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model."
-	case "rival-review":
-		description = "Run Rival's independent code review and consilium from Codex. Use for a requested Rival review; use rival-claude for a Claude-only review."
-		command = "megareview"
-		input = "Pass the user's scope and options verbatim. Empty input reviews git-detected changes. The default reviewer is Codex. `-m codex,k3` selects two reviewers; Grok is opt-in. Claude is not supported in this roster: use $rival-claude for Claude. For a GitLab MR, pass its HTTPS URL as the entire scope and use a local repository with a remote for the target project as the workdir. The host needs glab authentication for that host and Git fetch access. Rival resolves the base/head SHAs and reviews an isolated checkout. If resolution fails, report the failure; never retry against local HEAD. Preserve the URL/base/head header in the report. Do not post MR comments or approvals."
 	case "rival-plan", "rival-plan-codex", "rival-plan-claude":
 		description = "Review a plan or specification document through Rival from Codex, returning ratings and findings."
 		command = "plan --model codex --effort xhigh"

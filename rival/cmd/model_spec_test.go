@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // The command word and the display label differ for K3, so one field cannot
@@ -15,7 +15,7 @@ func TestSpecLabelsAndCommandNames(t *testing.T) {
 		label       string
 		cli         string
 	}{
-		{solSpec(), "sol", config.SolLabel, "codex"},
+		{codexSpec(), "codex", config.CodexLabel, "codex"},
 		{claudeSpec(), "claude", config.ClaudeLabel, "claude"},
 		{k3Spec(), "k3", config.K3Label, "opencode"},
 		{grokSpec(), "grok", config.GrokLabel, config.GrokLabel},
@@ -61,10 +61,10 @@ func TestGrokEffortClampsToItsOwnMenu(t *testing.T) {
 	}
 }
 
-// Sol receives the level verbatim: ultra is its own level, not an xhigh alias.
-func TestSolEffortIsNotAliased(t *testing.T) {
+// Codex receives the level verbatim: ultra is its own level, not an xhigh alias.
+func TestCodexEffortIsNotAliased(t *testing.T) {
 	for _, requested := range []string{"xhigh", "ultra"} {
-		got, err := solSpec().resolveEffort(requested)
+		got, err := codexSpec().resolveEffort(requested)
 		if err != nil {
 			t.Fatalf("resolveEffort(%q): %v", requested, err)
 		}
@@ -76,7 +76,7 @@ func TestSolEffortIsNotAliased(t *testing.T) {
 
 // Only Claude reports an auth hint, and only from its own log.
 func TestOnlyClaudeReportsAnAuthHint(t *testing.T) {
-	for _, spec := range []modelSpec{solSpec(), k3Spec(), grokSpec()} {
+	for _, spec := range []modelSpec{codexSpec(), k3Spec(), grokSpec()} {
 		if hint := spec.authHint("/nonexistent.log"); hint != "" {
 			t.Errorf("%s returned an auth hint %q", spec.commandName, hint)
 		}
@@ -97,7 +97,7 @@ func TestSessionModeNamesTheRun(t *testing.T) {
 // failure, or hangs forever waiting for input that will never come.
 func TestRunModelRunValidatesEffortBeforeAnythingElse(t *testing.T) {
 	preflightCalled := false
-	spec := solSpec()
+	spec := codexSpec()
 	spec.preflight = func(string) error {
 		preflightCalled = true
 		return nil

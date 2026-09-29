@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/executor"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/executor"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 )
 
@@ -34,6 +34,28 @@ func RunTimeoutReason(ctx context.Context, label, fallback string) string {
 		return fmt.Sprintf("run timeout after %s (RIVAL_RUN_TIMEOUT) — model did not finish", config.RunTimeout())
 	}
 	return fmt.Sprintf("%s run timeout after %s (RIVAL_RUN_TIMEOUT) — model did not finish", label, config.RunTimeout())
+}
+
+// RunFailureReason reports why a run that exited 0 still produced no review:
+// an empty log, or a provider quota/rate-limit message when nothing parsed.
+// It returns "" otherwise; output that merely fails to parse is not a run
+// failure (it prints as unparsed). Quota is checked only when nothing parsed:
+// the signatures are plain substrings, so a review of code that mentions them
+// must not fail. label prefixes the reason; an empty label returns it bare.
+func RunFailureReason(label, raw string, parsed bool) string {
+	var reason string
+	switch {
+	case strings.TrimSpace(raw) == "":
+		reason = "produced no output (empty result); likely an auth/session failure"
+	case !parsed && executor.IsQuotaExhausted(raw):
+		reason = "hit provider quota/rate limit (429)"
+	default:
+		return ""
+	}
+	if label == "" {
+		return reason
+	}
+	return label + " " + reason
 }
 
 // planFailureReason keeps user-facing failures model-specific even though the
@@ -125,7 +147,7 @@ func planModelForCLI(cli string) string {
 // RunPlanReview reviews the plan/spec file at absPath with each CLI in clis,
 // concurrently, under a single queue ticket. effort is an optional invocation
 // override; when empty, each model resolves its own configured/default effort.
-// There is no consilium judge — each CLI's structured 1-10 rating + findings
+// There is no judge — each CLI's structured 1-10 rating + findings
 // are returned independently. A CLI that is unavailable, fails, or hits quota
 // is recorded in Skipped rather than aborting the run; only when every CLI is
 // unusable does this return an error.
@@ -215,8 +237,7 @@ func runDocReview(ctx context.Context, ex planExecutor, mode, prompt, target, ef
 		return nil, fmt.Errorf("no plan models available (see skipped reasons): %s", formatSkipped(skipped))
 	}
 
-	// One queue ticket covers all plan sessions; all of them are the run set
-	// (there is no deferred consilium phase like megareview has).
+	// One queue ticket covers all plan sessions; all of them are the run set.
 	release, err := WaitForGroupSlot(ctx, noQueue, sessions, sessions, workdir, groupID, mode)
 	if err != nil {
 		return nil, err
@@ -278,17 +299,15 @@ func runPlanCLI(ctx context.Context, ex planExecutor, sess *session.Session, cli
 		return planCLIRun{CLI: cli, Model: model, Err: err, Reason: reason, ExitCode: -1}
 	}
 
-	switch {
-	case exitCode != 0:
-		_ = sess.Fail(exitCode, fmt.Sprintf("%s exited with code %d", config.EngineLabel(cli, model), exitCode))
-	case executor.IsQuotaExhausted(raw):
-		_ = sess.Fail(1, fmt.Sprintf("%s hit provider quota/rate limit (429)", config.EngineLabel(cli, model)))
-	case strings.TrimSpace(raw) == "":
-		// Exited 0 but wrote nothing — a silent no-op (e.g. an auth/session
-		// failure). Fail it so it is reported as skipped, not a "successful" plan
-		// review that formats to an empty string while the command exits 0.
-		_ = sess.Fail(1, fmt.Sprintf("%s produced no output (empty result) — likely an auth/session failure", config.EngineLabel(cli, model)))
-	default:
+	label := config.EngineLabel(cli, model)
+	_, parseErr := ParsePlanOutput(raw)
+	if exitCode != 0 {
+		_ = sess.Fail(exitCode, fmt.Sprintf("%s exited with code %d", label, exitCode))
+	} else if reason := RunFailureReason(label, raw, parseErr == nil); reason != "" {
+		// Fail it so it is reported as skipped, not a "successful" plan review
+		// that formats to an empty string while the command exits 0.
+		_ = sess.Fail(1, reason)
+	} else {
 		_ = sess.Complete(exitCode, int64(len(raw)), 0)
 	}
 
@@ -320,18 +339,15 @@ func assemblePlanResults(batch []planCLIRun, skipped []SkippedCLI) (*PlanRunResu
 		case r.ExitCode != 0:
 			skipped = append(skipped, SkippedCLI{CLI: r.CLI, Model: model, Reason: fmt.Sprintf("exited with code %d", r.ExitCode)})
 			continue
-		case executor.IsQuotaExhausted(r.Raw):
-			skipped = append(skipped, SkippedCLI{CLI: r.CLI, Model: model, Reason: "quota/rate limit reached (429) — not authenticated to a quota-bearing account or quota exhausted"})
-			continue
-		case strings.TrimSpace(r.Raw) == "":
-			// Defensive: an exit-0 run that wrote nothing is not a review. Skip it
-			// so a single-CLI run never formats to an empty string with exit 0.
-			skipped = append(skipped, SkippedCLI{CLI: r.CLI, Model: model, Reason: "produced no output (empty result) — the model exited without writing a review; likely an auth/session failure"})
-			continue
 		}
 
-		res := PlanCLIResult{CLI: r.CLI, Model: model, Raw: r.Raw}
 		parsed, parseErr := ParsePlanOutput(r.Raw)
+		if reason := RunFailureReason("", r.Raw, parseErr == nil); reason != "" {
+			// A single-CLI run must never format to an empty string with exit 0.
+			skipped = append(skipped, SkippedCLI{CLI: r.CLI, Model: model, Reason: reason})
+			continue
+		}
+		res := PlanCLIResult{CLI: r.CLI, Model: model, Raw: r.Raw}
 		if parseErr != nil {
 			log.Warn().Str("reviewer", config.EngineLabel(r.CLI, model)).Err(parseErr).Msg("failed to parse plan output, keeping raw")
 		} else {

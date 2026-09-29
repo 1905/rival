@@ -5,10 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/session"
 )
 
 type cachedSession struct {
@@ -17,10 +16,9 @@ type cachedSession struct {
 	session *session.Session
 }
 
-// Cache keeps the dashboards responsive without changing the session storage
-// format used by the CLI. Only files whose size or mtime changed are reparsed,
-// and parsed summaries never retain full prompts. Both front ends share one
-// instance per directory, so they cannot read different data.
+// Cache keeps the TUI responsive without changing the session storage format
+// used by the CLI. Only files whose size or mtime changed are reparsed, and
+// parsed summaries never retain full prompts.
 type Cache struct {
 	mu       sync.Mutex
 	dir      string
@@ -41,6 +39,18 @@ func New(dir string) *Cache {
 // removed, or changed by size or mtime. Two calls with no file change return
 // the same number, so a caller can skip redundant work.
 func (c *Cache) Load() ([]*session.Session, uint64) {
+	return c.LoadWithProgress(nil)
+}
+
+// progressEvery is how many session files pass between two progress calls.
+const progressEvery = 100
+
+// LoadWithProgress is Load plus an optional progress callback. progress, when
+// not nil, gets (done, total) over the session files in the directory: every
+// progressEvery files and once more at the end. It runs on the caller's
+// goroutine with the cache lock held, so it must not call back into c. With
+// no session files it is never called.
+func (c *Cache) LoadWithProgress(progress func(done, total int)) ([]*session.Session, uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -52,13 +62,21 @@ func (c *Cache) Load() ([]*session.Session, uint64) {
 		return cachedSessionValues(c.files), c.revision
 	}
 
-	seen := make(map[string]bool, len(entries))
-	changed := false
+	// Filter first, so total is known before the first progress call.
+	files := entries[:0]
 	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".json.tmp") {
-			continue
+		if !entry.IsDir() && session.IsSessionFile(entry.Name()) {
+			files = append(files, entry)
 		}
+	}
+
+	seen := make(map[string]bool, len(files))
+	changed := false
+	for i, entry := range files {
+		if progress != nil && i > 0 && i%progressEvery == 0 {
+			progress(i, len(files))
+		}
+		name := entry.Name()
 		seen[name] = true
 
 		info, err := entry.Info()
@@ -80,6 +98,10 @@ func (c *Cache) Load() ([]*session.Session, uint64) {
 			session: s,
 		}
 		changed = true
+	}
+
+	if progress != nil && len(files) > 0 {
+		progress(len(files), len(files))
 	}
 
 	for name := range c.files {

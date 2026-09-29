@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // Every advertised effort must parse — the value is ignored downstream (K3

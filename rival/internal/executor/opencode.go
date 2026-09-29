@@ -7,8 +7,8 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 )
 
 // OpencodePreflightModel validates K3, Rival's sole OpenCode-backed model.

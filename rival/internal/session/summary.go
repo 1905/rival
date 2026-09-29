@@ -8,9 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 const summaryEdgeBytes = 64 << 10
@@ -28,7 +27,7 @@ func LoadAllSummaries() []*Session {
 	sessions := make([]*Session, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".json.tmp") {
+		if entry.IsDir() || !IsSessionFile(name) {
 			continue
 		}
 		info, err := entry.Info()

@@ -9,23 +9,24 @@ import (
 	"syscall"
 	"time"
 
-	"charm.land/bubbles/v2/viewport"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
-	"github.com/1F47E/rival/internal/sessionview"
+	"github.com/1905/rival/internal/procinfo"
+	"github.com/1905/rival/internal/session"
+	"github.com/1905/rival/internal/sessionview"
 	"github.com/charmbracelet/x/ansi"
-)
-
-const (
-	viewList   = 0
-	viewDetail = 1
 )
 
 // displayItem wraps one or more sessions for display in the TUI.
 type displayItem struct {
 	Sessions []*session.Session
+	// hay caches the lowercase filter text. Items are rebuilt on every
+	// SessionEvent, so the cache never outlives the data it was built from,
+	// and each filter keystroke skips re-deriving 3000 haystacks.
+	hay string
 }
 
 // Primary returns the first session (used for shared metadata).
@@ -43,8 +44,7 @@ func (d *displayItem) IsGroup() bool {
 }
 
 // groupSessions merges sessions sharing a GroupID into display items. The
-// bucketing itself lives in internal/sessionview, shared with the web
-// dashboard.
+// bucketing itself lives in internal/sessionview.
 func groupSessions(sessions []*session.Session) []displayItem {
 	buckets := sessionview.Group(sessions)
 	items := make([]displayItem, 0, len(buckets))
@@ -59,29 +59,53 @@ func toDisplayItem(b sessionview.Bucket) displayItem {
 	return displayItem{Sessions: b.Sessions}
 }
 
-const pageSize = 100
-
 // Model is the bubbletea model for the TUI dashboard.
 type Model struct {
-	allItems       []displayItem // all grouped items
-	items          []displayItem // visible slice (paginated)
-	visibleCount   int           // how many items to show
-	selected       int
-	viewMode       int
-	promptExpanded bool
-	width          int
-	height         int
-	events         chan SessionEvent
-	ctx            context.Context
-	cancel         context.CancelFunc
-	errText        string
-	quitting       bool
-	totalSessions  int            // total session count (before grouping)
-	logView        viewport.Model // scrollable log pane for the detail view
-	// prompts holds full prompt text for the sessions in the open detail view.
-	// The list itself is built from summaries, which drop prompts to stay cheap.
-	// Loaded on detail entry, cleared on exit.
-	prompts map[string]string
+	lay layout
+	// helpH is the help bar's height in rows. It depends on the mode, "?" and
+	// the width, so measureHelp recomputes it when one of those changes rather
+	// than rendering the full help on every geometry call.
+	helpH  int
+	events chan SessionEvent
+	// progress carries the initial scan's LoadProgress; WatchSessions closes
+	// it when that scan is done.
+	progress chan LoadProgress
+	// loaded turns true on the first SessionEvent. Until then the body is the
+	// loader and the counts are "…", never a misleading 0.
+	loaded   bool
+	load     LoadProgress
+	ctx      context.Context
+	cancel   context.CancelFunc
+	errText  string
+	quitting bool
+
+	keys    keyMap
+	help    help.Model
+	mode    mode
+	list    listPane
+	preview previewPane
+
+	// spin animates running rows. It ticks only while something runs, so an
+	// idle dashboard costs no CPU; spinning records whether a tick is in
+	// flight, so a new event never starts a second, faster chain.
+	spin     spinner.Model
+	spinning bool
+	// ticking is the same guard for the 1s refresh tick: every SessionEvent
+	// used to start another self-renewing chain, multiplying log reads.
+	ticking bool
+
+	// kill signals a process. Tests replace it to record signals instead of
+	// sending them.
+	kill func(pid int, sig syscall.Signal) error
+	// alive reports whether pid is still the process that started at start.
+	// It authorizes stop signals, so the default is procinfo.SameProcess,
+	// which never passes an unrecorded start. Tests replace it with fakes;
+	// mayStop also refuses PIDStart 0 whatever alive says.
+	alive func(pid int, start int64) bool
+
+	// detail is the full-screen view of the selected run. modeDetail,
+	// modeSearch and modeConfirm all draw it.
+	detail detailPane
 }
 
 // Version is set from cmd package before launching the TUI.
@@ -91,63 +115,36 @@ var Version = "dev"
 func New() Model {
 	events := make(chan SessionEvent, 10)
 	ctx, cancel := context.WithCancel(context.Background())
-	return Model{
-		visibleCount: pageSize,
-		events:       events,
-		ctx:          ctx,
-		cancel:       cancel,
-		// Real dimensions arrive with the first WindowSizeMsg and are applied by
-		// syncDetailViewport; the log content is pre-wrapped, so SoftWrap stays off.
-		logView: viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+	h := help.New()
+	h.Styles = help.Styles{
+		Ellipsis:       dimStyle,
+		ShortKey:       textStyle,
+		ShortDesc:      dimStyle,
+		ShortSeparator: dimStyle,
+		FullKey:        textStyle,
+		FullDesc:       dimStyle,
+		FullSeparator:  dimStyle,
 	}
-}
-
-// loadPrompts reads the full prompt for every member of the selected item.
-// The list is built from summaries, which drop prompts, so the detail view
-// loads them on demand. A session that cannot be read keeps its preview.
-func (m *Model) loadPrompts() {
-	item := m.selectedItem()
-	if item == nil {
-		return
+	h.ShortSeparator = " · "
+	m := Model{
+		events:   events,
+		progress: make(chan LoadProgress, 1),
+		// Init starts the spinner chain for the loader.
+		spinning: true,
+		ctx:      ctx,
+		cancel:   cancel,
+		keys:     defaultKeys(),
+		help:     h,
+		list:     newListPane(),
+		// No style: the frame is embedded in rows that pick their own colour
+		// (and the selection bar must not get a nested reset).
+		spin:   spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+		kill:   syscall.Kill,
+		alive:  procinfo.SameProcess,
+		detail: newDetailPane(),
 	}
-	prompts := make(map[string]string, len(item.Sessions))
-	for _, s := range item.Sessions {
-		if s.Prompt != "" {
-			prompts[s.ID] = s.Prompt
-			continue
-		}
-		full, err := session.Load(s.ID)
-		if err != nil || full == nil {
-			continue
-		}
-		prompts[s.ID] = full.Prompt
-	}
-	m.prompts = prompts
-}
-
-// paginateItems sets the visible slice from allItems.
-func (m *Model) paginateItems() {
-	if m.visibleCount >= len(m.allItems) {
-		m.items = m.allItems
-	} else {
-		m.items = m.allItems[:m.visibleCount]
-	}
-	if m.selected >= len(m.items) {
-		m.selected = max(0, len(m.items)-1)
-	}
-}
-
-// hasMore returns true if there are hidden items beyond the visible page.
-func (m *Model) hasMore() bool {
-	return m.visibleCount < len(m.allItems)
-}
-
-// selectedItem returns the currently selected display item, or nil.
-func (m *Model) selectedItem() *displayItem {
-	if m.selected < 0 || m.selected >= len(m.items) {
-		return nil
-	}
-	return &m.items[m.selected]
+	m.measureHelp()
+	return m
 }
 
 // itemKey identifies a display item across refreshes. A group is keyed by its
@@ -163,90 +160,145 @@ func itemKey(item *displayItem) string {
 	return "solo:" + s.ID
 }
 
-// reanchorSelection restores the selection to the item identified by key after
-// the item list has been rebuilt.
-//
-// The index alone is not a stable handle: LoadAll sorts by StartTime descending
-// and MarkRunning stamps StartTime at launch, so a queued run starting while the
-// user reads a detail view shifts every row below it. Re-anchoring by index
-// would silently swap the displayed session — and point "x" at the wrong PID.
-// A vanished item drops the user back to the list rather than showing another
-// run's log under the old heading.
-func (m *Model) reanchorSelection(key string) {
-	if key == "" {
-		return
-	}
-	for i := range m.items {
-		if itemKey(&m.items[i]) == key {
-			m.selected = i
-			return
+// applySessions rebuilds the list from a watcher snapshot. The list keeps the
+// cursor on the same run; when that run vanished while its detail view was
+// open, the user drops back to the list rather than seeing another run's log
+// under the old heading (and "x" pointing at the wrong PID).
+func (m *Model) applySessions(sessions []*session.Session) {
+	anchor := m.list.selectedKey()
+	m.list.setItems(groupSessions(sessions), time.Now())
+	if m.inDetail() {
+		if m.list.selectedKey() != anchor {
+			m.closeDetail()
+		} else {
+			m.syncDetail(false)
 		}
 	}
-	if m.viewMode == viewDetail {
-		m.viewMode = viewList
-		m.promptExpanded = false
-		m.logView.SetContent("")
-	}
-	if m.selected >= len(m.items) {
-		m.selected = max(0, len(m.items)-1)
-	}
 }
 
-// contentHeight is the number of rows available to the body between the banner
-// and the help bar. Both viewContent and syncDetailViewport MUST use it: if the
-// two ever compute a different height the viewport renders a frame the view
-// then clips, which is what leaves stale rows on screen.
-func (m Model) contentHeight() int {
-	headerLines := strings.Count(m.renderBanner(), "\n")
-	h := m.height - headerLines - 1 // -1 for the help bar
-	if h < 0 {
-		h = 0
-	}
-	return h
+// inDetail reports whether the detail screen is showing: browsing it, typing a
+// search, or answering the stop confirm.
+func (m Model) inDetail() bool {
+	return m.mode == modeDetail || m.mode == modeSearch || m.mode == modeConfirm
 }
 
-// syncDetailViewport rebuilds the log viewport's size and content for the
-// current selection. resetToBottom forces the tail into view (entering detail);
-// otherwise the tail is followed only if the user was already parked at the
-// bottom.
-func (m *Model) syncDetailViewport(resetToBottom bool) {
-	item := m.selectedItem()
-	if m.viewMode != viewDetail || item == nil || item.Primary() == nil {
-		m.logView.SetContent("")
+func (m *Model) closeDetail() {
+	m.mode = modeList
+	m.detail.close()
+}
+
+// helpView renders the help bar for the current mode, no line wider than the
+// terminal. lipgloss.JoinVertical pads every row to the widest line, so one
+// over-wide help line would drag the whole frame over-width.
+func (m Model) helpView() string {
+	h := m.help
+	h.SetWidth(m.lay.Width)
+	lines := strings.Split(h.View(m.keys.help(m.mode)), "\n")
+	for i, l := range lines {
+		lines[i] = ansi.Truncate(l, m.lay.Width, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
+// measureHelp stores how many rows the help bar takes; "?" expands it. Call
+// it whenever the mode, "?" or the width changes.
+func (m *Model) measureHelp() {
+	m.helpH = strings.Count(m.helpView(), "\n") + 1
+}
+
+// listBodyHeight is the list pane height: the layout body minus any rows the
+// expanded help borrows.
+func (m Model) listBodyHeight() int {
+	return max(1, m.lay.BodyH-(m.helpH-1))
+}
+
+// listInnerHeight and listInnerWidth are the list pane's size inside its
+// border. The border exists only in the split view; alone, the list takes the
+// whole body.
+func (m Model) listInnerHeight() int {
+	if m.lay.ShowPreview {
+		return max(1, m.listBodyHeight()-2)
+	}
+	return m.listBodyHeight()
+}
+
+func (m Model) listInnerWidth() int {
+	if m.lay.ShowPreview {
+		return max(1, m.lay.ListW-2)
+	}
+	return m.lay.Width
+}
+
+// listRows is how many data rows fit between the list's column titles and
+// its page footer.
+func (m Model) listRows() int {
+	return max(1, m.listInnerHeight()-2)
+}
+
+// syncPreview re-renders the preview for the selected run. Its log is re-read
+// only when the file changed. The detail screen hides the preview, so nothing
+// is read there.
+func (m *Model) syncPreview() {
+	if !m.lay.ShowPreview || m.lay.TooSmall || m.inDetail() {
 		return
 	}
+	m.preview.refresh(m.list.selected(), m.previewInnerWidth(), m.listInnerHeight())
+}
 
-	// Capture the follow state BEFORE any resize. Shrinking the viewport raises
-	// the old offset above the new max-bottom, so sampling AtBottom after
-	// SetHeight reports false for a user who never scrolled and silently kills
-	// tail-follow.
-	wasAtBottom := m.logView.AtBottom()
+// previewInnerWidth is the preview text width: the box minus its border and
+// a 1-col pad each side, so the text never touches the border.
+func (m Model) previewInnerWidth() int {
+	return max(1, m.lay.PreviewW-4)
+}
 
-	height := m.contentHeight()
-	meta := renderDetailMeta(item, m.width, height, m.promptExpanded, m.prompts)
-	metaLines := strings.Count(meta, "\n") + 1
+// contentHeight is the detail body height: everything between the header and
+// the help bar. Both viewContent and syncDetail MUST use it: if the two ever
+// compute a different height the viewport renders a frame the view then
+// clips, which is what leaves stale rows on screen.
+func (m Model) contentHeight() int {
+	return max(0, m.lay.Height-m.lay.HeaderH-m.helpH)
+}
 
-	m.logView.SetWidth(m.width)
-	m.logView.SetHeight(max(1, height-metaLines))
-
-	if item.IsGroup() {
-		m.logView.SetContent(buildGroupLogContent(item, m.width))
-	} else {
-		m.logView.SetContent(buildLogContent(item.Primary(), m.width))
+// syncDetail resizes the detail viewport and reloads its content for the
+// current selection. reset puts the scroll back to the tab's start (the tail
+// for Output); otherwise follow decides.
+func (m *Model) syncDetail(reset bool) {
+	if !m.inDetail() {
+		return
 	}
+	m.resizeDetail()
+	m.detail.reload(m.list.selected(), m.lay.Width, reset)
+}
 
-	if resetToBottom || wasAtBottom {
-		m.logView.GotoBottom()
+// resizeDetail fits the detail viewport to the current geometry without
+// re-reading anything.
+func (m *Model) resizeDetail() {
+	if m.inDetail() {
+		m.detail.resize(m.lay.Width, m.contentHeight())
 	}
 }
 
-// Init starts the file watcher and waits for events.
+// Init starts the file watcher and waits for events, the loader's progress
+// and its spinner.
 func (m Model) Init() tea.Cmd {
-	return func() tea.Msg {
-		if err := WatchSessions(m.ctx, m.events); err != nil {
+	watch := func() tea.Msg {
+		if err := WatchSessions(m.ctx, m.events, m.progress); err != nil {
 			return errMsg{err}
 		}
 		return <-m.events
+	}
+	return tea.Batch(watch, waitForProgress(m.progress), m.spin.Tick)
+}
+
+// waitForProgress delivers the next LoadProgress. It returns nil once
+// WatchSessions closes the channel after the initial scan, ending the chain.
+func waitForProgress(ch chan LoadProgress) tea.Cmd {
+	return func() tea.Msg {
+		p, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return p
 	}
 }
 
@@ -267,207 +319,433 @@ func waitForEvent(events chan SessionEvent) tea.Cmd {
 	}
 }
 
-// hasRunning returns true if any session is running or queued, so the live
-// timer keeps ticking (queued rows show a growing wait time).
-func hasRunning(items []displayItem) bool {
-	for _, item := range items {
-		for _, s := range item.Sessions {
-			if s.Status == "running" || s.Status == "queued" {
-				return true
-			}
-		}
+// ensureLiveTimers starts whichever of the 1s refresh tick and the spinner is
+// not already running, while anything is live. Each chain renews itself and
+// ends on its own once nothing runs, so starting a second one would double
+// its rate.
+func (m *Model) ensureLiveTimers() tea.Cmd {
+	if !m.list.anyLive {
+		return nil
 	}
-	return false
+	var cmds []tea.Cmd
+	if !m.ticking {
+		m.ticking = true
+		cmds = append(cmds, tickCmd())
+	}
+	if !m.spinning {
+		m.spinning = true
+		cmds = append(cmds, m.spin.Tick)
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m Model) quit() (tea.Model, tea.Cmd) {
+	m.quitting = true
+	if m.cancel != nil {
+		m.cancel()
+	}
+	return m, tea.Quit
 }
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	prevMode, prevHelp := m.mode, m.help.ShowAll
+	next, cmd := m.update(msg)
+	nm, ok := next.(Model)
+	if !ok {
+		return next, cmd
+	}
+	// The help bar's height depends on the mode and on "?". When either
+	// changes, the detail viewport must be resized, or it keeps a height the
+	// view then clips and the log's last lines vanish.
+	if nm.mode != prevMode || nm.help.ShowAll != prevHelp {
+		(&nm).measureHelp()
+		(&nm).resizeDetail()
+	}
+	// A spinner frame changes nothing the list or the preview show.
+	if _, spin := msg.(spinner.TickMsg); !spin {
+		(&nm).reconcile()
+	}
+	return nm, cmd
+}
+
+// reconcile runs once after every update: it scrolls the list so the cursor
+// stays in view and re-renders the preview for whatever is selected now.
+func (m *Model) reconcile() {
+	m.list.clampOffset(m.listRows())
+	m.syncPreview()
+}
+
+// updateFilterInput feeds msg to the filter input and refilters when the
+// text changed. Keys and pastes both land here.
+func (m *Model) updateFilterInput(msg tea.Msg) tea.Cmd {
+	before := m.list.filter.Value()
+	var cmd tea.Cmd
+	m.list.filter, cmd = m.list.filter.Update(msg)
+	if m.list.filter.Value() != before {
+		m.list.refilter(time.Now())
+	}
+	return cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		// Keys this feature owns are handled FIRST, before the list switch. The
-		// list cases match "j"/"k"/"g"/"G" unconditionally (their viewList test is
-		// inside the case body), so anything routed after them would be swallowed
-		// in detail mode and the advertised scroll keys would do nothing.
-		switch msg.String() {
-		case "q", "ctrl+c":
-			m.quitting = true
-			if m.cancel != nil {
-				m.cancel()
-			}
-			return m, tea.Quit
-
-		case "esc", "backspace":
-			if m.viewMode == viewDetail {
-				m.viewMode = viewList
-				m.promptExpanded = false
-				m.prompts = nil // full prompts are only needed while the detail view is open
-				(&m).syncDetailViewport(false)
-				return m, nil
-			}
-
-		case "p":
-			if m.viewMode == viewDetail {
-				m.promptExpanded = !m.promptExpanded
-				// Meta height just changed, so the viewport must be resized —
-				// this is the path that exercises capture-before-resize.
-				(&m).syncDetailViewport(false)
-				return m, nil
-			}
-
-		case "o":
-			if m.viewMode == viewDetail {
-				if item := (&m).selectedItem(); item != nil {
-					if item.IsGroup() {
-						openPublicGroupLogs(item.Sessions)
-					} else if s := item.Primary(); s != nil && s.LogFile != "" {
-						openPublicLog(s)
-					}
-				}
-				return m, nil
-			}
-
-		case "x":
-			if m.viewMode == viewDetail {
-				if item := (&m).selectedItem(); item != nil {
-					for _, s := range item.Sessions {
-						// Queued sessions carry the waiting rival process's PID, so
-						// SIGTERM cancels the queue wait (the process's signal handler
-						// removes its ticket and fails the session).
-						if (s.Status != "running" && s.Status != "queued") || s.PID <= 0 {
-							continue
-						}
-						if err := syscall.Kill(s.PID, syscall.SIGTERM); err != nil {
-							// Process already dead — mark failed immediately.
-							failSessionForKill(s, 1, "killed (process already dead)")
-						} else {
-							// Signal sent — mark failed so TUI updates instantly.
-							// The subprocess executor will overwrite with its own status.
-							failSessionForKill(s, 137, "killed by user")
-						}
-					}
-				}
-				return m, nil
-			}
-
-		case "g":
-			if m.viewMode == viewDetail {
-				m.logView.GotoTop()
-				return m, nil
-			}
-
-		case "G":
-			if m.viewMode == viewDetail {
-				m.logView.GotoBottom()
-				return m, nil
-			}
+		if key.Matches(msg, forceQuit) {
+			return m.quit()
 		}
-
-		// In detail mode every remaining key belongs to the viewport
-		// (j/k/up/down/pgup/pgdn/space/u/d). Return immediately — falling
-		// through to the list switch would move the list selection instead.
-		if m.viewMode == viewDetail {
-			var cmd tea.Cmd
-			m.logView, cmd = m.logView.Update(msg)
-			return m, cmd
-		}
-
-		// List mode only.
-		switch msg.String() {
-		case "j", "down":
-			if m.selected < len(m.items)-1 {
-				m.selected++
-			}
-
-		case "k", "up":
-			if m.selected > 0 {
-				m.selected--
-			}
-
-		case "enter":
-			if len(m.items) > 0 {
-				m.viewMode = viewDetail
-				m.promptExpanded = false
-				(&m).loadPrompts()
-				// Open at the tail: live output and final verdicts both live at
-				// the end of the log.
-				(&m).syncDetailViewport(true)
-			}
-
-		case "g":
-			m.selected = 0
-
-		case "G":
-			if len(m.items) > 0 {
-				m.selected = len(m.items) - 1
-			}
-
-		case "l":
-			if m.hasMore() {
-				m.visibleCount += pageSize
-				m.paginateItems()
-			}
+		switch m.mode {
+		case modeFilter:
+			return m.updateFilterKey(msg)
+		case modeDetail:
+			return m.updateDetailKey(msg)
+		case modeSearch:
+			return m.updateSearchKey(msg)
+		case modeConfirm:
+			return m.updateConfirmKey(msg)
+		default:
+			return m.updateListKey(msg)
 		}
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		if m.viewMode == viewDetail {
-			(&m).syncDetailViewport(false)
-		}
+		m.lay = computeLayout(msg.Width, msg.Height)
+		(&m).measureHelp()
+		(&m).syncDetail(false)
 
 	case SessionEvent:
-		anchor := ""
-		if item := (&m).selectedItem(); item != nil {
-			anchor = itemKey(item)
-		}
-		m.totalSessions = len(msg.Sessions)
-		m.allItems = groupSessions(msg.Sessions)
-		m.paginateItems()
-		(&m).reanchorSelection(anchor)
-		if m.viewMode == viewDetail {
-			(&m).syncDetailViewport(false)
-		}
-		cmds := []tea.Cmd{waitForEvent(m.events)}
-		if hasRunning(m.items) {
-			cmds = append(cmds, tickCmd())
-		}
-		return m, tea.Batch(cmds...)
+		m.loaded = true
+		(&m).applySessions(msg.Sessions)
+		return m, tea.Batch(waitForEvent(m.events), (&m).ensureLiveTimers())
 
 	case tickMsg:
-		// Re-render for live timers and log tails. Keep ticking while running.
-		if m.viewMode == viewDetail {
-			(&m).syncDetailViewport(false)
+		// Re-read the open run's log while it can still grow. Keep ticking
+		// while anything runs.
+		if sel := m.list.selected(); m.inDetail() && sel != nil && itemLive(sel) {
+			(&m).syncDetail(false)
 		}
-		if hasRunning(m.items) {
+		if m.list.anyLive {
 			return m, tickCmd()
 		}
+		m.ticking = false
 		return m, nil
+
+	case LoadProgress:
+		if m.loaded {
+			return m, nil
+		}
+		m.load = msg
+		return m, waitForProgress(m.progress)
+
+	case spinner.TickMsg:
+		// Dropping the tick ends the chain; the next SessionEvent with a
+		// running row restarts it. The loader keeps it alive until then.
+		if m.loaded && !m.list.anyLive {
+			m.spinning = false
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 
 	case errMsg:
 		m.errText = msg.Error()
+		// No snapshot is coming; let the loader's spinner chain end.
+		m.loaded = true
 		return m, nil
+
+	default:
+		// Cursor blink and other input-internal messages.
+		var cmd tea.Cmd
+		switch m.mode {
+		case modeFilter:
+			// A paste arrives here, not as a key, so it must refilter too.
+			cmd = (&m).updateFilterInput(msg)
+		case modeSearch:
+			m.detail.search, cmd = m.detail.search.Update(msg)
+		}
+		return m, cmd
 	}
 
 	return m, nil
 }
 
-func openPublicLog(s *session.Session) {
-	viewPath, err := createPublicLogView(s)
+func (m Model) updateListKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	k := m.keys
+	switch {
+	case key.Matches(msg, k.Quit):
+		return m.quit()
+	case key.Matches(msg, k.Up):
+		m.list.move(-1)
+	case key.Matches(msg, k.Down):
+		m.list.move(1)
+	case key.Matches(msg, k.Top):
+		m.list.top()
+	case key.Matches(msg, k.Bottom):
+		m.list.bottom()
+	case key.Matches(msg, k.NextPage):
+		m.list.turnPage(1)
+	case key.Matches(msg, k.PrevPage):
+		m.list.turnPage(-1)
+	case key.Matches(msg, k.NextTab):
+		m.list.cycleTab(1, time.Now())
+	case key.Matches(msg, k.PrevTab):
+		m.list.cycleTab(-1, time.Now())
+	case key.Matches(msg, k.Help):
+		m.help.ShowAll = !m.help.ShowAll
+	case key.Matches(msg, k.Filter):
+		m.mode = modeFilter
+		cmd := m.list.filter.Focus()
+		return m, cmd
+	case key.Matches(msg, k.Back):
+		// esc outside the input clears a kept filter.
+		if m.list.filter.Value() != "" {
+			m.list.filter.Reset()
+			m.list.refilter(time.Now())
+		}
+	case key.Matches(msg, k.Open):
+		if sel := m.list.selected(); sel != nil {
+			m.mode = modeDetail
+			m.detail.open(sel)
+			// Open at the tail: live output and final verdicts both live at
+			// the end of the log.
+			(&m).syncDetail(true)
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+// Arrow keys still move the cursor while the filter has focus; j/k are
+// letters there.
+var (
+	arrowUp   = key.NewBinding(key.WithKeys("up"))
+	arrowDown = key.NewBinding(key.WithKeys("down"))
+)
+
+func (m Model) updateFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch {
+	case key.Matches(msg, m.keys.Open):
+		m.list.filter.Blur()
+		m.mode = modeList
+	case key.Matches(msg, m.keys.Back):
+		m.list.filter.Reset()
+		m.list.filter.Blur()
+		m.list.refilter(time.Now())
+		m.mode = modeList
+	case key.Matches(msg, arrowUp):
+		m.list.move(-1)
+	case key.Matches(msg, arrowDown):
+		m.list.move(1)
+	default:
+		cmd = (&m).updateFilterInput(msg)
+	}
+	return m, cmd
+}
+
+// updateDetailKey drives the detail screen while it has focus.
+func (m Model) updateDetailKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	k := m.keys
+	d := &m.detail
+	item := m.list.selected()
+	d.notice = ""
+	switch {
+	case key.Matches(msg, k.Quit):
+		return m.quit()
+
+	case key.Matches(msg, k.Back), msg.String() == "backspace":
+		// esc peels one layer: a search first, then the screen.
+		if d.query != "" {
+			d.clearSearch()
+			d.applyContent()
+			return m, nil
+		}
+		(&m).closeDetail()
+		return m, nil
+
+	case key.Matches(msg, k.Help):
+		m.help.ShowAll = !m.help.ShowAll
+
+	case key.Matches(msg, k.TabOutput):
+		d.tab = tabOutput
+		(&m).syncDetail(true)
+	case key.Matches(msg, k.TabPrompt):
+		d.tab = tabPrompt
+		(&m).syncDetail(true)
+	case key.Matches(msg, k.TabInfo):
+		d.tab = tabInfo
+		(&m).syncDetail(true)
+	case key.Matches(msg, k.NextTab):
+		d.tab = (d.tab + 1) % detailTabCount
+		(&m).syncDetail(true)
+	case key.Matches(msg, k.PrevTab):
+		d.tab = (d.tab + detailTabCount - 1) % detailTabCount
+		(&m).syncDetail(true)
+
+	case key.Matches(msg, k.NextMember):
+		d.cycleMember(item, 1)
+		(&m).syncDetail(true)
+	case key.Matches(msg, k.PrevMember):
+		d.cycleMember(item, -1)
+		(&m).syncDetail(true)
+
+	case key.Matches(msg, k.Follow), key.Matches(msg, k.Bottom):
+		d.follow = true
+		d.vp.GotoBottom()
+	case key.Matches(msg, k.Top):
+		d.vp.GotoTop()
+		d.follow = d.vp.AtBottom()
+
+	case key.Matches(msg, k.Search):
+		m.mode = modeSearch
+		d.search.SetValue(d.query)
+		d.search.CursorEnd()
+		return m, d.search.Focus()
+	case key.Matches(msg, k.NextMatch):
+		d.stepMatch(1)
+	case key.Matches(msg, k.PrevMatch):
+		d.stepMatch(-1)
+
+	case key.Matches(msg, k.OpenLog):
+		if item != nil {
+			if item.IsGroup() {
+				openGroupLogs(item.Sessions)
+			} else if s := item.Primary(); s != nil && s.LogFile != "" {
+				openLog(s)
+			}
+		}
+
+	case key.Matches(msg, k.Stop):
+		// Never signal on one key: x only opens the confirm bar.
+		if targets := liveTargets(item, m.alive); len(targets) > 0 {
+			d.confirm = &killConfirm{targets: targets}
+			m.mode = modeConfirm
+		} else if hasUnverified(item) {
+			d.notice = unverifiedNotice
+		} else {
+			d.notice = "nothing running"
+		}
+
+	default:
+		// Scroll keys (j/k/up/down/pgup/pgdn/space/u/d) belong to the
+		// viewport. Scrolling away from the tail pauses follow; scrolling
+		// back down to it resumes.
+		var cmd tea.Cmd
+		d.vp, cmd = d.vp.Update(msg)
+		if d.tab == tabOutput {
+			d.follow = d.vp.AtBottom()
+		}
+		return m, cmd
+	}
+	return m, nil
+}
+
+// updateSearchKey drives the search input. Every key but enter, esc and
+// ctrl+c is text, so "q" and "n" type themselves.
+func (m Model) updateSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	d := &m.detail
+	switch {
+	case key.Matches(msg, m.keys.Open):
+		d.search.Blur()
+		m.mode = modeDetail
+		d.runSearch(d.search.Value())
+	case key.Matches(msg, m.keys.Back):
+		d.clearSearch()
+		d.applyContent()
+		m.mode = modeDetail
+	default:
+		var cmd tea.Cmd
+		d.search, cmd = d.search.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+// updateConfirmKey answers the stop confirm. Only y stops; any other key
+// cancels, so a stray keypress can never kill a run.
+func (m Model) updateConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	confirm := m.detail.confirm
+	m.detail.confirm = nil
+	m.mode = modeDetail
+	if confirm == nil || !key.Matches(msg, m.keys.Yes) {
+		return m, nil
+	}
+	// Re-check against the current snapshot: a target that finished while
+	// the bar was open must not get a signal (its PID may be reused). A
+	// target still "running" whose process died meanwhile goes through, so
+	// stopSessions can fail it as dead.
+	want := make(map[string]bool, len(confirm.targets))
+	for _, s := range confirm.targets {
+		want[s.ID] = true
+	}
+	var targets []*session.Session
+	if item := m.list.selected(); item != nil {
+		for _, s := range item.Sessions {
+			if want[s.ID] && isLive(s.Status) && s.PID > 0 {
+				targets = append(targets, s)
+			}
+		}
+	}
+	if len(targets) == 0 {
+		m.detail.notice = "nothing running"
+		return m, nil
+	}
+	m.stopSessions(targets)
+	// The targets were failed in place; the header must count them now.
+	m.list.countStatuses()
+	(&m).syncDetail(false)
+	return m, nil
+}
+
+// stopSessions sends SIGTERM to each target and marks it failed so the TUI
+// updates at once. Only a target mayStop confirms gets the signal; any other
+// (dead, PID reused, or no recorded PIDStart) is failed as already dead.
+//
+// The owning rival process also finalizes a signalled session on SIGTERM.
+// Both writers go through Save's unique temp file + rename, so they can no
+// longer interleave into partial JSON; the last rename wins with a whole file.
+func (m Model) stopSessions(targets []*session.Session) {
+	for _, s := range targets {
+		// liveTargets already checked, but the process can die between the
+		// confirm and y, and its PID can then go to an unrelated process.
+		if s.PIDStart == 0 {
+			// No recorded start time: a dead run and a live one look the
+			// same, so neither signal nor rewrite it. The owner or the
+			// reaper finalizes it.
+			continue
+		}
+		if !mayStop(s, m.alive) || m.kill(s.PID, syscall.SIGTERM) != nil {
+			// The recorded process is gone (the PID may even belong to
+			// another process now): never signal, mark it dead.
+			failSessionForKill(s, 1, "killed (process already dead)")
+			continue
+		}
+		// Signal sent — mark failed so the TUI updates instantly. The
+		// subprocess executor will overwrite with its own status.
+		failSessionForKill(s, 137, "killed by user")
+	}
+}
+
+// openLog and openGroupLogs copy the raw log, with no public model renaming,
+// to a temp file and open it, so the model id in the file matches the one on
+// screen.
+func openLog(s *session.Session) {
+	viewPath, err := createLogView(s)
 	if err != nil {
 		return
 	}
-	openPublicLogPath(viewPath)
+	openLogPath(viewPath)
 }
 
-func openPublicGroupLogs(sessions []*session.Session) {
-	viewPath, err := createPublicGroupLogView(sessions)
+func openGroupLogs(sessions []*session.Session) {
+	viewPath, err := createGroupLogView(sessions)
 	if err != nil {
 		return
 	}
-	openPublicLogPath(viewPath)
+	openLogPath(viewPath)
 }
 
-func openPublicLogPath(viewPath string) {
+func openLogPath(viewPath string) {
 	if err := exec.Command("open", viewPath).Start(); err != nil {
 		_ = os.Remove(viewPath)
 		return
@@ -475,15 +753,15 @@ func openPublicLogPath(viewPath string) {
 	time.AfterFunc(10*time.Minute, func() { _ = os.Remove(viewPath) })
 }
 
-func createPublicLogView(s *session.Session) (string, error) {
+func createLogView(s *session.Session) (string, error) {
 	data, err := os.ReadFile(s.LogFile)
 	if err != nil {
 		return "", err
 	}
-	return createPublicTextView(config.PublicRuntimeLog(s.CLI, s.Model, string(data)))
+	return createTextView(string(data))
 }
 
-func createPublicGroupLogView(sessions []*session.Session) (string, error) {
+func createGroupLogView(sessions []*session.Session) (string, error) {
 	var content strings.Builder
 	for _, s := range sessions {
 		label := groupLogLabel(s)
@@ -492,7 +770,7 @@ func createPublicGroupLogView(sessions []*session.Session) (string, error) {
 		}
 		fmt.Fprintf(&content, "=== %s ===\n", label)
 		if s.ErrorMsg != "" {
-			fmt.Fprintf(&content, "Error: %s\n", config.PublicRuntimeError(s.CLI, s.Model, s.ErrorMsg))
+			fmt.Fprintf(&content, "Error: %s\n", s.ErrorMsg)
 		}
 		data, err := os.ReadFile(s.LogFile)
 		if err != nil {
@@ -500,17 +778,31 @@ func createPublicGroupLogView(sessions []*session.Session) (string, error) {
 				fmt.Fprintf(&content, "(log unavailable: %s)\n", err)
 			}
 		} else {
-			content.WriteString(config.PublicRuntimeLog(s.CLI, s.Model, string(data)))
+			content.Write(data)
 			if len(data) > 0 && data[len(data)-1] != '\n' {
 				content.WriteByte('\n')
 			}
 		}
 		content.WriteByte('\n')
 	}
-	return createPublicTextView(content.String())
+	return createTextView(content.String())
 }
 
-func createPublicTextView(content string) (string, error) {
+// groupLogLabel heads one member in the combined group log: its raw model id,
+// its role and its effort.
+func groupLogLabel(s *session.Session) string {
+	role := "REVIEW"
+	if s.Mode == "consilium" {
+		role = "JUDGE"
+	}
+	label := modelName(s) + " " + role
+	if s.Effort != "" {
+		label += " · EFFORT " + s.Effort
+	}
+	return label
+}
+
+func createTextView(content string) (string, error) {
 	file, err := os.CreateTemp("", "rival-log-*.txt")
 	if err != nil {
 		return "", err
@@ -528,99 +820,23 @@ func createPublicTextView(content string) (string, error) {
 	return viewPath, nil
 }
 
-// bannerLines is the ASCII logo for the TUI header.
-var bannerLines = []string{
-	`         _             __`,
-	`   _____(_)   ______ _/ /`,
-	"  / ___/ / | / / __ `/ /",
-	` / /  / /| |/ / /_/ / /`,
-	`/_/  /_/ |___/\__,_/_/`,
+// headerStats are the session counts for the header, counted per event.
+func (m Model) headerStats() headerStats {
+	st := m.list.stats
+	st.Version = Version
+	st.Loading = !m.loaded
+	return st
 }
 
-// bannerWidth is computed from the actual banner lines.
-var bannerWidth = func() int {
-	w := 0
-	for _, l := range bannerLines {
-		if n := len([]rune(l)); n > w {
-			w = n
-		}
+// spinFrame is the current spinner frame, or "" when nothing runs.
+func (m Model) spinFrame() string {
+	if !m.loaded {
+		return m.spin.View()
 	}
-	return w
-}()
-
-// renderBanner returns the header block: logo left, stats right (if width >= 70).
-func (m Model) renderBanner() string {
-	// Count stats.
-	running, queued, completed, failed := 0, 0, 0, 0
-	for _, item := range m.allItems {
-		for _, s := range item.Sessions {
-			switch s.Status {
-			case "running":
-				running++
-			case "queued":
-				queued++
-			case "completed":
-				completed++
-			case "failed":
-				failed++
-			}
-		}
+	if !m.list.anyLive {
+		return ""
 	}
-
-	logo := strings.Join(bannerLines, "\n")
-	styledLogo := bannerStyle.Render(logo)
-
-	// If terminal is narrow, just show the logo.
-	if m.width < 70 {
-		return styledLogo + "\n"
-	}
-
-	// Stats on the right.
-	var stats strings.Builder
-	stats.WriteString(labelStyle.Render(Version))
-	stats.WriteString("\n")
-	stats.WriteString(fmt.Sprintf("  %s %d", runningStyle.Render("●"), running))
-	if queued > 0 {
-		stats.WriteString(fmt.Sprintf("  %s %d", queuedStyle.Render("◌"), queued))
-	}
-	stats.WriteString(fmt.Sprintf("  %s %d", completedStyle.Render("●"), completed))
-	stats.WriteString(fmt.Sprintf("  %s %d", failedStyle.Render("●"), failed))
-	stats.WriteString("\n")
-	stats.WriteString(labelStyle.Render(fmt.Sprintf("  %d sessions", m.totalSessions)))
-
-	// Pad stats to fill the gap between logo and stats.
-	statsStr := stats.String()
-	gap := m.width - bannerWidth - lipgloss.Width(statsStr) - 4
-	if gap < 2 {
-		gap = 2
-	}
-	spacer := strings.Repeat(" ", gap)
-
-	// Join horizontally: logo lines + spacer + stats lines.
-	logoLines := strings.Split(styledLogo, "\n")
-	statsLines := strings.Split(statsStr, "\n")
-
-	// Pad to same height.
-	for len(statsLines) < len(logoLines) {
-		statsLines = append(statsLines, "")
-	}
-	for len(logoLines) < len(statsLines) {
-		logoLines = append(logoLines, strings.Repeat(" ", bannerWidth))
-	}
-
-	var out strings.Builder
-	for i := range logoLines {
-		sl := ""
-		if i < len(statsLines) {
-			sl = statsLines[i]
-		}
-		out.WriteString(logoLines[i])
-		out.WriteString(spacer)
-		out.WriteString(sl)
-		out.WriteString("\n")
-	}
-
-	return out.String()
+	return m.spin.View()
 }
 
 // View renders the UI. AltScreen is set on the view (bubbletea v2 dropped the
@@ -636,6 +852,9 @@ func altScreenView(content string) tea.View {
 	return v
 }
 
+// tooSmallNotice replaces the frame when the terminal cannot hold it.
+var tooSmallNotice = fmt.Sprintf("terminal too small (need %d×%d)", minWidth, minHeight)
+
 // viewContent renders the frame body.
 func (m Model) viewContent() string {
 	if m.quitting {
@@ -646,64 +865,66 @@ func (m Model) viewContent() string {
 		return "Error: " + m.errText
 	}
 
-	if m.width == 0 || m.height == 0 {
+	if m.lay.Width == 0 || m.lay.Height == 0 {
 		return "Initializing..."
 	}
 
-	header := m.renderBanner()
-	contentHeight := m.contentHeight()
+	if m.lay.TooSmall {
+		return ansi.Truncate(tooSmallNotice, m.lay.Width, "")
+	}
 
-	var content string
-	var help string
+	spin := m.spinFrame()
+	header := renderHeader(m.lay.Width, m.lay.Compact, m.headerStats(), spin)
+	helpBar := m.helpView()
 
-	switch m.viewMode {
-	case viewList:
-		content = renderSessionList(m.items, m.selected, m.width, contentHeight, m.hasMore(), len(m.allItems)-len(m.items))
-		helpText := "  j/k: navigate  enter: open  g/G: top/bottom"
-		if m.hasMore() {
-			helpText += "  l: load more"
-		}
-		helpText += "  q: quit"
-		help = m.renderHelp(helpText, "  j/k: navigate  enter: open  q: quit")
-
-	case viewDetail:
+	if m.inDetail() {
 		// Update owns the log content — the view only draws what the viewport
 		// already holds, so no file is read here.
-		meta := renderDetailMeta(m.selectedItem(), m.width, contentHeight, m.promptExpanded, m.prompts)
-		content = clipLines(meta+"\n"+m.logView.View(), contentHeight)
-		help = m.renderHelp(
-			"  j/k: scroll  g/G: top/bottom  p: prompt  o: open log  x: stop  esc: back  q: quit",
-			"  j/k: scroll  g/G: top/bottom  esc: back  q: quit",
-		)
+		body := m.detail.view(m.list.selected(), m.lay.Width, m.contentHeight(), spin)
+		return strings.Join([]string{header, body, helpBar}, "\n")
 	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, header+content, help)
+	tabs := m.list.tabBar(m.lay.Width, !m.loaded)
+	body := m.loaderView(spin)
+	if m.loaded {
+		body = m.bodyView(spin)
+	}
+	return strings.Join([]string{header, tabs, body, helpBar}, "\n")
 }
 
-// renderHelp renders the help bar so it never exceeds the terminal width.
-// lipgloss.JoinVertical pads every row to the widest line, so a help bar wider
-// than the terminal drags the entire frame over-width and the terminal hard-wraps
-// it — the exact corruption this feature exists to remove. Fall back to a short
-// form, then to a display-width truncation.
-func (m Model) renderHelp(full, short string) string {
-	if m.width <= 0 {
-		return ""
+// bodyView is the list alone, or, from previewMinWidth up, the list and the
+// preview in rounded boxes with a 1-col gap. Both boxes are exactly
+// listBodyHeight rows. The list always has focus here, so its border is
+// accent and the preview's is dim.
+func (m Model) bodyView(spin string) string {
+	list := m.list.view(m.listInnerWidth(), m.listInnerHeight(), spin)
+	if !m.lay.ShowPreview {
+		return list
 	}
-	text := full
-	if ansi.StringWidth(text) > m.width {
-		text = short
-	}
-	if ansi.StringWidth(text) > m.width {
-		text = ansi.Truncate(text, m.width, "")
-	}
-	return helpStyle.Render(text)
+	left := borderStyle.BorderForeground(colAccent).Render(list)
+	right := borderStyle.Padding(0, 1).Render(m.preview.view(m.previewInnerWidth(), m.listInnerHeight()))
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 }
 
-// clipLines hard-truncates content to at most maxLines lines.
-func clipLines(s string, maxLines int) string {
-	lines := strings.Split(s, "\n")
-	if len(lines) <= maxLines {
-		return s
+// loaderBarMax caps the loader bar's width so it reads as a bar, not a rule.
+const loaderBarMax = 48
+
+// loaderView fills the list body until the first snapshot: the spinner and
+// "reading sessions done/total" over a bar in the logo gradient, centred in
+// exactly width × listBodyHeight cells.
+func (m Model) loaderView(spin string) string {
+	w, h := m.lay.Width, m.listBodyHeight()
+	label := "reading sessions"
+	pct := 0.0
+	if m.load.Total > 0 {
+		label += fmt.Sprintf(" %d/%d", m.load.Done, m.load.Total)
+		pct = float64(m.load.Done) / float64(m.load.Total)
 	}
-	return strings.Join(lines[:maxLines], "\n")
+	barW := min(loaderBarMax, max(1, w-4))
+	title := runningStyle.Render(spin) + " " + textStyle.Render(label)
+	lines := []string{ansi.Truncate(title, barW, "")}
+	if h >= 3 {
+		lines = append(lines, "", gradientBar(barW, pct))
+	}
+	block := lipgloss.NewStyle().Width(barW).Align(lipgloss.Center).Render(strings.Join(lines, "\n"))
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, block)
 }

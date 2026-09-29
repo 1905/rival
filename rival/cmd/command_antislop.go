@@ -9,12 +9,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/parser"
-	"github.com/1F47E/rival/internal/review"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/parser"
+	"github.com/1905/rival/internal/review"
+	"github.com/1905/rival/internal/session"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -30,11 +29,12 @@ and wrapper slop — and returns a leanness rating (1-10) plus a cut list. It
 never reports bugs; use the code review commands for that.
 
 Input is a code-review scope. "--" ends option parsing and takes the rest
-verbatim, so a scope beginning with a dash is still reviewable. Default model
-is codex; -m accepts codex and claude (comma-separated). Default reasoning effort
-is high; override with -re/--effort or per model in ~/.rival/config.yaml.`
+verbatim, so a scope beginning with a dash is still reviewable. Default models
+are codex and claude, each printing its own block; -m accepts codex and claude
+(comma-separated), so -m claude runs Claude alone. Default reasoning effort is
+high; override with -re/--effort or per model in ~/.rival/config.yaml.`
 
-var defaultAntislopModels = []string{config.CodexLabel}
+var defaultAntislopModels = []string{config.CodexLabel, config.ClaudeLabel}
 
 var commandAntislopCmd = &cobra.Command{
 	Use:   "antislop",
@@ -45,27 +45,9 @@ var commandAntislopCmd = &cobra.Command{
 func init() {
 	commandAntislopCmd.Flags().String("workdir", ".", "working directory")
 	commandAntislopCmd.Flags().Bool("no-queue", false, "bypass the review queue")
-	commandAntislopCmd.Flags().StringSliceP("model", "m", defaultAntislopModels, "antislop model(s): codex, claude (comma-separated)")
-	commandAntislopCmd.Flags().String("effort", "", "override reasoning effort for every selected model: low, medium, high, ultra")
+	commandAntislopCmd.Flags().StringSliceP("model", "m", defaultAntislopModels, "antislop model(s): codex, claude (comma-separated). Default models are codex and claude")
+	commandAntislopCmd.Flags().String("effort", "", "override reasoning effort for every selected model: "+strings.Join(config.ValidEfforts, ", "))
 	commandCmd.AddCommand(commandAntislopCmd)
-}
-
-// buildAntislopCodePrompt assembles the code-mode prompt and the scope strings.
-// target is recorded as the sessions' review scope; display goes on the output
-// Scope line.
-func buildAntislopCodePrompt(scope string, autoScope bool, workdir string) (prompt, target, display string) {
-	if !autoScope {
-		return strings.ReplaceAll(config.AntislopCodePrompt, "{SCOPE}", scope), scope, scope
-	}
-	preamble, files := buildDiffPreamble(workdir)
-	if files == "" {
-		log.Debug().Msg("git scope: no changes detected, falling back to full project")
-		const full = "the entire project"
-		return strings.ReplaceAll(config.AntislopCodePrompt, "{SCOPE}", full), full, full
-	}
-	log.Info().Str("files", files).Msg("git scope: auto-detected changed files")
-	prompt = preamble + strings.ReplaceAll(config.AntislopCodePrompt, "{SCOPE}", "the changed files listed above")
-	return prompt, files, "changed files (git auto-detect)"
 }
 
 func commandAntislopAction(cmd *cobra.Command, args []string) error {
@@ -127,7 +109,7 @@ func commandAntislopAction(cmd *cobra.Command, args []string) error {
 		return &ExitCodeError{Code: 1, Err: err}
 	}
 
-	prompt, target, display := buildAntislopCodePrompt(parsed.ReviewScope, parsed.AutoScope, workdir)
+	prompt, target, display := buildReviewPrompt(antislopCodePrompt, parsed.ReviewScope, parsed.AutoScope, workdir)
 
 	// Cancel the queue wait / child processes on SIGINT/SIGTERM.
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

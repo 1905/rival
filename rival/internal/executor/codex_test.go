@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
-func TestCodexRunArgs_UsesExplicitSolModelAndEffort(t *testing.T) {
+func TestCodexRunArgs_UsesExplicitModelAndEffort(t *testing.T) {
 	for _, effort := range []string{"high", "ultra"} {
 		t.Run(effort, func(t *testing.T) {
-			joined := strings.Join(codexRunArgs(config.GPT56SolModel, effort, "/repo"), " ")
-			if !strings.Contains(joined, "-m "+config.GPT56SolModel) {
-				t.Fatalf("args do not select %s: %s", config.GPT56SolModel, joined)
+			joined := strings.Join(codexRunArgs(config.CodexModel, effort, "/repo"), " ")
+			if !strings.Contains(joined, "-m "+config.CodexModel) {
+				t.Fatalf("args do not select %s: %s", config.CodexModel, joined)
 			}
 			if !strings.Contains(joined, "model_reasoning_effort="+effort) {
 				t.Fatalf("args do not preserve effort %s: %s", effort, joined)
@@ -37,18 +37,33 @@ func TestRunCodexModelRejectsUnsupportedModel(t *testing.T) {
 		io.Discard,
 	)
 	if err == nil {
-		t.Fatal("unsupported Sol model was accepted")
+		t.Fatal("unsupported model was accepted")
 	}
 	if result != nil {
-		t.Fatalf("unsupported Sol model returned a result: %#v", result)
+		t.Fatalf("unsupported model returned a result: %#v", result)
 	}
 }
 
-// Sol exposes ultra as its own reasoning level, distinct from xhigh. Unifying
-// the ladder must not alias the two: the value reaches the runtime verbatim.
+// Sol was removed and an empty model no longer means Codex: both are
+// rejected before any process starts.
+func TestRunCodexModelRejectsSolAndEmpty(t *testing.T) {
+	for _, model := range []string{config.GPT56SolModel, ""} {
+		result, err := RunCodexModel(context.Background(), nil, "review", "high", "/repo", model, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "unsupported codex model") {
+			t.Fatalf("model %q: err = %v, want unsupported codex model", model, err)
+		}
+		if result != nil {
+			t.Fatalf("model %q returned a result: %#v", model, result)
+		}
+	}
+}
+
+// The codex runtime takes ultra as its own reasoning level, distinct from
+// xhigh. Unifying the ladder must not alias the two: the value reaches the
+// runtime verbatim.
 func TestCodexPassesUltraAndXhighThroughUnaliased(t *testing.T) {
 	for _, effort := range []string{"xhigh", "ultra"} {
-		args := codexRunArgs(config.GPT56SolModel, effort, "/tmp")
+		args := codexRunArgs(config.CodexModel, effort, "/tmp")
 		want := "model_reasoning_effort=" + effort
 		if !strings.Contains(strings.Join(args, " "), want) {
 			t.Errorf("codex args for %q missing %q: %v", effort, want, args)

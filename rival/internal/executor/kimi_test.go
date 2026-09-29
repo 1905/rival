@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // dropEnv entries ending in "_" are prefix drops — "AWS_" must catch the whole

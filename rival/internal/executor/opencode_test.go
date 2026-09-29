@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 func TestOpencodePreflight_K3RequiresKey(t *testing.T) {

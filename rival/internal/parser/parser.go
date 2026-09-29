@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // ParseResult holds the parsed user arguments.
@@ -14,26 +14,20 @@ type ParseResult struct {
 	IsReview    bool
 	AutoScope   bool // true when review has no explicit scope (use git detection)
 	ReviewScope string
-	Prompt      string
+	Prompt      string // raw prompt only; "" for a review (cmd builds that prompt)
 	IsEmpty     bool
 	Escaped     bool // true when the scope was passed after "--" (take it verbatim)
 }
 
-// ParseGPT56SolArgs parses raw arguments for the gpt-5.6-sol command.
-// Grammar: [-re level] [review [scope] | prompt]. An omitted effort stays
-// empty so the command can apply the configured Sol default.
-func ParseGPT56SolArgs(raw string) (*ParseResult, error) {
-	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
-}
-
 // ParseClaudeArgs parses raw arguments for the claude command (claude-opus-5-5).
-// Identical grammar to claude.
+// Grammar: [-re level] [review [scope] | prompt]. An omitted effort stays
+// empty so the command can apply Claude's configured default.
 func ParseClaudeArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
 }
 
 // ParseGrokArgs parses raw arguments for the grok command (grok-4.6).
-// Identical grammar to Sol: an omitted effort stays empty so the command can
+// Identical grammar to Claude: an omitted effort stays empty so the command can
 // apply grok's configured default.
 func ParseGrokArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)
@@ -82,10 +76,11 @@ func parseArgsWithEffort(raw, defaultEffort string, validEffort func(string) boo
 		scope := strings.TrimSpace(s[len("review"):])
 		if scope == "" {
 			result.AutoScope = true
-			scope = "the entire project"
+			scope = config.WholeProject
 		}
+		// The review prompt is built by cmd (review.BuildReviewerPrompt), so a
+		// review leaves Prompt empty.
 		result.ReviewScope = scope
-		result.Prompt = strings.ReplaceAll(config.ReviewPrompt, "{SCOPE}", scope)
 		return result, nil
 	}
 
@@ -99,7 +94,7 @@ func parseArgsWithEffort(raw, defaultEffort string, validEffort func(string) boo
 }
 
 // ParseCodexArgs parses raw arguments for the codex command (gpt-6-astra).
-// Identical grammar to Sol: an omitted effort stays empty so the command can
+// Identical grammar to Claude: an omitted effort stays empty so the command can
 // apply Codex's configured default.
 func ParseCodexArgs(raw string) (*ParseResult, error) {
 	return parseArgsWithEffort(raw, "", config.IsValidEffort, config.ValidEfforts)

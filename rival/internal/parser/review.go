@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
-// ParseReviewArgs parses raw arguments for the megareview command.
+// ParseReviewArgs parses raw review arguments (used by antislop).
 // Grammar: [options] [scope] — always a review, no "review" keyword needed.
 // Options may appear before or after scope tokens:
 //
@@ -69,10 +69,9 @@ func ParseReviewArgs(raw string) (*ParseResult, error) {
 	scope := strings.Join(scopeParts, " ")
 	if scope == "" {
 		result.AutoScope = true
-		scope = "the entire project"
+		scope = config.WholeProject
 	}
 	result.ReviewScope = scope
-	result.Prompt = strings.ReplaceAll(config.ReviewPrompt, "{SCOPE}", scope)
 	return result, nil
 }
 

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/executor"
-	"github.com/1F47E/rival/internal/parser"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/executor"
+	"github.com/1905/rival/internal/parser"
 )
 
 func TestGrokCommandIsPublic(t *testing.T) {

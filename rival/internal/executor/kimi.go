@@ -6,8 +6,8 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 )
 
 // KimiPreflight checks that the opencode CLI is installed and a Moonshot API
@@ -52,15 +52,19 @@ var kimiDropEnv = []string{
 // read-only OPENCODE_PERMISSION profile as the megareview reviewers; raw
 // prompts run full-auto (every tool allowed, per the original request) with
 // known credential env vars stripped as blast-radius reduction.
-func RunKimi(ctx context.Context, sess *session.Session, prompt, workdir string, mirror io.Writer) (*Result, error) {
-	return RunOpencodeWith(ctx, sess, prompt, "max", workdir, config.KimiModel, kimiRunOpts(sess.Mode, workdir), mirror)
+//
+// credWorkdir is where the Moonshot key is looked up. It differs from workdir
+// only for a GitLab MR review, which runs in a temporary checkout that has no
+// project .env; the key still comes from the caller's project.
+func RunKimi(ctx context.Context, sess *session.Session, prompt, workdir, credWorkdir string, mirror io.Writer) (*Result, error) {
+	return RunOpencodeWith(ctx, sess, prompt, "max", workdir, config.KimiModel, kimiRunOpts(sess.Mode, credWorkdir), mirror)
 }
 
 // kimiRunOpts selects the permission profile and env hardening for one run by
 // session mode. Review keeps the zero-value read-only reviewer defaults; only
-// the API key differs (Moonshot instead of Zen).
-func kimiRunOpts(mode, workdir string) OpencodeRunOpts {
-	opts := OpencodeRunOpts{APIKey: config.KimiAPIKeyFrom(workdir)}
+// the API key differs (Moonshot instead of Zen), read from credWorkdir.
+func kimiRunOpts(mode, credWorkdir string) OpencodeRunOpts {
+	opts := OpencodeRunOpts{APIKey: config.KimiAPIKeyFrom(credWorkdir)}
 	if mode != "review" {
 		opts.Permission = opencodeFullAutoPermission
 		opts.DropEnv = kimiDropEnv

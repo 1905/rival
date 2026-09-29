@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // ParseReviewerOutput accepts any JSON carrying the right keys, so a payload
 // can parse and still be unusable. A security gate that formats these as a
 // clean review reports "no vulnerabilities" when nothing was reviewed.
-func TestValidateSecurityOutputRejectsUnusablePayloads(t *testing.T) {
+func TestValidateSecurityResultRejectsUnusablePayloads(t *testing.T) {
 	tests := []struct {
 		name string
 		out  *ReviewerOutput
@@ -32,7 +32,7 @@ func TestValidateSecurityOutputRejectsUnusablePayloads(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateSecurityOutput(tt.out); err == nil {
+			if err := ValidateSecurityResult(tt.out, ""); err == nil {
 				t.Error("expected this payload to be rejected")
 			}
 		})
@@ -40,15 +40,21 @@ func TestValidateSecurityOutputRejectsUnusablePayloads(t *testing.T) {
 }
 
 // A clean review is valid: no findings is a real answer, unlike no summary.
-func TestValidateSecurityOutputAcceptsACleanReview(t *testing.T) {
+func TestValidateSecurityResultAcceptsACleanReview(t *testing.T) {
 	out := &ReviewerOutput{Summary: "No vulnerabilities found."}
-	if err := ValidateSecurityOutput(out); err != nil {
+	if err := ValidateSecurityResult(out, ""); err != nil {
 		t.Errorf("a clean review was rejected: %v", err)
 	}
 }
 
 func TestFormatSecurityResultFallsBackOnUnusableOutput(t *testing.T) {
-	got := FormatSecurityResult(nil, "provider exploded", "opencode", config.KimiModel, "src/")
+	got, err := FormatSecurityResult(nil, "provider exploded", "opencode", config.KimiModel, "src/", "/tmp/s.log")
+	if err == nil {
+		t.Error("unusable output returned no validation error")
+	}
+	if !strings.HasSuffix(got, "provider exploded\n\nLog: /tmp/s.log\n") {
+		t.Errorf("fallback lacks the trailing newline or Log line:\n%q", got)
+	}
 	if !strings.Contains(got, "UNUSABLE OUTPUT") {
 		t.Errorf("fallback header missing:\n%s", got)
 	}
@@ -101,7 +107,7 @@ func TestEchoedPromptIsNotACleanReview(t *testing.T) {
 		t.Error("an echoed prompt was accepted as a clean security review")
 	}
 
-	out := FormatSecurityResult(parsed, echoed, "opencode", "moonshotai/kimi-k3", "src/")
+	out, _ := FormatSecurityResult(parsed, echoed, "opencode", "moonshotai/kimi-k3", "src/", "")
 	if !strings.Contains(out, "UNUSABLE OUTPUT") {
 		t.Errorf("echoed prompt was not reported as unusable:\n%s", out)
 	}
@@ -116,7 +122,7 @@ func TestGenuineCleanReviewIsStillAccepted(t *testing.T) {
 	if err := ValidateSecurityResult(parsed, raw); err != nil {
 		t.Errorf("a genuine clean review was rejected: %v", err)
 	}
-	out := FormatSecurityResult(parsed, raw, "opencode", "moonshotai/kimi-k3", "src/")
+	out, _ := FormatSecurityResult(parsed, raw, "opencode", "moonshotai/kimi-k3", "src/", "")
 	if !strings.Contains(out, "No vulnerabilities found.") {
 		t.Errorf("clean review not rendered:\n%s", out)
 	}

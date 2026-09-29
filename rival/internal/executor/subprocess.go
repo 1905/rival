@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/1F47E/rival/internal/gitscope"
-	"github.com/1F47E/rival/internal/procinfo"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/gitscope"
+	"github.com/1905/rival/internal/procinfo"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 )
 

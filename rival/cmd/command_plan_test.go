@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 func TestCommandPlanDefaults(t *testing.T) {
@@ -14,8 +14,11 @@ func TestCommandPlanDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if effort != config.DefaultPlanEffort {
-		t.Fatalf("default plan effort = %q, want config default %q", effort, config.DefaultPlanEffort)
+	// No flag default: an unset --effort leaves each model on its own effort
+	// (codex xhigh, claude medium). The old "high" default was shown in help
+	// but discarded unless the flag was passed.
+	if effort != "" {
+		t.Fatalf("default plan effort flag = %q, want empty (per-model)", effort)
 	}
 	if config.DefaultPlanEffort != "high" {
 		t.Fatalf("config default plan effort = %q, want high", config.DefaultPlanEffort)

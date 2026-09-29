@@ -9,10 +9,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/executor"
-	"github.com/1F47E/rival/internal/review"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/executor"
+	"github.com/1905/rival/internal/review"
+	"github.com/1905/rival/internal/session"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -40,27 +40,12 @@ func init() {
 	commandCmd.AddCommand(commandSecurityCmd)
 }
 
-// securityScopeAndPrompt builds the review prompt.
-//
-// It deliberately does NOT call resolveGitScope: that helper's last act is to
-// overwrite the prompt with config.ReviewPrompt, the bug-hunter text, so a
-// security command using it would run a bug hunt while reporting a security
-// review. Empty stdin is this command's default invocation, so that mistake
-// would have been the normal path.
+// securityScopeAndPrompt builds the security-lens prompt. An empty scope
+// auto-detects the changed files.
 func securityScopeAndPrompt(rawScope, workdir string) (prompt, scope string) {
-	if scope = strings.TrimSpace(rawScope); scope != "" {
-		return review.BuildReviewerPrompt(scope, config.PromptSecurity), scope
-	}
-
-	preamble, files := buildDiffPreamble(workdir)
-	if files == "" {
-		log.Debug().Msg("git scope: no changes detected, reviewing the whole project")
-		const whole = "the entire project"
-		return review.BuildReviewerPrompt(whole, config.PromptSecurity), whole
-	}
-	log.Info().Str("files", files).Msg("git scope: auto-detected changed files")
-	return preamble + review.BuildReviewerPrompt("the changed files listed above", config.PromptSecurity),
-		"changed files (git auto-detect)"
+	scope = strings.TrimSpace(rawScope)
+	prompt, _, scope = buildReviewPrompt(lensPrompt(config.PromptSecurity), scope, scope == "", workdir)
+	return prompt, scope
 }
 
 // printSecurityResolution reports which model will run, and whether it can.
@@ -193,7 +178,7 @@ func commandSecurityAction(cmd *cobra.Command, args []string) error {
 	if parseErr != nil {
 		log.Warn().Err(parseErr).Msg("security output did not parse")
 	}
-	out := review.FormatSecurityResult(parsed, raw, "opencode", entry.Model, scope)
+	out, validErr := review.FormatSecurityResult(parsed, raw, "opencode", entry.Model, scope, sess.LogFile)
 	if _, err := io.WriteString(os.Stdout, out); err != nil {
 		return fmt.Errorf("write stdout: %w", err)
 	}
@@ -201,7 +186,7 @@ func commandSecurityAction(cmd *cobra.Command, args []string) error {
 	// A security gate must not exit 0 on output it cannot trust. Non-empty
 	// output is not evidence a review happened: it can be an echoed prompt,
 	// truncated JSON, or an unrecognized provider error.
-	if validErr := review.ValidateSecurityResult(parsed, raw); validErr != nil {
+	if validErr != nil {
 		failSession(sess, 1, fmt.Sprintf("unusable security output: %v", validErr))
 		return &ExitCodeError{Code: 1, Err: fmt.Errorf("security review produced no usable findings: %w", validErr)}
 	}

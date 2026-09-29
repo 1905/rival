@@ -54,22 +54,6 @@ func TestOpencodeVariantKimiK3PinsMax(t *testing.T) {
 	}
 }
 
-// k3/kimi-k3 select Kimi K3 via the Moonshot provider.
-func TestResolveReviewTargetsK3Selector(t *testing.T) {
-	for _, alias := range []string{"k3", "kimi-k3"} {
-		got, err := ResolveReviewTargets([]string{alias})
-		if err != nil {
-			t.Fatalf("%s: %v", alias, err)
-		}
-		if len(got) != 1 || got[0].CLI != "opencode" || got[0].Model != KimiModel {
-			t.Errorf("%s resolved to %+v, want opencode/%s", alias, got, KimiModel)
-		}
-	}
-	if _, err := ResolveReviewTargets([]string{"kimi"}); err == nil {
-		t.Error("ambiguous kimi selector should be rejected; use k3 or kimi-k3")
-	}
-}
-
 // A workdir that is a subdirectory of the project (e.g. rival/ under the repo
 // root) must still find the repo root's .env by walking up.
 func TestKimiAPIKeyFromWalksUpToParentEnvFile(t *testing.T) {

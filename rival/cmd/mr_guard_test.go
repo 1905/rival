@@ -1,44 +1,21 @@
 package cmd
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/1F47E/rival/internal/parser"
 )
 
-func TestModelCommandRejectsMRBeforeReviewer(t *testing.T) {
-	for _, raw := range []string{
-		"сделай ревью МР https://gitlab.example.com/team/app/-/merge_requests/42",
-		"review https://gitlab.example.com/team/app/-/merge_requests/42",
-	} {
-		t.Run(raw, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "input")
-			if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			input, err := os.Open(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = input.Close() }()
-			previous := os.Stdin
-			os.Stdin = input
-			defer func() { os.Stdin = previous }()
-			called := false
-			spec := solSpec()
-			spec.parse = parser.ParseGPT56SolArgs
-			spec.preflight = func(string) error {
-				called = true
-				return errors.New("reviewer reached without resolving the MR")
-			}
-			err = runModelCommand(spec, t.TempDir(), true)
-			if called || err == nil || !strings.Contains(err.Error(), "rival review") {
-				t.Fatalf("MR was not rejected before reviewer: called=%v err=%v", called, err)
-			}
-		})
+// A raw prompt cannot pin an MR checkout, so an MR URL in one is rejected
+// before any reviewer starts, with a pointer to the review path that can.
+func TestModelCommandRejectsMRInRawPrompt(t *testing.T) {
+	_, calls := fakeMR(t)
+	f := &fakeRun{}
+	_, err := runCommandWith(t, f, "сделай ревью МР "+testMRURL, t.TempDir())
+	if f.called || *calls != 0 {
+		t.Fatalf("reviewer or MR resolver reached: run=%v resolver=%d", f.called, *calls)
+	}
+	if err == nil || !strings.Contains(err.Error(), "no reviewer was started") ||
+		!strings.Contains(err.Error(), "rival command codex review <MR-URL>") {
+		t.Fatalf("err = %v, want a rejection pointing to rival command codex review <MR-URL>", err)
 	}
 }

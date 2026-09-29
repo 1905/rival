@@ -4,29 +4,15 @@ import (
 	"context"
 	"io"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/executor"
-	"github.com/1F47E/rival/internal/parser"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/executor"
+	"github.com/1905/rival/internal/parser"
+	"github.com/1905/rival/internal/session"
 )
 
 // The executor signatures are not uniform: grok takes a review flag, K3 takes
 // no effort, and the others take effort but no flag. Each adapter below
 // absorbs that difference so both workflows can call one shape.
-
-func solSpec() modelSpec {
-	return modelSpec{
-		commandName: config.SolLabel,
-		cli:         "codex",
-		model:       config.GPT56SolModel,
-		usage:       solUsage,
-		parse:       parser.ParseGPT56SolArgs,
-		preflight:   func(string) error { return executor.CodexPreflight() },
-		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
-			return executor.RunCodexModel(ctx, sess, prompt, effort, workdir, config.GPT56SolModel, out)
-		},
-	}
-}
 
 func codexSpec() modelSpec {
 	return modelSpec{
@@ -36,7 +22,7 @@ func codexSpec() modelSpec {
 		usage:       codexUsage,
 		parse:       parser.ParseCodexArgs,
 		preflight:   func(string) error { return executor.CodexPreflightFor(config.CodexModel) },
-		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
+		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir, _ string, _ bool, out io.Writer) (*executor.Result, error) {
 			return executor.RunCodexModel(ctx, sess, prompt, effort, workdir, config.CodexModel, out)
 		},
 	}
@@ -50,7 +36,7 @@ func claudeSpec() modelSpec {
 		usage:       claudeUsage,
 		parse:       parser.ParseClaudeArgs,
 		preflight:   func(string) error { return executor.ClaudePreflight() },
-		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
+		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir, _ string, _ bool, out io.Writer) (*executor.Result, error) {
 			return executor.RunClaude(ctx, sess, prompt, effort, workdir, out)
 		},
 	}
@@ -64,9 +50,10 @@ func k3Spec() modelSpec {
 		usage:       k3Usage,
 		parse:       parser.ParseKimiArgs,
 		preflight:   executor.KimiPreflight,
-		run: func(ctx context.Context, sess *session.Session, prompt, _, workdir string, _ bool, out io.Writer) (*executor.Result, error) {
-			// K3 takes no effort: its provider exposes only max reasoning.
-			return executor.RunKimi(ctx, sess, prompt, workdir, out)
+		run: func(ctx context.Context, sess *session.Session, prompt, _, workdir, credWorkdir string, _ bool, out io.Writer) (*executor.Result, error) {
+			// K3 takes no effort: its provider exposes only max reasoning. It is
+			// the only adapter whose credential lives in the project .env.
+			return executor.RunKimi(ctx, sess, prompt, workdir, credWorkdir, out)
 		},
 	}
 }
@@ -79,7 +66,7 @@ func grokSpec() modelSpec {
 		usage:       grokUsage,
 		parse:       parser.ParseGrokArgs,
 		preflight:   func(string) error { return executor.GrokPreflight() },
-		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir string, isReview bool, out io.Writer) (*executor.Result, error) {
+		run: func(ctx context.Context, sess *session.Session, prompt, effort, workdir, _ string, isReview bool, out io.Writer) (*executor.Result, error) {
 			// Grok sandboxes reviews and only reviews.
 			return executor.RunGrok(ctx, sess, prompt, effort, workdir, isReview, out)
 		},

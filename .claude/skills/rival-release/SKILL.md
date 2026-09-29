@@ -28,12 +28,12 @@ then wait for CI and verify.
    This push triggers the Release workflow.
 6. **Watch CI** — `gh run watch` (or `gh run list --workflow=Release`). The
    goreleaser job builds 4 platforms, publishes the GitHub release + assets, and
-   pushes the updated formula to `1F47E/homebrew-tap` (`rival.rb` at root).
+   pushes the updated formula to `1905/homebrew-tap` (`rival.rb` at root).
    - If CI fails, inspect with `gh run view --log-failed`, fix, re-tag if needed.
 7. **Verify release published** — `gh release view v<version>` should list the 4
-   tarballs + checksums. Confirm `1F47E/homebrew-tap` got a "Brew formula update
+   tarballs + checksums. Confirm `1905/homebrew-tap` got a "Brew formula update
    for rival version v<version>" commit.
-8. **Brew reinstall** — `brew update && brew uninstall rival && brew install 1f47e/tap/rival`.
+8. **Brew reinstall** — `brew update && brew uninstall rival && brew install 1905/tap/rival`.
 9. **Install skills** — `rival install --force`.
 10. **Verify** — `rival version` should show the new version.
 11. **Notify** — send a Telegram notification via `/notify` with version + changelog summary.

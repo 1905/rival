@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/1F47E/rival/internal/config"
-	"github.com/1F47E/rival/internal/session"
+	"github.com/1905/rival/internal/config"
+	"github.com/1905/rival/internal/session"
 )
 
 func sess(id, groupID, status, mode, cli, model, effort string) *session.Session {
@@ -115,25 +115,6 @@ func TestKindPrecedence(t *testing.T) {
 	}
 }
 
-func TestEngineLabelsDedupInOrder(t *testing.T) {
-	sessions := []*session.Session{
-		sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "high"),
-		sess("b", "g", "completed", "plan", "claude", config.ClaudeModel, "high"),
-		sess("c", "g", "completed", "plan", "codex", config.GPT56SolModel, "high"),
-	}
-	got := EngineLabels(sessions)
-	want := []string{config.SolLabel, config.ClaudeLabel}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("EngineLabels = %v, want %v", got, want)
-	}
-	if JoinLabels(got, "+") != config.SolLabel+"+"+config.ClaudeLabel {
-		t.Errorf("JoinLabels with + = %q", JoinLabels(got, "+"))
-	}
-	if JoinLabels(got, " + ") != config.SolLabel+" + "+config.ClaudeLabel {
-		t.Errorf("JoinLabels with space = %q", JoinLabels(got, " + "))
-	}
-}
-
 func TestEffort(t *testing.T) {
 	same := []*session.Session{
 		sess("a", "g", "completed", "plan", "codex", config.GPT56SolModel, "xhigh"),
@@ -157,7 +138,7 @@ func TestEffort(t *testing.T) {
 }
 
 // Elapsed is the wall-clock span of the whole group. The TUI used to report
-// the longest single member instead, which is why the two dashboards disagreed.
+// the longest single member instead.
 func TestElapsedSpansTheWholeGroup(t *testing.T) {
 	base := time.Now().Add(-30 * time.Minute)
 	firstEnd := base.Add(4 * time.Minute)

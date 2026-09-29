@@ -2,9 +2,99 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v3.34.0](https://github.com/1905/rival/releases/tag/v3.34.0) — 2026-09-26.
+Latest release: [v4.1.0](https://github.com/1905/rival/releases/tag/v4.1.0) — 2026-09-29.
 
 ## [Unreleased]
+
+## [v4.1.0] — 2026-09-29
+
+First 4.x release. v4.0.0 was tagged locally but never published; its changes ship here.
+
+### Added — Rival.app, a native macOS viewer
+
+- New menu bar and window app for `~/.rival/sessions`: `brew install --cask 1905/tap/rival-app`. It needs macOS 14 or later.
+- Menu bar: live run count, up to 10 live runs and the last 5 finished runs, a "Notify on finish" toggle.
+- Window: status tabs, filter, day sections, run detail with Result, Raw, Prompt and Info tabs, a member picker for groups, and Open full log.
+- Result tab: the model's final answer as a header card (model, effort, duration, rating, severity counts, summary) and one card per finding, grouped by severity. Prose answers render as formatted text. Finished runs open on Result, live runs on Raw. If the answer can't be parsed, Result shows the reason and links to Raw.
+- A dim-phosphor palette: colour marks running (amber) and failed (red) runs only.
+- A memory watchdog quits the app if its footprint reaches 1 GB and writes one line to `~/Library/Logs/Rival/watchdog.log`.
+- `make test` also runs a launch soak test (`app/scripts/soak_test.py`): it opens the dev app against a fixture for about a minute and fails on memory growth or high CPU.
+- Stop… sends SIGTERM to a run's live processes after a confirmation sheet, only while the PID start time still matches.
+- A notification is posted when a run finishes. Clicking it opens that run.
+- The app is universal and ad-hoc signed, not notarized. The cask removes the quarantine flag. If Homebrew asks, run `brew trust --tap 1905/tap`.
+- The release workflow has a new `app` job. It uploads `Rival-app.zip` and updates the `rival-app` cask in `1905/homebrew-tap`.
+
+### Added — paginated run lists
+
+- The TUI and Rival.app show 50 runs per page.
+- TUI: `n`/`PgDn` and `p`/`PgUp` turn the page. App: `←`/`→` or `[`/`]`, plus clickable `‹ prev` / `next ›` in the footer.
+
+### Added — `make run`, `make install`, `make test`
+
+- In the repository root: `make run` opens a debug "Rival (dev)" build against your real `~/.rival`. `make install` builds a native release into `/Applications/Rival.app` and moves the old copy to `/tmp/trash`. `make test` runs `swift test`.
+
+### Removed — `rival server`
+
+- **Breaking:** `rival server` (web dashboard) removed; use Rival.app (`brew install --cask 1905/tap/rival-app`) or `rival tui`.
+
+### Removed — megareview, the consilium judge, and Sol
+
+- **Breaking:** `rival review` and `rival command megareview` are removed, with the consilium judge. Use `rival command codex review` (skill: `/rival-codex review`).
+- **Breaking:** the `/rival-review` skill is removed. Use `/rival-codex review`. `rival install` removes the old skill.
+- **Breaking:** Sol (`gpt-5.6-sol`) is removed. `rival command sol`, `rival run sol` and the `sol` model alias are gone. Use `codex` (`rival command codex`, `-m codex`). There is no `rival run codex`.
+- An old `efforts.sol` key in `~/.rival/config.yaml` is ignored, not an error.
+- Sessions written by older releases still render: megareview groups, judge sessions and Sol runs keep their labels in the TUI and the app.
+- GitLab MR review moves from megareview to single-model review: `review <MR-URL>` on `rival command codex|claude|grok|k3`, and `rival run <x> --review <MR-URL>`.
+
+### Changed — antislop runs Codex and Claude by default
+
+- `rival command antislop` and `/rival-antislop` now run **Codex and Claude (Opus 5.5)** by default. Each model prints its own block.
+- `-m codex` or `-m claude` runs one model alone.
+
+### Documentation
+
+- README rewritten: a short TL;DR for humans, then a reference for agents with every command, flag, default, JSON contract, config key and exit code.
+- `docs/runtime-reference.md` and `docs/ai-code-review-patterns.md` lose their Sol, megareview and server content. `docs/releasing.md` covers the app release.
+- Entries for v3.24.0–v3.30.0 that were still listed here moved to their own section below v3.33.0.
+
+## [v3.34.0] — 2026-09-26
+
+### Changed — Fable removed, Astra renamed to Codex
+
+- **Breaking:** Fable (`claude-fable-5-1`) is removed. The Claude Code runtime now runs **Opus 5.5** (`claude-opus-5-5`) under the name `claude`.
+- Claude pins **medium** effort on every surface: code review, plan review, and antislop. An explicit `-re` or `efforts.claude` still wins.
+- **Breaking:** Astra is renamed to **Codex**. The model stays `gpt-6-astra` at xhigh. Use `-m codex` and `efforts.codex`.
+- Skills renamed: `/rival-astra` → `/rival-codex`, `/rival-plan-astra` → `/rival-plan-codex`, `/rival-fable` → `/rival-claude`, `/rival-plan-fable` → `/rival-plan-claude`. `rival install` removes the old skills.
+- Commands renamed: `rival command|run astra` → `codex`, `rival command|run fable` → `claude`. The Docker image is now `rival-claude`.
+- `rival command plan` accepts only `codex` and `claude`. Undocumented Sol plan support is gone.
+- Old `efforts.astra` / `efforts.fable` keys in `~/.rival/config.yaml` now fail validation. Rename them.
+- Sessions written by older releases still render. Old Fable sessions show as `retired-model`.
+
+## [v3.33.0] — 2026-09-17
+
+### Added — pinned GitLab MR reviews
+
+- Review GitLab MR URLs at the API's exact base/head commits in a temporary checkout.
+- Keep the caller's files and index intact, including runs with inherited Git variables.
+- Include the patch for reviewers without shell access. Reject patches over 512 KiB.
+- Keep K3 credential lookup in the caller's project. Support custom SSH ports.
+- Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
+- Refresh all ten bundled skills to 3.33.0 for Claude Code and Codex.
+- Publish macOS and Linux binaries for amd64 and arm64 through the transferred `1905` repositories. Update the Homebrew formula to 3.33.0.
+
+### Release verification
+
+- Release CI passed. All four published archive checksums matched.
+- Homebrew upgrade and installation of all ten skills for each host passed.
+- The published and installed macOS arm64 binaries passed version, help, and MR rejection smoke checks without provider calls.
+- All 637 tests passed with the race detector on the release revision. Build, vet, and lint passed.
+- Live GitLab and paid model calls remain untested. Linux and macOS amd64 binaries were built and checksum-verified but were not executed.
+
+## [v3.24.0 – v3.30.0] — 2026-07-31 to 2026-09-05
+
+These entries shipped in releases v3.24.0 through v3.30.0 but stayed under
+`[Unreleased]` until 2026-09-26. Several describe features that later releases
+removed or renamed (Sol, Fable, Astra, megareview, the web dashboard).
 
 ### Added — /rival-astra
 
@@ -192,39 +282,6 @@ workdir. Two caveats worth knowing:
   `/var/folders/...`). A workdir located inside one of those paths is therefore
   writable during a review.
 - Child-process network access is not blocked on macOS.
-
-## [v3.34.0] — 2026-09-26
-
-### Changed — Fable removed, Astra renamed to Codex
-
-- **Breaking:** Fable (`claude-fable-5-1`) is removed. The Claude Code runtime now runs **Opus 5.5** (`claude-opus-5-5`) under the name `claude`.
-- Claude pins **medium** effort on every surface: code review, plan review, and antislop. An explicit `-re` or `efforts.claude` still wins.
-- **Breaking:** Astra is renamed to **Codex**. The model stays `gpt-6-astra` at xhigh. Use `-m codex` and `efforts.codex`.
-- Skills renamed: `/rival-astra` → `/rival-codex`, `/rival-plan-astra` → `/rival-plan-codex`, `/rival-fable` → `/rival-claude`, `/rival-plan-fable` → `/rival-plan-claude`. `rival install` removes the old skills.
-- Commands renamed: `rival command|run astra` → `codex`, `rival command|run fable` → `claude`. The Docker image is now `rival-claude`.
-- `rival command plan` accepts only `codex` and `claude`. Undocumented Sol plan support is gone.
-- Old `efforts.astra` / `efforts.fable` keys in `~/.rival/config.yaml` now fail validation. Rename them.
-- Sessions written by older releases still render. Old Fable sessions show as `retired-model`.
-
-## [v3.33.0] — 2026-09-17
-
-### Added — pinned GitLab MR reviews
-
-- Review GitLab MR URLs at the API's exact base/head commits in a temporary checkout.
-- Keep the caller's files and index intact, including runs with inherited Git variables.
-- Include the patch for reviewers without shell access. Reject patches over 512 KiB.
-- Keep K3 credential lookup in the caller's project. Support custom SSH ports.
-- Reject MR URLs on commands that cannot resolve them. Document MR usage in both skill hosts.
-- Refresh all ten bundled skills to 3.33.0 for Claude Code and Codex.
-- Publish macOS and Linux binaries for amd64 and arm64 through the transferred `1905` repositories. Update the Homebrew formula to 3.33.0.
-
-### Release verification
-
-- Release CI passed. All four published archive checksums matched.
-- Homebrew upgrade and installation of all ten skills for each host passed.
-- The published and installed macOS arm64 binaries passed version, help, and MR rejection smoke checks without provider calls.
-- All 637 tests passed with the race detector on the release revision. Build, vet, and lint passed.
-- Live GitLab and paid model calls remain untested. Linux and macOS amd64 binaries were built and checksum-verified but were not executed.
 
 ## [v3.23.0] — 2026-07-20
 

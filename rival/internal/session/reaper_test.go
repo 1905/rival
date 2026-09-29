@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/1F47E/rival/internal/config"
+	"github.com/1905/rival/internal/config"
 )
 
 // deadPID is above the darwin PID ceiling (~99998) and far beyond typical linux
