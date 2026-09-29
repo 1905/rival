@@ -1,6 +1,6 @@
 ---
 name: rival-antislop
-version: 4.1.0
+version: 4.1.1
 description: Quality-only antislop review of changed code (or a given scope) via the rival binary — hunts slop and over-engineering, returns a leanness rating and a cut list, never bugs. Default models Codex (high effort) and Claude (Opus 5.5, medium effort). Detached + watched in the background. Use only when the user explicitly invokes /rival-antislop.
 argument-hint: "[<scope>]"
 allowed-tools: Bash, Read, Write

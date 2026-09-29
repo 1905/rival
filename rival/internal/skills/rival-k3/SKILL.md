@@ -1,6 +1,6 @@
 ---
 name: rival-k3
-version: 4.1.0
+version: 4.1.1
 description: Run Kimi K3 (max reasoning, via opencode) through the rival binary, detached and watched in the background. Use only when the user explicitly invokes /rival-k3.
 argument-hint: "[review [scope] | prompt]"
 allowed-tools: Bash, Read, Write

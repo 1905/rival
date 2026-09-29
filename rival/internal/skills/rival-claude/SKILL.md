@@ -1,6 +1,6 @@
 ---
 name: rival-claude
-version: 4.1.0
+version: 4.1.1
 description: Code review via Claude (Opus 5.5, medium effort) through the rival binary — reviews changed files (or a given scope) at its configured effort. Detached + watched in the background. Use only when the user explicitly invokes /rival-claude.
 argument-hint: "[scope | -re level [scope]]"
 allowed-tools: Bash, Read, Write

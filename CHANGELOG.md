@@ -2,9 +2,11 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v4.1.0](https://github.com/1905/rival/releases/tag/v4.1.0) — 2026-09-29.
+Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 2026-09-29.
 
 ## [Unreleased]
+
+## [v4.1.1] — 2026-09-29
 
 ### Added
 - Each release has a `Rival-X.Y.Z.dmg` for installing Rival.app without Homebrew. It is not notarized; the README explains how to allow the first launch.
