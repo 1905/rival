@@ -300,7 +300,9 @@ func runPlanCLI(ctx context.Context, ex planExecutor, sess *session.Session, cli
 	}
 
 	label := config.EngineLabel(cli, model)
-	_, parseErr := ParsePlanOutput(raw)
+	// Parse only the final answer: a plan payload printed earlier by a tool
+	// (a file the model read) must not pass for the review.
+	_, parseErr := ParsePlanOutput(FinalAnswer(raw))
 	if exitCode != 0 {
 		_ = sess.Fail(exitCode, fmt.Sprintf("%s exited with code %d", label, exitCode))
 	} else if reason := RunFailureReason(label, raw, parseErr == nil); reason != "" {
@@ -341,7 +343,7 @@ func assemblePlanResults(batch []planCLIRun, skipped []SkippedCLI) (*PlanRunResu
 			continue
 		}
 
-		parsed, parseErr := ParsePlanOutput(r.Raw)
+		parsed, parseErr := ParsePlanOutput(FinalAnswer(r.Raw))
 		if reason := RunFailureReason("", r.Raw, parseErr == nil); reason != "" {
 			// A single-CLI run must never format to an empty string with exit 0.
 			skipped = append(skipped, SkippedCLI{CLI: r.CLI, Model: model, Reason: reason})

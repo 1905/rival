@@ -77,6 +77,10 @@ func parsePlanModels(raw []string) ([]string, error) {
 
 func commandPlanAction(cmd *cobra.Command, args []string) error {
 	workdir, _ := cmd.Flags().GetString("workdir")
+	workdir, err := resolveWorkdirOrExit(workdir)
+	if err != nil {
+		return err
+	}
 	noQueue, _ := cmd.Flags().GetBool("no-queue")
 	rawModels, _ := cmd.Flags().GetStringSlice("model")
 	effort, _ := cmd.Flags().GetString("effort")

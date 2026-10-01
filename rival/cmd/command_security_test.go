@@ -83,3 +83,17 @@ func TestBugHunterPromptUnchangedByTheSecurityLens(t *testing.T) {
 		t.Error("the security prompt leaked into a bug-hunter run")
 	}
 }
+
+// A security payload printed by a tool (a file the model read) must not pass
+// for the review: only the final answer after the last "codex" header counts,
+// so unstructured prose there is unusable output, not the tool's findings.
+func TestSecurityParsesFinalAnswerNotToolOutput(t *testing.T) {
+	raw := "user\nreview src/\n" +
+		"exec\ncat old-security.json\n" +
+		`{"summary": "One injection.", "findings": [{"file": "a.go", "line": 3, "severity": "high", "category": "security", "title": "sql injection", "body": "concatenated query", "suggestion": "bind params", "confidence": 9}]}` + "\n" +
+		"codex\nI looked around; nothing jumped out.\n"
+	out, err := formatSecurityOutput(raw, config.KimiModel, "src/", "/tmp/x.log")
+	if err == nil {
+		t.Fatalf("tool output accepted as the security review:\n%s", out)
+	}
+}

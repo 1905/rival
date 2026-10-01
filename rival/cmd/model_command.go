@@ -126,6 +126,10 @@ func runModelCommand(spec modelSpec, workdir string, noQueue bool) error {
 	if err != nil {
 		return err
 	}
+	workdir, err = resolveWorkdirOrExit(workdir)
+	if err != nil {
+		return err
+	}
 	// Preflight in the caller's workdir: that is where credentials live, even
 	// when an MR review later runs in a temporary checkout.
 	if err := spec.preflight(workdir); err != nil {

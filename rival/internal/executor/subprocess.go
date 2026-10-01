@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/1905/rival/internal/gitscope"
 	"github.com/1905/rival/internal/procinfo"
@@ -58,6 +59,12 @@ func safeEnv() []string {
 	return result
 }
 
+// pipeDrainGrace bounds how long RunSubprocess keeps reading the provider's
+// output after its context is cancelled. The process-group kill normally
+// closes every pipe writer at once; this only matters when something outside
+// the group (a provider child that called setsid) still holds them.
+const pipeDrainGrace = 5 * time.Second
+
 // Result holds subprocess execution results.
 type Result struct {
 	ExitCode    int
@@ -101,6 +108,8 @@ func dropMatches(kv string, dropEnv []string) bool {
 // drops every variable with that prefix (see dropMatches).
 func RunSubprocess(ctx context.Context, sess *session.Session, binary string, args []string, env []string, prompt string, mirror io.Writer, dropEnv ...string) (*Result, error) {
 	cmd := exec.CommandContext(ctx, binary, args...)
+	setProcessGroup(cmd)
+	cmd.WaitDelay = pipeDrainGrace
 	base := safeEnv()
 	if len(dropEnv) > 0 {
 		kept := base[:0]
@@ -212,7 +221,32 @@ func RunSubprocess(ctx context.Context, sess *session.Session, binary string, ar
 		}
 	}()
 
-	wg.Wait()
+	// Drain the pipes before cmd.Wait: Wait closes the StdoutPipe/StderrPipe
+	// read ends as soon as the child exits, which would truncate output still
+	// buffered in the pipe. On cancel the Cancel hook SIGKILLs the whole
+	// process group, so every writer dies and the readers hit EOF. If a writer
+	// escaped the group, close our ends after pipeDrainGrace; that unblocks
+	// the goroutines (stdin too, if its write is stuck on a full pipe), so
+	// wg.Wait cannot hang. cmd.Wait then returns: the direct child is dead and
+	// WaitDelay bounds anything Wait itself still waits on.
+	drained := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+	case <-ctx.Done():
+		select {
+		case <-drained:
+		case <-time.After(pipeDrainGrace):
+			log.Warn().Str("session", sess.ID).Dur("grace", pipeDrainGrace).Msg("provider pipes still open after cancel — closing them")
+			_ = stdin.Close()
+			_ = stdout.Close()
+			_ = stderr.Close()
+			<-drained
+		}
+	}
 	err = cmd.Wait()
 
 	exitCode := 0

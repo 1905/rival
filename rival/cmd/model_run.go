@@ -48,6 +48,9 @@ func runModelRun(spec modelSpec, opts runOptions) error {
 	default:
 		return fmt.Errorf("provide --prompt-stdin or --review")
 	}
+	if opts.workdir, err = resolveWorkdir(opts.workdir); err != nil {
+		return err
+	}
 	// Preflight in the caller's workdir: that is where credentials live, even
 	// when an MR review later runs in a temporary checkout.
 	if err := spec.preflight(opts.workdir); err != nil {

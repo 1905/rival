@@ -560,3 +560,54 @@ func TestRunFailureReasonIgnoresQuotaTextInARealReview(t *testing.T) {
 		t.Fatalf("empty label: %q", got)
 	}
 }
+
+// codexToolPlanTranscript is a codex log where an `exec` tool printed a valid
+// plan assessment (a file the model read) and the model's final answer, after
+// the last "codex" header, is the given text.
+func codexToolPlanTranscript(finalAnswer string) string {
+	return "user\nreview the plan\n" +
+		"exec\ncat old-review.json\n" +
+		`{"summary":"tool output, not the answer","rating":10,"findings":[]}` + "\n" +
+		"codex\n" + finalAnswer + "\n"
+}
+
+// A plan assessment printed by a tool must never be reported as the model's
+// review: only the final answer counts, so unstructured prose there is a
+// parse failure (raw kept), not the tool's 10/10.
+func TestAssemblePlanResults_ParsesFinalAnswerNotToolOutput(t *testing.T) {
+	raw := codexToolPlanTranscript("The plan looks broadly fine, a few nits.")
+	res, err := assemblePlanResults([]planCLIRun{{CLI: "codex", Model: config.CodexModel, Raw: raw}}, nil)
+	if err != nil {
+		t.Fatalf("assemblePlanResults: %v", err)
+	}
+	if len(res.Results) != 1 {
+		t.Fatalf("want 1 result, got %+v", res.Results)
+	}
+	if p := res.Results[0].Parsed; p != nil {
+		t.Fatalf("tool output parsed as the review: rating %d, summary %q", p.Rating, p.Summary)
+	}
+}
+
+// The per-run session status must also judge the final answer: a quota error
+// there fails the run even though a tool printed a valid plan payload earlier.
+func TestRunDocReview_QuotaFinalAnswerFailsDespiteToolPlanJSON(t *testing.T) {
+	loadPlanTestConfig(t, "")
+
+	sessions := make(chan *session.Session, 1)
+	ex := planExecutor{
+		preflight: func(string) error { return nil },
+		run: func(_ context.Context, sess *session.Session, _, _, _, _ string) (string, int, error) {
+			sessions <- sess
+			return codexToolPlanTranscript("Error 429 (Too Many Requests)"), 0, nil
+		},
+	}
+
+	_, err := runDocReview(context.Background(), ex, session.ModeAntislop, "PROMPT", "src/", "", config.DefaultAntislopEffort, t.TempDir(), "final", true, []string{"codex"})
+	if err == nil {
+		t.Fatal("runDocReview succeeded on the tool's plan JSON; want all reviewers failed")
+	}
+	sess := <-sessions
+	if sess.Status != "failed" {
+		t.Errorf("session status = %q, want failed", sess.Status)
+	}
+}

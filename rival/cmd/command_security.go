@@ -82,6 +82,10 @@ func printSecurityResolution(entry config.SecurityModel, workdir string) error {
 
 func commandSecurityAction(cmd *cobra.Command, args []string) error {
 	workdir, _ := cmd.Flags().GetString("workdir")
+	workdir, err := resolveWorkdirOrExit(workdir)
+	if err != nil {
+		return err
+	}
 	noQueue, _ := cmd.Flags().GetBool("no-queue")
 	which, _ := cmd.Flags().GetBool("which")
 
@@ -174,11 +178,7 @@ func commandSecurityAction(cmd *cobra.Command, args []string) error {
 		return &ExitCodeError{Code: result.ExitCode, Err: fmt.Errorf("%s", exitMsg)}
 	}
 
-	parsed, parseErr := review.ParseReviewerOutput(raw)
-	if parseErr != nil {
-		log.Warn().Err(parseErr).Msg("security output did not parse")
-	}
-	out, validErr := review.FormatSecurityResult(parsed, raw, "opencode", entry.Model, scope, sess.LogFile)
+	out, validErr := formatSecurityOutput(raw, entry.Model, scope, sess.LogFile)
 	if _, err := io.WriteString(os.Stdout, out); err != nil {
 		return fmt.Errorf("write stdout: %w", err)
 	}
@@ -201,4 +201,17 @@ func commandSecurityAction(cmd *cobra.Command, args []string) error {
 		return &ExitCodeError{Code: 1, Err: fmt.Errorf("save session completion: %w", saveErr)}
 	}
 	return nil
+}
+
+// formatSecurityOutput parses a zero-exit security run and renders it. Only
+// the final answer is parsed, as for code reviews, so a payload printed by a
+// tool (a file the model read) cannot pass for the review. Validation still
+// sees the whole log: its echo check looks for the prompt anywhere in it. The
+// returned error is FormatSecurityResult's validation failure.
+func formatSecurityOutput(raw, model, scope, logPath string) (string, error) {
+	parsed, parseErr := review.ParseReviewerOutput(review.FinalAnswer(raw))
+	if parseErr != nil {
+		log.Warn().Err(parseErr).Msg("security output did not parse")
+	}
+	return review.FormatSecurityResult(parsed, raw, "opencode", model, scope, logPath)
 }
