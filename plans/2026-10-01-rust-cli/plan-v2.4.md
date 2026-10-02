@@ -142,6 +142,8 @@ Port: `internal/executor/{subprocess,quota}.go` + tests.
 
 **Task 2.3 verification:** controller workspace check: 296 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37022801563](https://github.com/1905/rival/actions/runs/37022801563) passed on macOS and Linux for `dcd9bd9`, including the Go contract, runner tests and Swift decoding on macOS. Tests use temporary session paths and injected child environments. `gitscope::repository_env` was pulled forward for subprocess filtering. `Config::environ()` preserves non-UTF-8 environment entries. Task2.4 also preserves Unix environment order through direct `execve`. Windows process operations remain explicit P5 placeholders.
 
+**P4 investigation follow-up:** cancellation readiness now uses a shell builtin with no later fork. Bounded process-tree diagnostics retain the 3.5-second assertion. Controller: 1,162 workspace tests passed. CI 37074140665 passed macOS/Linux at `f0f4a11`, including all 84 scenarios and Swift decoding. The earlier failure's cause remains unproven; the independently confirmed pipe/spawn omission is assigned to Task 5.0.
+
 ### Task 2.4 — executors `heavy`
 Port: `internal/executor/{codex,claude,claude_docker,grok,kimi,opencode}.go` + tests.
 - [x] Exact argv per CLI and model, env, workdir handling; tests assert argv vectors (as Go tests do). All 35 named Go adapter tests are mapped in the task report, including registry tests and fake Docker preflight/build checks.
@@ -253,20 +255,22 @@ Rust: `crates/rival/src/tui/markdown.rs`; dep `pulldown-cmark`.
 
 ### Task 4.8 — Result tab `heavy`
 Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
-- [ ] Tabs: `Result · Raw · Prompt · Info` (Raw = the Go TUI's Output view, unchanged). Keys `1`-`4`; `tab`-cycling as today.
-- [ ] Default tab: finished run → Result; live run → Raw with follow. When the selected live run finishes while on Raw with follow on → switch to Result; otherwise stay (same rules as Rival.app `RunDetailModel`).
-- [ ] Result layout (scrollable viewport, same scroll keys as Raw):
+- [x] Tabs: `Result · Raw · Prompt · Info` (Raw = the Go TUI's Output view, unchanged). Keys `1`-`4`; `tab`-cycling as today.
+- [x] Default tab: finished run → Result; live run → Raw with follow. When the selected live run finishes while on Raw with follow on → switch to Result; otherwise stay (same rules as Rival.app `RunDetailModel`).
+- [x] Result layout (scrollable viewport, same scroll keys as Raw):
   - header box: `model · effort · mode · elapsed` + `rating N/10` (amber) right-aligned; severity counts `● 1 critical ● 2 high …` in severity colours; summary wrapped.
   - per severity: a rule line `CRITICAL ────`, then each finding: `file:line · category · conf N` (accent/dim), title bold, body wrapped; `failure scenario` and `suggestion` collapsed behind `▸` lines, `enter`/`space` on the focused finding toggles them; `j/k` moves focus between findings.
   - markdown answers via Task 4.7; parse failure: `⚠ Couldn't parse this run's output.` + reason + session error + `press 2 for Raw`; live run: `Run is still going — press 2 for Raw.`
-- [ ] Parse once per finished member (cache by path + size + mtime), off the UI thread; reads the 256 KB tail only.
-- [ ] Model tests: default-tab rules (5 cases as in the app's `RunDetailModelTests`), focus/toggle, cache reuse.
+- [x] Parse once per finished member (cache by path + size + mtime), off the UI thread; reads the 256 KB tail only.
+- [x] Model tests: default-tab rules (5 cases as in the app's `RunDetailModelTests`), focus/toggle, cache reuse.
+
+**Task 4.8 verification:** 306 focused TUI tests and 1,205 workspace tests passed; nine intentional helper/generator ignores. Formatting and strict Clippy passed. Seven actual PTY cleanup checks passed. A separate watcher smoke proved live Raw → finished Result → explicit Raw → later refresh stays Raw. The Result cache rejects superseded responses and keeps at most eight parses.
 
 ### Gate P4 `gate`
-- [ ] ratatui `TestBackend` golden frames for: empty, loading, list page 1/2, filter, detail tabs, kill confirm, **Result findings (expanded + collapsed), Result markdown, Result parse failure, Result live note**.
-- [ ] Orchestrator: vhs screenshots of every TUI state on the fake fixture; judged by eye for readability (not look-alike with Go); fix loop (max 3).
-- [ ] Orchestrator: vhs screenshots of Go TUI vs Rust TUI on the same fake fixture; side by side by eye; fix loop (max 3).
-- [ ] Merge.
+- [x] ratatui `TestBackend` golden frames for: empty, loading, list page 1/2, filter, detail tabs, kill confirm, **Result findings (expanded + collapsed), Result markdown, Result parse failure, Result live note**.
+- [x] Orchestrator: vhs screenshots of every TUI state on the fake fixture; judged by eye for readability (not look-alike with Go); fix loop (max 3).
+- [x] Orchestrator: 33 VHS screenshots accepted by eye, including 13 Go/Rust state pairs on the same fixture and seven additional Rust Result states. Empty and loading captures also passed. No application visual-fix loop was needed. Evidence: `reviews/p4-terminal-gate.json`; raw captures remain in the task worktree. Narrow views have complete frame goldens and actual resize coverage.
+- [ ] Merge after exact-revision macOS/Linux CI passes.
 
 ---
 

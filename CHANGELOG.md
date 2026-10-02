@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Added the Result tab with parsed findings, expandable details, Markdown and live/failure notes. Background parsing is cached and rejects stale responses. Local validation: 1,205 workspace tests, terminal cleanup checks and 33 Go/Rust screenshots passed. Native Windows and release-switch gates remain pending.
 - Corrected the cancellation fixture to stop forking after readiness. Failures now record bounded process-tree diagnostics. All 1,162 workspace tests pass locally; the earlier hosted failure remains unexplained.
 - Added terminal Markdown rendering with styled headings, hanging lists, code and links. Entity-decoded terminal controls are stripped. Local validation: 1,160 workspace tests passed; a macOS cancellation timing failure remains under investigation.
 - Added the app's Result parser with answer deduplication, prompt-echo rejection and severity grouping. All 39 Swift parser cases pass in Rust, plus integer-boundary regressions. Local validation: 1,134 workspace tests passed; Result rendering remains pending.

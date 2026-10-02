@@ -1,0 +1,41 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 0  ✗ 1  1 sessions  3.34.0|
+ rival › orbit-web › review p0000…✗ failed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                          |
+────────────────────────────────────────────────────────────|
+⚠ Couldn't parse this run's output.                         |
+                                                            |
+JSON answer did not decode: summary: Expected to decode     |
+String but found number instead.                            |
+                                                            |
+error:                                                      |
+codex exited 1: rate limited                                |
+                                                            |
+press 2 for Raw                                             |
+                                                            |
+                                                            |
+                                                            |
+                                                            |
+────────────────────────────────────────────────────────────|
+ lines 1-9 of 9                                             |
+1-4 tab · [/] member · f follow · / search · o open log …   |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd|
+.gggggdddtttttttttdddtttttttttttt.ffffffffffffff...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..........................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.........................|
+............................................................|
+ddddddddddddddddddddddddddddddddddddddddddddddddddddddd.....|
+dddddddddddddddddddddddddddddddd............................|
+............................................................|
+ffffff......................................................|
+ffffffffffffffffffffffffffff................................|
+............................................................|
+ddddddadddddddd.............................................|
+............................................................|
+............................................................|
+............................................................|
+............................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.dddddddddt.dddddddddt.dddddddddt.dddddddddd...|

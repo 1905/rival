@@ -1,0 +1,57 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 1  ✗ 0  1 sessions  3.34.0                                        |
+ rival › orbit-web › review f0000000                                   ✓ completed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                                                                  |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮|
+│ gpt-6-astra · xhigh · review · 2m36s                                                 rating 7/10 │|
+│ ● 1 critical  ● 1 high  ● 1 medium                                                               │|
+│                                                                                                  │|
+│ Two real problems in the fingerprint re-key and one nit. The migration path is otherwise sound.  │|
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯|
+                                                                                                    |
+CRITICAL ───────────────────────────────────────────────────────────────────────────────────────────|
+▌ src/auth/fingerprint.rs:42 · bug · conf 90                                                        |
+▌ Re-key drops sessions created during the migration window                                         |
+▌ The loop reads the old key once and writes the new one after every batch, so sessions created mid-|
+▌ run keep the old fingerprint.                                                                     |
+▌ ▾ failure scenario                                                                                |
+▌   A user logs in while the re-key runs; their next request fails the fingerprint check and they   |
+▌   are signed out.                                                                                 |
+▌ ▾ suggestion                                                                                      |
+▌   Take the write lock for the whole re-key, or re-read the key per batch.                         |
+                                                                                                    |
+HIGH ───────────────────────────────────────────────────────────────────────────────────────────────|
+│ src/auth/store.rs:118 · concurrency · conf 75                                                     |
+│ Unbounded retry on lock contention                                                                |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+ lines 1-21 of 27                                                                                   |
+1-4 tab · j/k finding · enter open · [/] member · / search · o open log · x stop · esc back · ? more|
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd........................................|
+.gggggdddtttttttttdddttttttttttttttt...................................ccccccccccccccccc...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ddaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................................................rrrrrrrrrrrdd|
+ddfttttttttttt..fttttttt..rttttttttt..............................................................dd|
+dd................................................................................................dd|
+ddttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt.dd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+....................................................................................................|
+gggggggg.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ggaaaaaaaaaaaaaaaaaaaaaaaaaadddddddddddddddd........................................................|
+ggTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.........................................|
+ggtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt|
+ggttttttttttttttttttttttttttttt.....................................................................|
+ggdddddddddddddddddd................................................................................|
+gg..ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt...|
+gg..ttttttttttttttt.................................................................................|
+ggdddddddddddd......................................................................................|
+gg..ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt.........................|
+....................................................................................................|
+gggg.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ffaaaaaaaaaaaaaaaaaaaaadddddddddddddddddddddddd.....................................................|
+ffTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.ddddddddddttttt.dddddddttt.dddddddddt.dddddddddt.dddddddddddt.dddddddttt.dddddddt.dddd|

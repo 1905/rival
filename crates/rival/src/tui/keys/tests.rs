@@ -142,10 +142,10 @@ fn key_names_follow_bubbletea() {
 #[test]
 fn help_lines_fit_the_width() {
     let k = KeyMap::default();
-    for m in Mode::ALL {
+    for (m, findings) in Mode::ALL.into_iter().flat_map(|m| [(m, false), (m, true)]) {
         for show_all in [false, true] {
             for w in [0, 1, 5, 20, 59, 60, 90, 200] {
-                let lines = help_lines(&k.help(m), show_all, w, &STYLES);
+                let lines = help_lines(&k.help_for(m, findings), show_all, w, &STYLES);
                 assert!(!lines.is_empty(), "{m:?} w={w}: no help line");
                 for (i, l) in lines.iter().enumerate() {
                     assert!(
@@ -187,4 +187,31 @@ fn full_help_is_one_column_per_group() {
     assert_eq!(detail.len(), 6);
     let filter = help_lines(&k.help(Mode::Filter), true, 200, &STYLES);
     assert_eq!(filter.len(), 2, "simple help expands to one 2-row column");
+}
+
+/// A Result tab with findings advertises its focus and toggle keys in place
+/// of follow; the expanded help keeps its height. Elsewhere nothing changes.
+#[test]
+fn result_help_lists_the_finding_keys() {
+    let k = KeyMap::default();
+    let help = k.help_for(Mode::Detail, true);
+    let line = &help_lines(&help, false, 200, &STYLES)[0];
+    assert_eq!(
+        line.to_string(),
+        "1-4 tab · j/k finding · enter open · [/] member · / search · o open log · x stop · esc back · ? more"
+    );
+    assert!(!has_binding(&help.short, k.follow));
+    let full = flatten(help.full.clone());
+    assert!(has_binding(&full, k.toggle), "full help omits toggle");
+    assert_eq!(
+        help_lines(&help, true, 200, &STYLES).len(),
+        help_lines(&k.help(Mode::Detail), true, 200, &STYLES).len(),
+    );
+    for m in Mode::ALL {
+        assert_eq!(k.help_for(m, false), k.help(m), "{m:?}");
+        if m != Mode::Detail {
+            assert_eq!(k.help_for(m, true), k.help(m), "{m:?}");
+        }
+    }
+    assert!(k.toggle.matches("enter") && k.toggle.matches("space"));
 }

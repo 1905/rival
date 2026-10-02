@@ -16,6 +16,7 @@ pub mod logview;
 pub mod markdown;
 pub mod model;
 pub mod preview;
+pub mod result_view;
 pub mod runtime;
 pub mod session_list;
 pub mod styles;

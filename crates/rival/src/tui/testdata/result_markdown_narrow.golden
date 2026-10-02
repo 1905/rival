@@ -1,0 +1,41 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 1  ✗ 0  1 sessions  3.34.0|
+ rival › orbit-web › review m0…✓ completed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                          |
+────────────────────────────────────────────────────────────|
+╭──────────────────────────────────────────────────────────╮|
+│ gpt-6-astra · xhigh · review · 2m36s                     │|
+╰──────────────────────────────────────────────────────────╯|
+                                                            |
+Verdict                                                     |
+                                                            |
+The re-key is safe to ship once the lock is held for the    |
+whole run. The migrate step already retries.                |
+                                                            |
+• keep the batch size at 500                                |
+• log every skipped session                                 |
+  • with its id                                             |
+                                                            |
+────────────────────────────────────────────────────────────|
+ lines 1-13 of 18                                           |
+1-4 tab · [/] member · f follow · / search · o open log …   |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd|
+.gggggdddtttttttttdddttttttttt.ccccccccccccccccc...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..........................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ddaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa....................dd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+............................................................|
+ggggggg.....................................................|
+............................................................|
+ttttttttttttttTTTTTTTTTTTTtttttttttttttttttttttttttttttt....|
+tttttttttttttttaaaaaaatttttttttttttttttttttt................|
+............................................................|
+ddtttttttttttttttttttttttttt................................|
+ddttttttttttttttttttttttttt.................................|
+..ddttttttttttt.............................................|
+............................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.dddddddddt.dddddddddt.dddddddddt.dddddddddd...|

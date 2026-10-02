@@ -1,0 +1,41 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 1  ✗ 0  1 sessions  3.34.0|
+ rival › orbit-web › review f0…✓ completed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                          |
+────────────────────────────────────────────────────────────|
+╭──────────────────────────────────────────────────────────╮|
+│ gpt-6-astra · xhigh · review · 2m36s         rating 7/10 │|
+│ ● 1 critical  ● 1 high  ● 1 medium                       │|
+│                                                          │|
+│ Two real problems in the fingerprint re-key and one nit. │|
+│ The migration path is otherwise sound.                   │|
+╰──────────────────────────────────────────────────────────╯|
+                                                            |
+CRITICAL ───────────────────────────────────────────────────|
+▌ src/auth/fingerprint.rs:42 · bug · conf 90                |
+▌ Re-key drops sessions created during the migration window |
+▌ The loop reads the old key once and writes the new one    |
+▌ after every batch, so sessions created mid-run keep the   |
+────────────────────────────────────────────────────────────|
+ lines 1-13 of 26                                           |
+1-4 tab · j/k finding · enter open · [/] member · / search …|
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd|
+.gggggdddtttttttttdddttttttttt.ccccccccccccccccc...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..........................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ddaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.........rrrrrrrrrrrdd|
+ddfttttttttttt..fttttttt..rttttttttt......................dd|
+dd........................................................dd|
+ddttttttttttttttttttttttttttttttttttttttttttttttttttttttttdd|
+ddtttttttttttttttttttttttttttttttttttttt..................dd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+............................................................|
+gggggggg.ddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ggaaaaaaaaaaaaaaaaaaaaaaaaaadddddddddddddddd................|
+ggTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.|
+ggtttttttttttttttttttttttttttttttttttttttttttttttttttttt....|
+ggttttttttttttttttttttttttttttttttttttttttttttttttttttttt...|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.ddddddddddttttt.dddddddttt.dddddddddt.dddddddd|

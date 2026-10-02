@@ -672,6 +672,14 @@ pub fn group_fixture(h: &Harness) -> Vec<Arc<Session>> {
     ]
 }
 
+/// A reviewer answer with every finding shape: details on the first, none
+/// on the second, a suggestion only and no location on the third.
+pub const FINDINGS_JSON: &str = r#"{"summary": "Two real problems in the fingerprint re-key and one nit. The migration path is otherwise sound.", "rating": 7, "findings": [
+{"file": "src/auth/fingerprint.rs", "line": 42, "severity": "critical", "category": "bug", "title": "Re-key drops sessions created during the migration window", "body": "The loop reads the old key once and writes the new one after every batch, so sessions created mid-run keep the old fingerprint.", "failure_scenario": "A user logs in while the re-key runs; their next request fails the fingerprint check and they are signed out.", "suggestion": "Take the write lock for the whole re-key, or re-read the key per batch.", "confidence": 90},
+{"file": "src/auth/store.rs", "line": 118, "severity": "high", "category": "concurrency", "title": "Unbounded retry on lock contention", "body": "The retry has no cap and no backoff.", "confidence": 75},
+{"file": "", "line": 0, "severity": "medium", "category": "tests", "title": "No test covers the empty store", "body": "", "suggestion": "Add a table case with zero sessions.", "confidence": 60}
+]}"#;
+
 /// Draws `m` on a `width`×`height` TestBackend and returns the buffer.
 pub fn draw(m: &Model, width: u16, height: u16) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();

@@ -103,6 +103,8 @@ pub struct KeyMap {
     pub tab_raw: Binding,
     pub tab_prompt: Binding,
     pub tab_info: Binding,
+    /// The Result tab: opens or closes the focused finding's details.
+    pub toggle: Binding,
     pub open_log: Binding,
     pub stop: Binding,
     pub yes: Binding,
@@ -135,6 +137,7 @@ impl Default for KeyMap {
             tab_raw: Binding::new(&["2"], "2", "raw"),
             tab_prompt: Binding::new(&["3"], "3", "prompt"),
             tab_info: Binding::new(&["4"], "4", "info"),
+            toggle: Binding::new(&["enter", "space"], "enter/space", "open"),
             open_log: Binding::new(&["o"], "o", "open log"),
             stop: Binding::new(&["x"], "x", "stop"),
             yes: Binding::new(&["y"], "y", "yes"),
@@ -156,13 +159,17 @@ pub const ARROW_DOWN: Binding = Binding::new(&["down"], "↓", "down");
 const DETAIL_TABS: Binding = Binding::new(&["1", "2", "3", "4"], "1-4", "tab");
 /// "[/]": the member keys as one help entry.
 const MEMBERS: Binding = Binding::new(&["[", "]"], "[/]", "member");
+/// "j/k": the finding focus keys on the Result tab as one help entry.
+const FINDINGS: Binding = Binding::new(&["j", "k"], "j/k", "finding");
+/// "enter": the toggle as a short help entry; space works too.
+const OPEN_FINDING: Binding = Binding::new(&["enter", "space"], "enter", "open");
 /// "n/p": the page keys as one help entry.
 const PAGES: Binding = Binding::new(&["n", "p"], "n/p", "page");
 
 impl KeyMap {
     /// Every binding with its field name, for tests.
     #[cfg(test)]
-    pub fn all(&self) -> [(&'static str, Binding); 27] {
+    pub fn all(&self) -> [(&'static str, Binding); 28] {
         [
             ("up", self.up),
             ("down", self.down),
@@ -187,6 +194,7 @@ impl KeyMap {
             ("tab_raw", self.tab_raw),
             ("tab_prompt", self.tab_prompt),
             ("tab_info", self.tab_info),
+            ("toggle", self.toggle),
             ("open_log", self.open_log),
             ("stop", self.stop),
             ("yes", self.yes),
@@ -205,6 +213,35 @@ impl KeyMap {
         .into_iter()
         .find(|(b, _)| b.matches(key))
         .map(|(_, tab)| tab)
+    }
+
+    /// The bindings to advertise in `mode`. `findings` is true while the
+    /// detail screen shows a Result tab with findings: there j/k move the
+    /// focus and enter/space open a finding instead of scrolling.
+    pub fn help_for(&self, mode: Mode, findings: bool) -> ModeHelp {
+        if mode != Mode::Detail || !findings {
+            return self.help(mode);
+        }
+        let mut help = self.help(mode);
+        help.short = vec![
+            DETAIL_TABS,
+            FINDINGS,
+            OPEN_FINDING,
+            MEMBERS,
+            self.search,
+            self.open_log,
+            self.stop,
+            self.back,
+            self.help,
+        ];
+        help.full[0] = vec![
+            self.up.relabel("prev finding"),
+            self.down.relabel("next finding"),
+            self.toggle,
+            self.top,
+            self.bottom,
+        ];
+        help
     }
 
     /// Go: `keyMap.help`. The bindings to advertise in `mode`.

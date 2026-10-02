@@ -5,7 +5,8 @@
 //! The pane never reads a file. The Raw tab shows what its [`LogSlot`]
 //! holds; [`DetailPane::reload`] returns the read a worker should make, and
 //! [`DetailPane::accept_log`] takes the result only while it is still for
-//! the member and width on screen. Task 4.8 adds the Result view.
+//! the member and width on screen. The Result tab works the same way with
+//! its [`ResultSlot`]: the parse runs on a worker and comes back keyed.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,23 +21,27 @@ use rival_core::gostd;
 use rival_core::session::Session;
 
 use super::input::TextInput;
-use super::jobs::{PromptsRequest, PromptsResult};
-use super::logview::{LogKey, LogPane, LogRequest, LogResult, LogSlot, sanitize_log};
+use super::jobs::{Job, PromptsRequest, PromptsResult};
+use super::keys::KeyMap;
+use super::logview::{LogKey, LogPane, LogResult, LogSlot, sanitize_log};
 use super::model::{Ctx, DisplayItem, item_key};
 use super::preview::LOADING_LOG;
+use super::result_view::{
+    FindingFocus, ResultResponse, ResultSlot, ResultTarget, has_details, result_lines,
+};
 use super::session_list::{
-    Zone, format_elapsed, group_elapsed, item_status, kind_label, model_name, project_name,
-    short_id, status_glyph,
+    Zone, format_elapsed, group_elapsed, is_live, item_status, kind_label, model_name,
+    project_name, short_id, status_glyph,
 };
 use super::styles::{Styles, gradient_word};
 use super::text::{fit_cell, fit_line, line_width, pad_line, truncate_line, wrap_cells};
 use super::viewport::Viewport;
 
 /// The detail tabs, in key order 1-4. Every detail-screen module uses this
-/// one enum.
+/// one enum. The app's `DetailTab` has the same order.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum DetailTab {
-    /// The parsed review (Task 4.8).
+    /// The parsed answer of a finished member.
     Result,
     /// The raw log (Go: Output).
     #[default]
@@ -85,9 +90,6 @@ pub fn vp_height(height: usize) -> usize {
 /// The Info tab's label column.
 pub const INFO_LABEL_W: usize = 11;
 
-/// Shown on the Result tab until Task 4.8 builds it.
-const RESULT_PENDING: &str = "(result view not available yet)";
-
 /// An open "stop N running sessions? y/n" bar. `targets` are the sessions
 /// that were live when x was pressed; y re-checks them against the current
 /// snapshot before it sends anything.
@@ -123,6 +125,13 @@ pub struct DetailPane {
     pub lines: Vec<Line<'static>>,
     /// The Raw tab's log read.
     pub log: LogSlot,
+    /// The Result tab's parses.
+    pub result: ResultSlot,
+    /// The focused finding and the open ones on the Result tab.
+    pub findings: FindingFocus,
+    /// The member seen at the last reload and whether it was live then.
+    /// Only that member going from live to finished moves Raw to Result.
+    last_seen: Option<(String, bool)>,
     /// A one-shot status message ("nothing running"). The next key clears it.
     pub notice: String,
 }
@@ -143,21 +152,30 @@ impl Default for DetailPane {
             prompts_pending: None,
             lines: Vec::new(),
             log: LogSlot::default(),
+            result: ResultSlot::default(),
+            findings: FindingFocus::default(),
+            last_seen: None,
             notice: String::new(),
         }
     }
 }
 
 impl DetailPane {
-    /// Resets the pane for `item`: Raw tab, first member, follow on, no
-    /// search. Returns the load for the full prompts the list's summaries
-    /// dropped. Task 4.8 picks the per-run default tab here.
+    /// Resets the pane for `item`: first member, follow on, no search. A
+    /// finished first member opens on Result, a live one on Raw (the app's
+    /// `RunDetailModel.sync`). Returns the load for the full prompts the
+    /// list's summaries dropped.
     pub fn open(&mut self, item: Option<&DisplayItem>) -> Option<PromptsRequest> {
-        self.tab = DetailTab::Raw;
-        self.member_id = item
-            .and_then(DisplayItem::primary)
-            .map(|s| s.id.clone())
-            .unwrap_or_default();
+        let first = item.and_then(DisplayItem::primary);
+        let live = first.is_some_and(|s| is_live(&s.status));
+        self.tab = if live {
+            DetailTab::Raw
+        } else {
+            DetailTab::Result
+        };
+        self.member_id = first.map(|s| s.id.clone()).unwrap_or_default();
+        self.last_seen = first.map(|s| (s.id.clone(), live));
+        self.findings.reset();
         self.follow = true;
         self.clear_search();
         self.confirm = None;
@@ -191,6 +209,9 @@ impl DetailPane {
         self.prompts_pending = None;
         self.lines.clear();
         self.log.clear();
+        self.result.cancel();
+        self.findings.reset();
+        self.last_seen = None;
         self.confirm = None;
         self.notice.clear();
         self.clear_search();
@@ -219,14 +240,22 @@ impl DetailPane {
         item.sessions.get(self.member_index(item))
     }
 
-    /// Moves to the next (+1) or previous (-1) member, wrapping.
-    pub fn cycle_member(&mut self, item: Option<&DisplayItem>, delta: isize) {
+    /// Moves to the next (+1) or previous (-1) member, wrapping. A new
+    /// member starts at its tail, with follow on. Returns whether the member
+    /// changed: re-picking the one shown (a run of one) changes nothing, as
+    /// in the app's `RunDetailModel.selectMember`.
+    pub fn cycle_member(&mut self, item: Option<&DisplayItem>, delta: isize) -> bool {
         let Some(item) = item.filter(|i| i.sessions.len() >= 2) else {
-            return;
+            return false;
         };
         let n = item.sessions.len() as isize;
         let i = (self.member_index(item) as isize + delta).rem_euclid(n) as usize;
+        if item.sessions[i].id == self.member_id {
+            return false;
+        }
         self.member_id = item.sessions[i].id.clone();
+        self.follow = true;
+        true
     }
 
     /// Go: `resize`. Fits the viewport to a `width`×`height` pane. A reader
@@ -250,25 +279,55 @@ impl DetailPane {
         (width > 0).then(|| LogKey::new(s, width, 0))
     }
 
+    /// The parse the Result tab needs: the current member's log, once the
+    /// member is finished and has one.
+    pub fn wanted_result(&self, item: Option<&DisplayItem>) -> Option<ResultTarget> {
+        let s = self.current(item)?;
+        (!is_live(&s.status) && !s.log_file.is_empty()).then(|| ResultTarget::of(s))
+    }
+
     /// Go: `reload`. Rebuilds the current tab's content for `item`. `reset`
     /// resets the scroll position: Raw jumps to the tail, the other tabs to
     /// the top. Otherwise Raw follows the tail only while follow is on, and
-    /// a scrolled-up reader keeps their place. On the Raw tab it returns the
-    /// read that refreshes the log; the worker only stats an unchanged file.
-    pub fn reload(
-        &mut self,
-        item: Option<&DisplayItem>,
-        ctx: &Ctx,
-        reset: bool,
-    ) -> Option<LogRequest> {
-        let req = match self.tab {
+    /// a scrolled-up reader keeps their place.
+    ///
+    /// When the member on screen went from live to finished while the user
+    /// reads Raw at its tail, the tab moves to Result (the app's
+    /// `RunDetailModel.sync`). Switching to a finished member is not a
+    /// finish.
+    ///
+    /// Returns the job that refreshes the tab: the Raw log read or the
+    /// Result parse. The worker only stats an unchanged file.
+    pub fn reload(&mut self, item: Option<&DisplayItem>, ctx: &Ctx, reset: bool) -> Option<Job> {
+        let mut reset = reset;
+        self.last_seen = match self.current(item) {
+            Some(s) => {
+                let live = is_live(&s.status);
+                let finished = self
+                    .last_seen
+                    .as_ref()
+                    .is_some_and(|(id, was_live)| *id == s.id && *was_live && !live);
+                if finished && self.tab == DetailTab::Raw && self.follow {
+                    self.tab = DetailTab::Result;
+                    reset = true;
+                }
+                Some((s.id.clone(), live))
+            }
+            None => None,
+        };
+        let job = match self.tab {
             DetailTab::Raw => self
                 .wanted_log(item)
-                .and_then(|key| self.log.request(LogPane::Detail, key, true)),
+                .and_then(|key| self.log.request(LogPane::Detail, key, true))
+                .map(Job::Log),
+            DetailTab::Result => self
+                .wanted_result(item)
+                .and_then(|target| self.result.request(target))
+                .map(Job::Result),
             _ => None,
         };
         self.rebuild(item, ctx, reset);
-        req
+        job
     }
 
     /// Builds the current tab from what the pane already holds.
@@ -282,7 +341,10 @@ impl DetailPane {
         // A vanished member fell back to the first; stay there if it returns.
         self.member_id = s.id.clone();
         self.lines = match self.tab {
-            DetailTab::Result => vec![Line::styled(RESULT_PENDING, ctx.styles.dim)],
+            DetailTab::Result => {
+                let entry = self.result.entry_of(&ResultTarget::of(&s));
+                result_lines(&s, entry, &mut self.findings, width, ctx)
+            }
             DetailTab::Raw => output_lines(&s, width, &self.log, ctx.styles),
             DetailTab::Prompt => prompt_lines(
                 &s,
@@ -309,6 +371,70 @@ impl DetailPane {
         let wanted = self.wanted_log(item);
         if self.log.accept(res, wanted.as_ref()) && self.tab == DetailTab::Raw {
             self.rebuild(item, ctx, false);
+        }
+    }
+
+    /// Takes a worker's parse if it is still for the member on screen, and
+    /// redraws the Result tab with it.
+    pub fn accept_result(&mut self, res: ResultResponse, item: Option<&DisplayItem>, ctx: &Ctx) {
+        let wanted = self.wanted_result(item);
+        if self.result.accept(res, wanted.as_ref()) && self.tab == DetailTab::Result {
+            self.rebuild(item, ctx, false);
+        }
+    }
+
+    /// The Result tab's own keys while it lists findings: up/down (j/k)
+    /// move the focus, enter/space open or close the focused finding's
+    /// failure scenario and suggestion. The focused finding is scrolled
+    /// into view. Returns false for any other key, or when there are no
+    /// findings; the viewport then scrolls as on the other tabs.
+    pub fn result_key(
+        &mut self,
+        key: &str,
+        keys: &KeyMap,
+        item: Option<&DisplayItem>,
+        ctx: &Ctx,
+    ) -> bool {
+        let n = self.findings.rows.len();
+        if self.tab != DetailTab::Result || n == 0 {
+            return false;
+        }
+        let f = &mut self.findings;
+        if keys.down.matches(key) {
+            f.focus = (f.focus + 1).min(n - 1);
+        } else if keys.up.matches(key) {
+            f.focus = f.focus.saturating_sub(1);
+        } else if keys.toggle.matches(key) {
+            let i = f.focus;
+            if f.shown().is_some_and(|r| has_details(r, i)) && !f.expanded.remove(&i) {
+                f.expanded.insert(i);
+            }
+        } else {
+            return false;
+        }
+        self.rebuild(item, ctx, false);
+        self.scroll_to_focus();
+        true
+    }
+
+    /// Scrolls the least that shows the focused finding: its last row when
+    /// it ends below the view, but never past its first row. The first
+    /// finding brings the header back.
+    fn scroll_to_focus(&mut self) {
+        let Some(rows) = self.findings.rows.get(self.findings.focus).cloned() else {
+            return;
+        };
+        if self.findings.focus == 0 {
+            self.vp.goto_top();
+        }
+        let (top, h) = (self.vp.y_offset(), self.vp.height());
+        if rows.end > top + h {
+            self.vp.set_y_offset(rows.end.saturating_sub(h) as isize);
+        }
+        // The severity rule sits right above a group's first finding.
+        let start = rows.start.saturating_sub(2);
+        if start < self.vp.y_offset() {
+            self.vp.set_y_offset(start as isize);
         }
     }
 

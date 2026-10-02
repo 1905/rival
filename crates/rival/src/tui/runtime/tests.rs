@@ -17,6 +17,7 @@ use rival_core::sessionview::SessionEvent;
 use crate::tui::jobs::{LOG_VIEW_TTL, OpenedLog, PromptsRequest, quiet_command};
 use crate::tui::kill::StopRequest;
 use crate::tui::logview::{LogKey, LogPane, LogRequest};
+use crate::tui::result_view::{ResultRequest, ResultTarget};
 use crate::tui::testkit::{
     self, Harness, draw, fixed_now, harness, loading_model, press, preview_fixture_logs, rows,
 };
@@ -242,9 +243,18 @@ fn slow_tail(path: &Path, max: i64) -> io::Result<(Vec<u8>, bool)> {
     rival_core::logfmt::read_tail(path, max)
 }
 
+fn result_job(seq: u64, s: &Session) -> Job {
+    Job::Result(ResultRequest {
+        seq,
+        target: ResultTarget::of(s),
+        known: None,
+    })
+}
+
 /// Feedback findings 2 and 3: a slow worker and fast navigation (a new key
 /// for every request) keep the waiting work bounded, and the newest read of
-/// each pane and the newest prompt load still arrive.
+/// each pane, the newest result parse and the newest prompt load still
+/// arrive.
 #[test]
 fn a_slow_worker_keeps_waiting_work_bounded_and_delivers_the_newest() {
     let h = harness();
@@ -263,6 +273,7 @@ fn a_slow_worker_keeps_waiting_work_bounded_and_delivers_the_newest() {
             .unwrap();
         jobs.submit(log_job(LogPane::Detail, seq, s, width))
             .unwrap();
+        jobs.submit(result_job(seq, s)).unwrap();
         jobs.submit(Job::Prompts(PromptsRequest {
             item_key: format!("solo:{seq}"),
             ids: vec![s.id.clone()],
@@ -270,10 +281,11 @@ fn a_slow_worker_keeps_waiting_work_bounded_and_delivers_the_newest() {
         .unwrap();
         assert!(jobs.pending() <= MAX_PENDING, "{}", jobs.pending());
     }
-    assert!(jobs.pending() <= 3, "{} waiting", jobs.pending());
-    let (mut preview, mut detail, mut prompts, mut outputs) = (0, 0, String::new(), 0);
+    assert!(jobs.pending() <= 4, "{} waiting", jobs.pending());
+    let (mut preview, mut detail, mut result, mut prompts, mut outputs) =
+        (0, 0, 0, String::new(), 0);
     let last_prompts = format!("solo:{n}");
-    while preview != n || detail != n || prompts != last_prompts {
+    while preview != n || detail != n || result != n || prompts != last_prompts {
         match rx
             .recv_timeout(WAIT)
             .expect("the newest work never arrived")
@@ -282,12 +294,13 @@ fn a_slow_worker_keeps_waiting_work_bounded_and_delivers_the_newest() {
                 preview = res.seq;
             }
             Event::Job(JobOutput::Msg(Msg::Log(res))) => detail = res.seq,
+            Event::Job(JobOutput::Msg(Msg::Result(res))) => result = res.seq,
             Event::Job(JobOutput::Msg(Msg::Prompts(res))) => prompts = res.item_key,
             other => panic!("unexpected {other:?}"),
         }
         outputs += 1;
     }
-    assert!(outputs < 30, "{outputs} jobs ran for {} requests", 3 * n);
+    assert!(outputs < 40, "{outputs} jobs ran for {} requests", 4 * n);
     jobs.shutdown();
 }
 
@@ -396,6 +409,7 @@ fn closing_workers_skip_reads_but_run_stops_and_opens() {
         pending
             .push(log_job(LogPane::Detail, 1, &session, 40))
             .unwrap();
+        pending.push(result_job(1, &session)).unwrap();
         pending
             .push(Job::Prompts(PromptsRequest {
                 item_key: "solo:x".into(),
@@ -424,7 +438,32 @@ fn closing_workers_skip_reads_but_run_stops_and_opens() {
         .collect();
     assert_eq!(got, ["stopped", "opened"]);
     assert_eq!(testkit::launched().len(), 1);
-    assert_eq!(shared.lock().len(), 2, "the read and the prompt load ran");
+    assert_eq!(
+        shared.lock().len(),
+        3,
+        "the read, the parse and the prompt load stay unrun"
+    );
+}
+
+/// The Result tab's parses share one coalesced slot: a newer parse
+/// replaces the waiting one, and shutdown drops it unrun.
+#[test]
+fn result_parses_coalesce_and_shutdown_drops_them() {
+    let h = harness();
+    let sessions = preview_fixture_logs(&h);
+    let (tx, rx) = mpsc::channel();
+    // No worker: nothing drains the queue.
+    let mut jobs = JobPool::start(h.env.clone(), 0, tx).unwrap();
+    for (seq, s) in (1..=5).zip(sessions.iter().cycle()) {
+        jobs.submit(result_job(seq, s)).unwrap();
+        assert_eq!(jobs.pending(), 1);
+    }
+    jobs.submit(log_job(LogPane::Detail, 1, &sessions[0], 40))
+        .unwrap();
+    assert_eq!(jobs.pending(), 2, "the parse has its own slot");
+    jobs.shutdown();
+    assert_eq!(jobs.pending(), 0);
+    assert!(rx.try_recv().is_err(), "a dropped parse ran");
 }
 
 /// The model's tick and spinner chains stop once nothing is live, but the

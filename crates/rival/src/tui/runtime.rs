@@ -420,10 +420,11 @@ impl Timers {
 /// with [`BUSY_NOTICE`] instead of queued.
 pub const MAX_PENDING_ACTIONS: usize = 8;
 
-/// The most jobs [`JobPool`] keeps waiting: one read per pane, one prompt
-/// load and the actions. Tests check the bound; `Pending` keeps it by shape.
+/// The most jobs [`JobPool`] keeps waiting: one read per pane, one result
+/// parse, one prompt load and the actions. Tests check the bound; `Pending`
+/// keeps it by shape.
 #[cfg(test)]
-pub const MAX_PENDING: usize = 3 + MAX_PENDING_ACTIONS;
+pub const MAX_PENDING: usize = 4 + MAX_PENDING_ACTIONS;
 
 /// Work waiting for a worker, bounded by `MAX_PENDING`.
 ///
@@ -431,6 +432,8 @@ pub const MAX_PENDING: usize = 3 + MAX_PENDING_ACTIONS;
 ///   model's `LogSlot` waits only for its newest request, and drops older
 ///   results anyway, so the replaced read loses nothing; the newest one
 ///   always stays and is delivered.
+/// - A result parse replaces the waiting one, for the same reason: the
+///   `ResultSlot` waits only for its newest request.
 /// - A prompt load replaces the waiting one; the detail screen waits only
 ///   for the run it shows.
 /// - Stops and log opens queue in order. One equal to a waiting job merges
@@ -440,6 +443,7 @@ pub const MAX_PENDING: usize = 3 + MAX_PENDING_ACTIONS;
 struct Pending {
     preview: Option<Job>,
     detail: Option<Job>,
+    result: Option<Job>,
     prompts: Option<Job>,
     actions: VecDeque<Job>,
     closing: bool,
@@ -448,7 +452,7 @@ struct Pending {
 impl Pending {
     #[cfg(test)]
     fn len(&self) -> usize {
-        [&self.preview, &self.detail, &self.prompts]
+        [&self.preview, &self.detail, &self.result, &self.prompts]
             .iter()
             .filter(|j| j.is_some())
             .count()
@@ -464,6 +468,7 @@ impl Pending {
                 };
                 *slot = Some(job);
             }
+            Job::Result(_) => self.result = Some(job),
             Job::Prompts(_) => self.prompts = Some(job),
             Job::Stop(_) | Job::OpenLog(_) => {
                 if self.actions.contains(&job) {
@@ -478,8 +483,9 @@ impl Pending {
         Ok(())
     }
 
-    /// The next job: confirmed actions first, then the open run's read, the
-    /// preview's read and the prompts. Once closing, actions only.
+    /// The next job: confirmed actions first, then the open run's read and
+    /// parse, the preview's read and the prompts. Once closing, actions
+    /// only.
     fn pop(&mut self) -> Option<Job> {
         if let Some(job) = self.actions.pop_front() {
             return Some(job);
@@ -489,6 +495,7 @@ impl Pending {
         }
         self.detail
             .take()
+            .or_else(|| self.result.take())
             .or_else(|| self.preview.take())
             .or_else(|| self.prompts.take())
     }
@@ -560,15 +567,16 @@ impl JobPool {
     }
 
     /// Lets the workers finish the waiting stops and log opens, then joins
-    /// them. Waiting reads and prompt loads are dropped: no screen is left
-    /// to show them. Stops and log opens still run, as Go ran them inside
-    /// the update before the quit key was read.
+    /// them. Waiting reads, parses and prompt loads are dropped: no screen
+    /// is left to show them. Stops and log opens still run, as Go ran them
+    /// inside the update before the quit key was read.
     pub fn shutdown(&mut self) {
         {
             let mut pending = self.shared.lock();
             pending.closing = true;
             pending.preview = None;
             pending.detail = None;
+            pending.result = None;
             pending.prompts = None;
         }
         self.shared.wake.notify_all();

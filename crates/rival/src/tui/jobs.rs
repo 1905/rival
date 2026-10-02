@@ -21,6 +21,7 @@ use rival_core::session::Session;
 use super::kill::{ProcessOps, StopRequest, stop_sessions};
 use super::logview::{LogRequest, ReadTail, create_group_log_view, create_log_view, load_log};
 use super::model::Msg;
+use super::result_view::{ResultRequest, load_result};
 
 /// The full prompts of one run's members. The list holds summaries, which
 /// drop the prompt.
@@ -50,6 +51,8 @@ pub struct OpenLogRequest {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Job {
     Log(LogRequest),
+    /// The Result tab's parse of a finished member's log tail.
+    Result(ResultRequest),
     Prompts(PromptsRequest),
     Stop(StopRequest),
     OpenLog(OpenLogRequest),
@@ -277,6 +280,7 @@ impl JobEnv {
     pub fn run(&self, job: Job) -> JobOutput {
         match job {
             Job::Log(req) => JobOutput::Msg(Msg::Log(load_log(req, self.read_tail))),
+            Job::Result(req) => JobOutput::Msg(Msg::Result(load_result(req, self.read_tail))),
             Job::Prompts(req) => JobOutput::Msg(Msg::Prompts(self.load_prompts(req))),
             Job::Stop(req) => {
                 JobOutput::Msg(Msg::Stopped(stop_sessions(&self.paths, &self.procs, req)))

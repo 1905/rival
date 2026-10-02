@@ -764,6 +764,15 @@ fn search_fixture(h: &Harness) -> Vec<Arc<Session>> {
     })]
 }
 
+/// Opens `list`'s first run on the Raw tab. A finished run opens on
+/// Result; Go's search cases run on its Output tab, which is Raw here.
+fn open_raw(h: &Harness, list: Vec<Arc<Session>>, width: u16, height: u16) -> Model {
+    let mut m = open_detail(&h.env, list, width, height);
+    drive(&mut m, &h.env, [key("2")]);
+    assert_eq!(m.detail.tab, DetailTab::Raw);
+    m
+}
+
 /// The cells painted as search hits, as text.
 fn painted(m: &Model) -> String {
     let buf = draw(m, m.lay.width as u16, m.lay.height as u16);
@@ -783,7 +792,7 @@ fn painted(m: &Model) -> String {
 #[test]
 fn detail_search() {
     let h = harness();
-    let mut m = open_detail(&h.env, search_fixture(&h), 100, 30);
+    let mut m = open_raw(&h, search_fixture(&h), 100, 30);
     drive(&mut m, &h.env, [key("/")]);
     assert!(m.mode == Mode::Search && m.detail.search.focused());
     drive(&mut m, &h.env, type_text("fingerprint"));
@@ -834,7 +843,7 @@ fn detail_search() {
 #[test]
 fn detail_search_no_matches() {
     let h = harness();
-    let mut m = open_detail(&h.env, search_fixture(&h), 100, 30);
+    let mut m = open_raw(&h, search_fixture(&h), 100, 30);
     drive(&mut m, &h.env, [key("/")]);
     drive(&mut m, &h.env, type_text("zzz"));
     drive(&mut m, &h.env, [key("enter")]);
@@ -845,7 +854,7 @@ fn detail_search_no_matches() {
 #[test]
 fn search_input_types_q() {
     let h = harness();
-    let mut m = open_detail(&h.env, search_fixture(&h), 100, 30);
+    let mut m = open_raw(&h, search_fixture(&h), 100, 30);
     drive(&mut m, &h.env, keys(&["/", "q", "n"]));
     assert!(!m.quitting(), "q in the search input quit");
     assert_eq!(m.detail.search.value(), "qn");
@@ -1242,7 +1251,7 @@ fn golden_cases() -> Vec<(&'static str, String)> {
     frame("detail_raw_group", &m);
 
     // Search hits on the Raw tab.
-    let mut m = open_detail(&h.env, search_fixture(&h), 100, 24);
+    let mut m = open_raw(&h, search_fixture(&h), 100, 24);
     drive(&mut m, &h.env, [key("/")]);
     drive(&mut m, &h.env, type_text("fingerprint"));
     drive(&mut m, &h.env, keys(&["enter", "n"]));

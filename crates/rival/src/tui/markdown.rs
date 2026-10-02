@@ -18,9 +18,9 @@
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd, TextMergeStream};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use rival_core::logfmt;
 use unicode_segmentation::UnicodeSegmentation;
 
+use super::logview::strip_controls;
 use super::styles::Styles;
 use super::text::width;
 
@@ -36,10 +36,6 @@ const QUOTE_BAR: &str = "│ ";
 /// Renders `md` for a `width`-cell pane: headings bold accent, paragraphs and
 /// list items word-wrapped by display cell with a hanging indent, fenced code
 /// dim and never wrapped (the viewport clips it). Width 0 means no wrapping.
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "called by the result view of a later task")
-)]
 pub fn render(md: &str, width: u16, theme: &Styles) -> Text<'static> {
     let mut r = Renderer::new(usize::from(width), theme);
     // Merged text keeps an entity-decoded escape and its parameters in one
@@ -52,12 +48,9 @@ pub fn render(md: &str, width: u16, theme: &Styles) -> Text<'static> {
 
 /// Makes parsed text safe for the terminal. The result parser sanitizes the
 /// log, but CommonMark decodes entities such as `&#27;` afterwards, so every
-/// string is cleaned again before it becomes a span. `sanitize` strips
-/// ANSI/OSC sequences and C0 controls and keeps tabs; C1 controls go too.
+/// string is cleaned again before it becomes a span.
 fn clean(s: &str) -> String {
-    let mut out = logfmt::sanitize(s);
-    out.retain(|c| c == '\t' || c == '\n' || !c.is_control());
-    out
+    strip_controls(s)
 }
 
 /// A run of inline content waiting to be wrapped.

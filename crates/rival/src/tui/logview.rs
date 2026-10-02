@@ -25,6 +25,20 @@ pub fn sanitize_log(raw: &str) -> String {
     logfmt::expand_tabs(&logfmt::sanitize(raw), logfmt::TAB_WIDTH)
 }
 
+/// Makes text from a model's answer safe to become a span. `sanitize` strips
+/// ANSI/OSC sequences and C0 controls but keeps C1 controls; those go too.
+/// Tabs and newlines stay.
+pub fn strip_controls(s: &str) -> String {
+    let mut out = logfmt::sanitize(s);
+    out.retain(|c| c == '\t' || c == '\n' || !c.is_control());
+    out
+}
+
+/// [`strip_controls`] with tabs expanded, for text that is wrapped by cell.
+pub fn display_text(s: &str) -> String {
+    logfmt::expand_tabs(&strip_controls(s), logfmt::TAB_WIDTH)
+}
+
 /// Go: `readTail`, the seam tests use to count file reads.
 pub type ReadTail = fn(&Path, i64) -> io::Result<(Vec<u8>, bool)>;
 

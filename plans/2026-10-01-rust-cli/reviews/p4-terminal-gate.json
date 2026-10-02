@@ -1,0 +1,259 @@
+{
+  "status": "visual and local checks passed; hosted CI pending",
+  "captures": [
+    {
+      "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-visual-pat97kbu",
+      "fixture": "standard",
+      "captures": [
+        {
+          "program": "go",
+          "binary": "/opt/homebrew/bin/rival",
+          "binary_sha256": "1e1b752e179349e9dafcf8f74fd4ede299a9232bcb6c2ca108f0e3685ff60d12",
+          "exit_code": 0,
+          "seconds": 16.87,
+          "screenshots": [
+            "filter.png",
+            "info.png",
+            "kill-confirm.png",
+            "list-help.png",
+            "list-page-1.png",
+            "list-page-2.png",
+            "live-raw.png",
+            "output.png",
+            "prompt.png",
+            "raw-search-input.png",
+            "raw-search-matches.png"
+          ],
+          "screenshot_sha256": {
+            "filter.png": "bda0801904771ec77f6b65ce0bf6243deb3a41caa1aa89791ea2f2c6e6619a13",
+            "info.png": "b20435e3e17cc375d921e31182dc4fc5d3fef3e385509f25c904954d2dd1f936",
+            "kill-confirm.png": "0c486766bd9a1bcfcb550b42fb01ef5d5cca4e195ebd012d2a20eeac13d0fb61",
+            "list-help.png": "aa069f3065e74cd4ea27b82afab0906a5819be6f475223b31c4201cdb37e252e",
+            "list-page-1.png": "2f54e9ad3c0a042f0b0881aebdbe3e3a31f2fed460464c4b855c6c5ae7823174",
+            "list-page-2.png": "23f653e41c225e8724bda48fec65495126b64b6979115c8df5bf11720a110ffa",
+            "live-raw.png": "13ae536c9e06ee41cb1e4b292033e10c5eaddca6fb9b35e4a40b63863966a422",
+            "output.png": "31248eb6ddc56b9bb364acd6d354b4422b2540fdb80fbcc3001b250c8fc1ef86",
+            "prompt.png": "4f328d980c350f095e48250c938777f32e8413af4f004c044f9645c0d5a21d87",
+            "raw-search-input.png": "06ccd071eff7c0a340fae4ef047462b85e9960430bbbd3d39d8bb1760592085a",
+            "raw-search-matches.png": "2cff29fb84c8cd079f9c5a8bd0cdb8ee93194f76a6ad4e893f2b9aca1d68b8f1"
+          }
+        },
+        {
+          "program": "rust",
+          "binary": "/Users/kass/dev/rival/worktrees/rust-cli/target/debug/rival",
+          "binary_sha256": "6b3441b2a9ac0b8295b706008a76d9775df8fece4b7d1617d7d16a75b11e4f42",
+          "exit_code": 0,
+          "seconds": 24.44,
+          "screenshots": [
+            "filter.png",
+            "findings-collapsed.png",
+            "findings-expanded.png",
+            "info.png",
+            "kill-confirm.png",
+            "list-help.png",
+            "list-page-1.png",
+            "list-page-2.png",
+            "live-raw.png",
+            "prompt.png",
+            "raw-search-input.png",
+            "raw-search-matches.png",
+            "raw.png",
+            "result-failed.png",
+            "result-group-first.png",
+            "result-group-second.png",
+            "result-live.png",
+            "result-markdown.png"
+          ],
+          "screenshot_sha256": {
+            "filter.png": "2969323282e5d523d8ae7976d7fb25fc2c09c6a961dc8b5e724866dfc56fd973",
+            "findings-collapsed.png": "b76f0a3d6032167610571a741634582c24051527dc2a3f21e11eae3acf8292e5",
+            "findings-expanded.png": "10ed99685682bcade2ba341491c9e633f9bb0e65c93e7cd7d7ed2b5162dcf3f1",
+            "info.png": "36fae1525ebf72e02786e5d1ca4d2f9b347fcfd0be14c836e25de27ec196c230",
+            "kill-confirm.png": "d15d5d90af40886e309c77b03c9a3f9359a460960936f3d6bc4c84b322444e10",
+            "list-help.png": "0bc0091dfbb0c5226f45f0f07c0e0cbd01240ff0fe26fa4cb5a1143b133a1786",
+            "list-page-1.png": "8d36e011c34f37eb512165e89e476c7455bb8b1d7edbf74a7a42bad3bb1c5bc1",
+            "list-page-2.png": "63d6c6d1e8c9b75cd6848a6af6913bc8b67815970eb29b5303c5ddf3740b808c",
+            "live-raw.png": "7ed4f6d65bd676071e14400530d73da772a608dc383c71e993f57cab03438b01",
+            "prompt.png": "de1e09caa753d032a5f6d4659d2f60d2adfbb71e0e125b8c71e51d37e87fb971",
+            "raw-search-input.png": "38d23a3a6fe08e07db958a6e680fba12294c5aef2aecfc5eabf909e11881b117",
+            "raw-search-matches.png": "a996bae7988530e215909a075a9b3e63ab3fdb8d9edfce1ae5a64429693dafe3",
+            "raw.png": "637afa51dfd589a1ca7c62b9df17415778a458bd66ea9150324c7a9f0f5b141e",
+            "result-failed.png": "90c0c9aa7ba8ee5bd67f45292faffad91ac70135488f44a9b7ffc54b501bf114",
+            "result-group-first.png": "3a7162d987886a14016a2921bebbcf45e314345b851d881a4fd752c9bfc83990",
+            "result-group-second.png": "b34d85fbfbb771b6f3e782ea91ebc92dc4925772f369af97f23db44597e43b39",
+            "result-live.png": "73e2457af91ca536984460eeb33597a01011a143a4d407ffe74e126cb8ba4f55",
+            "result-markdown.png": "1bbda025df6929a563bb2626186260c842e16913accef7f05b04a2cbaabb6d7e"
+          }
+        }
+      ],
+      "dummy_reaped": true
+    },
+    {
+      "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-visual-st_k1j66",
+      "fixture": "empty",
+      "captures": [
+        {
+          "program": "go",
+          "binary": "/opt/homebrew/bin/rival",
+          "binary_sha256": "1e1b752e179349e9dafcf8f74fd4ede299a9232bcb6c2ca108f0e3685ff60d12",
+          "exit_code": 0,
+          "seconds": 6.81,
+          "screenshots": [
+            "empty.png"
+          ],
+          "screenshot_sha256": {
+            "empty.png": "ba684587e0f09a16a63ea31e1cf2a54f159dee79210f46fb1ccda74e66deaaf4"
+          }
+        },
+        {
+          "program": "rust",
+          "binary": "/Users/kass/dev/rival/worktrees/rust-cli/target/debug/rival",
+          "binary_sha256": "6b3441b2a9ac0b8295b706008a76d9775df8fece4b7d1617d7d16a75b11e4f42",
+          "exit_code": 0,
+          "seconds": 7.24,
+          "screenshots": [
+            "empty.png"
+          ],
+          "screenshot_sha256": {
+            "empty.png": "48cddf933c10658cf0103ba8d31f48dcf058e2719d5d43e9ce422cfe87648852"
+          }
+        }
+      ],
+      "dummy_reaped": true
+    },
+    {
+      "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-visual-hz75jj78",
+      "fixture": "loading",
+      "captures": [
+        {
+          "program": "go",
+          "binary": "/opt/homebrew/bin/rival",
+          "binary_sha256": "1e1b752e179349e9dafcf8f74fd4ede299a9232bcb6c2ca108f0e3685ff60d12",
+          "exit_code": 0,
+          "seconds": 7.58,
+          "screenshots": [
+            "loading.png"
+          ],
+          "screenshot_sha256": {
+            "loading.png": "910b64755907acb42790ce1f47e3e0a871122f6bcdcc874ee5e97cd85dd1179e"
+          }
+        },
+        {
+          "program": "rust",
+          "binary": "/Users/kass/dev/rival/worktrees/rust-cli/target/debug/rival",
+          "binary_sha256": "6b3441b2a9ac0b8295b706008a76d9775df8fece4b7d1617d7d16a75b11e4f42",
+          "exit_code": 0,
+          "seconds": 7.59,
+          "screenshots": [
+            "loading.png"
+          ],
+          "screenshot_sha256": {
+            "loading.png": "035d4bbb6d4e3c44f752313d2f40465bdc7f51283d17670ce4cbd955f9402399"
+          }
+        }
+      ],
+      "dummy_reaped": true
+    }
+  ],
+  "runtime": {
+    "binary": "/Users/kass/dev/rival/worktrees/rust-cli/target/debug/rival",
+    "sha256": "6b3441b2a9ac0b8295b706008a76d9775df8fece4b7d1617d7d16a75b11e4f42",
+    "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-runtime-rust-4.8-vi55h2ay",
+    "cases": [
+      {
+        "name": "quit",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 3635
+      },
+      {
+        "name": "ctrl-c",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 3635
+      },
+      {
+        "name": "sigint",
+        "exit_code": 1,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 3685
+      },
+      {
+        "name": "sigterm",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 3635
+      },
+      {
+        "name": "resize",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 6571
+      },
+      {
+        "name": "watcher-error",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": true,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 227
+      },
+      {
+        "name": "stdin-pipe",
+        "exit_code": 0,
+        "raw_during_run": true,
+        "terminal_modes_restored": true,
+        "pending_input_state_changed": false,
+        "entered_alt_screen": true,
+        "left_alt_screen": true,
+        "cursor_restored": true,
+        "output_bytes": 3635
+      }
+    ]
+  },
+  "transition": {
+    "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-result-transition-_ip1b3nl",
+    "sha256": "6b3441b2a9ac0b8295b706008a76d9775df8fece4b7d1617d7d16a75b11e4f42",
+    "checks": [
+      "live run opens Raw at tail",
+      "live finish selects parsed Result through actual watcher",
+      "key 2 opens Raw",
+      "later finished-session refresh preserves explicit Raw",
+      "exit 0; terminal modes, alternate screen and cursor restored"
+    ],
+    "success": true,
+    "dummy_reaped": true
+  },
+  "workspace_passed": 1205,
+  "workspace_ignored": 9,
+  "fmt": "passed",
+  "clippy": "passed with -D warnings"
+}

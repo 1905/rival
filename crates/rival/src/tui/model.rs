@@ -33,6 +33,7 @@ use super::kill::{
 use super::layout::{Layout, MIN_HEIGHT, MIN_WIDTH, compute_layout};
 use super::logview::{LogPane, LogResult};
 use super::preview::PreviewPane;
+use super::result_view::ResultResponse;
 use super::session_list::{ListPane, Zone, is_live, item_status};
 use super::styles::{HeaderStats, STYLES, Styles, gradient_bar, render_header};
 use super::text::{fit_line, line_width, pad_line, truncate};
@@ -125,6 +126,8 @@ pub enum Msg {
     Error(String),
     /// A [`Job::Log`] finished.
     Log(LogResult),
+    /// A [`Job::Result`] finished.
+    Result(ResultResponse),
     /// A [`Job::Prompts`] finished.
     Prompts(PromptsResult),
     /// A [`Job::Stop`] finished.
@@ -257,16 +260,16 @@ impl Model {
 
     /// Handles one message and returns what the runtime must do next.
     pub fn update(&mut self, msg: Msg) -> Vec<Cmd> {
-        let (prev_mode, prev_help) = (self.mode, self.show_all_help);
+        let prev_help = self.help_state();
         let spin = matches!(msg, Msg::SpinTick);
         // A tick and a snapshot check the shown logs for growth; other
         // messages only read a log the screen does not hold yet.
         let refresh = matches!(msg, Msg::Tick | Msg::Sessions(_));
         let mut cmds = self.route(msg);
-        // The help bar's height depends on the mode and on "?". When either
-        // changes the detail viewport must be resized, or it keeps a height
-        // the view then clips.
-        if self.mode != prev_mode || self.show_all_help != prev_help {
+        // The help bar's height depends on the mode, on "?" and on whether a
+        // Result tab lists findings. When one changes the detail viewport
+        // must be resized, or it keeps a height the view then clips.
+        if self.help_state() != prev_help {
             self.measure_help();
             self.resize_detail();
         }
@@ -437,6 +440,19 @@ impl Model {
                 self.accept_log(res);
                 Vec::new()
             }
+            Msg::Result(res) => {
+                if self.in_detail() {
+                    let ctx = Ctx {
+                        now: self.now(),
+                        zone: self.list.zone,
+                        styles: &self.styles,
+                    };
+                    self.detail.accept_result(res, self.list.selected(), &ctx);
+                } else {
+                    self.detail.result.accept(res, None);
+                }
+                Vec::new()
+            }
             Msg::Prompts(res) => {
                 if self.in_detail() {
                     let ctx = Ctx {
@@ -527,8 +543,8 @@ impl Model {
             zone: self.list.zone,
             styles: &self.styles,
         };
-        if let Some(req) = self.detail.reload(self.list.selected(), &ctx, reset) {
-            self.jobs.push(Cmd::Job(Job::Log(req)));
+        if let Some(job) = self.detail.reload(self.list.selected(), &ctx, reset) {
+            self.jobs.push(Cmd::Job(job));
         }
     }
 
@@ -629,12 +645,13 @@ impl Model {
             self.set_detail_tab(self.detail.tab.cycle(1));
         } else if k.prev_tab.matches(key) {
             self.set_detail_tab(self.detail.tab.cycle(-1));
-        } else if k.next_member.matches(key) {
-            self.detail.cycle_member(self.list.selected(), 1);
-            self.sync_detail(true);
-        } else if k.prev_member.matches(key) {
-            self.detail.cycle_member(self.list.selected(), -1);
-            self.sync_detail(true);
+        } else if k.next_member.matches(key) || k.prev_member.matches(key) {
+            // Go resets the view even when the member stays; the app keeps
+            // the reader's place, and so does this.
+            let delta = if k.next_member.matches(key) { 1 } else { -1 };
+            if self.detail.cycle_member(self.list.selected(), delta) {
+                self.sync_detail(true);
+            }
         } else if k.follow.matches(key) || k.bottom.matches(key) {
             self.detail.follow = true;
             self.detail.vp.goto_bottom();
@@ -682,6 +699,17 @@ impl Model {
             } else {
                 self.detail.notice = "nothing running".to_string();
             }
+        } else if self.detail.result_key(
+            key,
+            &k,
+            self.list.selected(),
+            &Ctx {
+                now: self.now(),
+                zone: self.list.zone,
+                styles: &self.styles,
+            },
+        ) {
+            // The Result tab moved its finding focus or opened a finding.
         } else {
             // Scroll keys (j/k/up/down/pgup/pgdown/space/u/d/b) belong to
             // the viewport. Scrolling away from the tail pauses follow;
@@ -741,10 +769,23 @@ impl Model {
 
     // --- geometry -----------------------------------------------------------
 
+    /// What the help bar depends on besides the width.
+    fn help_state(&self) -> (Mode, bool, bool) {
+        (self.mode, self.show_all_help, self.shows_findings())
+    }
+
+    /// Whether the detail screen shows a Result tab with findings, whose
+    /// keys the help then lists.
+    fn shows_findings(&self) -> bool {
+        self.in_detail()
+            && self.detail.tab == DetailTab::Result
+            && !self.detail.findings.rows.is_empty()
+    }
+
     /// The help lines for the current mode, "?" and width.
     fn help_view(&self) -> Vec<Line<'static>> {
         help_lines(
-            &self.keys.help(self.mode),
+            &self.keys.help_for(self.mode, self.shows_findings()),
             self.show_all_help,
             self.lay.width,
             &self.styles,
@@ -1001,5 +1042,7 @@ impl<'a> Rows<'a> {
 mod detail_tests;
 #[cfg(test)]
 mod list_tests;
+#[cfg(test)]
+mod result_tests;
 #[cfg(test)]
 mod tests;

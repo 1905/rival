@@ -1,0 +1,57 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 1  ✗ 0  1 sessions  3.34.0                                        |
+ rival › orbit-web › review m0000000                                   ✓ completed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                                                                  |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮|
+│ gpt-6-astra · xhigh · review · 2m36s                                                             │|
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯|
+                                                                                                    |
+Verdict                                                                                             |
+                                                                                                    |
+The re-key is safe to ship once the lock is held for the whole run. The migrate step already        |
+retries.                                                                                            |
+                                                                                                    |
+• keep the batch size at 500                                                                        |
+• log every skipped session                                                                         |
+  • with its id                                                                                     |
+                                                                                                    |
+  let key = store.read_key()?;                                                                      |
+  for batch in sessions.chunks(500) { rekey(batch, &key)?; }                                        |
+                                                                                                    |
+See the runbook (https://example.com/runbook) and <b>this</b> note.                                 |
+                                                                                                    |
+                                                                                                    |
+                                                                                                    |
+                                                                                                    |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+ lines 1-17 of 17                                                                                   |
+1-4 tab · [/] member · f follow · / search · o open log · x stop · esc back · ? more                |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd........................................|
+.gggggdddtttttttttdddttttttttttttttt...................................ccccccccccccccccc...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ddaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa............................................................dd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+....................................................................................................|
+ggggggg.............................................................................................|
+....................................................................................................|
+ttttttttttttttTTTTTTTTTTTTttttttttttttttttttttttttttttttttttttttttttttttaaaaaaattttttttttttt........|
+tttttttt............................................................................................|
+....................................................................................................|
+ddtttttttttttttttttttttttttt........................................................................|
+ddttttttttttttttttttttttttt.........................................................................|
+..ddttttttttttt.....................................................................................|
+....................................................................................................|
+dddddddddddddddddddddddddddddd......................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd........................................|
+....................................................................................................|
+tttttttttttttttddddddddddddddddddddddddddddddtttttttttttttttttttttt.................................|
+....................................................................................................|
+....................................................................................................|
+....................................................................................................|
+....................................................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.dddddddddt.dddddddddt.dddddddddt.dddddddddddt.dddddddttt.dddddddt.dddd................|

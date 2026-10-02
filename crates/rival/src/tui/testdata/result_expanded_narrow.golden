@@ -1,0 +1,41 @@
+rival  ● 0 running  ◌ 0 queued  ✓ 1  ✗ 0  1 sessions  3.34.0|
+ rival › orbit-web › review f0…✓ completed 2m36s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                          |
+────────────────────────────────────────────────────────────|
+                                                            |
+CRITICAL ───────────────────────────────────────────────────|
+▌ src/auth/fingerprint.rs:42 · bug · conf 90                |
+▌ Re-key drops sessions created during the migration window |
+▌ The loop reads the old key once and writes the new one    |
+▌ after every batch, so sessions created mid-run keep the   |
+▌ old fingerprint.                                          |
+▌ ▾ failure scenario                                        |
+▌   A user logs in while the re-key runs; their next request|
+▌   fails the fingerprint check and they are signed out.    |
+▌ ▾ suggestion                                              |
+▌   Take the write lock for the whole re-key, or re-read the|
+▌   key per batch.                                          |
+────────────────────────────────────────────────────────────|
+ lines 8-20 of 30                                           |
+1-4 tab · j/k finding · enter open · [/] member · / search …|
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd|
+.gggggdddtttttttttdddttttttttt.ccccccccccccccccc...dddddddt.|
+.AAAAAAAA..ddddd..dddddddd..dddddd..........................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+............................................................|
+gggggggg.ddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ggaaaaaaaaaaaaaaaaaaaaaaaaaadddddddddddddddd................|
+ggTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.|
+ggtttttttttttttttttttttttttttttttttttttttttttttttttttttt....|
+ggttttttttttttttttttttttttttttttttttttttttttttttttttttttt...|
+ggtttttttttttttttt..........................................|
+ggdddddddddddddddddd........................................|
+gg..tttttttttttttttttttttttttttttttttttttttttttttttttttttttt|
+gg..tttttttttttttttttttttttttttttttttttttttttttttttttttt....|
+ggdddddddddddd..............................................|
+gg..tttttttttttttttttttttttttttttttttttttttttttttttttttttttt|
+gg..tttttttttttttt..........................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.ddddddddddttttt.dddddddttt.dddddddddt.dddddddd|
