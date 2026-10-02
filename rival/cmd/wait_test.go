@@ -261,3 +261,56 @@ func TestWaiterRun_Timeout(t *testing.T) {
 		t.Errorf("expected 'still running', got %q", buf.String())
 	}
 }
+
+func TestWaiterRun_Heartbeat(t *testing.T) {
+	// rival alive, sessions never terminal → --heartbeat must hand control
+	// back with exit 5 long before the overall timeout.
+	var buf bytes.Buffer
+	base := time.Now()
+	calls := 0
+	w := &waiter{
+		pid:         7,
+		ids:         []string{"a"},
+		poll:        time.Millisecond,
+		timeout:     time.Hour,
+		heartbeat:   50 * time.Millisecond,
+		loadSession: func(string) sessionStatus { return sessionStatus{Status: "running", found: true} },
+		ralive:      func(int, int64) bool { return true },
+		now: func() time.Time {
+			calls++
+			return base.Add(time.Duration(calls) * 20 * time.Millisecond)
+		},
+		out: &buf,
+	}
+	if code := w.run(context.Background()); code != waitExitRunning {
+		t.Errorf("exit code=%d, want %d (out: %q)", code, waitExitRunning, buf.String())
+	}
+	if !strings.Contains(buf.String(), "heartbeat") {
+		t.Errorf("expected a heartbeat line, got %q", buf.String())
+	}
+}
+
+func TestWaiterRun_TimeoutBeatsHeartbeat(t *testing.T) {
+	// When both elapse on the same tick the hard bound wins: a watcher must
+	// not re-arm a run that is out of budget.
+	var buf bytes.Buffer
+	base := time.Now()
+	calls := 0
+	w := &waiter{
+		pid:         7,
+		ids:         []string{"a"},
+		poll:        time.Millisecond,
+		timeout:     50 * time.Millisecond,
+		heartbeat:   50 * time.Millisecond,
+		loadSession: func(string) sessionStatus { return sessionStatus{Status: "running", found: true} },
+		ralive:      func(int, int64) bool { return true },
+		now: func() time.Time {
+			calls++
+			return base.Add(time.Duration(calls) * 20 * time.Millisecond)
+		},
+		out: &buf,
+	}
+	if code := w.run(context.Background()); code != waitExitTimeout {
+		t.Errorf("exit code=%d, want %d (out: %q)", code, waitExitTimeout, buf.String())
+	}
+}

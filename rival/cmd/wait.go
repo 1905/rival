@@ -24,6 +24,7 @@ const (
 	waitExitFailed    = 2 // at least one session failed (incl. run timeout)
 	waitExitCrashed   = 3 // rival died but left a session non-terminal
 	waitExitTimeout   = 4 // --timeout elapsed while still running
+	waitExitRunning   = 5 // --heartbeat elapsed; still running, re-arm the watcher
 	waitExitUsage     = 64
 )
 
@@ -59,7 +60,10 @@ Two modes:
       Note: a session is marked terminal moments before its output is flushed
       to the launching command's stdout; prefer --log when that matters.
 
-Exit codes: 0 all completed · 2 some failed · 3 rival crashed · 4 timed out.`,
+  --heartbeat <d> returns early with exit 5 while the run is still going, so a
+  background watcher wakes its caller to report progress and then re-arms.
+
+Exit codes: 0 all completed · 2 some failed · 3 rival crashed · 4 timed out · 5 heartbeat.`,
 	RunE: waitAction,
 }
 
@@ -69,6 +73,7 @@ func init() {
 	// run is still within its configured budget (see config.MaxRunWait).
 	waitCmd.Flags().Duration("timeout", config.MaxRunWait(), "give up waiting after this long")
 	waitCmd.Flags().Duration("poll", config.QueuePollInterval, "poll interval")
+	waitCmd.Flags().Duration("heartbeat", 0, "exit 5 after this long if still running, so a watcher can report progress and re-arm (0 = off)")
 	rootCmd.AddCommand(waitCmd)
 }
 
@@ -76,6 +81,7 @@ func waitAction(cmd *cobra.Command, args []string) error {
 	logFile, _ := cmd.Flags().GetString("log")
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 	poll, _ := cmd.Flags().GetDuration("poll")
+	heartbeat, _ := cmd.Flags().GetDuration("heartbeat")
 	if poll <= 0 {
 		return &ExitCodeError{Code: waitExitUsage, Err: fmt.Errorf("--poll must be > 0")}
 	}
@@ -86,6 +92,7 @@ func waitAction(cmd *cobra.Command, args []string) error {
 	w := &waiter{
 		poll:        poll,
 		timeout:     timeout,
+		heartbeat:   heartbeat,
 		loadSession: loadSessionStatus,
 		ralive:      procinfo.Alive,
 		now:         time.Now,
@@ -143,8 +150,9 @@ type waiter struct {
 	ids      []string
 	logFile  string
 
-	poll    time.Duration
-	timeout time.Duration
+	poll      time.Duration
+	timeout   time.Duration
+	heartbeat time.Duration // 0 = off
 
 	loadSession func(id string) sessionStatus
 	ralive      func(pid int, start int64) bool
@@ -155,7 +163,8 @@ type waiter struct {
 // run polls until an outcome is decided and returns the exit code. It prints a
 // one-line summary per session (or a crash/timeout line) before returning.
 func (w *waiter) run(ctx context.Context) int {
-	deadline := w.now().Add(w.timeout)
+	start := w.now()
+	deadline := start.Add(w.timeout)
 	havePID := w.pid > 0
 	firstPoll := true
 
@@ -205,6 +214,10 @@ func (w *waiter) run(ctx context.Context) int {
 		if !w.now().Before(deadline) {
 			w.printf("still running after %s (rival pid %d)%s\n", w.timeout, w.pid, w.lastQueueLine())
 			return waitExitTimeout
+		}
+		if w.heartbeat > 0 && w.now().Sub(start) >= w.heartbeat {
+			w.printf("heartbeat: running for %s (rival pid %d)%s\n", w.heartbeat, w.pid, w.lastQueueLine())
+			return waitExitRunning
 		}
 
 		select {
@@ -274,7 +287,7 @@ func (w *waiter) lastQueueLine() string {
 		return ""
 	}
 	last := ""
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if len(line) >= 12 && line[:12] == "rival queue:" {
 			last = line
 		}
@@ -309,7 +322,7 @@ func parseLogFile(path string) (pid int, pidStart int64, ids []string, err error
 	// The run's own start lines carry message:"starting …"; reaper lines carry
 	// message:"reaping …". Require both fields on the same line.
 	seen := map[string]bool{}
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		if !startingMarkerRe.MatchString(line) {
 			continue
 		}

@@ -6,6 +6,16 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 
 ## [Unreleased]
 
+### Added
+- **`rival wait --heartbeat <d>`.** Returns early with exit `5` while the run is
+  still going, so a background watcher wakes its caller to report progress and
+  then re-arms. `--timeout` keeps its meaning and wins when both elapse on the
+  same tick. Off by default.
+- **Skills report progress on long runs.** Every skill's watcher passes
+  `--heartbeat 5m`; on exit `5`, or a watcher that died without `RIVAL_DONE`, the
+  skill checks the rival PID, sends the user one progress line and re-arms
+  instead of waiting silently.
+
 ## [v4.1.1] — 2026-09-29
 
 ### Added
