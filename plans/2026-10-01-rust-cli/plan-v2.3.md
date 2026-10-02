@@ -1,7 +1,8 @@
-# Rust CLI + TUI — Implementation Plan v2.2
+# Rust CLI + TUI — Implementation Plan v2.3
 
-**Date:** 2026-10-01
-**Status:** superseded by v2.3 — scope approved 2026-10-02
+**Date:** 2026-10-03
+**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Changes from v2.2:** P3 is merged. The required live plan test exposed Windows spawn/console gaps and an incomplete Go-retirement checklist. This revision keeps the approved behavior and adds a documented owner Job guard, console-aware detach flags, startup-race tests and explicit source-test retirement. No feature or release authorization changes. Full functional-test review output: `reviews/p3-live-plan-review.txt`.
 **Changes from v2.0:** Go review fixes (branch `fix/go-review-findings`, 2026-10-01) wired in: port base is master *after* that merge; Tasks 2.3, 2.6/2.7, 3.1/3.2 carry the fixed behaviour and its regression tests.
 **Changes from v2.1:** Codex plan review (6/10, 7 findings, all confirmed) applied: exit_code contract, detach inherits stdio, Windows stop via the owning process + Job Object, isolated `update` scenarios, stderr expectations, Swift decode test in branch CI, unpublished 6-target build gate.
 **Changes from v1.1 (user, 2026-10-01):** no Go-vs-Rust parity harness and no Go reference binary. CLI logic is ported exactly from the Go source and proven by the ported Go unit tests + contract tests + Rust golden tests. TUI is "about the same design", free to improve; Go TUI code is read only for logic (filter, paging, kill safety, watcher). TUI frame-by-frame look-alike checks removed.
@@ -207,12 +208,12 @@ Port: `cmd/{queue,sessions,version,update}.go` + `update_{check_,}test.go`, `int
 
 - [x] Queue/session output, version banner, update cache/client, Homebrew update and telemetry lifecycle ported. All non-TUI CLI scenarios are enabled in CI.
 
-**Task 3.4 local verification:** 815 workspace tests passed with six intentional helper/generator ignores; formatting, Clippy and build passed. Runner checks: 69 tests, including two new raw-file hash checks. All 84 scenarios passed across the full run and focused corrections to three source-derived fixtures. Nineteen release-profile update tests passed, including the debug-only endpoint override. A detached-owner SIGKILL produced wait exit 3 while its provider stayed alive; later orphan recovery finalized the session and freed the ticket. The real Codex review completed and its Rust session rendered in Rival.app. The real plan review and hosted CI remain pending. Update transport/JSON diagnostics and closed-descriptor child inheritance limits are recorded in `research.md`.
+**Task 3.4 local verification:** 815 workspace tests passed with six intentional helper/generator ignores; formatting, Clippy and build passed. Runner checks: 69 tests, including two new raw-file hash checks. All 84 scenarios passed across the full run and focused corrections to three source-derived fixtures. Nineteen release-profile update tests passed, including the debug-only endpoint override. A detached-owner SIGKILL produced wait exit 3 while its provider stayed alive; later orphan recovery finalized the session and freed the ticket. The real Codex review completed and its Rust session rendered in Rival.app. The real plan review completed in 682.32 seconds with exit 0. Both live sessions rendered in Rival.app. CI 37053147082 passed on macOS/Linux at `bb95462`, including all 84 scenarios and Swift decoding. Update transport/JSON diagnostics and closed-descriptor child inheritance limits are recorded in `research.md`.
 
 ### Gate P3 `gate`
-- [x] Local non-TUI scenario set (84 scenarios covering the command/flag matrix in `parity/coverage.md`) passes. Interactive TUI acceptance remains P4; hosted macOS/Linux results remain pending.
-- [ ] Orchestrator manual check: one real `rival command codex review` and one `rival command plan` on this repo with the Rust binary (temp HOME, real CLIs); output reads right and the session opens in the Swift app.
-- [ ] Merge.
+- [x] All 84 non-TUI scenarios passed on macOS and Linux in CI 37053147082. Interactive TUI acceptance remains P4; coverage and unit-only limits are listed in `parity/coverage.md`.
+- [x] Real Codex code and plan reviews completed through the Rust binary in a private home. Both completed sessions opened and rendered Result in Rival.app. Task credentials were removed and the task app closed.
+- [x] `bb954627a5959747c2f3d414a4434aedf0f737bf` merged and pushed to master after CI 37053147082 passed.
 
 ---
 
@@ -220,6 +221,7 @@ Port: `cmd/{queue,sessions,version,update}.go` + `update_{check_,}test.go`, `int
 
 ### Task 4.1 — data side `heavy`
 Port: `internal/sessionview/{cache,group}.go` + tests, `internal/dashboard/watcher.go` (notify crate).
+- [x] Prompt-free cache, grouped summaries and owned watcher implemented in `rival_core::sessionview`. All 17 named Go cache/group cases and the loader case are ported. Controller verification: 851 workspace tests passed, six intentional helper/generator ignores; formatting and Clippy passed. Hosted P4 checks remain pending.
 
 ### Task 4.2 — model, keys, layout, styles `heavy`
 Use `internal/dashboard/{model,keys,layout,styles}.go` for logic (key map, loader, layout rules). Design: about the same as today (dim-phosphor palette from master `3989a88`, same panes), free to improve spacing and readability. Port only the logic tests from `{keys,layout,loader}_test.go`; style tests are rewritten for the Rust design.
@@ -266,10 +268,12 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 ## P5 — Windows (`feature/rust-p5-windows`)
 
 ### Task 5.1 — Windows process layer `heavy`
-- [ ] `procinfo`: `GetProcessTimes`. Detach: `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS | CREATE_NO_WINDOW`, stdio inherited as on Unix.
-- [ ] Ownership: the `rival` process that runs a review creates one Job Object per provider with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and assigns the provider at spawn (`CREATE_SUSPENDED` → assign → resume), so every descendant is in the Job. Timeout/cancel inside the owner = `TerminateJobObject`, then the same bounded pipe drain as Unix.
+- [ ] `procinfo`: `GetProcessTimes`. Windows detach preserves each inherited stream. Use `CREATE_NEW_PROCESS_GROUP` while sharing the existing console if any standard handle is console-backed. When all streams are redirected or non-console, also use `DETACHED_PROCESS`. Do not combine `CREATE_NO_WINDOW` with console inheritance or assume it adds behavior beside `DETACHED_PROCESS`. Detect console handles with `GetConsoleMode`; do not reopen redirected files. Native helpers cover console-only, mixed console/file/pipe and fully redirected streams, plus parent exit. A closed console itself cannot remain usable; do not claim otherwise.
+- [ ] Ownership: before its first provider spawn, the actual review owner joins one unnamed, non-inheritable cleanup Job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, without breakaway or UI limits. Keep its controlling handle for the owner's process lifetime. This makes provider creation inherit containment atomically, including death before the per-provider assignment. Initialize once under concurrency; failure aborts the spawn. The short-lived detach parent must not initialize this guard.
+- [ ] Keep one nested kill-on-close Job per provider. Use stable `std::process::Command` with `CREATE_SUSPENDED`, assign to that nested Job, then resume the initial thread. The inherited owner Job protects the interval before assignment. This keeps standard `.cmd` quoting and stdio handling. Assignment/resume failure kills and reaps the contained child. Per-provider timeout/cancel terminates only its nested Job, then performs the same bounded pipe drain as Unix. The owner Job must never be closed by a per-run guard while Rival is alive.
 - [ ] Stop from another process (TUI, `rival` stop paths): console events cannot reach a detached process, so stop = `TerminateProcess` on the **owner `rival` pid** recorded in the session (checked against its start time like Unix). The owner's Job handle closes with it → kill-on-close ends the provider tree. The session is then reaped to `failed` and the queue ticket is freed by `ReapDead`, same path as a crashed owner on Unix. Wait up to the same grace period, then report.
 - [ ] Native Windows tests (CI `windows-latest`): a fake launcher spawning a grandchild that holds stdout; (a) owner timeout → both dead, pipes closed, `RunSubprocess` returns; (b) a second process stops the detached owner → owner, launcher and grandchild dead, session `failed`, queue slot released.
+- [ ] Native startup-race test: pause an owned helper after suspended child creation but before nested-Job assignment, terminate the owner from a second process, and prove the child dies. Also prove normal successful owner exit returns 0, simultaneous providers remain separately cancellable, and inherited external Jobs do not bypass containment. No skip on a supported Windows runner.
 - [ ] Paths: `%USERPROFILE%\.rival`; `.cmd`/`.exe` resolution for reviewer CLIs (`codex.cmd` from npm).
 
 ### Task 5.2 — Windows CI `light`
@@ -289,7 +293,10 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 ### Task 6.2 — remove Go `light`
 - [ ] Move `rival/` to `/tmp/trash/rival-go.<ts>`; `git add -A`; skills tree lives only under `crates/rival-core/skills/`; `bump-skill-versions.sh` points there; `testdata` contract test now Rust-only plus a Swift decode test in `app/Tests` reading `testdata/written/`.
 
+- [ ] Remove Go CI setup/tests and every direct Go-source read in Rust/Python checks, including config, review prompt and skills tests. Retain independent hashes, embedded-content assertions and all Rust/Swift contract fixtures. Do not make required checks silently skip because Go is absent. Run the complete Rust workspace and Python runner suites after moving `rival/`.
+
 ### Gate P6 `gate`
+- [ ] After Go removal: formatting, Clippy, full Rust workspace tests and runner tests pass on the P6 branch, plus native Windows process tests.
 - [ ] Full scenario set green on macOS and Linux.
 - [ ] Swift decode contract job green on the P6 branch (required before merge and before any tag).
 - [ ] Unpublished release build: run the new release workflow on the P6 branch via `workflow_dispatch` in snapshot mode (no publish, no formula push) for all six targets; download artifacts; check names `rival_<os>_<arch>.tar.gz`/`.zip`, checksums file, `rival version` output per archive (run where the host can), and the rendered formula diff against the current one.

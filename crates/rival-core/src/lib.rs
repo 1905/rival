@@ -15,6 +15,7 @@ pub mod procinfo;
 pub mod queue;
 pub mod review;
 pub mod session;
+pub mod sessionview;
 pub mod skills;
 pub mod telemetry;
 pub mod update;

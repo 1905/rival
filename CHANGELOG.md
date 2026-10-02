@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Added cached session summaries, grouped status and elapsed time, and a file watcher with cancellation and cleanup. Local validation: 851 workspace tests passed; interactive TUI and native Windows acceptance remain pending.
 - Added the Rust workspace, configuration, session storage, log parsing, and macOS/Linux process identity support.
 - Added Rust queue tickets, FIFO locking, cancellation, and independent-process queue tests. CLI wiring remains pending.
 - Added detach and wait logic, inherited-descriptor checks, and authored success/failure/crash/timeout scenarios. The command scenarios remain unrun until P3.
@@ -33,7 +34,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Copied all embedded skill assets unchanged and updated the version-bump script for both source trees. Temporary-copy checks pass; missing skill files now make the script fail.
 - Added Rust queue/session commands, the version banner, cached update checks, Homebrew updates and the existing telemetry opt-outs. Release builds ignore the scenario endpoint override.
 - All 84 non-TUI command scenarios now pass locally. CI runs the full set, including isolated updates, concurrent reviewers, MR cleanup and help/flag coverage.
-- Verified detached-owner crash reporting and later session/queue recovery. A real Codex review completed and opened in Rival.app; the live plan check and hosted P3 gate remain pending.
+- Verified detached-owner crash reporting and later session/queue recovery. Real code and plan reviews completed and opened in Rival.app. The P3 gate passed on macOS and Linux.
 - Recorded the existing partial skill-write risk and ineffective Go panic wrapper. The port preserves these behaviors.
 - TUI, Windows support, and the release switch remain unfinished. The shipped CLI is still Go.
 - Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.

@@ -1,0 +1,24 @@
+
+═══ RIVAL PLAN REVIEW ═══
+
+File: /Users/kass/dev/rival/worktrees/rust-cli/plans/2026-10-01-rust-cli/plan-v2.2.md
+Rating: 7/10
+
+Summary: The plan has strong compatibility tests and clear phase gates. Three concrete gaps remain in Windows process handling and the Go-removal procedure that should be resolved before P5/P6.
+
+1. [high] Deleting the Go tree leaves required CI and Rust tests broken — Task 6.2 — remove Go:290
+   The removal task only migrates skills and session contracts. CI still runs Go tests from rival/ at .github/workflows/ci.yml:66–74. Rust tests also read the deleted sources directly: crates/rival-core/src/config/tests.rs:1449, crates/rival-core/src/review/prompt/tests.rs:343, and crates/rival-core/src/skills/tests.rs:343. Following the listed steps leaves deterministic test failures; the P6 gate does not explicitly require the full workspace suite after removal.
+   Fix: Add a Go-dependency cleanup step covering CI setup/jobs and source-reading Rust tests. Preserve their independent goldens or hashes, then require the complete Rust suite and Swift contract checks after rival/ is removed.
+   (gap, confidence 10)
+
+2. [high] Suspended creation leaves a race where stopping the owner leaks a provider — Task 5.1 — Windows process layer:270
+   CREATE_SUSPENDED → assign → resume does not assign the provider atomically. If the TUI terminates the owner after creation but before assignment, the suspended provider is outside the Job and survives kill-on-close indefinitely. This directly conflicts with the promised owner-stop cleanup. Microsoft documents this exact orphaning window, and research.md acknowledges it without resolving the prescribed sequence. [Microsoft guidance](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812/)
+   Fix: Require atomic Job assignment during creation, such as PROC_THREAD_ATTRIBUTE_JOB_LIST through a stable-compatible Windows API implementation. Add a deterministic test that terminates the owner during provider startup and verifies that no child survives.
+   (bug, confidence 10)
+
+3. [high] Detached Windows processes cannot inherit console I/O as promised — Task 5.1 — Windows process layer:269
+   DETACHED_PROCESS disconnects the child from the parent's console. Redirected file and pipe handles can remain usable, but merely inheriting console-backed stdin/stdout/stderr does not preserve access to that console. Consequently, an invocation with an unredirected standard stream can lose input or output despite the stated Unix-equivalent contract. The proposed Windows tests exercise process termination, not this distinction. [Console creation](https://learn.microsoft.com/en-us/windows/console/creation-of-a-console), [console handle access](https://learn.microsoft.com/en-us/windows/console/console-handles)
+   Fix: Define explicit handling for console-backed streams before fixing the creation flags. Preserve redirected handles and specify a console attachment strategy or a documented redirected-only restriction. Require native detach tests with console streams, partial redirection, and fully redirected input/output.
+   (bug, confidence 9)
+
+Findings: 3 total — 0 crit, 3 high, 0 med, 0 low

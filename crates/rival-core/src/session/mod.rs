@@ -10,6 +10,7 @@ pub mod summary;
 #[cfg(test)]
 mod tests;
 
+use std::borrow::Borrow;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read as _, Write as _};
@@ -265,7 +266,7 @@ pub(crate) fn proc_pid(pid: i64) -> i32 {
 }
 
 /// Go: `t.Sub(u)`, saturating at the `time.Duration` range.
-fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
+pub(crate) fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
     let d = t.signed_duration_since(u);
     d.num_nanoseconds().unwrap_or(if d > TimeDelta::zero() {
         i64::MAX
@@ -702,8 +703,8 @@ impl Session {
 
 /// Newest `start_time` first. Rust's stable sort keeps the name order for
 /// ties; Go's `sort.Slice` may not for more than 12 sessions.
-pub(crate) fn sort_newest_first(sessions: &mut [Session]) {
-    sessions.sort_by_key(|s| std::cmp::Reverse(s.start_time));
+pub(crate) fn sort_newest_first<S: Borrow<Session>>(sessions: &mut [S]) {
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.borrow().start_time));
 }
 
 /// Reports whether name is a save temp file: the legacy `<id>.json.tmp` or
@@ -722,8 +723,9 @@ pub fn is_session_file(name: &str) -> bool {
 /// `queued_at` is the creation timestamp and, unlike `start_time`, is not
 /// reset as members are promoted to running. The deterministic fallbacks keep
 /// legacy sessions stable when they do not have queue metadata.
-pub fn sort_group_members(sessions: &mut [Session]) {
+pub fn sort_group_members<S: Borrow<Session>>(sessions: &mut [S]) {
     gostd::slice_stable(sessions, |a, b| {
+        let (a, b) = (a.borrow(), b.borrow());
         let (rank_a, rank_b) = (group_mode_rank(&a.mode), group_mode_rank(&b.mode));
         if rank_a != rank_b {
             return rank_a < rank_b;

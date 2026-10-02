@@ -79,7 +79,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 
 | Unix (Go today) | Windows (Rust) |
 |---|---|
-| detach: re-exec with `setsid`, inherits the caller's stdin/stdout/stderr | `CREATE_NEW_PROCESS_GROUP \| DETACHED_PROCESS \| CREATE_NO_WINDOW`, inherits the caller's stdin/stdout/stderr |
+| detach: re-exec with `setsid`, inherits the caller's stdin/stdout/stderr | Console-aware flags per plan v2.3: `CREATE_NEW_PROCESS_GROUP`, adding `DETACHED_PROCESS` only when no stream needs the inherited console; preserve each file/pipe handle |
 | queue `flock` | `LockFileEx` (via the `fd-lock` crate on both) |
 | provider in its own process group; timeout SIGKILLs the group | provider in a Job Object with kill-on-close owned by the running `rival`; timeout = `TerminateJobObject` |
 | stop from the TUI: signal the process group | console events can't reach a detached process: `TerminateProcess` on the owner `rival` pid (start-time checked) → its Job closes → whole tree dies → session reaped to `failed`, queue slot freed |
@@ -132,6 +132,8 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - `gostd.rs` shares Go duration, quoting, case-folding and error-text semantics. Its Unicode 15.0.0 tables come from the release toolchain, Go 1.25.14, with the BSD license retained in `licenses/Go-LICENSE`.
 - macOS process identity uses `sysctl kern.proc.pid`, matching Go. `proc_pidinfo` cannot inspect some processes Go can inspect.
 - YAML uses serde-saphyr 1.3.0. Compatibility limit: Rival validation messages and the `parse <path>:` prefix match Go; malformed-YAML parser details use Rust's wording.
+- P3 is merged at `bb95462`. All 84 scenarios pass on macOS/Linux; two real Rust-driven reviews rendered in the unchanged Swift app.
+- P5 implementation correction, not yet verified: an owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. This replaces the original flag recipe and closes the documented suspended-child orphan interval; plan v2.3 carries native regression requirements.
 
 ## Rollout
 
