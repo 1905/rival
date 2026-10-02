@@ -152,6 +152,242 @@ impl Drop for Recorded {
     }
 }
 
+/// A process identity recorded only for failure messages; never signalled.
+struct Ident {
+    pid: i32,
+    start: i64,
+}
+
+/// Most group members a snapshot lists.
+const MAX_MEMBERS: usize = 64;
+
+/// `name pid: <kernel state>` if `pid` still has its recorded start time,
+/// else `name pid: gone`. A best-effort sample: the start check and the
+/// state read are separate reads, so the process may exit (or, rarely, its
+/// PID be reused) in between.
+fn describe(name: &str, pid: i32, start: i64) -> String {
+    if procinfo::same_process(pid, start) {
+        format!("{name} {pid}: {}", proc_state(pid))
+    } else {
+        format!("{name} {pid}: gone")
+    }
+}
+
+/// A best-effort sample of the launcher tree for failure messages: both
+/// recorded processes and up to [`MAX_MEMBERS`] members of the launcher's
+/// process group. Only bounded direct kernel reads; no helper process.
+fn tree_snapshot(launcher: &Ident, grandchild: &Recorded) -> String {
+    let group = match group_members(launcher.pid) {
+        Ok((pids, false)) if pids.is_empty() => "empty".to_string(),
+        // A capped scan that saw no member does not prove the group empty.
+        Ok((pids, true)) if pids.is_empty() => "no member seen … (truncated)".to_string(),
+        Ok((pids, truncated)) => {
+            let mut text = pids
+                .iter()
+                .map(|&pid| format!("{pid} ({})", proc_state(pid)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if truncated {
+                text.push_str(", … (truncated)");
+            }
+            text
+        }
+        Err(e) => e,
+    };
+    format!(
+        "{}; {}; launcher group {}: {group}",
+        describe("launcher", launcher.pid, launcher.start),
+        describe("grandchild", grandchild.pid, grandchild.start),
+        launcher.pid
+    )
+}
+
+/// State, parent, process group and command name of `pid`.
+#[cfg(target_os = "macos")]
+fn proc_state(pid: i32) -> String {
+    // SAFETY: a plain-data struct; all-zero bytes are a valid value.
+    let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
+    let size = std::mem::size_of::<libc::proc_bsdinfo>() as libc::c_int;
+    // A nonzero arg also finds exiting and zombie processes; with 0 this
+    // answers ESRCH for them (seen here right after the group SIGKILL).
+    // SAFETY: info is a writable buffer of exactly `size` bytes.
+    let got =
+        unsafe { libc::proc_pidinfo(pid, libc::PROC_PIDTBSDINFO, 1, (&raw mut info).cast(), size) };
+    if got != size {
+        return format!(
+            "proc_pidinfo returned {got}: {}",
+            std::io::Error::last_os_error()
+        );
+    }
+    let comm: String = info
+        .pbi_comm
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8 as char)
+        .collect();
+    // sys/proc.h p_stat values.
+    let state = match info.pbi_status {
+        1 => "idle".to_string(),
+        2 => "run".to_string(),
+        3 => "sleep".to_string(),
+        4 => "stopped".to_string(),
+        libc::SZOMB => "zombie".to_string(),
+        n => format!("status {n}"),
+    };
+    format!(
+        "{state} ppid={} pgid={} comm={comm}",
+        info.pbi_ppid, info.pbi_pgid
+    )
+}
+
+/// Up to [`MAX_MEMBERS`] members of process group `pgid`
+/// (`proc_listpids`), and whether the list may be cut short.
+#[cfg(target_os = "macos")]
+fn group_members(pgid: i32) -> Result<(Vec<i32>, bool), String> {
+    /// `sys/proc_info.h`; the libc crate does not export it.
+    const PROC_PGRP_ONLY: u32 = 2;
+    let mut pids = [0i32; MAX_MEMBERS];
+    // SAFETY: pids is a writable buffer of the byte size passed.
+    let got = unsafe {
+        libc::proc_listpids(
+            PROC_PGRP_ONLY,
+            pgid as u32,
+            pids.as_mut_ptr().cast(),
+            std::mem::size_of_val(&pids) as libc::c_int,
+        )
+    };
+    if got < 0 {
+        return Err(format!(
+            "proc_listpids: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    // A full buffer may mean more members than fit.
+    let n = (got as usize / std::mem::size_of::<i32>()).min(MAX_MEMBERS);
+    let members = pids[..n].iter().copied().filter(|&p| p > 0).collect();
+    Ok((members, n == MAX_MEMBERS))
+}
+
+/// `/proc/<pid>/stat`: (state, ppid, pgrp, comm).
+#[cfg(target_os = "linux")]
+fn linux_stat(pid: i32) -> Option<(String, i32, i32, String)> {
+    let data = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let (open, close) = (data.find('(')?, data.rfind(')')?);
+    let mut f = data[close + 1..].split_whitespace();
+    let state = f.next()?.to_string();
+    let ppid = f.next()?.parse().ok()?;
+    let pgrp = f.next()?.parse().ok()?;
+    Some((state, ppid, pgrp, data[open + 1..close].to_string()))
+}
+
+#[cfg(target_os = "linux")]
+fn proc_state(pid: i32) -> String {
+    match linux_stat(pid) {
+        Some((state, ppid, pgrp, comm)) => {
+            let state = if state == "Z" {
+                "zombie".to_string()
+            } else {
+                format!("state {state}")
+            };
+            format!("{state} ppid={ppid} pgid={pgrp} comm={comm}")
+        }
+        None => "no readable /proc stat".to_string(),
+    }
+}
+
+/// Up to [`MAX_MEMBERS`] members of process group `pgid`, from at most
+/// `MAX_SCAN` `/proc` entries, and whether either cap was hit.
+#[cfg(target_os = "linux")]
+fn group_members(pgid: i32) -> Result<(Vec<i32>, bool), String> {
+    const MAX_SCAN: usize = 8192;
+    let dir = fs::read_dir("/proc").map_err(|e| format!("read /proc: {e}"))?;
+    let mut members = Vec::new();
+    for (scanned, entry) in dir.flatten().enumerate() {
+        if scanned == MAX_SCAN || members.len() == MAX_MEMBERS {
+            return Ok((members, true));
+        }
+        let pid = entry.file_name().to_str().and_then(|s| s.parse().ok());
+        if let Some(pid) = pid
+            && linux_stat(pid).is_some_and(|s| s.2 == pgid)
+        {
+            members.push(pid);
+        }
+    }
+    Ok((members, false))
+}
+
+/// The failure-only readers above work on this test process.
+#[test]
+fn tree_snapshot_readers_report_this_process() {
+    let pid = std::process::id() as i32;
+    // SAFETY: plain syscall.
+    let pgid = unsafe { libc::getpgrp() };
+    let state = proc_state(pid);
+    assert!(state.contains(&format!("pgid={pgid} ")), "{state}");
+    let (members, truncated) = group_members(pgid).unwrap();
+    // Under a full group the cap may cut this process off the list.
+    assert!(members.contains(&pid) || truncated, "{members:?}");
+    let me = Ident {
+        pid,
+        start: procinfo::start_nanos(pid).unwrap(),
+    };
+    let live = describe("me", me.pid, me.start);
+    assert!(live.starts_with(&format!("me {pid}: ")), "{live}");
+    assert!(live.contains(&format!("pgid={pgid} ")), "{live}");
+    assert_eq!(
+        describe("me", me.pid, me.start + 1),
+        format!("me {pid}: gone")
+    );
+}
+
+/// An exited, unreaped child reads as a zombie. The child is ours: the
+/// guard kills (no-op once exited) and reaps it on every path.
+#[test]
+fn tree_snapshot_readers_report_a_zombie() {
+    struct Reap(std::process::Child);
+    impl Drop for Reap {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let child = Reap(
+        std::process::Command::new("/usr/bin/true")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let pid = child.0.id() as i32;
+    // Polls for the exit without reaping (WNOWAIT) or blocking (WNOHANG).
+    // A zero si_pid means the child has not exited yet.
+    let end = Instant::now() + BOUND;
+    loop {
+        // SAFETY: info is a valid out buffer, zeroed before each call
+        // because WNOHANG may return without writing it.
+        let (rc, exited) = unsafe {
+            let mut info: libc::siginfo_t = std::mem::zeroed();
+            let rc = libc::waitid(
+                libc::P_PID,
+                pid as libc::id_t,
+                &mut info,
+                libc::WEXITED | libc::WNOWAIT | libc::WNOHANG,
+            );
+            (rc, info.si_pid() == pid)
+        };
+        assert_eq!(rc, 0, "{}", std::io::Error::last_os_error());
+        if exited {
+            break;
+        }
+        assert!(Instant::now() < end, "child {pid} never exited");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let state = proc_state(pid);
+    assert!(state.starts_with("zombie "), "{state}");
+    drop(child);
+}
+
 fn write_atomic(path: &Path, text: &str) {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, text).unwrap();
@@ -369,17 +605,22 @@ fn cancel_kills_launcher_grandchild() {
 /// `deadline`: a context deadline from the start; `None`: a manual cancel
 /// once the grandchild is recorded.
 fn launcher_grandchild_case(deadline: Option<Duration>) {
+    /// Go's bound from the cancel to the return.
+    const LIMIT: Duration = Duration::from_millis(3500);
     let mut fx = Fixture::new();
     let dir = fx.work.path().to_path_buf();
     let pid_file = dir.join("grandchild.pid");
     // The subshell ignores SIGTERM; SIG_IGN survives exec, so the sleep does too.
-    // The pid file is published only after the marker line is written, so a
-    // cancel on the pid file cannot kill the launcher before its echo.
+    // The pid file (`<grandchild> <launcher>`) is published only after the
+    // marker line is written, so a cancel on the pid file cannot kill the
+    // launcher before its echo. After that the launcher only runs the `wait`
+    // builtin: it forks nothing more, so at readiness the whole tested tree
+    // exists and a cancel cannot race a later fork.
     let launcher = write_script(
         &dir,
         "launcher.sh",
         &format!(
-            "( trap '' TERM; exec sleep 20 ) &\necho $! > {}.tmp\necho launcher-started\nmv {0}.tmp {0}\nsleep 20\n",
+            "( trap '' TERM; exec sleep 20 ) &\necho $! $$ > {}.tmp\necho launcher-started\nmv {0}.tmp {0}\nwait\n",
             shell_quote(pid_file.to_str().unwrap())
         ),
     );
@@ -391,15 +632,21 @@ fn launcher_grandchild_case(deadline: Option<Duration>) {
     };
 
     let started = Instant::now();
-    let (grandchild, cancelled_at, (returned_at, res)) = std::thread::scope(|s| {
+    let (grandchild, launcher, cancelled_at, stuck, (returned_at, res)) = std::thread::scope(|s| {
         // On a failed assertion: kill the grandchild (identity-checked),
         // then cancel, so the scope's join of the run is short. A run that
         // returns before the grandchild is recorded fails without any kill.
         let _stop = CancelOnDrop(cancel.clone());
         let rx = spawn_run(s, &mut fx, &ctx, &script, &[], "", &base);
-        let grandchild = wait_until(&rx, "grandchild pid", || {
-            let pid = fs::read_to_string(&pid_file).ok()?.trim().parse().ok()?;
-            Some(Recorded::new(pid, procinfo::start_nanos(pid)?))
+        let (grandchild, launcher) = wait_until(&rx, "launcher pid file", || {
+            let text = fs::read_to_string(&pid_file).ok()?;
+            let mut f = text.split_whitespace().map(str::parse::<i32>);
+            let (gc, l) = (f.next()?.ok()?, f.next()?.ok()?);
+            let launcher = Ident {
+                pid: l,
+                start: procinfo::start_nanos(l)?,
+            };
+            Some((Recorded::new(gc, procinfo::start_nanos(gc)?), launcher))
         });
         assert!(grandchild.alive());
         let cancelled_at = match deadline {
@@ -410,16 +657,31 @@ fn launcher_grandchild_case(deadline: Option<Duration>) {
                 at
             }
         };
-        let outcome = rx.recv_timeout(BOUND).expect("run never returned");
-        (grandchild, cancelled_at, outcome)
+        // Still draining at the bound: record the tree now, while whatever
+        // holds the pipes still exists, before the assertion below.
+        let due = (cancelled_at + LIMIT).saturating_duration_since(Instant::now());
+        let (stuck, outcome) = match rx.recv_timeout(due) {
+            Ok(outcome) => (None, outcome),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let at_bound = tree_snapshot(&launcher, &grandchild);
+                let outcome = rx.recv_timeout(BOUND).expect("run never returned");
+                let after = tree_snapshot(&launcher, &grandchild);
+                (Some((at_bound, after)), outcome)
+            }
+            Err(e) => panic!("run thread ended without an outcome: {e}"),
+        };
+        (grandchild, launcher, cancelled_at, stuck, outcome)
     });
     if deadline.is_some() {
         assert_eq!(ctx.err(), Some(ContextError::DeadlineExceeded));
     }
     let waited = returned_at.saturating_duration_since(cancelled_at);
+    let trees = stuck.map_or(String::new(), |(at_bound, after)| {
+        format!("\nat the bound: {at_bound}\nafter the return: {after}")
+    });
     assert!(
-        waited < Duration::from_millis(3500),
-        "run hung {waited:?} after the cancel (grandchild held the pipes)"
+        waited < LIMIT,
+        "run hung {waited:?} after the cancel, result {res:?}{trees}"
     );
     assert_eq!(res.unwrap().exit_code, -1);
     assert!(contains(&fx.log(), b"launcher-started\n"));
@@ -429,8 +691,8 @@ fn launcher_grandchild_case(deadline: Option<Duration>) {
     while grandchild.alive() {
         assert!(
             Instant::now() < end,
-            "grandchild {} still alive after the run was cancelled",
-            grandchild.pid
+            "grandchild still alive after the run was cancelled: {}",
+            tree_snapshot(&launcher, &grandchild)
         );
         std::thread::sleep(Duration::from_millis(50));
     }

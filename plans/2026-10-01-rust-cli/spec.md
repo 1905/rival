@@ -91,6 +91,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 | Path | Change |
 |---|---|
 | `Cargo.toml`, `crates/rival-core/**`, `crates/rival/**` (new) | The Rust implementation; module per Go package, tests ported from the Go `_test.go` files (~10.8k lines). |
+| `crates/rival-core/src/executor/process.rs` and `process/spawn_tests.rs` | Shared macOS pipe/spawn synchronization and a forced-overlap regression preserve Go's descriptor inheritance behavior. Rival's signal self-pipe uses the same pipe helper. |
 | `parity/**` (new) | Scenario files, fake CLI scripts (incl. `brew`), local update-endpoint server, Python runner (`parity/run.py`), normaliser, mismatch report. |
 | `testdata/**` (new) | Shared fake fixtures; Go contract test in `rival/internal/session` + Rust contract test; a Swift decoding test reads Rust-written sessions. |
 | `.github/workflows/ci.yml` (new or extended) | `cargo test` on macOS, Linux, Windows; scenario runner on macOS + Linux; Swift decode test of Rust-written sessions on macOS (required from P1). |
@@ -134,6 +135,8 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - YAML uses serde-saphyr 1.3.0. Compatibility limit: Rival validation messages and the `parse <path>:` prefix match Go; malformed-YAML parser details use Rust's wording.
 - P3 is merged at `bb95462`. All 84 scenarios pass on macOS/Linux; two real Rust-driven reviews rendered in the unchanged Swift app.
 - P5 implementation correction, not yet verified: an owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. This replaces the original flag recipe and closes the documented suspended-child orphan interval; plan v2.3 carries native regression requirements.
+
+- P5 process correction, not yet verified: Go 1.25.14 locks pipe setup against process launch on macOS. Rust 1.98.1 pipe setup is non-atomic there, and the port omitted that lock. Plan v2.4 adds the missing synchronization. The intermittent P4 cancellation failure remains unexplained.
 
 ## Rollout
 

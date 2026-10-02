@@ -256,6 +256,10 @@ CI 37070816095 passed Linux but failed the existing `cancel_kills_launcher_grand
 
 Two source-derived possibilities remain under investigation. The test publishes readiness before starting an additional unrecorded foreground sleep, so cancellation can overlap that later fork. Separately, [Rust 1.98.1 pipe creation](https://raw.githubusercontent.com/rust-lang/rust/1.98.1/library/std/src/sys/pipe/unix.rs) sets close-on-exec in separate calls on macOS. [Duct's platform notes](https://github.com/oconnor663/duct.py/blob/master/gotchas.md#preventing-pipe-inheritance-races-on-macos) describe the resulting inheritance race and a shared pipe/spawn mutex. Neither possibility is yet proven as the cause of this CI failure. The timing assertion remains required; no retry or larger limit replaces it.
 
+CI 37072193764 passed both macOS and Linux at `f49f447`, before any cancellation-fixture change. This confirms the failure is intermittent. The fixture now uses the shell `wait` builtin after publishing readiness. It records the launcher identity and adds bounded kernel-only process-group snapshots on failure. Two reader checks cover live and zombie processes. The 3.5-second assertion is unchanged. Controller verification passed 1,162 workspace tests with eight intentional ignores.
+
+The missing macOS synchronization is independently established from source. Go 1.25.14 `os/pipe_unix.go` holds `syscall.ForkLock.RLock()` across `Pipe` and both `CloseOnExec` calls. `syscall/exec_unix.go` acquires the matching fork lock before child creation. Concurrent Rust plan reviewers use unguarded `std::io::pipe` and process launches. Task 5.0 in plan v2.4 restores that behavior with a forced-overlap test. It is not yet implemented and is not a proven explanation of the CI failure.
+
 ## Terminal Markdown — 2026-10-03
 
 The renderer uses pulldown-cmark 0.13.4 with optional extensions disabled. It keeps inline styles, hanging list indents and grapheme boundaries. HTML is literal text. Quotes and rules have simple terminal forms. CommonMark list/fence rules replace the app's small block parser; both original MarkdownBlocks examples have explicit Rust expectations.

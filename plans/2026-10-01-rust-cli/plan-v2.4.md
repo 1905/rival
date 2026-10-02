@@ -1,7 +1,8 @@
-# Rust CLI + TUI — Implementation Plan v2.3
+# Rust CLI + TUI — Implementation Plan v2.4
 
 **Date:** 2026-10-03
-**Status:** superseded by v2.4 — scope approved 2026-10-02
+**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Changes from v2.3:** Add Task 5.0 to preserve Go's macOS pipe/spawn synchronization. Source inspection proved the port omitted it. Its relation to the intermittent P4 cancellation failure remains unproven. The feature and release scope is unchanged.
 **Changes from v2.2:** P3 is merged. The required live plan test exposed Windows spawn/console gaps and an incomplete Go-retirement checklist. This revision keeps the approved behavior and adds a documented owner Job guard, console-aware detach flags, startup-race tests and explicit source-test retirement. No feature or release authorization changes. Full functional-test review output: `reviews/p3-live-plan-review.txt`.
 **Changes from v2.0:** Go review fixes (branch `fix/go-review-findings`, 2026-10-01) wired in: port base is master *after* that merge; Tasks 2.3, 2.6/2.7, 3.1/3.2 carry the fixed behaviour and its regression tests.
 **Changes from v2.1:** Codex plan review (6/10, 7 findings, all confirmed) applied: exit_code contract, detach inherits stdio, Windows stop via the owning process + Job Object, isolated `update` scenarios, stderr expectations, Swift decode test in branch CI, unpublished 6-target build gate.
@@ -248,7 +249,7 @@ Port: `app/Sources/RivalKit/ResultParser.swift` (newest logic, incl. double-answ
 ### Task 4.7 — markdown → terminal text `heavy`
 Rust: `crates/rival/src/tui/markdown.rs`; dep `pulldown-cmark`.
 - [x] `render(md: &str, width: u16, theme: &Styles) -> ratatui::text::Text<'static>`: headings bold + accent, paragraphs wrapped to width, `-`/`*`/`1.` lists with hanging indent (lazy continuation lines join the item), fenced code as dim block with no wrapping, inline code in accent, bold/italic, links as `text (url)`, no raw HTML (shown as text).
-- [x] All 26 renderer tests pass, including both Swift MarkdownBlocks cases, the complete review fixture, Unicode/narrow wrapping and entity-decoded terminal controls. Controller: 1,160 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Long code lines clip at the viewport edge. Wiring, hosted checks and visual acceptance remain pending.
+- [x] All 26 renderer tests pass, including both Swift MarkdownBlocks cases, the complete review fixture, Unicode/narrow wrapping and entity-decoded terminal controls. Controller: 1,160 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. CI 37072193764 passed macOS/Linux at `f49f447`, including all 84 CLI scenarios and Swift decoding. Long code lines clip at the viewport edge. Wiring and visual acceptance remain pending.
 
 ### Task 4.8 — Result tab `heavy`
 Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
@@ -270,6 +271,14 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 ---
 
 ## P5 — Windows (`feature/rust-p5-windows`)
+
+### Task 5.0 — pipe inheritance on macOS `heavy`
+Files: `crates/rival-core/src/executor/{process,subprocess,oscmd}.rs`, `crates/rival-core/src/{gitscope,mergerequest}/mod.rs`, `crates/rival/src/{detach,update_cmd,signals}.rs`, `crates/rival/src/tui/jobs.rs`, and their process-spawning tests. Put focused helper tests in `crates/rival-core/src/executor/process/spawn_tests.rs` if needed.
+- [ ] Preserve Go 1.25.14 `os/pipe_unix.go` and `syscall/exec_unix.go` synchronization. One process-wide macOS lock covers pipe creation through close-on-exec setup and every Rival process spawn. Public helpers `process::pipe()` and `process::spawn(&mut Command)` keep standard-library return types. Other platforms use their existing standard-library behavior.
+- [ ] Audit both crates' actual process launches, including test helpers. Route them through the shared spawn helper. Replace production `output()` with configured stdio, guarded spawn and `wait_with_output()`; release the lock immediately after spawn, before waits or reads. Preserve argv, environment order, stdio, executable-format rejection, error prefixes and cancellation behavior. Never take this lock inside `pre_exec`.
+- [ ] Route the signal self-pipe through the shared pipe helper, keeping the write end nonblocking. Linux then uses atomic close-on-exec through `std::io::pipe`. Do not hold the spawn lock while joining or running child processes.
+- [ ] Add a bounded macOS regression with an owned child that observes inherited descriptors/EOF. Force an inheritable-pipe window using a small test seam and prove the shared guard prevents another spawn from inheriting it. Verify the test detects a deliberately bypassed guard, then restore it. Do not replace proof with repeated stress runs. Preserve the existing 3.5-second cancellation assertion.
+- [ ] Run focused pipe/process, subprocess, signal and affected command unit tests, formatting and Clippy. Controller runs the full workspace and macOS/Linux CI. Document that the guard protects Rival's own pipe and process calls; it cannot coordinate unknown foreign-library calls. Do not claim the earlier CI failure's cause is proven.
 
 ### Task 5.1 — Windows process layer `heavy`
 - [ ] `procinfo`: `GetProcessTimes`. Windows detach preserves each inherited stream. Use `CREATE_NEW_PROCESS_GROUP` while sharing the existing console if any standard handle is console-backed. When all streams are redirected or non-console, also use `DETACHED_PROCESS`. Do not combine `CREATE_NO_WINDOW` with console inheritance or assume it adds behavior beside `DETACHED_PROCESS`. Detect console handles with `GetConsoleMode`; do not reopen redirected files. Native helpers cover console-only, mixed console/file/pipe and fully redirected streams, plus parent exit. A closed console itself cannot remain usable; do not claim otherwise.
