@@ -64,13 +64,13 @@ so no character of the content can be shell-interpreted.
 **Step 2 — arm the background watcher (`run_in_background: true`):**
 
 ```bash
-rival wait --log <rival_err>
+rival wait --log <rival_err> --heartbeat 5m
 echo "RIVAL_DONE rc=$? out=<rival_out> err=<rival_err>"
 ```
 
 Substitute the literal `<rival_err>` / `<rival_out>` paths. `rival wait` blocks
 until the detached rival finishes (or crashes, or times out) — its exit code:
-`0` all completed · `2` some failed · `3` rival crashed · `4` timed out.
+`0` all completed · `2` some failed · `3` rival crashed · `4` timed out · `5` heartbeat (still running, see Heartbeat).
 **This MUST be `run_in_background: true`** — it is the whole point; a foreground
 wait would block your session for the entire run.
 
@@ -79,6 +79,20 @@ background and you'll present it when it lands. If `<rival_err>` already has a
 `rival queue:` line, relay their queue position in one sentence. Then **stop** —
 do NOT poll, do NOT `sleep`, do NOT block. Continue with whatever else the user
 wants. The watcher will wake you.
+
+### Heartbeat (watcher exit `5`)
+
+The watcher passes `--heartbeat 5m`, so it wakes you at least every 5 minutes of
+a long run. On every watcher notification, decide before presenting anything:
+
+- `rc=5` (`heartbeat:` line), or the watcher died without printing `RIVAL_DONE`
+  (e.g. killed by the OS) → check the run with `kill -0 <rival_pid>`:
+  - alive → send the user ONE line: elapsed minutes plus the latest
+    `tail -n 1 <rival_err>` queue/progress line (say so if the watcher died).
+    Re-arm the Step 2 watcher in the background and end the turn. Do not
+    present, do not relaunch rival.
+  - dead → go to Present output.
+- Any other exit code → go to Present output.
 
 ### Present output (on the watcher's completion notification)
 

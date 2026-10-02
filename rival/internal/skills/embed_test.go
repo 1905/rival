@@ -132,3 +132,20 @@ func TestAntislopSkillsAreEmbedded(t *testing.T) {
 		})
 	}
 }
+
+func TestSkillWatchersUseHeartbeat(t *testing.T) {
+	// Every watcher wakes its caller periodically so a long run reports
+	// progress and a dead watcher is noticed instead of waited on silently.
+	for _, name := range Names {
+		data, err := Files.ReadFile(name + "/SKILL.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := string(data)
+		for _, want := range []string{"rival wait --log <rival_err> --heartbeat 5m", "### Heartbeat", "`5` heartbeat"} {
+			if !strings.Contains(content, want) {
+				t.Errorf("%s skill missing %q", name, want)
+			}
+		}
+	}
+}
