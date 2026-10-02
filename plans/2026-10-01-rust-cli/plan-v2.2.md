@@ -88,7 +88,7 @@ Port: `internal/config/config.go` (1,069 lines) + `{config,codex,kimi,security,a
 
 ### Task 1.5 — logfmt + procinfo `light`
 Port: `internal/logfmt`, `internal/procinfo` (darwin `sysctl kern.proc.pid`, linux `/proc/<pid>/stat`, other → None) + tests. As built: use Go's sysctl interface; proc_pidinfo could not inspect another user's process.
-- [ ] Green on macOS; Linux path covered by `#[cfg]` tests that run in CI.
+- [x] Green on macOS and Linux; native Linux process checks passed in CI run 37007239814.
 
 ### Task 1.6 — testdata + contract tests `heavy`
 - [x] `testdata/sessions/*.json` + `logs/` = the fake fixtures in `app/Tests/Fixtures` (copy); `expected.json` lists decoded fields per file.

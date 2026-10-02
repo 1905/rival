@@ -88,6 +88,13 @@ func TestMoonshotModelUsesKimiKey(t *testing.T) {
 func TestMoonshotFallbackWalksUpFromWorkdir(t *testing.T) {
 	t.Setenv("MOONSHOT_API_KEY", "")
 	t.Setenv("KIMI_API", "")
+	// Preflight only looks the CLI up; the fake fails loudly if it is ever run.
+	bin := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PATH", bin)
+	if err := os.WriteFile(filepath.Join(bin, "opencode"), []byte("#!/bin/sh\necho 'fake opencode must not run' >&2\nexit 97\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("MOONSHOT_API_KEY=sk-walkup\n"), 0600); err != nil {
 		t.Fatal(err)

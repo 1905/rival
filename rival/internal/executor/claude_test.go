@@ -22,7 +22,8 @@ func TestClaudeReviewTransportRestrictions(t *testing.T) {
 			t.Setenv("CLAUDECODE", "1")
 			t.Setenv("RIVAL_CLAUDE_AUTH", "subscription")
 			t.Setenv("ANTHROPIC_API_KEY", "should-not-reach-child")
-			fake := "#!/bin/sh\n[ -z \"$CLAUDECODE\" ] || exit 10\n[ -z \"$ANTHROPIC_API_KEY\" ] || exit 11\nprintf '%s\\n' \"$@\"\n"
+			// Drain the prompt first so RunSubprocess's stdin writer never races exit.
+			fake := "#!/bin/sh\n/bin/cat >/dev/null\n[ -z \"$CLAUDECODE\" ] || exit 10\n[ -z \"$ANTHROPIC_API_KEY\" ] || exit 11\nprintf '%s\\n' \"$@\"\n"
 			if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(fake), 0700); err != nil {
 				t.Fatal(err)
 			}
@@ -69,7 +70,7 @@ func TestClaudeDockerReviewMountIsReadOnly(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", bin)
 	t.Setenv(config.ClaudeDockerTokenEnv, "fixture-token")
-	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte("#!/bin/sh\n/bin/cat >/dev/null\nprintf '%s\\n' \"$@\"\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	sess, err := session.NewQueued("claude", "review", config.ClaudeModel, "medium", repo, "review", "", "")
