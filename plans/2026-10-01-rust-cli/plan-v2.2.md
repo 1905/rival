@@ -158,10 +158,13 @@ Port: `internal/review/{types,prompt,parse,review_format,slots,security}.go` + t
 - [ ] Every parse of a provider log goes through `final_answer` first (code review, plan, antislop, security), as in the fixed Go code; port the regression tests (tool-printed assessment JSON + unstructured final answer → parse failure).
 - [x] `FinalAnswer`, `jsonObjects`, `ParseReviewerOutput`, `ParsePlanOutput`, placeholder filters, severity order — ported with **Go** behavior. Tests pin both known gaps listed below.
 
-**Task 2.6 verification:** controller workspace check: 490 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Eighty-two focused review tests cover Go JSON decoding, prompts, output, security validation and queue rollback/release. The Task 2.5 lens wrapper is complete. Pure plan parsing/formatting was pulled forward from Task 2.7. Provider-log helpers apply `final_answer`; runtime call sites remain Task 2.7/P3, so that checkbox stays open. Hosted CI is pending for this batch.
+**Task 2.6 verification:** controller workspace check: 490 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37030778213](https://github.com/1905/rival/actions/runs/37030778213) passed on macOS and Linux for `b8f9bab`, including Swift session decoding. Eighty-two focused review tests cover Go JSON decoding, prompts, output, security validation and queue rollback/release. The Task 2.5 lens wrapper is complete. Pure plan parsing/formatting was pulled forward from Task 2.7. Provider-log helpers apply `final_answer`; runtime call sites remain Task 2.7/P3, so that checkbox stays open.
 
 ### Task 2.7 — review runs (plan/antislop/security/doc) `heavy`
 Port: `internal/review/{plan,planrun}.go` + `{plan,planrun,antislop,selection}_test.go`.
+- [x] Concurrent plan/document reviews, requested result order, per-model effort, final-answer parsing, timeout/quota handling and cleanup ported with all named Go cases.
+
+**Task 2.7 verification:** controller workspace check: 532 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Forty-two focused orchestration tests include simultaneous reviewers, one batch ticket, persisted outcomes and panic cleanup. Four new review scenarios are authored; all 38 schemas validate. Scenario execution and code-review/security command parsing remain P3. Hosted CI is pending.
 
 ### Task 2.8 — merge requests `heavy`
 Port: `internal/mergerequest/mergerequest.go` + test, `cmd/merge_request.go` + `mr_guard_test.go` (glab via `Command`, host-scoped credentials).

@@ -77,4 +77,19 @@
 - JSON key presence is case-sensitive; struct-field decoding uses Go case folding. Tests preserve duplicate-key order, slice reuse, null handling, huge unknown numbers and first type-error text. The final-answer header requires the exact line `codex`, without CR.
 - Go nil and empty finding slices become an empty Rust vector. No command serializes that distinction. Provider-log APIs accept UTF-8 strings; invalid-byte handling remains a boundary limitation for the command port.
 - SlotRelease frees an acquired ticket on every return path. Tests verify partial mark-running rollback, cancellation, timeout and queue-unavailable fallback with temporary paths and injected stderr.
-- Controller verification passed 490 workspace tests, formatting and Clippy. Runtime use of final-answer helpers remains Task2.7/P3; hosted verification is pending for this batch.
+- Controller verification passed 490 workspace tests, formatting and Clippy. CI 37030778213 passed on macOS and Linux at `b8f9bab`, including Swift decoding. Runtime use of final-answer helpers remains Task2.7/P3.
+
+### MR URL parsing — source findings, not yet implemented
+
+- Go preserves host spelling and explicit ports, lowercases schemes, and does not resolve path dot segments during parsing. A bare trailing query marker survives Rival's clearing of RawQuery through ForceQuery. Task2.8 must test these differences before selecting a URL helper. [Go 1.25.14 URL source](https://raw.githubusercontent.com/golang/go/go1.25.14/src/net/url/url.go)
+
+### Concurrent review runs
+
+- Task2.7 starts all selected reviewers before joining in requested order. Bounded fake reviewers prove concurrent execution, stable results, per-model efforts and a single queue ticket for the whole batch.
+- Two controller findings were corrected: unfinished-session finalization and run-context cancellation now also execute during unwinding. Panic tests reload the failed session and verify that the parent context remains live.
+- Controller verification passed 532 workspace tests, formatting and Clippy. Thirty-eight scenario schemas validate; command execution remains pending P3. Plan and document runtime parsing now uses the final-answer helper. Code-review/security command paths remain P3.
+
+### Isolated MR transport fixture
+
+- `git remote get-url` expands URL rewriting, so an unconditional fixture rewrite would break remote identity validation. A conditional include limits rewriting to `**/tmp/rival-mr-*/`. [Git remote documentation](https://git-scm.com/docs/git-remote.html), [Git conditional includes](https://git-scm.com/docs/git-config/2.44.3.html)
+- A local probe verified unchanged caller HTTPS identity, snapshot-only local rewriting and disabled network protocols. Absolute patterns through macOS `/var` symlinks failed; the narrow directory pattern passed. The full MR scenario remains unrun until P3.

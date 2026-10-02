@@ -1,7 +1,6 @@
 //! Reviewer prompts, output parsing and console formatting. Go:
 //! `internal/review/{types,prompt,parse,review_format,slots,security}.go`
-//! and the pure parse/format half of `plan.go`. Plan and doc review
-//! orchestration (`planrun.go`) is not here.
+//! and `plan.go`, plus plan and doc review runs (`planrun.go`).
 //!
 //! Every caller that parses a provider log passes it through
 //! [`final_answer`] first ([`parse_reviewer_log`], [`parse_plan_log`]), so
@@ -10,6 +9,7 @@
 mod format;
 mod parse;
 mod plan;
+mod planrun;
 mod prompt;
 mod security;
 mod slots;
@@ -22,6 +22,10 @@ pub use parse::{final_answer, parse_reviewer_log, parse_reviewer_output};
 pub use plan::{
     PlanCLIResult, PlanOutput, PlanRunResult, format_antislop_result, format_plan_console,
     format_plan_multi_console, format_plan_result, parse_plan_log, parse_plan_output,
+};
+pub use planrun::{
+    DocReview, ReviewBatch, run_doc_review, run_failure_reason, run_plan_review,
+    run_timeout_reason, with_run_timeout,
 };
 pub use prompt::build_reviewer_prompt;
 pub use security::{format_security_console, format_security_result, validate_security_result};

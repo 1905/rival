@@ -1,0 +1,110 @@
+{
+  "name": "plan-codex-structured",
+  "description": "`rival command plan` with the default model (cmd/command_plan.go defaultPlanModels = codex, no --effort). internal/review/planrun.go runDocReview resolves codex to its xhigh pin, creates one queued plan session, takes one queue ticket and runs runPlanCLI. The codex log has a tool-printed plan JSON before the last `codex` header; ParsePlanOutput(FinalAnswer(raw)) takes the final answer. FormatPlanResult -> FormatPlanConsole (plan.go formatPlanBody, review_format.go writeFinding/severityTally) sorts high before medium and drops failure_scenario. The session completes with Complete(0, len(raw), 0).",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer the user's question directly\\. Do not offer follow-up options, menus, walkthroughs, or ask if they want more\\. No filler, no sign-offs\\. Just deliver the answer and stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou review an engineering PLAN / SPEC document \\(not source code\\)\\.[^\n]*\n\nPlan document to review: <ROOT>/work/plan\\.md\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\n{\"summary\":\"Plan is mostly sound.\",\"rating\":7,\"findings\":[{\"file\":\"Testing\",\"line\":0,\"severity\":\"medium\",\"category\":\"verification\",\"title\":\"no load test\",\"confidence\":6},{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"failure_scenario\":\"a failed deploy leaves the column in place\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n\nAdd a column, then ship.\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan"
+      ],
+      "stdin": "plan.md",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL PLAN REVIEW ═══\n\nFile: <ROOT>/work/plan.md\nRating: 7/10\n\nSummary: Plan is mostly sound.\n\n1. [high] no rollback step — Rollout:12\n   the plan never says how to revert the migration\n   Fix: add a down migration\n   (gap, confidence 9)\n\n2. [med] no load test — Testing\n   (verification, confidence 6)\n\nFindings: 2 total — 0 crit, 1 high, 1 med, 0 low\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "reviewer": "codex"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "plan",
+          "review_scope": "<ROOT>/work/plan.md",
+          "group_id": "<UUID2>",
+          "work_dir": "<ROOT>/work",
+          "output_bytes": 550,
+          "output_lines": 0
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\n{\"summary\":\"Plan is mostly sound.\",\"rating\":7,\"findings\":[{\"file\":\"Testing\",\"line\":0,\"severity\":\"medium\",\"category\":\"verification\",\"title\":\"no load test\",\"confidence\":6},{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"failure_scenario\":\"a failed deploy leaves the column in place\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n"
+      }
+    ],
+    "calls": {
+      "codex": 2
+    }
+  }
+}

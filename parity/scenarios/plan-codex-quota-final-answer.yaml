@@ -1,0 +1,111 @@
+{
+  "name": "plan-codex-quota-final-answer",
+  "description": "`rival command plan` where a tool printed a valid plan JSON but the codex final answer (after the last `codex` header) is a 429. internal/review/planrun.go runPlanCLI parses ParsePlanOutput(FinalAnswer(raw)), so nothing parsed and RunFailureReason reports quota: the session fails with '<label> hit provider quota/rate limit (429)'. assemblePlanResults skips codex and returns 'all plan reviewers failed or hit quota limits (see skipped reasons): ...' (formatSkipped), which cmd/root.go Execute prints on stderr with exit 1.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer the user's question directly\\. Do not offer follow-up options, menus, walkthroughs, or ask if they want more\\. No filler, no sign-offs\\. Just deliver the answer and stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou review an engineering PLAN / SPEC document \\(not source code\\)\\.[^\n]*\n\nPlan document to review: <ROOT>/work/plan\\.md\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\nError 429 (Too Many Requests)\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n\nAdd a column, then ship.\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan"
+      ],
+      "stdin": "plan.md",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "all plan reviewers failed or hit quota limits (see skipped reasons): codex: hit provider quota/rate limit (429)"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "reviewer": "codex"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 1,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "plan",
+          "review_scope": "<ROOT>/work/plan.md",
+          "group_id": "<UUID2>",
+          "work_dir": "<ROOT>/work",
+          "error": "codex hit provider quota/rate limit (429)"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\nError 429 (Too Many Requests)\n"
+      }
+    ],
+    "calls": {
+      "codex": 2
+    }
+  }
+}

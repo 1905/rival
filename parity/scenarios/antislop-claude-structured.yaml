@@ -1,0 +1,125 @@
+{
+  "name": "antislop-claude-structured",
+  "description": "`rival command antislop` with `-m claude src/api/` on stdin (cmd/command_antislop.go: parser.ParseReviewArgs, parsePlanModels, buildReviewPrompt(antislopCodePrompt) with an explicit scope). review.RunDocReview(mode antislop, fallback DefaultAntislopEffort) resolves claude to its medium pin via ResolveAntislopEffort. The Claude executor runs read-only (task mode) and keeps the antislop session mode (executor/claude.go claudeArgs, setClaudeTransportMode). FormatAntislopResult renders the single-model Leanness layout.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou do a QUALITY-ONLY code review: hunt slop and over-engineering, not bugs\\.[^\n]*\n\nReview scope: src/api/\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "CLAUDECODE": null,
+                "ANTHROPIC_API_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"One cut.\",\"rating\":6,\"findings\":[{\"file\":\"src/api/handler.go\",\"line\":30,\"severity\":\"medium\",\"category\":\"simplification\",\"title\":\"wrapper adds nothing\",\"body\":\"callOnce only forwards to call\",\"suggestion\":\"inline it\",\"confidence\":8}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "antislop"
+      ],
+      "stdin": "-m claude src/api/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL ANTISLOP REVIEW ═══\n\nScope: src/api/\nLeanness: 6/10\n\nSummary: One cut.\n\n1. [med] wrapper adds nothing — src/api/handler.go:30\n   callOnce only forwards to call\n   Fix: inline it\n   (simplification, confidence 8)\n\nFindings: 1 total — 0 crit, 0 high, 1 med, 0 low\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "reviewer": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "mode": "antislop",
+          "review_scope": "src/api/",
+          "group_id": "<UUID2>",
+          "work_dir": "<ROOT>/work",
+          "account": "subscription",
+          "output_bytes": 246,
+          "output_lines": 0
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "{\"summary\":\"One cut.\",\"rating\":6,\"findings\":[{\"file\":\"src/api/handler.go\",\"line\":30,\"severity\":\"medium\",\"category\":\"simplification\",\"title\":\"wrapper adds nothing\",\"body\":\"callOnce only forwards to call\",\"suggestion\":\"inline it\",\"confidence\":8}]}\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  }
+}
