@@ -20,7 +20,9 @@ func TestCodexPlanUsesCodexRuntimeAndStructuredOutput(t *testing.T) {
 	t.Setenv("PATH", bin)
 	argsFile := filepath.Join(repo, "args.txt")
 	t.Setenv("RIVAL_TEST_ARGS", argsFile)
-	script := "#!/bin/sh\nif [ \"$1\" = login ]; then exit 0; fi\nprintf '%s\\n' \"$@\" > \"$RIVAL_TEST_ARGS\"\nprintf '%s\\n' '" + realPlanJSON + "'\n"
+	// Drain the prompt with a shell builtin before the successful exit (PATH
+	// holds only this fake): exiting unread races the prompt writer into EPIPE.
+	script := "#!/bin/sh\nif [ \"$1\" = login ]; then exit 0; fi\nwhile IFS= read -r line; do :; done\nprintf '%s\\n' \"$@\" > \"$RIVAL_TEST_ARGS\"\nprintf '%s\\n' '" + realPlanJSON + "'\n"
 	if err := os.WriteFile(filepath.Join(bin, "codex"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
