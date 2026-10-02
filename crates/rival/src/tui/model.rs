@@ -665,8 +665,9 @@ impl Model {
     /// preview in rounded boxes with a 1-col gap. The list has focus here,
     /// so its border is accent and the preview's is dim.
     fn render_body(&self, area: Rect, buf: &mut Buffer, spin: &str) {
+        let now = self.now();
         if !self.lay.show_preview {
-            self.list.render(area, buf, spin, &self.styles);
+            self.list.render(area, buf, spin, now, &self.styles);
             return;
         }
         let list_w = u16::try_from(self.lay.list_w).unwrap_or(u16::MAX);
@@ -685,7 +686,7 @@ impl Model {
             .border_style(self.styles.focus_border);
         let inner = list_box.inner(left);
         list_box.render(left, buf);
-        self.list.render(inner, buf, spin, &self.styles);
+        self.list.render(inner, buf, spin, now, &self.styles);
         // Task 4.4 draws the preview inside this box.
         Block::bordered()
             .border_type(BorderType::Rounded)
@@ -767,5 +768,7 @@ impl<'a> Rows<'a> {
     }
 }
 
+#[cfg(test)]
+mod list_tests;
 #[cfg(test)]
 mod tests;

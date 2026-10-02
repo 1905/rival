@@ -1,0 +1,49 @@
+rival  ⠋ 1 running  ◌ 1 queued  ✓ 45  ✗ 22  69 sessions  3.34.0                                     |
+ ALL 67   RUNNING 2   FAILED 22   DONE 43                                                  / filter |
+ ST  KIND     MODEL                EFF     TIME    PROJECT                                          |
+ TODAY                                                                                              |
+ ⠋   review   gpt-6-astra          xhigh   3m7s    orbit-web                                        |
+ ◌   review   moonshotai/kimi-k3   high    #2 1m0s ledger                                           |
+ ✗   mega     gpt-5.6-sol +1       mixed   7m0s    mathquest                                        |
+ ✓   review/… claude-opus-5-5      medium  6m24s   rival                                            |
+ ✗   sec      gpt-5.6-sol          medium  41s     rival                                            |
+ ✓   plan     claude-opus-5-5      medium  12m3s   rival                                            |
+ ✓   slop     grok-4.6             medium  2m0s    rival                                            |
+ ✗   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✗   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✗   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ✗   review   gpt-5.5              high    1m      proj                                             |
+ ✓   review   gpt-5.5              high    1m      proj                                             |
+ ‹ prev  page 1/2  next ›  · 67 runs                                                                |
+↑/k up · ↓/j down · n/p page · enter open · / filter · tab status · ? more · q quit                 |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..cccc..ffff..ddddddddddd..dddddd.....................................|
+.AAAAAA...ddddddddd...ddddddddd...ddddddd..................................................dddddddd.|
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD|
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD|
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS|
+.qqq.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.ddddddddddddddddddddddddddddddddddddddddddddddddd|
+.dddddd..tttttttt..ttttttddddddddddd................................................................|
+ttt.dddddttt.dddddddttt.dddddddttttt.dddddddt.dddddddddttt.dddddddddt.dddddddt.dddd.................|

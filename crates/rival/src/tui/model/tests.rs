@@ -456,17 +456,28 @@ fn page_keys_move_fifty_runs() {
             })
         })
         .collect();
+    // No start time: every run sits under one OLDER header at row 0, so the
+    // run with ordinal i is row i + 1.
     let mut m = list_model(many, 100, 30);
+    assert_eq!((m.list.cursor, selected_id(&m).as_str()), (1, "s000"));
     m.update(key("n"));
-    assert_eq!(m.list.cursor, PAGE_SIZE);
+    assert_eq!(
+        (m.list.page(), selected_id(&m)),
+        (1, format!("s{PAGE_SIZE:03}"))
+    );
+    assert_eq!(m.list.cursor, PAGE_SIZE + 1);
     send(&mut m, [key("n"), key("n")]);
-    assert_eq!(m.list.cursor, 2 * PAGE_SIZE, "stops at the last page");
+    assert_eq!(
+        (m.list.page(), selected_id(&m).as_str()),
+        (2, "s100"),
+        "stops at the last page"
+    );
     m.update(key("p"));
-    assert_eq!(m.list.cursor, PAGE_SIZE);
+    assert_eq!(selected_id(&m), "s050");
     m.update(key("G"));
-    assert_eq!(m.list.cursor, 119);
+    assert_eq!((m.list.cursor, selected_id(&m).as_str()), (120, "s119"));
     m.update(key("g"));
-    assert_eq!(m.list.cursor, 0);
+    assert_eq!((m.list.cursor, selected_id(&m).as_str()), (1, "s000"));
 }
 
 #[test]
@@ -576,8 +587,11 @@ fn compact_header_below_thirty_rows() {
 fn selected_row_uses_the_selection_bar() {
     let m = list_model(list_fixture(), 100, 30);
     let buf = draw(&m, 100, 30);
-    // Header, tab bar, column titles, then the first run (the cursor).
-    let y = (m.lay.header_h + 2) as u16;
+    // Header, tab bar, column titles, the TODAY heading, then the first run
+    // (the cursor).
+    let y = (m.lay.header_h + 3) as u16;
+    assert!(rows(&buf)[usize::from(y) - 1].starts_with(" TODAY"));
+    assert_ne!(buf[(0, y - 1)].bg, STYLES.selected.bg.unwrap());
     for x in [0u16, 50, 99] {
         assert_eq!(buf[(x, y)].bg, STYLES.selected.bg.unwrap(), "cell {x}");
     }

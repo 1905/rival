@@ -266,7 +266,7 @@ pub(crate) fn proc_pid(pid: i64) -> i32 {
 }
 
 /// Go: `t.Sub(u)`, saturating at the `time.Duration` range.
-pub(crate) fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
+pub fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
     let d = t.signed_duration_since(u);
     d.num_nanoseconds().unwrap_or(if d > TimeDelta::zero() {
         i64::MAX
@@ -312,7 +312,7 @@ fn mono_sub(t: Instant, u: Instant) -> i64 {
 }
 
 /// Go: `d.Round(time.Second).String()`.
-pub(crate) fn duration_text(nanos: i64) -> String {
+pub fn duration_text(nanos: i64) -> String {
     gostd::format_duration(round_duration(nanos, 1_000_000_000))
 }
 

@@ -184,10 +184,22 @@ The first Go baseline recording stayed blank. Waiting for the actual empty-state
 
 The task-owned capture helper now reattaches stdout/stderr to its VHS `/dev/tty` before executing Rival. A native empty-state screenshot then passed and showed the installed Go v4.1.1 TUI. The recorder uses a private HOME and disables telemetry/update checks. Its dummy process was reaped; a cwd-scoped process check found no surviving Rival/VHS/browser processes. Full Go/Rust fixture comparison remains pending P4.
 
+The standard recording initially produced wrong-state PNGs despite exit 0. VHS `Screenshot` marks the next captured frame; immediate navigation can change that frame. The tape now waits for each expected screen and pauses after each screenshot. All eight Go reference states passed visual inspection: both list pages, filter, Output, Prompt, Info, live output and stop confirmation. The confirmation was cancelled. No task-owned recorder or dummy processes survived. [VHS screenshot source](https://github.com/charmbracelet/vhs/blob/v0.11.0/screenshot.go).
+
 ## TUI model and geometry — 2026-10-03
 
 The model routes keys by list, filter, detail, search and confirmation modes. Text input cannot trigger list shortcuts; Ctrl+C exits from every mode. Layout retains the 60×16 minimum, preview from 120 columns, 50-run pages and compact header below 30 rows. The model takes injected events and a clock; it does not perform file or terminal I/O.
 
 Controller checks passed 915 workspace tests, formatting and Clippy. The 64 new tests cover the Go key/layout/loader cases, input routing, resize bounds, timer ownership and styles. A draft clipping bug split joined emoji. Grapheme-based clipping now has regressions for emoji, flags, combining marks and CJK text. Line-input editing still uses characters, like Go's rune-based input; a long input can start its visible window inside a cluster.
 
+CI 37058461016 passed on macOS/Linux at `e2d9372`, including all 84 CLI scenarios and Swift decoding.
+
 Ratatui uses the crossterm backend. Its lockfile also lists optional backends; earlier dependency versions remain intact. The logo gradient uses the app's linear RGB blend. Colors use RGB without Go's terminal-profile downsampling. Full list/detail content and terminal cleanup remain in later P4 tasks; no interactive Rust acceptance is claimed here.
+
+## TUI list and local calendar — 2026-10-03
+
+The list now filters across group members, preserves selection by run identity and counts 50 runs per page. Section headings do not count toward the page limit. Status totals follow the text filter; changing the filter or status tab returns to page one. Six complete frame goldens cover loading, empty, two pages, filter and minimum width.
+
+The draft copied the current UTC offset into every midnight boundary. That misclassified runs near a daylight-saving change, including TODAY when midnight and noon have different offsets. The fixed implementation resolves each midnight through the local timezone. Injected timezone rules keep the goldens deterministic. Regressions cover spring/fall boundaries and skipped/repeated midnight. An isolated Unix child verifies the actual local-zone lookup without changing parallel tests' environment.
+
+Controller verification passed 966 workspace tests with seven intentional helper/generator ignores, formatting and Clippy. All 23 named Go list/pagination cases are ported. The source's narrow KIND cell still clips `review/dk`; the 60-column compact header also clips its version. These are recorded visual observations for the P4 gate. Windows path labels remain assigned to P5. Interactive Rust acceptance is still pending.

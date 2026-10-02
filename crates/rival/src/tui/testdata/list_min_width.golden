@@ -1,0 +1,33 @@
+rival  ⠋ 1 running  ◌ 1 queued  ✓ 45  ✗ 22  69 sessions  3.3|
+ ALL 67   RUNNING 2   FAILED 22   DONE 43          / filter |
+ ST  KIND     MODEL                TIME    PROJECT          |
+ TODAY                                                      |
+ ⠋   review   gpt-6-astra          3m7s    orbit-web        |
+ ◌   review   moonshotai/kimi-k3   #2 1m0s ledger           |
+ ✗   mega     gpt-5.6-sol +1       7m0s    mathquest        |
+ ✓   review/… claude-opus-5-5      6m24s   rival            |
+ ✗   sec      gpt-5.6-sol          41s     rival            |
+ ✓   plan     claude-opus-5-5      12m3s   rival            |
+ ✓   slop     grok-4.6             2m0s    rival            |
+ ✗   review   gpt-5.5              1m      proj             |
+ ✓   review   gpt-5.5              1m      proj             |
+ ✓   review   gpt-5.5              1m      proj             |
+ ‹ prev  page 1/2  next ›  · 67 runs                        |
+↑/k up · ↓/j down · n/p page · enter open · / filter …      |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..cccc..ffff..ddddddddddd..ddd|
+.AAAAAA...ddddddddd...ddddddddd...ddddddd..........dddddddd.|
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD|
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD|
+.rrr.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS|
+.fff.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.fff.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.ccc.tttttttt.tttttttttttttttttttt.ttttttt.ddddddddddddddddd|
+.dddddd..tttttttt..ttttttddddddddddd........................|
+ttt.dddddttt.dddddddttt.dddddddttttt.dddddddt.dddddddd......|

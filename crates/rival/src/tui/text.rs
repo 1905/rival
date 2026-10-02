@@ -104,6 +104,20 @@ pub fn pad_line(line: Line<'static>, w: usize) -> Line<'static> {
     line
 }
 
+/// Go: `fitCell` on a styled string. Cuts a styled line to `w` cells with an
+/// ellipsis and pads it to exactly `w`, keeping every span's style.
+pub fn fit_cell_line(line: Line<'static>, w: usize) -> Line<'static> {
+    if w == 0 {
+        return Line::default();
+    }
+    if line_width(&line) <= w {
+        return pad_line(line, w);
+    }
+    let mut cut = fit_line(line, w - 1);
+    cut.spans.push(Span::raw("…"));
+    pad_line(cut, w)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +222,23 @@ mod tests {
             "the mark stays with its base or goes"
         );
         assert_eq!(line_width(&pad_line(cut, 4)), 4);
+    }
+
+    #[test]
+    fn fit_cell_line_cuts_with_an_ellipsis_and_pads() {
+        let red = Style::new().fg(Color::Red);
+        let line = Line::from(vec![Span::styled("ab", red), Span::raw("日本語")]);
+        let cut = fit_cell_line(line.clone(), 5);
+        assert_eq!(cut.to_string(), "ab日…");
+        assert_eq!(cut.spans[0].style, red);
+        let cut = fit_cell_line(line.clone(), 6);
+        assert_eq!(
+            cut.to_string(),
+            "ab日… ",
+            "the wide glyph at the edge is dropped"
+        );
+        assert_eq!(line_width(&cut), 6);
+        assert_eq!(fit_cell_line(line.clone(), 9).to_string(), "ab日本語 ");
+        assert_eq!(fit_cell_line(line, 0).to_string(), "");
     }
 }
