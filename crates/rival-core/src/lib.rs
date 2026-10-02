@@ -12,6 +12,7 @@ pub mod parser;
 pub mod paths;
 pub mod procinfo;
 pub mod queue;
+pub mod review;
 pub mod session;
 
 /// Build version. Mirrors Go's `var version = "dev"`; release builds override it later.

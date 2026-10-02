@@ -311,7 +311,7 @@ fn mono_sub(t: Instant, u: Instant) -> i64 {
 }
 
 /// Go: `d.Round(time.Second).String()`.
-fn duration_text(nanos: i64) -> String {
+pub(crate) fn duration_text(nanos: i64) -> String {
     gostd::format_duration(round_duration(nanos, 1_000_000_000))
 }
 

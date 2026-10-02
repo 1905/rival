@@ -148,15 +148,17 @@ Port: `internal/executor/{codex,claude,claude_docker,grok,kimi,opencode}.go` + t
 
 ### Task 2.5 — parser + gitscope `light`
 Port: `internal/parser/{parser,review}.go`, `internal/gitscope/{env,gitscope}.go`, `cmd/gitscope_helper.go` + tests.
-- [x] Argument grammar, source error strings, scope detection and diff preambles ported with the named Go tests. The small `lensPrompt` wrapper follows its prompt builder in Task 2.6.
+- [x] Argument grammar, source error strings, scope detection and diff preambles ported with the named Go tests. The small `lensPrompt` wrapper is complete with its prompt builder in Task 2.6.
 
-**Task 2.5 verification:** controller workspace check: 407 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Git tests use temporary homes and repositories. Duplicate-file and inherited-repository-override quirks are pinned. Invalid UTF-8 Git output remains a recorded compatibility limit; Windows PWD handling remains P5. Hosted CI is pending for this batch.
+**Task 2.5 verification:** controller workspace check: 407 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37028459182](https://github.com/1905/rival/actions/runs/37028459182) passed on macOS and Linux for `6030678`, including Swift session decoding. Git tests use temporary homes and repositories. Duplicate-file and inherited-repository-override quirks are pinned. Invalid UTF-8 Git output remains a recorded compatibility limit; Windows PWD handling remains P5.
 
 ### Task 2.6 — review: types, prompt, parse, format `heavy`
 Port: `internal/review/{types,prompt,parse,review_format,slots,security}.go` + tests.
-- [ ] Prompts byte-identical (golden tests copy the Go strings).
+- [x] Prompts byte-identical. Source comparisons and independent length/SHA-256 pins cover all six prompt pieces and both assembled review prompts.
 - [ ] Every parse of a provider log goes through `final_answer` first (code review, plan, antislop, security), as in the fixed Go code; port the regression tests (tool-printed assessment JSON + unstructured final answer → parse failure).
-- [ ] `FinalAnswer`, `jsonObjects`, `ParseReviewerOutput`, `ParsePlanOutput`, placeholder filters, severity order — port the **Go** behaviour (not the Swift fixes); record the two known Go gaps in the "known Go bugs" table below.
+- [x] `FinalAnswer`, `jsonObjects`, `ParseReviewerOutput`, `ParsePlanOutput`, placeholder filters, severity order — ported with **Go** behavior. Tests pin both known gaps listed below.
+
+**Task 2.6 verification:** controller workspace check: 490 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Eighty-two focused review tests cover Go JSON decoding, prompts, output, security validation and queue rollback/release. The Task 2.5 lens wrapper is complete. Pure plan parsing/formatting was pulled forward from Task 2.7. Provider-log helpers apply `final_answer`; runtime call sites remain Task 2.7/P3, so that checkbox stays open. Hosted CI is pending for this batch.
 
 ### Task 2.7 — review runs (plan/antislop/security/doc) `heavy`
 Port: `internal/review/{plan,planrun}.go` + `{plan,planrun,antislop,selection}_test.go`.
@@ -291,6 +293,8 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | File-list merging only removes duplicates across its two inputs | `gitscope.mergeFileLists` | Duplicates inside either input remain. Preserve during the port. |
 | Claude Docker authentication is passed in process arguments | `executor.runClaudeDocker` | The existing `-e ANTHROPIC_AUTH_TOKEN=…` argument exposes the token to process inspection. Preserve during this port; fix separately. |
 | Kimi adapter restricts tools only for the exact `review` mode | `executor.kimiRunOpts` | All other modes get full-auto options. Current callers use raw/review; task-mode behavior is a latent source bug. |
+| Queue wait I/O errors are reported as cancellation | `review.WaitForGroupSlot` | Every non-timeout wait failure becomes `cancelled while queued`. Preserved in the port. |
+| Plan output accepts an empty summary | `review.ParsePlanOutput` | A valid rating plus empty findings can render as a clean plan without a Summary line. Review/security validation is stricter. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

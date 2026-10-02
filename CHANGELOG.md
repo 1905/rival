@@ -15,6 +15,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Ported Codex, Claude native/Docker, Grok, K3 and OpenCode adapters with exact argument and environment tests. Added 22 command scenarios; execution remains pending P3.
 - Fixed the Rust macOS launch path to reject invalid executable formats, matching Go. Regression checks pass on hosted macOS and Linux.
 - Ported prompt and review argument parsing, Git scope detection, and diff preambles. Local source-derived tests pass; command wiring remains pending P3.
+- Ported review prompts, assessment parsing, console formatting, and queue-slot cleanup. Prompt byte checks and final-answer regressions pass locally; review execution and command wiring remain pending.
 - Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
 - Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
 - Fixed existing Go test fixtures that required an installed OpenCode CLI or raced stdin writes.

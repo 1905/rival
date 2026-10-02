@@ -69,4 +69,12 @@
 - Task2.5 preserves the Go parser's literal-space `-re` grammar, exact option errors, simple Unicode case mapping and original-byte review slicing. Source-derived tests cover the unusual `revİew` case and `-h=x` help behavior.
 - Git scope uses the shared direct execution helper. Tests confirm argv, logical PWD and inherited repository overrides with a temporary fake Git executable. Real Git tests use temporary repositories and homes.
 - Git stdout currently uses lossy UTF-8 decoding. Go retains raw bytes. Invalid-byte filenames with `core.quotepath=false` can therefore differ; default quoted output is covered. Windows PWD handling remains assigned to P5.
-- Controller verification passed 407 workspace tests, formatting and Clippy. Hosted verification remains pending for this batch.
+- Controller verification passed 407 workspace tests, formatting and Clippy. CI 37028459182 passed on macOS and Linux at `6030678`, including Swift session decoding.
+
+### Review contracts
+
+- Task2.6 compares all six review prompt pieces against Go source text, then retains fixed length/SHA-256 pins for P6. Both assembled default prompts are pinned too. A separate Python source evaluator confirmed all eight hashes without running Go.
+- JSON key presence is case-sensitive; struct-field decoding uses Go case folding. Tests preserve duplicate-key order, slice reuse, null handling, huge unknown numbers and first type-error text. The final-answer header requires the exact line `codex`, without CR.
+- Go nil and empty finding slices become an empty Rust vector. No command serializes that distinction. Provider-log APIs accept UTF-8 strings; invalid-byte handling remains a boundary limitation for the command port.
+- SlotRelease frees an acquired ticket on every return path. Tests verify partial mark-running rollback, cancellation, timeout and queue-unavailable fallback with temporary paths and injected stderr.
+- Controller verification passed 490 workspace tests, formatting and Clippy. Runtime use of final-answer helpers remains Task2.7/P3; hosted verification is pending for this batch.

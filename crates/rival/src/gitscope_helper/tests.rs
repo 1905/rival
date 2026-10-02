@@ -190,3 +190,50 @@ fn no_changes_gives_an_empty_preamble() {
         (String::new(), String::new())
     );
 }
+
+/// Go: cmd TestSecurityPromptIsAlwaysTheSecurityLens and
+/// TestSecurityAutoScopeFallsBackToWholeProject, through `lens_prompt` (the
+/// `securityScopeAndPrompt` wrapper lands with the command in P3).
+#[test]
+fn lens_prompt_renders_the_selected_lens() {
+    let fx = Fixture::new();
+    let cfg = fx.config();
+    let dir = tempfile::tempdir().unwrap();
+    let wd = s(dir.path());
+    let bug_hunter = review::build_reviewer_prompt(&cfg, "x", PromptKind::BugHunter);
+    for (scope, auto) in [("src/api/", false), ("", true)] {
+        let (prompt, target, display) = build_review_prompt(
+            lens_prompt(&cfg, PromptKind::Security),
+            scope,
+            auto,
+            &cfg,
+            &wd,
+        );
+        assert!(prompt.contains("## Role: Security Reviewer"), "{scope:?}");
+        assert!(
+            !prompt.contains("## Role: Implementation Bug Hunter"),
+            "{scope:?}"
+        );
+        assert!(!prompt.contains(&bug_hunter[..80]), "{scope:?}");
+        assert!(!target.is_empty() && target == display, "{scope:?}");
+    }
+    // A temp dir is not a git repo, so auto-scope reviews the whole project.
+    let (prompt, target, _) =
+        build_review_prompt(lens_prompt(&cfg, PromptKind::Security), "", true, &cfg, &wd);
+    assert_eq!(target, WHOLE_PROJECT);
+    assert_eq!(
+        prompt,
+        review::build_reviewer_prompt(&cfg, WHOLE_PROJECT, PromptKind::Security)
+    );
+    let (prompt, _, _) = build_review_prompt(
+        lens_prompt(&cfg, PromptKind::BugHunter),
+        "internal/auth/",
+        false,
+        &cfg,
+        &wd,
+    );
+    assert_eq!(
+        prompt,
+        review::build_reviewer_prompt(&cfg, "internal/auth/", PromptKind::BugHunter)
+    );
+}

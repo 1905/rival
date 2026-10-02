@@ -1,11 +1,10 @@
 //! Git-scoped review prompts shared by the commands. Go:
 //! `cmd/gitscope_helper.go`.
-//!
-//! Go's `lensPrompt` wraps `review.BuildReviewerPrompt` and lands with
-//! Task 2.6, which ports that builder.
 
-use rival_core::config::{ANTISLOP_CODE_PROMPT, Config, DIFF_REVIEW_PREAMBLE, WHOLE_PROJECT};
-use rival_core::{gitscope, logging};
+use rival_core::config::{
+    ANTISLOP_CODE_PROMPT, Config, DIFF_REVIEW_PREAMBLE, PromptKind, WHOLE_PROJECT,
+};
+use rival_core::{gitscope, logging, review};
 
 #[cfg(test)]
 mod tests;
@@ -63,6 +62,11 @@ pub fn build_review_prompt(
         scope = WHOLE_PROJECT;
     }
     (build(scope), scope.to_string(), scope.to_string())
+}
+
+/// Returns the reviewer prompt builder for one lens.
+pub fn lens_prompt(cfg: &Config, kind: PromptKind) -> impl Fn(&str) -> String + '_ {
+    move |scope| review::build_reviewer_prompt(cfg, scope, kind)
 }
 
 /// Renders the code-mode antislop prompt for `scope`.
