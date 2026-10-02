@@ -130,6 +130,13 @@ impl StdinSource for FakeStdin {
             None => Ok(self.data.clone()),
         }
     }
+
+    fn reader(&mut self) -> Box<dyn std::io::BufRead + '_> {
+        assert!(!self.forbid_read, "stdin was read");
+        assert!(self.read_error.is_none(), "read_error is for read_all");
+        self.reads += 1;
+        Box::new(std::io::Cursor::new(self.data.clone()))
+    }
 }
 
 /// Go `fakeRun`: records what the provider was handed and writes `log` as

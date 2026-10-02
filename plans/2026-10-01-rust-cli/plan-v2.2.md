@@ -193,10 +193,14 @@ Port: `cmd/{command_plan,command_antislop,command_security}.go` + tests, `review
 
 - [x] Commands wired with the shared workdir helper, source validation order, final-answer parsing and security completion-save failure handling.
 
-**Task 3.2 verification:** controller checks passed: 734 workspace tests, six ignored helper/generator entries, formatting, Clippy and build. All 12 plan/antislop/security scenarios passed, including the eight new validation and runtime-failure cases. All 53 scenario schemas validate. Sixty-five new command tests cover the named Go cases and security's distinct closed-stdin branch. A second subprocess fixture now emits its marker before starting the process that publishes readiness. Hosted CI is pending. Windows stdin/path handling remains P5; invalid UTF-8 input remains the recorded command-boundary limitation.
+**Task 3.2 verification:** controller checks passed: 734 workspace tests, six ignored helper/generator entries, formatting, Clippy and build. All 12 plan/antislop/security scenarios passed, including the eight new validation and runtime-failure cases. All 53 scenario schemas validate. Sixty-five new command tests cover the named Go cases and security's distinct closed-stdin branch. A second subprocess fixture now emits its marker before starting the process that publishes readiness. [CI 37046983286](https://github.com/1905/rival/actions/runs/37046983286) passed on macOS/Linux at `daa123a`, including Swift decoding. Windows stdin/path handling remains P5; invalid UTF-8 input remains the recorded command-boundary limitation.
 
 ### Task 3.3 — install + skills `heavy`
 Port: `internal/skills/{embed,codex}.go` + tests, `cmd/install.go` + test. `include_dir!` over `crates/rival-core/skills/` (a copy of `rival/internal/skills/*`; `scripts/bump-skill-versions.sh` updated to bump both until P6).
+
+- [x] Embedded assets, Codex variants, target detection, prompt buffering, force/skip behavior and retired-skill cleanup ported. The version-bump script updates both trees.
+
+**Task 3.3 verification:** controller checks passed: 774 workspace tests, six ignored helper/generator entries, formatting and Clippy. All four installer scenarios passed in temporary homes; all 57 scenario schemas validate. Ten embedded files match the Go assets byte for byte. The script updated 18 temporary copies without changing repository versions. Hosted CI is pending. The script now exits nonzero for missing skill files. Windows path behavior remains P5; invalid UTF-8 and failed-parent error-path limits remain recorded.
 
 ### Task 3.4 — queue, sessions, version, update, telemetry `light`
 Port: `cmd/{queue,sessions,version,update}.go` + `update_{check_,}test.go`, `internal/update/check.go`, `internal/telemetry/telemetry.go` (same DSN, same opt-out).
@@ -309,6 +313,9 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Plan output accepts an empty summary | `review.ParsePlanOutput` | A valid rating plus empty findings can render as a clean plan without a Summary line. Review/security validation is stricter. |
 | An encoded MR marker is not detected | `mergerequest.Contains` | It checks the raw input; `%2F-%2Fmerge_requests%2F42` can fall through as an ordinary scope. Preserved. |
 | MR command cancellation kills only the immediate Git/glab child | `mergerequest.git`, `Prepare` | Go uses `CommandContext` with no pipe-drain limit. A descendant holding a pipe can delay return after cancellation. This differs from the fixed provider executor and is preserved. |
+| Codex antislop skill text names only Codex as the default | `skills.CodexSkill` | Runtime defaults to Codex plus Claude. Embedded instructions are copied unchanged. |
+| Deprecated-skill cleanup leaves dangling symlinks | `installSkills` | Its initial `Stat` follows the link and fails. Preserved. |
+| Partial retired-skill cleanup loses its removal count on error | `removeSkillDirsByHash` caller | The failure message is printed, but prior successful removals are not counted. Preserved. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

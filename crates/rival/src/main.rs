@@ -4,6 +4,7 @@ mod command_security;
 mod detach;
 mod gitscope_helper;
 mod gocsv;
+mod install;
 mod merge_request;
 mod model_command;
 mod model_run;

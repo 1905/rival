@@ -130,4 +130,12 @@ The three commands now use the existing review orchestration and final-answer he
 
 Security completion-save errors return exit 1. If the session directory also prevents the failure save, its stored session remains running, as in Go. The test checks this limit instead of claiming successful persistence. Windows home/path/stat behavior remains assigned to P5.
 
-Controller verification passed 734 workspace tests, formatting, Clippy, build and all 12 plan/antislop/security scenarios. All 53 scenario schemas validate. The escaped-pipe fixture had the same unguarded marker order as the earlier launcher fixture. Its marker now precedes helper startup; bounded draining, descriptor forwarding and identity checks are unchanged. Native hosted verification is pending.
+Controller verification passed 734 workspace tests, formatting, Clippy, build and all 12 plan/antislop/security scenarios. All 53 scenario schemas validate. The escaped-pipe fixture had the same unguarded marker order as the earlier launcher fixture. Its marker now precedes helper startup; bounded draining, descriptor forwarding and identity checks are unchanged. CI 37046983286 passed on macOS/Linux at `daa123a`, including Swift decoding.
+
+## Embedded skills and installation — 2026-10-03
+
+All nine skill files and the Codex workflow template match the Go assets byte for byte. Generated variants retain Go's descriptions, input rules and command substitutions. Installation uses the user home independently of `RIVAL_HOME`. One buffered reader serves both targets.
+
+Controller checks passed: 774 workspace tests, formatting, Clippy, four installer scenarios and 57 scenario schemas. The version-bump script updated all 18 skill copies in a temporary repository. The 20 original asset files stayed unchanged. Missing skill files now make that maintenance script exit nonzero.
+
+Source quirks remain visible: the Codex antislop instructions name a single default reviewer, dangling deprecated symlinks survive cleanup, and a partial hash-cleanup failure loses its removal count. Go's Windows embedded-file lookup also uses backslashes against `embed.FS`; Rust keeps slash asset paths so the approved Windows install can work. Native Windows validation remains P5. Failed-parent path detail and invalid UTF-8 remain the recorded filesystem boundary limits.

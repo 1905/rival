@@ -29,6 +29,8 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Fixed a cancellation test fixture that published readiness before its expected output.
 - Added Rust plan, antislop and security commands with source-compatible validation, final-answer parsing and completion-save error handling. Twelve command scenarios pass locally.
 - Removed the same readiness race from the escaped-pipe test fixture without changing its cleanup checks.
+- Added Rust skill installation for Claude Code and Codex, including buffered prompts, forced updates and retired-skill cleanup. Four isolated installer scenarios pass.
+- Copied all embedded skill assets unchanged and updated the version-bump script for both source trees. Temporary-copy checks pass; missing skill files now make the script fail.
 - The command port, TUI, Windows support, and release switch remain unfinished. The shipped CLI is still Go.
 - Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
 

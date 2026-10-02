@@ -2,7 +2,7 @@
 //! codes. Go: `main.go`, `cmd/root.go`.
 
 use std::fmt;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -19,7 +19,7 @@ use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{command_antislop, command_plan, command_security};
+use crate::{command_antislop, command_plan, command_security, install};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -84,6 +84,9 @@ pub trait StdinSource {
     }
     /// Go `io.ReadAll(os.Stdin)`. The error is Go's `*PathError` text.
     fn read_all(&mut self) -> Result<Vec<u8>, String>;
+    /// Go `bufio.NewReader(cmd.InOrStdin())` for line prompts. Callers keep
+    /// one reader for the whole command, so buffered answers are not lost.
+    fn reader(&mut self) -> Box<dyn BufRead + '_>;
 }
 
 /// The real fd 0.
@@ -115,6 +118,12 @@ impl StdinSource for ProcessStdin {
             .read_to_end(&mut data)
             .map_err(|e| text(&e))?;
         Ok(data)
+    }
+
+    /// A fd 0 closed at startup reads EOF here (Rust reopened it on
+    /// /dev/null); Go's read fails. Both give a prompt an empty answer.
+    fn reader(&mut self) -> Box<dyn BufRead + '_> {
+        Box::new(io::stdin().lock())
     }
 }
 
@@ -402,7 +411,6 @@ fn pre_run(
 /// Which later task ports a command that is not wired yet.
 fn pending_task(id: CommandId) -> Option<&'static str> {
     match id {
-        CommandId::Install => Some("Task 3.3"),
         CommandId::Queue | CommandId::QueueClear | CommandId::Sessions | CommandId::Update => {
             Some("Task 3.4")
         }
@@ -449,6 +457,7 @@ fn dispatch(
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandAntislop => command_antislop::command_antislop_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
+        CommandId::Install => install::install_action(env, inv),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),

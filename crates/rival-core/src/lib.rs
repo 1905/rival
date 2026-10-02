@@ -15,6 +15,7 @@ pub mod procinfo;
 pub mod queue;
 pub mod review;
 pub mod session;
+pub mod skills;
 
 /// Build version. Mirrors Go's `var version = "dev"`; release builds override it later.
 pub const VERSION: &str = "dev";
