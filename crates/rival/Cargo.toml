@@ -18,6 +18,9 @@ clap_complete = { version = "4.6.11", default-features = false }
 # pipe (mio cannot register that fd), like bubbletea's Program.Run.
 crossterm = { version = "0.29.0", features = ["use-dev-tty"] }
 libc = "0.2.189"
+# CommonMark parser for the TUI result view. The default features add an HTML
+# writer and a CLI; the TUI needs only the event stream.
+pulldown-cmark = { version = "0.13.4", default-features = false }
 ratatui = "0.30.2"
 regex = "1.13.1"
 rival-core = { path = "../rival-core" }

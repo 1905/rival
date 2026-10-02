@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Added terminal Markdown rendering with styled headings, hanging lists, code and links. Entity-decoded terminal controls are stripped. Local validation: 1,160 workspace tests passed; a macOS cancellation timing failure remains under investigation.
 - Added the app's Result parser with answer deduplication, prompt-echo rejection and severity grouping. All 39 Swift parser cases pass in Rust, plus integer-boundary regressions. Local validation: 1,134 workspace tests passed; Result rendering remains pending.
 - Wired the interactive TUI with background jobs, signal handling and terminal cleanup. Update notices wait until exit. Fixed piped-input startup and quick-quit log opening. Local validation: 1,091 workspace tests and seven real terminal checks passed; Result and native Windows acceptance remain pending.
 - Added Raw, Prompt and Info detail tabs, search, follow mode, group-member selection and log previews. Stop jobs recheck completed sessions and process identity. Log copies have owned cleanup. Local validation: 1,068 workspace tests passed; terminal wiring and Result remain pending.

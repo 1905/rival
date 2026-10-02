@@ -13,6 +13,7 @@ pub mod keys;
 pub mod kill;
 pub mod layout;
 pub mod logview;
+pub mod markdown;
 pub mod model;
 pub mod preview;
 pub mod runtime;

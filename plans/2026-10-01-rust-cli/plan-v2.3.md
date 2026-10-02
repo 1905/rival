@@ -243,12 +243,12 @@ Port: `cmd/tui.go`; no-op logger while the TUI runs (master fix `3989a88`); back
 Port: `app/Sources/RivalKit/ResultParser.swift` (newest logic, incl. double-answer dedupe and the unanswered-transcript fix) + `app/Tests/RivalKitTests/ResultParserTests.swift` (41 cases). Rust: `crates/rival-core/src/result.rs`.
 - [x] API: `parse_run_result(raw: &str) -> RunResult` with `RunResult::{Findings{summary, rating: Option<u8>, groups: Vec<SeverityGroup>}, Markdown{text}, Failed{reason}}`; `SeverityGroup{severity, findings}`; `Finding{file, line, severity, category, title, body, failure_scenario, suggestion, confidence}`.
 - [x] Separate from `review::parse` (Go port, used by CLI output for parity). Unifying the two is a known-bugs follow-up after P6.
-- [x] The three fake logs in `testdata/logs` produce findings (6, rating 6), markdown and failure. All 39 Swift parser/grouping cases are ported; the two MarkdownBlocks cases belong to 4.7. Four additional Rust tests cover decoding paths and measured Foundation integer boundaries. Controller: 1,134 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Hosted CI remains pending.
+- [x] The three fake logs in `testdata/logs` produce findings (6, rating 6), markdown and failure. All 39 Swift parser/grouping cases are ported; the two MarkdownBlocks cases belong to 4.7. Four additional Rust tests cover decoding paths and measured Foundation integer boundaries. Controller: 1,134 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. CI 37070816095 passed Linux. macOS passed the parser cases but failed an existing cancellation test; investigation is recorded in `research.md`.
 
 ### Task 4.7 — markdown → terminal text `heavy`
 Rust: `crates/rival/src/tui/markdown.rs`; dep `pulldown-cmark`.
-- [ ] `render(md: &str, width: u16, theme: &Styles) -> ratatui::text::Text<'static>`: headings bold + accent, paragraphs wrapped to width, `-`/`*`/`1.` lists with hanging indent (lazy continuation lines join the item), fenced code as dim block with no wrapping, inline code in accent, bold/italic, links as `text (url)`, no raw HTML (shown as text).
-- [ ] Unit tests on `Text` lines for each element and for the review-markdown fake log.
+- [x] `render(md: &str, width: u16, theme: &Styles) -> ratatui::text::Text<'static>`: headings bold + accent, paragraphs wrapped to width, `-`/`*`/`1.` lists with hanging indent (lazy continuation lines join the item), fenced code as dim block with no wrapping, inline code in accent, bold/italic, links as `text (url)`, no raw HTML (shown as text).
+- [x] All 26 renderer tests pass, including both Swift MarkdownBlocks cases, the complete review fixture, Unicode/narrow wrapping and entity-decoded terminal controls. Controller: 1,160 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Long code lines clip at the viewport edge. Wiring, hosted checks and visual acceptance remain pending.
 
 ### Task 4.8 — Result tab `heavy`
 Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.

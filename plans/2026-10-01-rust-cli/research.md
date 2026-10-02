@@ -249,3 +249,17 @@ The Result parser uses the app's answer extraction, deduplication and unanswered
 A standalone Swift probe measured JSONDecoder<Int>. Plain in-range integers stay exact. Decimal/exponent tokens use floating-point rounding: `9007199254740993.0` becomes `9007199254740992`, and `1e-400` becomes zero. Plain `-9223372036854775809` also becomes Int64.min through that fallback. `9223372036854775807.0` is rejected after rounding to 2^63. The Rust decoder preserves source tokens and checks the floating result before conversion. Regression expectations use these measured results; no exact-decimal arithmetic or saturating cast is used.
 
 Controller checks passed 1,134 workspace tests with eight intentional helper/generator ignores, formatting, Clippy and build. Decode errors identify the field path but use Rust wording. Deep JSON recursion limits, duplicate-key handling and rare Unicode trimming differences are not exhaustively matched to Foundation. Rust splits on LF bytes; Swift's Character split treats CRLF differently. The Result view may improve these display details under the approved scope. Hosted CI and rendering acceptance remain pending.
+
+## Cancellation test investigation — 2026-10-03
+
+CI 37070816095 passed Linux but failed the existing `cancel_kills_launcher_grandchild` test on macos-15. It returned 5.083 seconds after cancellation, exceeding the 3.5-second assertion. Parser cases passed. Twenty focused local runs and three full core-library runs did not reproduce the failure. This does not establish a fix.
+
+Two source-derived possibilities remain under investigation. The test publishes readiness before starting an additional unrecorded foreground sleep, so cancellation can overlap that later fork. Separately, [Rust 1.98.1 pipe creation](https://raw.githubusercontent.com/rust-lang/rust/1.98.1/library/std/src/sys/pipe/unix.rs) sets close-on-exec in separate calls on macOS. [Duct's platform notes](https://github.com/oconnor663/duct.py/blob/master/gotchas.md#preventing-pipe-inheritance-races-on-macos) describe the resulting inheritance race and a shared pipe/spawn mutex. Neither possibility is yet proven as the cause of this CI failure. The timing assertion remains required; no retry or larger limit replaces it.
+
+## Terminal Markdown — 2026-10-03
+
+The renderer uses pulldown-cmark 0.13.4 with optional extensions disabled. It keeps inline styles, hanging list indents and grapheme boundaries. HTML is literal text. Quotes and rules have simple terminal forms. CommonMark list/fence rules replace the app's small block parser; both original MarkdownBlocks examples have explicit Rust expectations.
+
+Text is sanitized after entity decoding, including link destinations and code. Adjacent text events are merged before cleaning, so a decoded escape and its parameters are removed together. The renderer also removes C1 controls. Existing CLI and Raw-tab sanitizers remain unchanged.
+
+All 26 renderer tests pass, including the complete review fixture. Controller checks passed 1,160 workspace tests with eight intentional ignores, formatting, Clippy and build. Code lines stay unwrapped and clip horizontally; the viewport only scrolls vertically. A grapheme or nested prefix wider than a tiny pane can exceed its width and is clipped. Width zero disables wrapping. Result integration and full visual acceptance remain pending.
