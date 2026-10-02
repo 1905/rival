@@ -631,7 +631,7 @@ fn detail_frame_shows_tabs_and_search() {
     m.update(key("enter"));
     let v = frame_text(&m);
     assert!(v.contains(" 1 Result  2 Raw  3 Prompt  4 Info"), "{v}");
-    assert!(v.contains("rival › gpt-6-astra"), "{v}");
+    assert!(v.contains(" rival › orbit-web › review a0000000"), "{v}");
     send(&mut m, [key("/"), key("q")]);
     let v = frame_text(&m);
     assert!(

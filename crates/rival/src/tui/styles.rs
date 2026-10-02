@@ -73,6 +73,9 @@ pub struct Styles {
     pub code_block: Style,
     /// Inline code in markdown.
     pub inline_code: Style,
+    /// A detail search hit: black on the accent. Colours only, so the line
+    /// keeps its width.
+    pub matched: Style,
 }
 
 impl Styles {
@@ -106,6 +109,7 @@ impl Styles {
             value: text.add_modifier(Modifier::BOLD),
             code_block: dim,
             inline_code: accent,
+            matched: Style::new().fg(rgb(0x000000)).bg(rgb(ACCENT)),
         }
     }
 

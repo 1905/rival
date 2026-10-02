@@ -1,0 +1,49 @@
+rival  ⠋ 1 running  ◌ 0 queued  ✓ 1  ✗ 1  3 sessions  3.34.0                                                                      |
+ ALL 3   RUNNING 1   FAILED 1   DONE 1                                                                                   / filter |
+╭─────────────────────────────────────────────────────────────────────╮ ╭────────────────────────────────────────────────────────╮|
+│ ST  KIND     MODEL                EFF     TIME    PROJECT           │ │ orbit-web · review · codex                             │|
+│ TODAY                                                               │ │ gpt-6-astra · xhigh · 1m0s                             │|
+│ ⠋   review   gpt-6-astra          xhigh   1m0s    orbit-web         │ │ started 11:59 · pid 101                                │|
+│ ✓   plan     claude-opus-5-5      medium  2m36s   ledger            │ │ ─ output (tail) ─                                      │|
+│ ✗   review   gpt-5.5              high    23s     mathquest         │ │ LIVE-RUN-OUTPUT                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│                                                                     │ │                                                        │|
+│ 3 runs                                                              │ │                                                        │|
+╰─────────────────────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────────╯|
+↑/k up · ↓/j down · n/p page · enter open · / filter · tab status · ? more · q quit                                               |
+-- styles --
+ggggg..rrrrrrrrrrr..qqqqqqqqqq..ccc..fff..dddddddddd..dddddd......................................................................|
+.AAAAA...ddddddddd...dddddddd...dddddd...................................................................................dddddddd.|
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+aDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDa.d.tttttttttdddttttttdddddddd.............................d|
+aDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDa.d.TTTTTTTTTTTdddddddddddrrrr.............................d|
+aSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSa.d.dddddddddddddddddddddddddddddddddddddddddddddddddddddd.d|
+a.ccc.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.dddddddddddddddddda.d.dddddddddddddddddddddddddddddddddddddddddddddddddddddd.d|
+a.fff.tttttttt.tttttttttttttttttttt.ddddddd.ttttttt.dddddddddddddddddda.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+a.....................................................................a.d........................................................d|
+addddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddda.d........................................................d|
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.dddddttt.dddddddttt.dddddddttttt.dddddddt.dddddddddttt.dddddddddt.dddddddt.dddd...............................................|

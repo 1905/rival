@@ -352,7 +352,7 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
 
 /// Go: `id[:8]`, the first 8 bytes. A cut inside a multi-byte char keeps
 /// its stray bytes as U+FFFD.
-fn short_id(id: &str) -> Cow<'_, str> {
+pub fn short_id(id: &str) -> Cow<'_, str> {
     if id.len() > 8 {
         String::from_utf8_lossy(&id.as_bytes()[..8])
     } else {

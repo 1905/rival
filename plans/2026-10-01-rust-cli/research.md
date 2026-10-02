@@ -202,4 +202,22 @@ The list now filters across group members, preserves selection by run identity a
 
 The draft copied the current UTC offset into every midnight boundary. That misclassified runs near a daylight-saving change, including TODAY when midnight and noon have different offsets. The fixed implementation resolves each midnight through the local timezone. Injected timezone rules keep the goldens deterministic. Regressions cover spring/fall boundaries and skipped/repeated midnight. An isolated Unix child verifies the actual local-zone lookup without changing parallel tests' environment.
 
-Controller verification passed 966 workspace tests with seven intentional helper/generator ignores, formatting and Clippy. All 23 named Go list/pagination cases are ported. The source's narrow KIND cell still clips `review/dk`; the 60-column compact header also clips its version. These are recorded visual observations for the P4 gate. Windows path labels remain assigned to P5. Interactive Rust acceptance is still pending.
+Controller verification passed 966 workspace tests with seven intentional helper/generator ignores, formatting and Clippy. CI 37061335806 passed on macOS/Linux at `dc5001f`, including all 84 CLI scenarios and Swift decoding. All 23 named Go list/pagination cases are ported. The source's narrow KIND cell still clips `review/dk`; the 60-column compact header also clips its version. These are recorded visual observations for the P4 gate. Windows path labels remain assigned to P5. Interactive Rust acceptance is still pending.
+
+## Terminal restoration baseline — 2026-10-03
+
+A task-owned PTY check ran the installed Go TUI with private homes. All six cases restored terminal modes, cursor and the main screen: quit, raw Ctrl+C, OS SIGINT, OS SIGTERM, resize and watcher setup failure. Quit, raw Ctrl+C, SIGTERM and watcher-error quit return 0. SIGINT returns 1 with `tui: program was killed: program was interrupted`. BubbleTea's signal handlers distinguish interrupt from normal quit; Rust terminal wiring must preserve that distinction.
+
+The terminal comparison excludes only Darwin's PENDIN pending-input state bit. The local SDK labels it as state. All other termios fields must match. This is a TUI-only smoke check, not a CLI output comparison or Go reference build. Actual Rust terminal checks remain pending Task 4.5 and Gate P4.
+
+## Detail views and asynchronous work — 2026-10-03
+
+Raw, Prompt and Info now have complete detail views, search, follow and member selection. The wide list shows a metadata/log preview. Raw reads at most 256 KiB; preview reads at most 32 KiB and keeps 200 source lines. File state reuses unchanged wrapped content. Late results are checked against the selected member, width and request sequence.
+
+Unlike Go's inline update calls, Rust returns jobs for file reads, prompt loads, stops and log opening. Loading notes remain visible until the first result arrives. The runtime owns their execution in Task 4.5. A stop job reloads the stored status before acting, so a completed run cannot be failed merely because the stop waited in the queue. PID start-time verification still runs immediately before signaling. Full prompts survive the failure save.
+
+The first opener draft spawned a cleanup thread per request. The accepted code returns an owned outcome instead. A runtime-held collection reaps finished launchers and expires copies after ten minutes. All three launcher streams use the null device. If the TUI exits before a launcher finishes, its copy stays in the temp directory so the viewer can still consume it. Dropped, undelivered outcomes follow the same policy. This leftover-copy limit is explicit; Go left all copies after early exit. Linux and Windows opener selection remain assigned to 4.5/P5.
+
+Controller verification: 1,068 workspace tests passed with eight intentional helper/generator ignores; formatting and Clippy passed. The TUI subset has 218 tests, including six new complete frame goldens. Fake launcher tests reap their exact children on normal return and panic. No real viewer or provider ran. All named Go log, viewport and kill-safety cases are covered, plus detail and preview cases. Interactive Rust acceptance remains pending.
+
+Compatibility limits: read/seek errors currently use an `open <path>:` prefix. Search highlighting follows rune boundaries, so a match inside a joined grapheme can split styles across spans. Metadata values retain Go's unsanitized behavior. Wrapping retains Go's pending-whitespace width quirk. These do not change the CLI or session contract.

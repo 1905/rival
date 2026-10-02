@@ -115,7 +115,13 @@ fn filter_narrows_clears_and_keeps() {
 fn q_inside_filter_types_q() {
     let mut m = list_model(list_fixture(), 120, 40);
     m.update(key("/"));
-    assert!(m.update(key("q")).is_empty(), "q inside the filter quit");
+    // The refilter may ask for the new selection's preview log; it must not
+    // quit.
+    let cmds = m.update(key("q"));
+    assert!(
+        cmds.iter().all(|c| matches!(c, Cmd::Job(_))),
+        "q inside the filter quit: {cmds:?}"
+    );
     assert!(!m.quitting());
     assert_eq!(m.list.filter.value(), "q");
     // ctrl+c still quits from inside the input.

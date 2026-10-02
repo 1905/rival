@@ -229,10 +229,11 @@ Use `internal/dashboard/{model,keys,layout,styles}.go` for logic (key map, loade
 
 ### Task 4.3 — list, pagination `heavy`
 Logic from `session_list.go` (filter, sections, pagination); port `{list_model,pagination}_test.go`; rendering tests written fresh.
-- [x] Full list filtering, calendar sections, stable selection and 50-run paging implemented. All 23 named list/pagination cases are covered. Six complete frame goldens cover loading, empty, both pages, filter and minimum width. Controller: 966 workspace tests passed, seven intentional ignores; formatting and Clippy passed. Day boundaries use the local offset at each boundary, with spring/fall and skipped/repeated-midnight checks. Hosted verification pending.
+- [x] Full list filtering, calendar sections, stable selection and 50-run paging implemented. All 23 named list/pagination cases are covered. Six complete frame goldens cover loading, empty, both pages, filter and minimum width. Controller: 966 workspace tests passed, seven intentional ignores; formatting and Clippy passed. Day boundaries use the local offset at each boundary, with spring/fall and skipped/repeated-midnight checks. CI 37061335806 passed on macOS/Linux at `dc5001f`, including all 84 CLI scenarios and Swift decoding.
 
 ### Task 4.4 — detail, preview, logview, viewport, kill `heavy`
 Logic from `{detail_view,preview,logview,kill}.go` (follow, viewport, log tail, kill safety); port `{logview,viewport,kill_safety}_test.go`; rendering tests written fresh. `parity_test.go` (Go TUI vs app parity) is not ported.
+- [x] Raw/Prompt/Info tabs, member selection, follow, search, preview and safe stop implemented. Blocking work leaves the model as jobs; late reads cannot replace another member or width. Six new full frame goldens cover details and preview. Controller: 1,068 workspace tests passed, eight intentional ignores; formatting and Clippy passed. Log launchers use null streams and owned copy cleanup. A queued stop leaves an already completed record unchanged. Terminal runtime, Linux opener and Result remain in 4.5/4.8; Windows remains P5. Hosted verification pending.
 
 ### Task 4.5 — `rival tui` wiring `light`
 Port: `cmd/tui.go`; no-op logger while the TUI runs (master fix `3989a88`); background reap.

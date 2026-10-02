@@ -118,6 +118,141 @@ pub fn fit_cell_line(line: Line<'static>, w: usize) -> Line<'static> {
     pad_line(cut, w)
 }
 
+/// Go: `ansi.Truncate(s, w, tail)` on a styled line. `tail` is added, unstyled,
+/// only when the line was cut, and counts against `w`.
+pub fn truncate_line(line: Line<'static>, w: usize, tail: &str) -> Line<'static> {
+    if line_width(&line) <= w {
+        return line;
+    }
+    let tail_w = width(tail);
+    if tail_w > w {
+        return Line::default();
+    }
+    let mut cut = fit_line(line, w - tail_w);
+    if !tail.is_empty() {
+        cut.spans.push(Span::raw(tail.to_string()));
+    }
+    cut
+}
+
+/// Go: `ansi.Hardwrap(s, limit, true)` on plain text. Breaks every line at
+/// `limit` cells and keeps leading spaces. A cluster wider than the room left
+/// moves to the next line whole, even when that leaves an empty line, as in
+/// Go.
+pub fn hardwrap(s: &str, limit: usize) -> String {
+    if limit == 0 {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(s.len() + s.len() / limit);
+    let mut cur = 0;
+    for g in s.graphemes(true) {
+        if g == "\n" {
+            out.push('\n');
+            cur = 0;
+            continue;
+        }
+        let w = g.width();
+        if cur + w > limit {
+            out.push('\n');
+            cur = 0;
+        }
+        out.push_str(g);
+        cur += w;
+    }
+    out
+}
+
+/// Go: `ansi.Wordwrap(s, limit, "")` on plain text. Breaks at spaces and
+/// hyphens, never inside a word; a word longer than `limit` stays long for
+/// [`hardwrap`] to break. Pending spaces count in bytes, as Go's buffer
+/// length does.
+pub fn wordwrap(s: &str, limit: usize) -> String {
+    if limit == 0 {
+        return s.to_string();
+    }
+    struct State {
+        buf: String,
+        word: String,
+        space: String,
+        cur: usize,
+        word_len: usize,
+    }
+    impl State {
+        fn add_space(&mut self) {
+            self.cur += self.space.len();
+            self.buf.push_str(&self.space);
+            self.space.clear();
+        }
+        fn add_word(&mut self) {
+            if self.word.is_empty() {
+                return;
+            }
+            self.add_space();
+            self.cur += self.word_len;
+            self.buf.push_str(&self.word);
+            self.word.clear();
+            self.word_len = 0;
+        }
+        fn add_newline(&mut self) {
+            self.buf.push('\n');
+            self.cur = 0;
+            self.space.clear();
+        }
+    }
+    let mut st = State {
+        buf: String::with_capacity(s.len()),
+        word: String::new(),
+        space: String::new(),
+        cur: 0,
+        word_len: 0,
+    };
+    for g in s.graphemes(true) {
+        let first = g.chars().next().unwrap_or(' ');
+        if g == "\n" {
+            if st.word_len == 0 {
+                if st.cur + st.space.len() > limit {
+                    st.cur = 0;
+                } else {
+                    let space = std::mem::take(&mut st.space);
+                    st.buf.push_str(&space);
+                }
+                st.space.clear();
+            }
+            st.add_word();
+            st.add_newline();
+        } else if first.is_whitespace() && first != '\u{a0}' && g.chars().count() == 1 {
+            st.add_word();
+            st.space.push_str(g);
+        } else if g == "-" {
+            st.add_space();
+            st.add_word();
+            st.buf.push('-');
+            st.cur += 1;
+        } else {
+            st.word.push_str(g);
+            st.word_len += g.width();
+            if st.cur + st.space.len() + st.word_len > limit && st.word_len < limit {
+                st.add_newline();
+            }
+        }
+    }
+    st.add_word();
+    st.buf
+}
+
+/// Go: `wrapCells`. Word-wraps `text` to `width` cells, then hard-breaks
+/// anything still longer, so no line exceeds `width`. Width 0 returns the
+/// text as one line.
+pub fn wrap_cells(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    hardwrap(&wordwrap(text, width), width)
+        .split('\n')
+        .map(str::to_string)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +375,106 @@ mod tests {
         assert_eq!(line_width(&cut), 6);
         assert_eq!(fit_cell_line(line.clone(), 9).to_string(), "ab日本語 ");
         assert_eq!(fit_cell_line(line, 0).to_string(), "");
+    }
+
+    #[test]
+    fn truncate_line_adds_the_tail_only_when_cut() {
+        let red = Style::new().fg(Color::Red);
+        let line = Line::from(vec![Span::styled("abc", red), Span::raw("def")]);
+        assert_eq!(truncate_line(line.clone(), 6, "…"), line);
+        let cut = truncate_line(line.clone(), 4, "…");
+        assert_eq!(cut.to_string(), "abc…");
+        assert_eq!(cut.spans[0].style, red);
+        assert_eq!(truncate_line(line.clone(), 2, "").to_string(), "ab");
+        assert_eq!(truncate_line(line, 0, "…").to_string(), "");
+    }
+
+    // x/ansi v0.11.7 TestHardwrap, the plain-text cases with
+    // preserveSpace = true.
+    #[test]
+    fn hardwrap_go_cases() {
+        let cases: &[(&str, &str, usize, &str)] = &[
+            ("empty string", "", 0, ""),
+            ("passthrough", "foobar\n ", 0, "foobar\n "),
+            ("pass", "foo", 4, "foo"),
+            ("simple", "foobarfoo", 4, "foob\narfo\no"),
+            ("lf", "f\no\nobar", 3, "f\no\noba\nr"),
+            ("lf_space", "foo bar\n  baz", 3, "foo\n ba\nr\n  b\naz"),
+            ("begin_with_space", " foo", 4, " foo"),
+            ("emoji", "foo🫧foobar", 4, "foo\n🫧fo\nobar"),
+            ("column", "VERTICAL", 1, "V\nE\nR\nT\nI\nC\nA\nL"),
+        ];
+        for (name, input, limit, want) in cases {
+            assert_eq!(hardwrap(input, *limit), *want, "{name}");
+        }
+        // A wide glyph that cannot fit moves whole, never split.
+        assert_eq!(hardwrap("a日本", 2), "a\n日\n本");
+    }
+
+    // x/ansi v0.11.7 TestWordwrap, the plain-text cases (a hyphen is always
+    // a breakpoint, so the "-" cases need no breakpoint argument).
+    #[test]
+    fn wordwrap_go_cases() {
+        let cases: &[(&str, &str, usize, &str)] = &[
+            ("empty string", "", 0, ""),
+            ("passthrough", "foobar\n ", 0, "foobar\n "),
+            ("pass", "foo", 3, "foo"),
+            ("toolong", "foobarfoo", 4, "foobarfoo"),
+            ("white space", "foo bar foo", 4, "foo\nbar\nfoo"),
+            (
+                "broken_at_spaces",
+                "foo bars foobars",
+                4,
+                "foo\nbars\nfoobars",
+            ),
+            ("hyphen", "foo-foobar", 4, "foo-\nfoobar"),
+            ("space_breakpoint", "foo --bar", 9, "foo --bar"),
+            ("simple", "foo bars foobars", 4, "foo\nbars\nfoobars"),
+            ("limit", "foo bar", 5, "foo\nbar"),
+            ("remove white spaces", "foo    \nb   ar   ", 4, "foo\nb\nar"),
+            (
+                "white space trail width",
+                "foo\nb\t a\n bar",
+                4,
+                "foo\nb\t a\n bar",
+            ),
+            ("explicit_line_break", "foo bar foo\n", 4, "foo\nbar\nfoo\n"),
+            (
+                "explicit_breaks",
+                "\nfoo bar\n\n\nfoo\n",
+                4,
+                "\nfoo\nbar\n\n\nfoo\n",
+            ),
+            (
+                "example",
+                " This is a list: \n\n\t* foo\n\t* bar\n\n\n\t* foo  \nbar    ",
+                6,
+                " This\nis a\nlist: \n\n\t* foo\n\t* bar\n\n\n\t* foo\nbar",
+            ),
+        ];
+        for (name, input, limit, want) in cases {
+            assert_eq!(wordwrap(input, *limit), *want, "{name}");
+        }
+    }
+
+    #[test]
+    fn wrap_cells_never_exceeds_the_width() {
+        assert_eq!(wrap_cells("hello wide world", 0), ["hello wide world"]);
+        assert_eq!(wrap_cells("hello wide world", 10), ["hello wide", "world"]);
+        // The long word stays whole for the word wrap, so "mn" goes to its
+        // own line before the hard wrap breaks the word.
+        assert_eq!(
+            wrap_cells("abcdefghijkl mn", 5),
+            ["abcde", "fghij", "kl", "mn"]
+        );
+        let text = format!("{} {}", "日本語".repeat(9), "word ".repeat(30));
+        for w in 1..40 {
+            for l in wrap_cells(&text, w) {
+                assert!(width(&l) <= w.max(2), "{w}: {l:?}");
+                if w >= 2 {
+                    assert!(width(&l) <= w, "{w}: {l:?}");
+                }
+            }
+        }
     }
 }

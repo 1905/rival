@@ -1,5 +1,9 @@
-//! Test helpers: key presses, pinned-clock models and TestBackend frames.
+//! Test helpers: key presses, pinned-clock models, TestBackend frames and a
+//! synchronous job runner with fake processes.
 
+use std::cell::{Cell as StdCell, RefCell};
+use std::collections::VecDeque;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -13,10 +17,184 @@ use ratatui::style::{Color, Modifier, Style};
 use super::styles::STYLES;
 use unicode_width::UnicodeWidthStr;
 
+use rival_core::logfmt;
+use rival_core::paths::Paths;
 use rival_core::session::Session;
 use rival_core::sessionview::SessionEvent;
 
-use super::model::{DisplayItem, Model, Msg};
+use super::jobs::{JobEnv, JobOutput, LogViews};
+use super::kill::ProcessOps;
+use super::model::{Cmd, DisplayItem, Model, Msg};
+
+// --- jobs and fake processes ------------------------------------------------
+
+thread_local! {
+    static ALIVE: StdCell<bool> = const { StdCell::new(false) };
+    static SIGNAL_FAILS: StdCell<bool> = const { StdCell::new(false) };
+    static SIGNALS: RefCell<Vec<i64>> = const { RefCell::new(Vec::new()) };
+    static READS: StdCell<usize> = const { StdCell::new(0) };
+    static LAUNCHED: RefCell<Vec<PathBuf>> = const { RefCell::new(Vec::new()) };
+    static LAUNCH_FAILS: StdCell<bool> = const { StdCell::new(false) };
+}
+
+/// The files the fake viewer launcher was asked to open on this thread.
+pub fn launched() -> Vec<PathBuf> {
+    LAUNCHED.with_borrow(Clone::clone)
+}
+
+/// Makes the fake viewer launcher fail, as for a missing opener.
+pub fn set_launch_fails(fails: bool) {
+    LAUNCH_FAILS.set(fails);
+}
+
+/// The fake viewer launcher: records the path and starts nothing.
+fn fake_launch(path: &Path) -> io::Result<Option<std::process::Child>> {
+    LAUNCHED.with_borrow_mut(|l| l.push(path.to_path_buf()));
+    if LAUNCH_FAILS.get() {
+        return Err(io::Error::from(io::ErrorKind::NotFound));
+    }
+    Ok(None)
+}
+
+/// What the fake `alive` answers for every PID on this test's thread.
+pub fn set_alive(alive: bool) {
+    ALIVE.set(alive);
+}
+
+/// Makes the fake signal fail with ESRCH, as for a process that just died.
+pub fn set_signal_fails(fails: bool) {
+    SIGNAL_FAILS.set(fails);
+}
+
+/// The PIDs the fake signal recorded on this test's thread.
+pub fn signals() -> Vec<i64> {
+    SIGNALS.with_borrow(Clone::clone)
+}
+
+/// How many log reads (not stats) ran on this test's thread.
+pub fn reads() -> usize {
+    READS.get()
+}
+
+/// The fake `alive`: whatever [`set_alive`] said. It never looks at a real
+/// process.
+pub fn fake_alive(_pid: i64, _start: i64) -> bool {
+    ALIVE.get()
+}
+
+/// The fake signal: records the PID and never sends anything.
+fn fake_terminate(pid: i64) -> io::Result<()> {
+    SIGNALS.with_borrow_mut(|s| s.push(pid));
+    if SIGNAL_FAILS.get() {
+        return Err(io::Error::from_raw_os_error(libc::ESRCH));
+    }
+    Ok(())
+}
+
+/// `logfmt::read_tail`, counted.
+fn counting_read_tail(path: &Path, max_bytes: i64) -> io::Result<(Vec<u8>, bool)> {
+    READS.set(READS.get() + 1);
+    logfmt::read_tail(path, max_bytes)
+}
+
+pub const FAKE_PROCS: ProcessOps = ProcessOps {
+    alive: fake_alive,
+    terminate: fake_terminate,
+};
+
+/// A temp home and the job environment pointing at it. The fakes on this
+/// thread start from "not alive, signals succeed, nothing recorded".
+pub struct Harness {
+    pub home: tempfile::TempDir,
+    pub env: JobEnv,
+}
+
+impl Harness {
+    pub fn paths(&self) -> &Paths {
+        &self.env.paths
+    }
+
+    /// Writes `content` to a log file in the temp home and returns its path.
+    pub fn log(&self, name: &str, content: &str) -> String {
+        let dir = self.home.path().join("logs");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        std::fs::write(&path, content).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+}
+
+pub fn harness() -> Harness {
+    ALIVE.set(false);
+    SIGNAL_FAILS.set(false);
+    SIGNALS.with_borrow_mut(Vec::clear);
+    READS.set(0);
+    LAUNCHED.with_borrow_mut(Vec::clear);
+    LAUNCH_FAILS.set(false);
+    let home = tempfile::tempdir().unwrap();
+    let tmp = home.path().join("tmp");
+    std::fs::create_dir_all(&tmp).unwrap();
+    let env = JobEnv {
+        paths: Paths::from_home(home.path()),
+        procs: FAKE_PROCS,
+        read_tail: counting_read_tail,
+        launch: fake_launch,
+        temp_dir: tmp,
+    };
+    Harness { home, env }
+}
+
+/// Feeds `msgs` to `m` and runs every job it asks for to completion on this
+/// thread, feeding the results back, as the runtime's workers would. Opened
+/// log copies go to `views` when given.
+pub fn drive_with(
+    m: &mut Model,
+    env: &JobEnv,
+    mut views: Option<&mut LogViews>,
+    msgs: impl IntoIterator<Item = Msg>,
+) {
+    for msg in msgs {
+        let mut queue = VecDeque::from([msg]);
+        while let Some(msg) = queue.pop_front() {
+            for cmd in m.update(msg) {
+                let Cmd::Job(job) = cmd else {
+                    continue;
+                };
+                match env.run(job) {
+                    JobOutput::Msg(res) => queue.push_back(res),
+                    JobOutput::Opened(opened) => {
+                        if let Some(views) = views.as_deref_mut() {
+                            views.adopt(opened);
+                        }
+                    }
+                    JobOutput::Nothing => {}
+                }
+            }
+        }
+    }
+}
+
+/// [`drive_with`] without a log-view owner.
+pub fn drive(m: &mut Model, env: &JobEnv, msgs: impl IntoIterator<Item = Msg>) {
+    drive_with(m, env, None, msgs);
+}
+
+/// A loaded model at `width`×`height` with its jobs run, fake processes
+/// and the pinned clock.
+pub fn job_model(env: &JobEnv, sessions: Vec<Arc<Session>>, width: u16, height: u16) -> Model {
+    let mut m = loading_model(width, height);
+    m.alive = fake_alive;
+    drive(&mut m, env, [Msg::Sessions(SessionEvent { sessions })]);
+    m
+}
+
+/// Go `openDetail`: [`job_model`], then the real enter key.
+pub fn open_detail(env: &JobEnv, sessions: Vec<Arc<Session>>, width: u16, height: u16) -> Model {
+    let mut m = job_model(env, sessions, width, height);
+    drive(&mut m, env, [key("enter")]);
+    assert!(m.in_detail(), "enter did not open the detail screen");
+    m
+}
 
 /// The pinned "now" every test model uses.
 pub fn fixed_now() -> DateTime<FixedOffset> {
@@ -316,6 +494,89 @@ pub fn preview_fixture() -> Vec<Arc<Session>> {
     ]
 }
 
+/// Go `previewFixture`: [`preview_fixture`] with a log per run that names
+/// it, so a test can tell which run a pane shows.
+pub fn preview_fixture_logs(h: &Harness) -> Vec<Arc<Session>> {
+    let logs = [
+        ("live.log", "LIVE-RUN-OUTPUT\n"),
+        ("done.log", "DONE-RUN-OUTPUT\n"),
+        ("fail.log", "FAIL-RUN-OUTPUT\n"),
+    ];
+    preview_fixture()
+        .into_iter()
+        .zip(logs)
+        .map(|(s, (name, body))| {
+            Arc::new(Session {
+                log_file: h.log(name, body),
+                ..(*s).clone()
+            })
+        })
+        .collect()
+}
+
+/// Go `groupFixture`: two reviewers plus the judge, handed over in the
+/// wrong order so grouping has to sort them.
+pub fn group_fixture(h: &Harness) -> Vec<Arc<Session>> {
+    let base = fixed_now() - TimeDelta::minutes(5);
+    let (q1, q2, q3) = (
+        base,
+        base + TimeDelta::seconds(1),
+        base + TimeDelta::seconds(2),
+    );
+    let member = |id: &str,
+                  cli: &str,
+                  model: &str,
+                  mode: &str,
+                  status: &str,
+                  q,
+                  pid,
+                  log: &str,
+                  body: &str| {
+        Arc::new(Session {
+            group_id: "grp00000-0000".into(),
+            queued_at: Some(q),
+            pid,
+            log_file: h.log(log, body),
+            ..run(id, cli, model, mode, "", status, q, "/src/orbit-web")
+        })
+    };
+    vec![
+        member(
+            "judge000-0000",
+            "codex",
+            "gpt-6-astra",
+            "consilium",
+            "running",
+            q3,
+            901,
+            "judge.log",
+            "JUDGE-OUTPUT\nVERDICT: 6/10\n",
+        ),
+        member(
+            "gemini00-0000",
+            "opencode",
+            "gemini-3.1",
+            "megareview",
+            "completed",
+            q2,
+            0,
+            "gemini.log",
+            "GEMINI-OUTPUT\n",
+        ),
+        member(
+            "gpt55000-0000",
+            "codex",
+            "gpt-5.5",
+            "megareview",
+            "running",
+            q1,
+            902,
+            "gpt55.log",
+            "GPT55-OUTPUT\n",
+        ),
+    ]
+}
+
 /// Draws `m` on a `width`×`height` TestBackend and returns the buffer.
 pub fn draw(m: &Model, width: u16, height: u16) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
@@ -348,6 +609,7 @@ fn style_code(cell: &Cell) -> char {
     let cursor = s.accent.add_modifier(Modifier::REVERSED);
     let named = [
         ('S', s.selected),
+        ('M', s.matched),
         ('A', s.active_tab),
         ('C', cursor),
         ('D', s.section),

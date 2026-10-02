@@ -1,10 +1,12 @@
 //! The dashboard model: state, message routing and the frame.
 //! Go: `internal/dashboard/model.go`.
 //!
-//! The model never touches the terminal, the session files or the clock on
-//! its own. The runtime (Task 4.5) feeds it [`Msg`]s from the watcher, the
-//! keyboard and its timers, carries out the returned [`Cmd`]s and draws it
-//! with [`Model::draw`]. Tests drive it the same way through a ratatui
+//! The model never touches the terminal, the session files, the processes
+//! or the clock on its own. The runtime (Task 4.5) feeds it [`Msg`]s from
+//! the watcher, the keyboard, its timers and its job workers, carries out the
+//! returned [`Cmd`]s and draws it with [`Model::draw`]. Blocking work (log
+//! reads, prompt loads, stops) leaves as [`Cmd::Job`] and comes back as a
+//! result message. Tests drive it the same way through a ratatui
 //! `TestBackend`.
 
 use std::sync::Arc;
@@ -21,10 +23,17 @@ use ratatui::widgets::{Block, BorderType, Padding, Widget};
 use rival_core::session::Session;
 use rival_core::sessionview::{self, Bucket, LoadProgress, SessionEvent};
 
-use super::detail_view::{DetailPane, DetailTab};
+use super::detail_view::{DetailPane, DetailTab, KillConfirm};
+use super::jobs::{Job, OpenLogRequest, PromptsResult};
 use super::keys::{ARROW_DOWN, ARROW_UP, FORCE_QUIT, KeyMap, Mode, help_lines, key_name};
+use super::kill::{
+    AliveFn, StopRequest, StopResult, UNVERIFIED_NOTICE, has_unverified, live_targets,
+    recheck_targets, same_process,
+};
 use super::layout::{Layout, MIN_HEIGHT, MIN_WIDTH, compute_layout};
-use super::session_list::{ListPane, is_live, item_status};
+use super::logview::{LogPane, LogResult};
+use super::preview::PreviewPane;
+use super::session_list::{ListPane, Zone, is_live, item_status};
 use super::styles::{HeaderStats, STYLES, Styles, gradient_bar, render_header};
 use super::text::{fit_line, line_width, pad_line, truncate};
 
@@ -85,6 +94,15 @@ pub fn item_live(item: &DisplayItem) -> bool {
     is_live(item_status(item))
 }
 
+/// What the views need besides their own state: the clock, the local zone
+/// and the theme.
+#[derive(Debug, Clone, Copy)]
+pub struct Ctx<'a> {
+    pub now: DateTime<FixedOffset>,
+    pub zone: Zone,
+    pub styles: &'a Styles,
+}
+
 /// Everything the model reacts to.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
@@ -105,10 +123,16 @@ pub enum Msg {
     SpinTick,
     /// The watcher failed to start; no snapshot is coming.
     Error(String),
+    /// A [`Job::Log`] finished.
+    Log(LogResult),
+    /// A [`Job::Prompts`] finished.
+    Prompts(PromptsResult),
+    /// A [`Job::Stop`] finished.
+    Stopped(StopResult),
 }
 
 /// What the runtime must do after an update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Cmd {
     /// Stop the watcher and leave the terminal.
     Quit,
@@ -116,6 +140,10 @@ pub enum Cmd {
     Tick,
     /// Send [`Msg::SpinTick`] after [`SPIN_INTERVAL`].
     Spin,
+    /// Run blocking work off the UI thread with `JobEnv::run` and send back
+    /// the message it returns. Results may arrive late or out of order; the
+    /// model drops the ones the screen no longer needs.
+    Job(Job),
 }
 
 /// The refresh tick for live timers and log tails.
@@ -147,6 +175,13 @@ pub struct Model {
     pub(crate) mode: Mode,
     pub(crate) list: ListPane,
     pub(crate) detail: DetailPane,
+    pub(crate) preview: PreviewPane,
+    /// Authorizes opening the stop confirm: whether a PID is still the
+    /// process that started at the recorded time. The stop job checks again
+    /// right before it signals. Tests replace it with fakes.
+    pub(crate) alive: AliveFn,
+    /// Jobs queued during the current update, returned with its commands.
+    jobs: Vec<Cmd>,
     pub(crate) spin_frame: usize,
     /// Whether a spinner tick is in flight, so a new event never starts a
     /// second, faster chain.
@@ -179,6 +214,9 @@ impl Model {
             mode: Mode::List,
             list: ListPane::default(),
             detail: DetailPane::default(),
+            preview: PreviewPane::default(),
+            alive: same_process,
+            jobs: Vec::new(),
             spin_frame: 0,
             // Init starts the spinner chain for the loader.
             spinning: true,
@@ -209,11 +247,23 @@ impl Model {
         (self.clock)()
     }
 
+    /// The clock, zone and theme the views draw with.
+    pub(crate) fn ctx(&self) -> Ctx<'_> {
+        Ctx {
+            now: self.now(),
+            zone: self.list.zone,
+            styles: &self.styles,
+        }
+    }
+
     /// Handles one message and returns what the runtime must do next.
     pub fn update(&mut self, msg: Msg) -> Vec<Cmd> {
         let (prev_mode, prev_help) = (self.mode, self.show_all_help);
         let spin = matches!(msg, Msg::SpinTick);
-        let cmds = self.route(msg);
+        // A tick and a snapshot check the shown logs for growth; other
+        // messages only read a log the screen does not hold yet.
+        let refresh = matches!(msg, Msg::Tick | Msg::Sessions(_));
+        let mut cmds = self.route(msg);
         // The help bar's height depends on the mode and on "?". When either
         // changes the detail viewport must be resized, or it keeps a height
         // the view then clips.
@@ -221,18 +271,89 @@ impl Model {
             self.measure_help();
             self.resize_detail();
         }
-        // A spinner frame changes nothing the list shows.
+        // A spinner frame changes nothing the list or the preview show.
         if !spin {
-            self.reconcile();
+            self.reconcile(refresh);
+        }
+        if self.quitting {
+            self.jobs.clear();
+        } else {
+            cmds.append(&mut self.jobs);
         }
         cmds
     }
 
     /// Runs once after every update: scrolls the list so the cursor stays in
-    /// view. Task 4.4 adds the preview refresh here.
-    fn reconcile(&mut self) {
+    /// view and asks for the preview's log when the selection, the size or a
+    /// refresh needs it.
+    fn reconcile(&mut self, refresh: bool) {
         let rows = self.list_rows();
         self.list.clamp_offset(rows);
+        self.sync_preview(refresh);
+    }
+
+    /// Go: `syncPreview`. The detail screen hides the preview, so nothing is
+    /// read there.
+    fn sync_preview(&mut self, refresh: bool) {
+        if !self.preview_shown() {
+            return;
+        }
+        let (w, h) = (self.preview_inner_width(), self.list_inner_height());
+        let ctx = Ctx {
+            now: self.now(),
+            zone: self.list.zone,
+            styles: &self.styles,
+        };
+        if let Some(req) = self
+            .preview
+            .request(self.list.selected(), w, h, &ctx, refresh)
+        {
+            self.jobs.push(Cmd::Job(Job::Log(req)));
+        }
+    }
+
+    fn preview_shown(&self) -> bool {
+        self.lay.show_preview && !self.lay.too_small && !self.in_detail()
+    }
+
+    /// Takes a finished log read. Each pane drops a read it no longer
+    /// needs: another member, another width, or an older result.
+    fn accept_log(&mut self, res: LogResult) {
+        let ctx = Ctx {
+            now: self.now(),
+            zone: self.list.zone,
+            styles: &self.styles,
+        };
+        match res.pane {
+            LogPane::Detail if self.in_detail() => {
+                self.detail.accept_log(res, self.list.selected(), &ctx);
+            }
+            LogPane::Detail => {
+                self.detail.log.accept(res, None);
+            }
+            LogPane::Preview if self.preview_shown() => {
+                let (w, h) = (self.preview_inner_width(), self.list_inner_height());
+                self.preview.accept(res, self.list.selected(), w, h, &ctx);
+            }
+            LogPane::Preview => {
+                self.preview.tail.accept(res, None);
+            }
+        }
+    }
+
+    /// Go: the end of `updateConfirmKey`. The stop wrote the targets as
+    /// failed; the rows on screen copy what was stored, the header counts
+    /// them now, and the open detail redraws.
+    fn apply_stop(&mut self, res: StopResult) {
+        for item in &mut self.list.items {
+            for s in &mut item.sessions {
+                if let Some((_, update)) = res.updates.iter().find(|(id, _)| *id == s.id) {
+                    update.apply(Arc::make_mut(s));
+                }
+            }
+        }
+        self.list.count_statuses();
+        self.sync_detail(false);
     }
 
     fn route(&mut self, msg: Msg) -> Vec<Cmd> {
@@ -313,6 +434,25 @@ impl Model {
                 self.loaded = true;
                 Vec::new()
             }
+            Msg::Log(res) => {
+                self.accept_log(res);
+                Vec::new()
+            }
+            Msg::Prompts(res) => {
+                if self.in_detail() {
+                    let ctx = Ctx {
+                        now: self.now(),
+                        zone: self.list.zone,
+                        styles: &self.styles,
+                    };
+                    self.detail.accept_prompts(res, self.list.selected(), &ctx);
+                }
+                Vec::new()
+            }
+            Msg::Stopped(res) => {
+                self.apply_stop(res);
+                Vec::new()
+            }
         }
     }
 
@@ -368,14 +508,22 @@ impl Model {
         self.detail.close();
     }
 
-    /// Resizes the detail pane and re-targets it at the current selection.
-    /// `reset` puts the scroll back to the tab's start.
+    /// Go: `syncDetail`. Resizes the detail viewport and reloads its content
+    /// for the current selection. `reset` puts the scroll back to the tab's
+    /// start (the tail for Raw); otherwise follow decides.
     fn sync_detail(&mut self, reset: bool) {
         if !self.in_detail() {
             return;
         }
         self.resize_detail();
-        self.detail.reload(self.list.selected(), reset);
+        let ctx = Ctx {
+            now: self.now(),
+            zone: self.list.zone,
+            styles: &self.styles,
+        };
+        if let Some(req) = self.detail.reload(self.list.selected(), &ctx, reset) {
+            self.jobs.push(Cmd::Job(Job::Log(req)));
+        }
     }
 
     /// Fits the detail pane to the current geometry without re-reading.
@@ -419,7 +567,9 @@ impl Model {
             }
         } else if k.open.matches(key) && self.list.selected().is_some() {
             self.mode = Mode::Detail;
-            self.detail.open(self.list.selected());
+            if let Some(req) = self.detail.open(self.list.selected()) {
+                self.jobs.push(Cmd::Job(Job::Prompts(req)));
+            }
             // Open at the tail: live output and final verdicts both live at
             // the end of the log.
             self.sync_detail(true);
@@ -451,6 +601,7 @@ impl Model {
         Vec::new()
     }
 
+    /// Go: `updateDetailKey`. Drives the detail screen while it has focus.
     fn detail_key(&mut self, key: &str) -> Vec<Cmd> {
         let k = self.keys;
         self.detail.notice.clear();
@@ -460,6 +611,7 @@ impl Model {
             // esc peels one layer: a search first, then the screen.
             if !self.detail.query.is_empty() {
                 self.detail.clear_search();
+                self.detail.apply_content(&self.styles);
             } else {
                 self.close_detail();
             }
@@ -477,15 +629,62 @@ impl Model {
         } else if k.prev_member.matches(key) {
             self.detail.cycle_member(self.list.selected(), -1);
             self.sync_detail(true);
+        } else if k.follow.matches(key) || k.bottom.matches(key) {
+            self.detail.follow = true;
+            self.detail.vp.goto_bottom();
+        } else if k.top.matches(key) {
+            self.detail.vp.goto_top();
+            self.detail.follow = self.detail.vp.at_bottom();
         } else if k.search.matches(key) {
             self.mode = Mode::Search;
             let query = self.detail.query.clone();
             self.detail.search.set_value(&query);
             self.detail.search.cursor_end();
             self.detail.search.focus();
+        } else if k.next_match.matches(key) {
+            self.detail.step_match(1);
+        } else if k.prev_match.matches(key) {
+            self.detail.step_match(-1);
+        } else if k.open_log.matches(key) {
+            if let Some(item) = self.list.selected() {
+                let req = if item.is_group() {
+                    Some(OpenLogRequest {
+                        sessions: item.sessions.clone(),
+                        group: true,
+                    })
+                } else {
+                    item.primary()
+                        .filter(|s| !s.log_file.is_empty())
+                        .map(|s| OpenLogRequest {
+                            sessions: vec![Arc::clone(s)],
+                            group: false,
+                        })
+                };
+                if let Some(req) = req {
+                    self.jobs.push(Cmd::Job(Job::OpenLog(req)));
+                }
+            }
+        } else if k.stop.matches(key) {
+            // Never signal on one key: x only opens the confirm bar.
+            let item = self.list.selected();
+            let targets = live_targets(item, self.alive);
+            if !targets.is_empty() {
+                self.detail.confirm = Some(KillConfirm { targets });
+                self.mode = Mode::Confirm;
+            } else if has_unverified(item) {
+                self.detail.notice = UNVERIFIED_NOTICE.to_string();
+            } else {
+                self.detail.notice = "nothing running".to_string();
+            }
+        } else {
+            // Scroll keys (j/k/up/down/pgup/pgdown/space/u/d/b) belong to
+            // the viewport. Scrolling away from the tail pauses follow;
+            // scrolling back down to it resumes.
+            self.detail.vp.handle_key(key);
+            if self.detail.tab == DetailTab::Raw {
+                self.detail.follow = self.detail.vp.at_bottom();
+            }
         }
-        // Follow, top/bottom, scrolling, n/N matches, open log and stop are
-        // detail behaviour: Task 4.4 routes them here.
         Vec::new()
     }
 
@@ -501,9 +700,10 @@ impl Model {
             self.detail.search.blur();
             self.mode = Mode::Detail;
             let query = self.detail.search.value();
-            self.detail.run_search(&query);
+            self.detail.run_search(&query, &self.styles);
         } else if self.keys.back.matches(key) {
             self.detail.clear_search();
+            self.detail.apply_content(&self.styles);
             self.mode = Mode::Detail;
         } else {
             self.detail.search.handle_key(ev);
@@ -511,12 +711,25 @@ impl Model {
         Vec::new()
     }
 
-    /// Answers the stop confirm: every key closes the bar, and only y may
-    /// stop, so a stray key press can never kill a run. Task 4.4 adds the y
-    /// path (re-check against the current snapshot, then the signal).
-    fn confirm_key(&mut self, _key: &str) -> Vec<Cmd> {
-        self.detail.confirm = None;
+    /// Go: `updateConfirmKey`. Every key closes the bar, and only y stops, so
+    /// a stray key press can never kill a run. The targets are re-checked
+    /// against the current snapshot first; the stop itself runs as a job,
+    /// which checks each process identity again right before its signal.
+    fn confirm_key(&mut self, key: &str) -> Vec<Cmd> {
+        let confirm = self.detail.confirm.take();
         self.mode = Mode::Detail;
+        let Some(confirm) = confirm.filter(|_| self.keys.yes.matches(key)) else {
+            return Vec::new();
+        };
+        let item = self.list.selected();
+        let targets = recheck_targets(item, &confirm.targets);
+        if targets.is_empty() {
+            self.detail.notice = "nothing running".to_string();
+            return Vec::new();
+        }
+        let item_key = item.map(item_key).unwrap_or_default();
+        self.jobs
+            .push(Cmd::Job(Job::Stop(StopRequest { item_key, targets })));
         Vec::new()
     }
 
@@ -609,22 +822,29 @@ impl Model {
     }
 
     /// Draws the frame into `area` of `buf`. The geometry comes from the
-    /// last resize; anything outside `area` is clipped, so a stale size can
-    /// never write out of bounds.
+    /// last resize: the frame is `lay.width`×`lay.height`, clipped to
+    /// `area`, so a stale size can never write out of bounds or past the
+    /// frame it laid out.
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let area = area.intersection(buf.area);
         if area.is_empty() || self.quitting {
             return;
         }
-        let mut out = Rows::new(area, buf);
         if !self.err_text.is_empty() {
-            out.line(Line::raw(format!("Error: {}", self.err_text)));
+            Rows::new(area, buf).line(Line::raw(format!("Error: {}", self.err_text)));
             return;
         }
         if self.lay.width == 0 || self.lay.height == 0 {
-            out.line(Line::raw("Initializing..."));
+            Rows::new(area, buf).line(Line::raw("Initializing..."));
             return;
         }
+        let to_u16 = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
+        let area = Rect {
+            width: area.width.min(to_u16(self.lay.width)),
+            height: area.height.min(to_u16(self.lay.height)),
+            ..area
+        };
+        let mut out = Rows::new(area, buf);
         let w = self.lay.width;
         if self.lay.too_small {
             let notice = format!("terminal too small (need {MIN_WIDTH}×{MIN_HEIGHT})");
@@ -646,7 +866,7 @@ impl Model {
             let h = self.content_height();
             let rect = out.take(h);
             self.detail
-                .render(self.list.selected(), self.mode, rect, out.buf, &self.styles);
+                .render(self.list.selected(), rect, out.buf, spin, &self.ctx());
         } else {
             out.line(self.list.tab_bar(w, !self.loaded, &self.styles));
             let rect = out.take(self.list_body_height());
@@ -687,12 +907,14 @@ impl Model {
         let inner = list_box.inner(left);
         list_box.render(left, buf);
         self.list.render(inner, buf, spin, now, &self.styles);
-        // Task 4.4 draws the preview inside this box.
-        Block::bordered()
+        let preview_box = Block::bordered()
             .border_type(BorderType::Rounded)
             .border_style(self.styles.border)
-            .padding(Padding::horizontal(1))
-            .render(right, buf);
+            .padding(Padding::horizontal(1));
+        let inner = preview_box.inner(right);
+        preview_box.render(right, buf);
+        self.preview
+            .render(self.list.selected(), inner, buf, &self.ctx());
     }
 
     /// Fills the list body until the first snapshot: the spinner and
@@ -768,6 +990,8 @@ impl<'a> Rows<'a> {
     }
 }
 
+#[cfg(test)]
+mod detail_tests;
 #[cfg(test)]
 mod list_tests;
 #[cfg(test)]

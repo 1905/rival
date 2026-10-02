@@ -1,0 +1,61 @@
+         _             __                                                                           |
+   _____(_)   ______ _/ /                                                    ● 0 running  ◌ 0 queued|
+  / ___/ / | / / __ `/ /                                                     ✓ 0  ✗ 1               |
+ / /  / /| |/ / /_/ / /                                                      1 sessions  3.34.0     |
+/_/  /_/ |___/\__,_/_/                                                                              |
+ rival › orbit-web › review abcdef01                                      ✗ failed 1m30s   follow ● |
+ 1 Result  2 Raw  3 Prompt  4 Info                                                                  |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+id          abcdef01-2345-6789                                                                      |
+group id    -                                                                                       |
+cli         codex                                                                                   |
+model       gpt-6-astra                                                                             |
+effort      xhigh                                                                                   |
+mode        review                                                                                  |
+status      failed                                                                                  |
+exit        1                                                                                       |
+started     2026-10-03 11:53:30                                                                     |
+ended       2026-10-03 11:55:00                                                                     |
+duration    1m30s                                                                                   |
+queued at   2026-10-03 11:53:00                                                                     |
+workdir     /src/orbit-web                                                                          |
+scope       plans/2026-09-26-service-identity                                                       |
+account     work                                                                                    |
+pid         81233                                                                                   |
+output      2048 bytes, 17 lines                                                                    |
+log         /var/log/rival/golden-info.log                                                          |
+                                                                                                    |
+────────────────────────────────────────────────────────────────────────────────────────────────────|
+ lines 1-19 of 21                                                                                   |
+1-4 tab · [/] member · f follow · / search · o open log · x stop · esc back · ? more                |
+-- styles --
+.........g.............gg...........................................................................|
+...gggggggg...gggggg.gg.g....................................................rrrrrrrrrrr..qqqqqqqqqq|
+..g.gggg.g.g.g.g.gg.gg.g.....................................................ccc..fff...............|
+.g.g..g.gg.gg.g.ggg.g.g......................................................dddddddddd..dddddd.....|
+ggg..ggg.ggggggggggggg..............................................................................|
+.gggggdddtttttttttdddttttttttttttttt......................................ffffffffffffff...dddddddt.|
+.dddddddd..ddddd..dddddddd..AAAAAA..................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ddddddddddd.TTTTTTTTTTTTTTTTTT......................................................................|
+ddddddddddd.t.......................................................................................|
+ddddddddddd.ttttt...................................................................................|
+ddddddddddd.TTTTTTTTTTT.............................................................................|
+ddddddddddd.ttttt...................................................................................|
+ddddddddddd.tttttt..................................................................................|
+ddddddddddd.ffffff..................................................................................|
+ddddddddddd.t.......................................................................................|
+ddddddddddd.ttttttttttttttttttt.....................................................................|
+ddddddddddd.ttttttttttttttttttt.....................................................................|
+ddddddddddd.ttttt...................................................................................|
+ddddddddddd.ttttttttttttttttttt.....................................................................|
+ddddddddddd.tttttttttttttt..........................................................................|
+ddddddddddd.ttttttttttttttttttttttttttttttttt.......................................................|
+ddddddddddd.tttt....................................................................................|
+ddddddddddd.ttttt...................................................................................|
+ddddddddddd.tttttttttttttttttttt....................................................................|
+ddddddddddd.tttttttttttttttttttttttttttttt..........................................................|
+....................................................................................................|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+ttt.ddddddttt.dddddddddt.dddddddddt.dddddddddt.dddddddddddt.dddddddttt.dddddddt.dddd................|

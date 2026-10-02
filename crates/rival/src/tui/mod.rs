@@ -8,11 +8,16 @@
 
 pub mod detail_view;
 pub mod input;
+pub mod jobs;
 pub mod keys;
+pub mod kill;
 pub mod layout;
+pub mod logview;
 pub mod model;
+pub mod preview;
 pub mod session_list;
 pub mod styles;
 #[cfg(test)]
 pub mod testkit;
 pub mod text;
+pub mod viewport;
