@@ -17,9 +17,9 @@ env:
   # contract test pins.
   GO_VERSION: "1.25.14"
   GOTOOLCHAIN: go1.25.14
-  # The full parity scenario run starts with P3 (CLI commands ported). Flip this
-  # to "true" then; while it is "false" the skip is reported as a warning.
-  PARITY_SCENARIOS: "false"
+  # The full parity scenario run is on from P3 (every non-TUI command ported).
+  # Set it to "false" to skip; the skip is then reported as a warning.
+  PARITY_SCENARIOS: "true"
 
 jobs:
   test:

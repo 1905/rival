@@ -1,0 +1,108 @@
+{
+  "name": "command-codex-no-queue-workdir",
+  "description": "Derived from executor-codex-success (its Go source notes apply). `rival command codex --no-queue --workdir sub` (cmd/command_codex.go flags). cmd/workdir.go resolveWorkdir turns `--workdir sub` into <ROOT>/work/sub; every argv, cwd, preamble and session work_dir follows it. --no-queue: internal/review/slots.go WaitForGroupSlot marks the sessions running without queue.New(), so no ~/.rival/queue/.lock is created.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work/sub",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work/sub\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work/sub"
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting codex (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "codex": 2
+    }
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    }
+  ]
+}

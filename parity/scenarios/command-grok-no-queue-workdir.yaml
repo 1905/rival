@@ -1,0 +1,105 @@
+{
+  "name": "command-grok-no-queue-workdir",
+  "description": "Derived from executor-grok-success (its Go source notes apply). `rival command grok --no-queue --workdir sub` (cmd/command_grok.go flags). cmd/workdir.go resolveWorkdir turns `--workdir sub` into <ROOT>/work/sub; every argv, cwd, preamble and session work_dir follows it. --no-queue: internal/review/slots.go WaitForGroupSlot marks the sessions running without queue.New(), so no ~/.rival/queue/.lock is created.",
+  "fakes": {
+    "scripts": {
+      "grok": {
+        "responses": [
+          {
+            "argv": [
+              "--prompt-file",
+              {
+                "$regex": "<ROOT>/tmp/rival-grok-[0-9]+\\.md"
+              },
+              "-m",
+              "grok-4.6",
+              "--effort",
+              "high",
+              "--output-format",
+              "plain",
+              "--no-auto-update",
+              "--yolo",
+              "--cwd",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work/sub"
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    },
+    {
+      "write": "home/.grok/auth.json",
+      "text": "{}\n",
+      "mode": "0600"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "grok",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting grok (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "high",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".grok/auth.json",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "grok",
+          "model": "grok-4.6",
+          "effort": "high",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "grok": 1
+    }
+  }
+}

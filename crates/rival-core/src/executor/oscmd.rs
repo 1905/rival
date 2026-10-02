@@ -109,6 +109,28 @@ pub(crate) fn run(
     (captured, result)
 }
 
+/// Go `exec.Command(name, args...)` up to `Start`, for callers that pick the
+/// child's stdio themselves. A bare name is looked up in `cfg`'s `$PATH`; a
+/// name with a `/` is used as-is, as Go skips `LookPath` for it. The child
+/// gets `cfg`'s env. Returns the command and the program path for
+/// [`fork_error`].
+pub fn command(cfg: &Config, name: &str, args: &[&str]) -> Result<(Command, PathBuf), String> {
+    let path = if name.contains('/') {
+        PathBuf::from(name)
+    } else {
+        look_path(cfg, name).map_err(|e| e.to_string())?
+    };
+    let env = dedup_env(cfg.environ())?;
+    let mut cmd = Command::new(&path);
+    process::set_exec(&mut cmd, &path, name, args, &env).map_err(|e| fork_error(&path, &e))?;
+    Ok((cmd, path))
+}
+
+/// Go's `Start` error: `fork/exec <path>: <errno text>`.
+pub fn fork_error(path: &std::path::Path, e: &io::Error) -> String {
+    format!("fork/exec {}: {}", path.display(), spawn_error_text(e))
+}
+
 /// Two handles on this process's stderr, for a child's stdout and stderr.
 #[cfg(unix)]
 fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
@@ -124,7 +146,7 @@ fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
 }
 
 /// Go `(*exec.ExitError).Error()`: `exit status N`, or `signal: <name>`.
-pub(crate) fn exit_status_text(status: ExitStatus) -> String {
+pub fn exit_status_text(status: ExitStatus) -> String {
     if let Some(code) = status.code() {
         return format!("exit status {code}");
     }

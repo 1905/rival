@@ -11,7 +11,8 @@ use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::Config;
 use rival_core::mergerequest::{self, Snapshot};
 use rival_core::paths::{self, Paths};
-use rival_core::{logging, queue, session};
+use rival_core::telemetry::Telemetry;
+use rival_core::{logging, queue, session, update};
 
 use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
@@ -19,7 +20,9 @@ use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{command_antislop, command_plan, command_security, install};
+use crate::{
+    command_antislop, command_plan, command_security, install, queue_sessions, update_cmd,
+};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -240,7 +243,7 @@ impl RootHooks {
     pub fn production() -> Self {
         RootHooks {
             reap: Arc::new(reap),
-            update_check: Arc::new(pending_update_check),
+            update_check: Arc::new(|cfg| update::check_production(rival_core::VERSION, cfg)),
             detach: Box::new(|| detach::detach_if_requested(true)),
         }
     }
@@ -251,10 +254,6 @@ pub fn reap(cfg: &Config) {
     session::reaper::reap_orphans(cfg.paths());
     queue::Manager::new(cfg.paths(), cfg).reap_dead();
 }
-
-/// Extension point for Task 3.4 (`internal/update` port). Until then no
-/// release check runs; the root still starts and bounds it like Go.
-fn pending_update_check(_cfg: &Config) {}
 
 /// Go `main` + `cmd.Execute`. Returns the process exit code.
 pub fn main_entry() -> i32 {
@@ -272,6 +271,9 @@ pub fn main_entry() -> i32 {
     // Runtime getenv calls see .env additions; the user config stays the
     // one loaded above.
     let cfg = initial.reload_env(Paths::from_env());
+    // Go: telemetry.Init after the logger, then a deferred Flush that only
+    // a normal return from Execute reaches (every error path calls os.Exit).
+    let telemetry = Telemetry::init(rival_core::VERSION, |key| cfg.getenv(key));
 
     let args: Vec<String> = std::env::args_os()
         .skip(1)
@@ -289,7 +291,28 @@ pub fn main_entry() -> i32 {
         prepare_mr: prepare,
         signals: true,
     };
-    execute(&mut env, &RootHooks::production(), &defaults, &args)
+    let exit = execute_inner(
+        &mut env,
+        &RootHooks::production(),
+        &defaults,
+        &args,
+        UPDATE_CHECK_WAIT,
+    );
+    // Go `defer telemetry.RecoverPanic()` in Execute: a no-op (see
+    // Telemetry::recover_panic).
+    telemetry.recover_panic();
+    if exit.returned {
+        telemetry.flush();
+    }
+    exit.code
+}
+
+/// How Go's `Execute` ended.
+pub(crate) struct Exit {
+    pub code: i32,
+    /// `Execute` returned normally (no `os.Exit`), so `main`'s deferred
+    /// telemetry flush runs.
+    pub returned: bool,
 }
 
 /// Background work the root joins before it exits.
@@ -324,16 +347,8 @@ enum PreRun {
     Fail(CmdError),
 }
 
-/// Go `cmd.Execute` over `args` (no program name). Returns the exit code.
-pub fn execute(
-    env: &mut CmdEnv<'_>,
-    hooks: &RootHooks,
-    defaults: &Defaults,
-    args: &[String],
-) -> i32 {
-    execute_with_wait(env, hooks, defaults, args, UPDATE_CHECK_WAIT)
-}
-
+/// [`execute_inner`]'s exit code, for tests.
+#[cfg(test)]
 pub(crate) fn execute_with_wait(
     env: &mut CmdEnv<'_>,
     hooks: &RootHooks,
@@ -341,6 +356,17 @@ pub(crate) fn execute_with_wait(
     args: &[String],
     update_wait: Duration,
 ) -> i32 {
+    execute_inner(env, hooks, defaults, args, update_wait).code
+}
+
+/// Go `cmd.Execute` over `args` (no program name).
+fn execute_inner(
+    env: &mut CmdEnv<'_>,
+    hooks: &RootHooks,
+    defaults: &Defaults,
+    args: &[String],
+    update_wait: Duration,
+) -> Exit {
     let mut root = tree::build(defaults);
     let mut bg = Background::default();
     let result = match tree::parse(&mut root, args) {
@@ -352,7 +378,12 @@ pub(crate) fn execute_with_wait(
             Ok(())
         }
         Ok(Parsed::Run(inv)) => match pre_run(env, hooks, &inv, &mut bg) {
-            PreRun::Exit(code) => return code,
+            PreRun::Exit(code) => {
+                return Exit {
+                    code,
+                    returned: false,
+                };
+            }
             PreRun::Fail(err) => Err(err),
             PreRun::Continue => dispatch(env, &mut root, &inv),
         },
@@ -361,10 +392,16 @@ pub(crate) fn execute_with_wait(
     bg.wait_for_reap();
     bg.wait_for_update_check(update_wait);
     match result {
-        Ok(()) => 0,
+        Ok(()) => Exit {
+            code: 0,
+            returned: true,
+        },
         Err(err) => {
             let _ = writeln!(env.stderr, "{}", err.message);
-            err.code
+            Exit {
+                code: err.code,
+                returned: false,
+            }
         }
     }
 }
@@ -411,9 +448,6 @@ fn pre_run(
 /// Which later task ports a command that is not wired yet.
 fn pending_task(id: CommandId) -> Option<&'static str> {
     match id {
-        CommandId::Queue | CommandId::QueueClear | CommandId::Sessions | CommandId::Update => {
-            Some("Task 3.4")
-        }
         CommandId::Tui => Some("Task 4.5"),
         _ => None,
     }
@@ -458,6 +492,10 @@ fn dispatch(
         CommandId::CommandAntislop => command_antislop::command_antislop_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
+        CommandId::Queue => queue_sessions::queue_list_action(env),
+        CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
+        CommandId::Sessions => queue_sessions::sessions_action(env, inv),
+        CommandId::Update => update_cmd::update_action(env),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),

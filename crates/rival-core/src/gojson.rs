@@ -11,7 +11,7 @@ use std::io;
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, TimeZone, Timelike};
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::ser::{Formatter, PrettyFormatter};
+use serde_json::ser::{CompactFormatter, Formatter, PrettyFormatter};
 use serde_json::value::RawValue;
 
 use crate::gostd;
@@ -28,10 +28,19 @@ pub fn marshal_indent<T: Serialize + ?Sized>(value: &T) -> serde_json::Result<Ve
     Ok(out)
 }
 
-/// A pretty formatter with Go's extra string escapes.
-struct GoFormatter<'a>(PrettyFormatter<'a>);
+/// Go: `json.Marshal(v)`. Compact, with the same HTML-safe escaping as
+/// [`marshal_indent`].
+pub fn marshal<T: Serialize + ?Sized>(value: &T) -> serde_json::Result<Vec<u8>> {
+    let mut out = Vec::with_capacity(128);
+    let mut ser = serde_json::Serializer::with_formatter(&mut out, GoFormatter(CompactFormatter));
+    value.serialize(&mut ser)?;
+    Ok(out)
+}
 
-impl Formatter for GoFormatter<'_> {
+/// A serde_json formatter with Go's extra string escapes.
+struct GoFormatter<F>(F);
+
+impl<F: Formatter> Formatter for GoFormatter<F> {
     fn begin_array<W: ?Sized + io::Write>(&mut self, w: &mut W) -> io::Result<()> {
         self.0.begin_array(w)
     }

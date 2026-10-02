@@ -128,7 +128,7 @@ Each scenario gets its own temp root:
   - `unlink_stdin: true` (needs `stdin_file`): the runner unlinks that file once the parent has exited (`run`: right after it exits; `start`: at its `wait`). A detached child must keep reading through its inherited descriptor.
   - `stdout_file`, `stderr_file`: arbitrary new file names. The path must not exist yet, and no two steps may share one. Default: `.parity/steps/NN.stdout` and `.stderr`.
 - Step stdout and stderr go to files, so a detached child that inherits them appends to the same step output.
-- `expect` in a step: `exit_code` and `stdout` are required. `stderr_lines` and `log_events` default to empty, which means none are allowed.
+- `expect` in a step: `exit_code` and `stdout` are required. `stdout` may be `{"$regex": ...}` (full match) for clap-generated help and completion scripts, whose text may differ from cobra's; every other output is compared exactly. `stderr_lines` and `log_events` default to empty, which means none are allowed.
 - The exit code is checked when the parent exits. Stdout, stderr lines and log events are checked only at the end, after every task process has exited or been killed. Output a detached child writes late is still checked, named redirect files included.
 - Stderr is split per line: a line that parses as a JSON object is a log event, and every other line (blank lines too) is a plain line.
 - Plain lines must equal `stderr_lines` in order. Examples: `rival: detached pid=<PID1>`, errors printed by `cmd/root.go` `Execute`, and the `Update available:` notice of `internal/update/check.go` with its blank line before and after.
@@ -136,8 +136,12 @@ Each scenario gets its own temp root:
 - Each expected event names `level` and `message`, plus required `fields`. Extra fields in an event are allowed. An extra event fails the scenario.
 - Final `expect`:
   - `home_files` (required): the exact file list under `HOME`.
-  - `files`: `json` (subset match), `text` (exact) or `absent` for a normalised path.
+  - `files`: `json` (subset match), `text` (exact), `sha256` (of the raw bytes, never normalised; use it to prove a file was left unchanged) or `absent` for a normalised path.
   - `calls`: exact call counts per fake. A fake not listed must not be called.
+  - `files` by meaning: `{"glob": "<HOME>/.rival/sessions/*.json", "where": {"cli": "codex"}, "bind": {"CODEX": "id", "GROUP": "group_id"}, "json": {...}}`. `where` is a subset match on the raw (not normalised) JSON. Exactly one file under the root must match, or the scenario fails.
+  - `bind` names UUID fields of that file. Any expected string may then use `<ID:CODEX>`, which becomes that UUID's `<UUIDn>` marker. Use it for concurrent reviewers, where first-seen order is a race: it ties the log event, the home file name and the session JSON to the same reviewer.
+  - A name bound by two files must get the same UUID from both, or the scenario fails. Use it for a shared `group_id`.
+  - `dirs`: `{"path": "<ROOT>/tmp", "entries": []}` lists the exact entry names of a directory (not recursive). It fails when the directory is missing, so an empty list proves the directory exists and holds nothing.
   - `http_requests`: the update server requests as a multiset. Empty by default.
 - Expected values compare by type. `{"$regex": ...}` is the only wildcard, and it must be written out.
 

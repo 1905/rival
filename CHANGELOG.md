@@ -31,7 +31,11 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Removed the same readiness race from the escaped-pipe test fixture without changing its cleanup checks.
 - Added Rust skill installation for Claude Code and Codex, including buffered prompts, forced updates and retired-skill cleanup. Four isolated installer scenarios pass.
 - Copied all embedded skill assets unchanged and updated the version-bump script for both source trees. Temporary-copy checks pass; missing skill files now make the script fail.
-- The command port, TUI, Windows support, and release switch remain unfinished. The shipped CLI is still Go.
+- Added Rust queue/session commands, the version banner, cached update checks, Homebrew updates and the existing telemetry opt-outs. Release builds ignore the scenario endpoint override.
+- All 84 non-TUI command scenarios now pass locally. CI runs the full set, including isolated updates, concurrent reviewers, MR cleanup and help/flag coverage.
+- Verified detached-owner crash reporting and later session/queue recovery. A real Codex review completed and opened in Rival.app; the live plan check and hosted P3 gate remain pending.
+- Recorded the existing partial skill-write risk and ineffective Go panic wrapper. The port preserves these behaviors.
+- TUI, Windows support, and the release switch remain unfinished. The shipped CLI is still Go.
 - Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
 
 ### Changed

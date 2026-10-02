@@ -1,0 +1,152 @@
+{
+  "name": "completion-scripts",
+  "description": "cobra's default `completion` command (bash, zsh, fish, powershell, --no-descriptions). The Rust port generates clap scripts, so the checks are structural: top-level commands and a nested command/flag appear; zsh/fish/powershell carry descriptions unless --no-descriptions. `completion` alone prints its help (not Runnable -> flag.ErrHelp). `completion tcsh` prints the same help with exit 0: cobra v1.8.1 command.go execute() returns ErrHelp for a non-runnable command (line 925) before ValidateArgs/NoArgs (line 938).",
+  "steps": [
+    {
+      "run": [
+        "completion"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\AGenerate the autocompletion script for rival for the specified shell\\.\\n)(?=.*Usage:\\s+rival\\s+completion(?![\\w-]))(?=.*\\n\\s+bash +Generate the autocompletion script for bash)(?=.*\\n\\s+zsh +Generate the autocompletion script for zsh)(?=.*\\n\\s+fish +Generate the autocompletion script for fish)(?=.*\\n\\s+powershell +Generate the autocompletion script for powershell)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for completion).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "bash"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "bash",
+        "--no-descriptions"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "zsh"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?=.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "zsh",
+        "--no-descriptions"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?!.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "fish"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?=.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "fish",
+        "--no-descriptions"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?!.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "powershell"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?=.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "powershell",
+        "--no-descriptions"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\bcommand\\b)(?=.*\\binstall\\b)(?=.*\\bqueue\\b)(?=.*\\bsessions\\b)(?=.*\\bupdate\\b)(?=.*\\bversion\\b)(?=.*\\bwait\\b)(?=.*\\bcodex\\b)(?=.*workdir)(?=.*no-queue)(?!.*Skill-facing Codex executor).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "completion",
+        "tcsh"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\AGenerate the autocompletion script for rival for the specified shell\\.\\n)(?=.*Usage:\\s+rival\\s+completion(?![\\w-]))(?=.*\\n\\s+bash +Generate the autocompletion script for bash)(?=.*\\n\\s+zsh +Generate the autocompletion script for zsh)(?=.*\\n\\s+fish +Generate the autocompletion script for fish)(?=.*\\n\\s+powershell +Generate the autocompletion script for powershell)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for completion).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

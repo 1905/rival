@@ -99,9 +99,9 @@ Port: `internal/logfmt`, `internal/procinfo` (darwin `sysctl kern.proc.pid`, lin
 ### Task 1.7 — scenario runner (Rust only) `heavy`
 - [x] `parity/run.py --bin <rival> [--scenario <glob>]`: per scenario, a temp HOME, PATH = `parity/fakes` first, run the Rust binary, collect stdout, **stderr split into plain lines and JSON log events**, exit code and `~/.rival/**`; normalise UUIDs/pids/times/temp paths; compare to the scenario's `expect:` block: exit code, stdout golden, `stderr_lines` (exact plain lines, e.g. `rival: detached pid=<PID>`, usage/validation errors from `root.go:144-149`, `Update available: …` from `update/check.go:108`), `log_events` (level + message + required fields, order-insensitive), session fields, files present; exit 1 on mismatch. Plain stderr lines are allowed alongside JSON; an unexpected plain line fails the scenario.
 - [x] `parity/fakes/`: Python fakes `codex`, `claude`, `grok`, `opencode`, `glab`, `docker`, **`brew`** driven by `FAKE_<NAME>_SCRIPT=<file>` (canned output, exit code, delay, quota text); fake `brew --prefix rival` points into the scenario's temp dir, so `rival update` never touches the installed binary.
-- [ ] Update endpoint: the Rust update client reads `RIVAL_UPDATE_API` (base URL override, honoured only in debug builds; scenarios run the debug binary) and the runner serves canned release JSON from a local HTTP server (`http.server` on 127.0.0.1). Scenarios run with no external network; a guard in the runner fails the scenario if the fake `brew` reports a non-temp prefix. Runner server/guard verified; client implementation remains Task 3.4.
+- [x] Update endpoint: the Rust update client reads `RIVAL_UPDATE_API` (base URL override, honoured only in debug builds; scenarios run the debug binary) and the runner serves canned release JSON from a local HTTP server (`http.server` on 127.0.0.1). Scenarios run with no external network; a guard in the runner fails the scenario if the fake `brew` reports a non-temp prefix. Client and isolated update scenarios pass in P3; the release-profile override test passes too.
 - [x] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
-- [ ] Self-test: 3 scenarios (`version`, `sessions` on empty home, `queue`) pass once Task 3.4 lands; until then the runner's own unit tests.
+- [x] Self-test: `version`, `sessions` on empty home, and `queue` scenarios pass with Task 3.4.
 
 Runner validation: 55 unit tests pass locally, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, inherited stdin after unlink, and bounded startup diagnostics. Hosted macOS/Linux verification passed in CI 37011767761. Initial CLI scenarios remain pending Task 3.4.
 
@@ -123,8 +123,8 @@ Port: `internal/queue/{queue,ticket}.go` + `{queue,crossproc}_test.go`.
 
 ### Task 2.2 — detach + wait `heavy`
 Port: `cmd/{detach,detach_unix,detach_other,wait}.go` + `wait_test.go`. Rust: `crates/rival/src/{detach,wait}.rs`.
-- [ ] Detach (`cmd/detach.go:30-57`): re-exec self with the same args and env `RIVAL_DETACHED=1` (same guard name as Go), new session (`setsid` via `pre_exec`), **inherit stdin, stdout and stderr as they are** (never reopen files; the caller's redirects are the contract), print `rival: detached pid=<n>` on the inherited stderr; if that print fails, kill the child and exit 1; `#[cfg(windows)]` stub until P5.
-- [ ] Scenario: arbitrary redirect file names for stdin/stdout/stderr, input file unlinked right after the parent exits → the detached run still reads its prompt and writes to the caller's files.
+- [x] Detach (`cmd/detach.go:30-57`): re-exec self with the same args and env `RIVAL_DETACHED=1` (same guard name as Go), new session (`setsid` via `pre_exec`), **inherit stdin, stdout and stderr as they are** (never reopen files; the caller's redirects are the contract), print `rival: detached pid=<n>` on the inherited stderr; if that print fails, kill the child and exit 1; `#[cfg(windows)]` stub until P5.
+- [x] Scenario: arbitrary redirect file names for stdin/stdout/stderr, input file unlinked right after the parent exits → the detached run still reads its prompt and writes to the caller's files. Passed in P3; actual read timing is not controlled, as recorded in the scenario.
 - [x] `wait --log <file>` logic: starting markers, session polling, all six named Go test cases, exit codes and exact summary lines ported. CLI wiring and signal checks remain P3.
 
 **P2a verification:** detach/wait functions implemented; 36 focused Rust tests pass. The full workspace has 257 passing tests and two ignored helper/generator entries. All 58 runner self-tests pass. Build, formatting and Clippy pass locally. The seven new detach/wait scenarios validate against source-derived sample output; actual command execution waits for P3. The scenario checks link short IDs to full UUID markers. Closed-before-startup stderr remains a P3 compatibility item (see `research.md`); the detach checkbox stays open until resolved. Redirect/unlink timing is stated explicitly in its scenario.
@@ -200,13 +200,17 @@ Port: `internal/skills/{embed,codex}.go` + tests, `cmd/install.go` + test. `incl
 
 - [x] Embedded assets, Codex variants, target detection, prompt buffering, force/skip behavior and retired-skill cleanup ported. The version-bump script updates both trees.
 
-**Task 3.3 verification:** controller checks passed: 774 workspace tests, six ignored helper/generator entries, formatting and Clippy. All four installer scenarios passed in temporary homes; all 57 scenario schemas validate. Ten embedded files match the Go assets byte for byte. The script updated 18 temporary copies without changing repository versions. Hosted CI is pending. The script now exits nonzero for missing skill files. Windows path behavior remains P5; invalid UTF-8 and failed-parent error-path limits remain recorded.
+**Task 3.3 verification:** controller checks passed: 774 workspace tests, six ignored helper/generator entries, formatting and Clippy. All four installer scenarios passed in temporary homes; all 57 scenario schemas validate. Ten embedded files match the Go assets byte for byte. The script updated 18 temporary copies without changing repository versions. [CI 37048782978](https://github.com/1905/rival/actions/runs/37048782978) passed on macOS/Linux at `e86dd68`, including Swift decoding. The script now exits nonzero for missing skill files. Windows path behavior remains P5; invalid UTF-8 and failed-parent error-path limits remain recorded.
 
 ### Task 3.4 — queue, sessions, version, update, telemetry `light`
 Port: `cmd/{queue,sessions,version,update}.go` + `update_{check_,}test.go`, `internal/update/check.go`, `internal/telemetry/telemetry.go` (same DSN, same opt-out).
 
+- [x] Queue/session output, version banner, update cache/client, Homebrew update and telemetry lifecycle ported. All non-TUI CLI scenarios are enabled in CI.
+
+**Task 3.4 local verification:** 815 workspace tests passed with six intentional helper/generator ignores; formatting, Clippy and build passed. Runner checks: 69 tests, including two new raw-file hash checks. All 84 scenarios passed across the full run and focused corrections to three source-derived fixtures. Nineteen release-profile update tests passed, including the debug-only endpoint override. A detached-owner SIGKILL produced wait exit 3 while its provider stayed alive; later orphan recovery finalized the session and freed the ticket. The real Codex review completed and its Rust session rendered in Rival.app. The real plan review and hosted CI remain pending. Update transport/JSON diagnostics and closed-descriptor child inheritance limits are recorded in `research.md`.
+
 ### Gate P3 `gate`
-- [ ] Full scenario set (every command and flag in `cli-surface.md`, success + failure) → all pass.
+- [x] Local non-TUI scenario set (84 scenarios covering the command/flag matrix in `parity/coverage.md`) passes. Interactive TUI acceptance remains P4; hosted macOS/Linux results remain pending.
 - [ ] Orchestrator manual check: one real `rival command codex review` and one `rival command plan` on this repo with the Rust binary (temp HOME, real CLIs); output reads right and the session opens in the Swift app.
 - [ ] Merge.
 
@@ -316,6 +320,10 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Codex antislop skill text names only Codex as the default | `skills.CodexSkill` | Runtime defaults to Codex plus Claude. Embedded instructions are copied unchanged. |
 | Deprecated-skill cleanup leaves dangling symlinks | `installSkills` | Its initial `Stat` follows the link and fails. Preserved. |
 | Partial retired-skill cleanup loses its removal count on error | `removeSkillDirsByHash` caller | The failure message is printed, but prior successful removals are not counted. Preserved. |
+| A partial skill write can leave the new version header with truncated content | `install.writeSkill` | Go `os.WriteFile` truncates before writing. A later version-only comparison can skip the damaged file. Confirmed from source after the P3 live review; preserved. |
+| The panic wrapper never captures a panic | `telemetry.RecoverPanic` | Its indirect `recover()` call does not run directly in the deferred function. Source-derived Go bug; no automatic Rust panic capture is added. |
+| Command errors skip the deferred telemetry flush | `cmd.Execute`, `main` | `os.Exit` bypasses the defer. Preserved; normal returns flush with a two-second budget. |
+| Update versions use padded string ordering | `update.normalizeVersion` | Numeric releases sort before `dev`; two-part versions remain unpadded. Preserved. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

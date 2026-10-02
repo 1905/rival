@@ -1,0 +1,175 @@
+{
+  "name": "run-grok-flags",
+  "description": "`rival run grok` (cmd/run_grok.go, cmd/model_run.go). Step 1: --prompt-stdin --effort low --no-queue --workdir sub: spec.resolveEffort -> GrokEffort(low); executor/grok.go RunGrokModel writes the prompt to a temp file and runs without the review sandbox; the temp file is removed (tmp/ stays empty). Step 2: --review src/ --no-queue --effort ultra: ultra clamps to high, review adds --sandbox read-only, mirror then the formatted review.",
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    },
+    {
+      "write": "home/.grok/auth.json",
+      "text": "{}\n",
+      "mode": "0600"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "grok": {
+        "responses": [
+          {
+            "argv": [
+              "--prompt-file",
+              {
+                "$regex": "<ROOT>/tmp/rival-grok-[0-9]+\\.md"
+              },
+              "-m",
+              "grok-4.6",
+              "--effort",
+              "low",
+              "--output-format",
+              "plain",
+              "--no-auto-update",
+              "--yolo",
+              "--cwd",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work/sub"
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--prompt-file",
+              {
+                "$regex": "<ROOT>/tmp/rival-grok-[0-9]+\\.md"
+              },
+              "-m",
+              "grok-4.6",
+              "--effort",
+              "high",
+              "--output-format",
+              "plain",
+              "--no-auto-update",
+              "--yolo",
+              "--cwd",
+              "<ROOT>/work",
+              "--sandbox",
+              "read-only"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "run",
+        "grok",
+        "--prompt-stdin",
+        "--effort",
+        "low",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting grok",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "low",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "run",
+        "grok",
+        "--review",
+        "src/",
+        "--no-queue",
+        "--effort",
+        "ultra"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n\n\n═══ RIVAL REVIEW ═══\n\nModel: grok (grok-4.6)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID2>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting grok",
+            "fields": {
+              "session": "<UUID2>",
+              "effort": "high",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".grok/auth.json",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID2>.json",
+      ".rival/sessions/<UUID2>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "cli": "grok",
+          "effort": "low",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.json",
+        "json": {
+          "status": "completed",
+          "cli": "grok",
+          "effort": "high",
+          "mode": "review",
+          "review_scope": "src/",
+          "work_dir": "<ROOT>/work"
+        }
+      }
+    ],
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ],
+    "calls": {
+      "grok": 2
+    }
+  }
+}

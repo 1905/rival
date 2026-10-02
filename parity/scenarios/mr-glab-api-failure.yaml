@@ -1,6 +1,6 @@
 {
   "name": "mr-glab-api-failure",
-  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). matchingRemote finds origin (git remote, git remote get-url origin; remoteIdentity matches gitlab.example.com + group/sub/app), then glab api --hostname gitlab.example.com projects/group%2Fsub%2Fapp/merge_requests/42 runs in the caller workdir with apiEnv (global GitLab token/host vars and DEBUG removed, GIT_TERMINAL_PROMPT=0, GLAB_CHECK_UPDATE=false). glab exits 1; exec.Cmd.Output reports `exit status 1` (its stderr only lands in ExitError.Stderr, which the message does not print). No checkout, session or queue work happens; cmd/root.go Execute prints the error on stderr and exits 1.",
+  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). matchingRemote finds origin (git remote, git remote get-url origin; remoteIdentity matches gitlab.example.com + group/sub/app), then glab api --hostname gitlab.example.com projects/group%2Fsub%2Fapp/merge_requests/42 runs in the caller workdir with apiEnv (global GitLab token/host vars and DEBUG removed, GIT_TERMINAL_PROMPT=0, GLAB_CHECK_UPDATE=false). glab exits 1; exec.Cmd.Output reports `exit status 1` (its stderr only lands in ExitError.Stderr, which the message does not print). No checkout, session or queue work happens; cmd/root.go Execute prints the error on stderr and exits 1. expect.dirs: <ROOT>/tmp (TMPDIR) exists and is empty: glab fails before os.MkdirTemp, so no checkout was created.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -99,6 +99,12 @@
     "calls": {
       "codex": 1,
       "glab": 1
-    }
+    },
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
   }
 }

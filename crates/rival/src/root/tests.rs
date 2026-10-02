@@ -379,21 +379,40 @@ fn wait_summarizes_finished_sessions_from_the_configured_home() {
     assert_eq!(r.stderr, "rival wait: exit 2\n");
 }
 
+/// Go `main` defers `telemetry.Flush`, and `Execute` calls `os.Exit` on
+/// every error, so only a normal return reaches the flush. A detach parent
+/// exits inside the pre-run hook, also with `os.Exit`.
 #[test]
-fn pending_commands_fail_plainly_after_the_pre_run() {
-    for (args, path, task) in [
-        (&["queue"][..], "rival queue", "Task 3.4"),
-        (&["queue", "clear"], "rival queue clear", "Task 3.4"),
-        (&["sessions"], "rival sessions", "Task 3.4"),
-        (&["update"], "rival update", "Task 3.4"),
+fn only_a_normal_return_reaches_the_telemetry_flush() {
+    let fix = Fixture::new();
+    let events = recorder();
+    for (args, detach, code, returned) in [
+        (&["version"][..], DetachOutcome::Continue, 0, true),
+        (&["--help"], DetachOutcome::Continue, 0, true),
+        (&["nope"], DetachOutcome::Continue, 1, false),
+        (&["wait"], DetachOutcome::Continue, 64, false),
+        (
+            &["command", "codex", "--detach"],
+            DetachOutcome::Exit(0),
+            0,
+            false,
+        ),
     ] {
-        let r = run(args);
-        assert_eq!(r.code, 1, "{args:?}");
-        assert_eq!(
-            r.stderr,
-            format!("{path}: not available in this build yet ({task} of the Rust port)\n")
-        );
-        assert_eq!(r.events, ["reap", "update"], "{args:?}");
+        let hooks = hooks(&events, detach);
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+        let prepare = no_mr();
+        let mut stdin = FakeStdin::new("");
+        let mut env = CmdEnv {
+            cfg: &fix.cfg,
+            stdin: &mut stdin,
+            stdout: &mut stdout,
+            stderr: &mut stderr,
+            prepare_mr: &*prepare,
+            signals: false,
+        };
+        let exit = execute_inner(&mut env, &hooks, &DEFAULTS, &args, Duration::from_secs(5));
+        assert_eq!((exit.code, exit.returned), (code, returned), "{args:?}");
     }
 }
 

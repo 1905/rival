@@ -14,8 +14,10 @@ libc = "0.2.189"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = "1.3.0"
+sentry = { version = "0.49.3", default-features = false, features = ["ureq", "rustls"] }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
 sha2 = "0.11.0"
+ureq = { version = "3.0.11", default-features = false, features = ["rustls"] }
 vte = "0.14.1"
 tempfile = "3.27.0"
 uuid = { version = "1.26.1", features = ["v4"] }

@@ -1,6 +1,6 @@
 {
   "name": "mr-review-success",
-  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). matchingRemote finds origin (git remote, git remote get-url origin; remoteIdentity matches gitlab.example.com + group/sub/app), then glab api --hostname gitlab.example.com projects/group%2Fsub%2Fapp/merge_requests/42 runs in the caller workdir with apiEnv (global GitLab token/host vars and DEBUG removed, GIT_TERMINAL_PROMPT=0, GLAB_CHECK_UPDATE=false). The fake glab returns the MR with diff_refs base/head equal to the remote fixture commits (SHAs from the runner's fixed identity/date). Prepare makes $TMPDIR/rival-mr-N (os.MkdirTemp), runs git init, remote add origin <caller HTTPS URL>, fetch --quiet --no-tags --no-recurse-submodules origin <base> <head>, -c core.hooksPath=/dev/null checkout --quiet --detach <head>, rev-parse HEAD, cat-file -e <base>^{commit}, and diff --no-ext-diff --no-textconv --output=.git/rival-mr.diff. Only that checkout's fetch reaches the local remote: GIT_CONFIG_GLOBAL includes the url.insteadOf rewrite under includeIf gitdir:**/tmp/rival-mr-*/, protocol.allow=never and protocol.file.allow=always, so the caller's `git remote get-url` stays HTTPS and nothing can reach a network. prepareReviewTarget prints Identity + blank line first; the bug-hunter prompt carries the snapshot scope with the raw patch (review/prompt.go BuildReviewerPrompt). codex runs in the checkout; FormatReviewResult shows the MR URL as Scope. The caller's dirty and untracked files are untouched. The checkout is removed after the run (reviewTarget.close); the runner cannot assert an empty tmp/ (no glob/absent support), so cleanup stays a unit-test check.",
+  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). matchingRemote finds origin (git remote, git remote get-url origin; remoteIdentity matches gitlab.example.com + group/sub/app), then glab api --hostname gitlab.example.com projects/group%2Fsub%2Fapp/merge_requests/42 runs in the caller workdir with apiEnv (global GitLab token/host vars and DEBUG removed, GIT_TERMINAL_PROMPT=0, GLAB_CHECK_UPDATE=false). The fake glab returns the MR with diff_refs base/head equal to the remote fixture commits (SHAs from the runner's fixed identity/date). Prepare makes $TMPDIR/rival-mr-N (os.MkdirTemp), runs git init, remote add origin <caller HTTPS URL>, fetch --quiet --no-tags --no-recurse-submodules origin <base> <head>, -c core.hooksPath=/dev/null checkout --quiet --detach <head>, rev-parse HEAD, cat-file -e <base>^{commit}, and diff --no-ext-diff --no-textconv --output=.git/rival-mr.diff. Only that checkout's fetch reaches the local remote: GIT_CONFIG_GLOBAL includes the url.insteadOf rewrite under includeIf gitdir:**/tmp/rival-mr-*/, protocol.allow=never and protocol.file.allow=always, so the caller's `git remote get-url` stays HTTPS and nothing can reach a network. prepareReviewTarget prints Identity + blank line first; the bug-hunter prompt carries the snapshot scope with the raw patch (review/prompt.go BuildReviewerPrompt). codex runs in the checkout; FormatReviewResult shows the MR URL as Scope. The caller's dirty and untracked files are untouched. The checkout is removed after the run (reviewTarget.close); expect.dirs checks that tmp/ is empty afterwards. expect.dirs: <ROOT>/tmp (TMPDIR) exists and is empty: the review completed and reviewTarget.close removed the checkout.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -248,6 +248,12 @@
     "calls": {
       "codex": 2,
       "glab": 1
-    }
+    },
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
   }
 }

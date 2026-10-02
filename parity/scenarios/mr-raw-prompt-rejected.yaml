@@ -1,6 +1,6 @@
 {
   "name": "mr-raw-prompt-rejected",
-  "description": "`rival command codex` with a raw prompt that names an MR URL (Go cmd/mr_guard_test.go TestModelCommandRejectsMRInRawPrompt). runModelCommand calls rejectUnresolvedMR(raw) for a non-review prompt before effort, preflight or any MR resolve; Execute prints the error and exits 1. Neither codex nor glab runs (both fakes are present but unscripted, so any call fails the scenario).",
+  "description": "`rival command codex` with a raw prompt that names an MR URL (Go cmd/mr_guard_test.go TestModelCommandRejectsMRInRawPrompt). runModelCommand calls rejectUnresolvedMR(raw) for a non-review prompt before effort, preflight or any MR resolve; Execute prints the error and exits 1. Neither codex nor glab runs (both fakes are present but unscripted, so any call fails the scenario). expect.dirs: <ROOT>/tmp (TMPDIR) exists and is empty: the prompt is rejected before Prepare, so no checkout was created.",
   "steps": [
     {
       "run": [
@@ -19,6 +19,12 @@
     }
   ],
   "expect": {
-    "home_files": []
+    "home_files": [],
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
   }
 }

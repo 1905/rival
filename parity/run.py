@@ -16,6 +16,7 @@ import difflib
 import faulthandler
 import fnmatch
 import glob
+import hashlib
 import http.server
 import json
 import os
@@ -66,6 +67,7 @@ GIT_IDENTITY = {
 }
 RUN_KEYS = ("run", "cwd", "stdin", "stdin_file", "unlink_stdin", "stdout_file", "stderr_file", "env", "timeout")
 DEFAULT_STEP_TIMEOUT = 30.0
+BIND_RE = re.compile(r"<ID:([A-Z0-9_]+)>")
 DEFAULT_SCENARIO_TIMEOUT = 300.0
 
 LAUNCHER = """#!{python} -IB
@@ -146,8 +148,15 @@ def _step_expect(expect, where):
     _keys(expect, where, ("exit_code", "stdout", "stderr_lines", "log_events"), ("exit_code", "stdout"))
     if type(expect["exit_code"]) is not int:
         raise ScenarioError(where + ".exit_code: want an integer")
-    if not isinstance(expect["stdout"], str):
-        raise ScenarioError(where + ".stdout: want a string")
+    out = expect["stdout"]
+    if not isinstance(out, str) and not (isinstance(out, dict) and set(out) == {"$regex"}
+                                         and isinstance(out["$regex"], str)):
+        raise ScenarioError(where + ".stdout: want a string or {\"$regex\": ...}")
+    if isinstance(out, dict):
+        try:
+            re.compile(out["$regex"])
+        except re.error as err:
+            raise ScenarioError("%s.stdout: bad $regex: %s" % (where, err))
     _str_list(expect.get("stderr_lines", []), where + ".stderr_lines")
     problems = normalise.validate_expected_events(expect.get("log_events", []))
     if problems:
@@ -263,15 +272,41 @@ def validate(sc):
     if handles:
         raise ScenarioError("handles never waited: %s" % sorted(handles))
     expect = sc["expect"]
-    _keys(expect, "expect", ("home_files", "files", "calls", "http_requests"), ("home_files",))
+    _keys(expect, "expect", ("home_files", "files", "dirs", "calls", "http_requests"), ("home_files",))
     _str_list(expect["home_files"], "expect.home_files")
+    bound = set()
     for i, f in enumerate(_list(expect.get("files", []), "expect.files")):
         where = "expect.files[%d]" % i
-        _keys(f, where, ("path", "json", "text", "absent"), ("path",))
-        if sum(k in f for k in ("json", "text", "absent")) != 1:
-            raise ScenarioError(where + ": set exactly one of json, text, absent")
+        _keys(f, where, ("path", "glob", "where", "bind", "json", "text", "sha256", "absent"))
+        if ("path" in f) == ("glob" in f):
+            raise ScenarioError(where + ": set exactly one of path, glob")
+        if sum(k in f for k in ("json", "text", "sha256", "absent")) != 1:
+            raise ScenarioError(where + ": set exactly one of json, text, sha256, absent")
+        if "sha256" in f and not (isinstance(f["sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", f["sha256"])):
+            raise ScenarioError(where + ".sha256: want 64 lowercase hex digits")
         if "absent" in f and f["absent"] is not True:
             raise ScenarioError(where + ".absent: want true")
+        if "glob" in f:
+            if not isinstance(f["glob"], str) or not isinstance(f.get("where"), dict) or not f["where"]:
+                raise ScenarioError(where + ": glob needs a string glob and a non-empty where object")
+            if "absent" in f:
+                raise ScenarioError(where + ": a glob selects one existing file; absent is not allowed")
+            bind = f.get("bind", {})
+            if not isinstance(bind, dict) or not all(
+                    re.fullmatch(r"[A-Z0-9_]+", k) and isinstance(v, str) and v for k, v in bind.items()):
+                raise ScenarioError(where + ".bind: want {NAME: json_field} with NAME of [A-Z0-9_]")
+            bound.update(bind)
+        elif "where" in f or "bind" in f:
+            raise ScenarioError(where + ": where and bind need glob")
+    for i, d in enumerate(_list(expect.get("dirs", []), "expect.dirs")):
+        where = "expect.dirs[%d]" % i
+        _keys(d, where, ("path", "entries"), ("path", "entries"))
+        if not isinstance(d["path"], str):
+            raise ScenarioError(where + ".path: want a string")
+        _str_list(d["entries"], where + ".entries")
+    used = set(BIND_RE.findall(json.dumps([steps, expect])))
+    if used - bound:
+        raise ScenarioError("<ID:...> names never bound by a files glob: %s" % sorted(used - bound))
     calls = expect.get("calls", {})
     _keys(calls, "expect.calls", fakecli.NAMES)
     for name, n in calls.items():
@@ -541,6 +576,8 @@ class Task:
         self.server = None
         self.server_closed = False
         self.seq = 0
+        self.bindings = {}
+        self.selected = {}
         self.norm = normalise.Normaliser(
             [(self.home, "<HOME>"), (root, "<ROOT>"), (self.root, "<ROOT>"),
              (bin_path, "<BIN>"), (os.path.realpath(bin_path), "<BIN>")],
@@ -756,10 +793,17 @@ class Task:
     def check_output(self, handle, expect):
         label = handle.label
         stdout = self.norm.text(_read(handle.out_path))
-        if stdout != expect["stdout"]:
-            self.problem("%s: stdout differs\n%s" % (label, _diff(expect["stdout"], stdout)))
         plain, events = normalise.split_stderr(_read(handle.err_path))
         plain = [self.norm.text(line) for line in plain]
+        normalised = [self.norm.json(e) for e in events]
+        # Bound names resolve only now: the actual output assigned its markers first.
+        expect = self.resolve(expect)
+        if isinstance(expect["stdout"], dict):
+            # Structural check (clap help and completion scripts): a full match.
+            if not normalise.matches(expect["stdout"], stdout):
+                self.problem("%s: stdout does not match %r\n  actual: %r" % (label, expect["stdout"]["$regex"], stdout))
+        elif stdout != expect["stdout"]:
+            self.problem("%s: stdout differs\n%s" % (label, _diff(expect["stdout"], stdout)))
         if plain != expect.get("stderr_lines", []):
             self.problem("%s: plain stderr lines differ\n  expected: %r\n  actual:   %r"
                          % (label, expect.get("stderr_lines", []), plain))
@@ -767,8 +811,7 @@ class Task:
             bad = normalise.event_problems(event)
             if bad:
                 self.problem("%s: malformed log event %s: %s" % (label, json.dumps(event), ", ".join(bad)))
-        events = [self.norm.json(e) for e in events]
-        missing, extra = normalise.match_events(expect.get("log_events", []), events)
+        missing, extra = normalise.match_events(expect.get("log_events", []), normalised)
         for e in missing:
             self.problem("%s: expected log event not seen: %s" % (label, json.dumps(e, sort_keys=True)))
         for e in extra:
@@ -815,8 +858,54 @@ class Task:
 
     # -- final checks
 
+    def resolve(self, value):
+        """Replaces <ID:NAME> with the UUID marker of the file bound to NAME."""
+        if isinstance(value, str):
+            def sub(m):
+                raw = self.bindings.get(m.group(1))
+                return m.group(0) if raw is None else self.norm.marker("UUID", raw)
+            return BIND_RE.sub(sub, value)
+        if isinstance(value, dict):
+            return {k: self.resolve(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self.resolve(v) for v in value]
+        return value
+
+    def bind_files(self):
+        """Selects each glob entry's one file by raw JSON fields, before any output check."""
+        for i, f in enumerate(self.sc["expect"].get("files", [])):
+            if "glob" not in f:
+                continue
+            pattern = self.subst(f["glob"])
+            found = []
+            for dirpath, dirnames, filenames in os.walk(self.root):
+                dirnames[:] = sorted(d for d in dirnames if os.path.join(dirpath, d) != self.parity)
+                for name in sorted(filenames):
+                    p = os.path.join(dirpath, name)
+                    if not fnmatch.fnmatchcase(p, pattern):
+                        continue
+                    try:
+                        data = json.loads(_read(p))
+                    except ValueError:
+                        continue
+                    if normalise.matches(f["where"], data):
+                        found.append((p, data))
+            label = "files[%d] glob %s where %s" % (i, f["glob"], json.dumps(f["where"], sort_keys=True))
+            if len(found) != 1:
+                self.problem("%s: %d files match, want 1" % (label, len(found)))
+                continue
+            path, data = found[0]
+            self.selected[i] = path
+            for name, field in sorted(f.get("bind", {}).items()):
+                value = data.get(field) if isinstance(data, dict) else None
+                if not isinstance(value, str) or not normalise.UUID_RE.fullmatch(value):
+                    self.problem("%s: field %s is not a UUID; cannot bind %s" % (label, field, name))
+                elif self.bindings.setdefault(name, value) != value:
+                    # A name bound by two files must name one UUID: e.g. a shared group_id.
+                    self.problem("%s: %s=%s differs from the UUID already bound to %s"
+                                 % (label, field, value, name))
+
     def check_files(self):
-        expect = self.sc["expect"]
         listed = []
         for dirpath, dirnames, filenames in os.walk(self.home):
             dirnames.sort()
@@ -824,9 +913,11 @@ class Task:
                 p = os.path.join(dirpath, name)
                 listed.append((os.lstat(p).st_mtime_ns, os.path.relpath(p, self.home)))
         actual = sorted(self.norm.text(rel) for _, rel in sorted(listed))
+        expect = self.resolve(self.sc["expect"])
         want = sorted(expect["home_files"])
         if actual != want:
             self.problem("home files differ\n  expected: %r\n  actual:   %r" % (want, actual))
+        self.check_dirs(expect)
         if not expect.get("files"):
             return
         index = {}
@@ -835,14 +926,28 @@ class Task:
             for name in filenames:
                 p = os.path.join(dirpath, name)
                 index.setdefault(self.norm.text(p), p)
-        for f in expect["files"]:
-            real = index.get(f["path"])
+        expect = self.resolve(self.sc["expect"])
+        for i, f in enumerate(expect["files"]):
+            if "glob" in f:
+                real = self.selected.get(i)
+                if real is None:
+                    continue  # bind_files reported it
+                f = dict(f, path="%s (selected by %s)" % (self.norm.text(real), f["glob"]))
+            else:
+                real = index.get(f["path"])
             if "absent" in f:
                 if real is not None:
                     self.problem("file %s exists, want absent" % f["path"])
                 continue
             if real is None:
                 self.problem("file %s missing" % f["path"])
+                continue
+            if "sha256" in f:
+                # Raw bytes, never normalised: proves a file was left exactly as it was.
+                with open(real, "rb") as fh:
+                    got = hashlib.sha256(fh.read()).hexdigest()
+                if got != f["sha256"]:
+                    self.problem("file %s sha256 %s, want %s" % (f["path"], got, f["sha256"]))
                 continue
             content = _read(real)
             if "text" in f:
@@ -858,6 +963,18 @@ class Task:
             if not normalise.matches(f["json"], got):
                 self.problem("file %s JSON differs\n  expected subset: %s\n  actual: %s"
                              % (f["path"], json.dumps(f["json"], sort_keys=True), json.dumps(got, sort_keys=True)))
+
+    def check_dirs(self, expect):
+        """Exact entry names of a directory: proves it exists and holds nothing else."""
+        for d in expect.get("dirs", []):
+            real = self.path(d["path"])
+            if not os.path.isdir(real) or os.path.islink(real):
+                self.problem("dir %s missing" % d["path"])
+                continue
+            got = sorted(self.norm.text(name) for name in os.listdir(real))
+            if got != sorted(d["entries"]):
+                self.problem("dir %s entries differ\n  expected: %r\n  actual:   %r"
+                             % (d["path"], sorted(d["entries"]), got))
 
     def check_calls(self):
         want = self.sc["expect"].get("calls", {})
@@ -927,6 +1044,8 @@ class Task:
                 with SIGNALS.deferred():
                     self.cleanup()
             # Step output is read only now: no task process can still write to it.
+            if self.server is not None:
+                self.bind_files()
             checks = [(handle.label, lambda h=handle, e=expect: self.check_output(h, e))
                       for handle, expect in self.outputs]
             if self.server is not None:

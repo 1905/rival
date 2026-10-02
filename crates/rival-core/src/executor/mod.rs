@@ -13,7 +13,7 @@ pub mod codex;
 pub mod grok;
 pub mod kimi;
 pub mod opencode;
-pub(crate) mod oscmd;
+pub mod oscmd;
 pub mod process;
 pub mod quota;
 pub mod subprocess;

@@ -139,3 +139,19 @@ All nine skill files and the Codex workflow template match the Go assets byte fo
 Controller checks passed: 774 workspace tests, formatting, Clippy, four installer scenarios and 57 scenario schemas. The version-bump script updated all 18 skill copies in a temporary repository. The 20 original asset files stayed unchanged. Missing skill files now make that maintenance script exit nonzero.
 
 Source quirks remain visible: the Codex antislop instructions name a single default reviewer, dangling deprecated symlinks survive cleanup, and a partial hash-cleanup failure loses its removal count. Go's Windows embedded-file lookup also uses backslashes against `embed.FS`; Rust keeps slash asset paths so the approved Windows install can work. Native Windows validation remains P5. Failed-parent path detail and invalid UTF-8 remain the recorded filesystem boundary limits.
+
+## Unpublished release dispatch — 2026-10-03
+
+The release workflow already exists on master and has prior runs. Keep its path when adding snapshot dispatch. GitHub documents branch dispatch through CLI/API for an already-run workflow. The intended P6 check uses the feature branch, without a release tag or an early Rust-switch merge. This dispatch has not yet been tried with the revised workflow. [GitHub dispatch documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)
+
+## Remaining commands and P3 checks — 2026-10-03
+
+Queue/session output, the version banner, update client/cache, Homebrew update and telemetry lifecycle now have Rust implementations. The client decodes the first HTTP JSON value without waiting for EOF and samples cache time after a successful fetch. Homebrew receives null stdin; the upgraded installer receives the caller's input. Scoped test writers join before return.
+
+The controller verified 815 workspace tests, formatting, Clippy, build, 67 runner tests and the two later raw-hash tests. The implementer also ran all 69 runner tests together. Nineteen release-profile update tests passed; the controller independently reran the compiled release endpoint-override test. All 84 CLI scenarios passed across the full run and three corrected fixtures. The corrections preserve Go's high-to-max Claude effort mapping, read-only review arguments and unchanged stale-cache bytes. Hosted CI is pending.
+
+An actual detached fake review held one running queue ticket. Killing its owner made `wait` return 3 while the provider remained alive. After task-owned provider cleanup, normal `sessions` startup marked the orphan failed with exit 1 and removed the queue ticket. No task processes survived.
+
+A real Codex review through the Rust binary completed in 208.45 seconds. Rival.app displayed the completed session and parsed finding from the private test home. The finding concerns interrupted skill writes: Go uses `os.WriteFile`, which truncates before writing. A partial write can preserve a new version header and defeat the next version-only check. This is an existing Go risk, retained under the approved port contract. The live plan review remains in progress.
+
+Compatibility limits: update transport and JSON syntax diagnostics use ureq/serde wording. ureq uses its User-Agent, webpki roots and proxy rules, without Go's gzip behavior. The inherited child-stdio update path passes Rust's null-device replacement if a descriptor was closed before startup. These limits are separate from the verified detach closed-descriptor contract. Sentry uses one SDK transport thread with a two-second flush; command errors bypass that flush as Go's `os.Exit` does. No automatic error or panic event is added. Interactive TUI acceptance remains P4; native Windows checks remain P5.

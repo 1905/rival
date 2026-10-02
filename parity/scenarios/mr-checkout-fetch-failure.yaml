@@ -1,0 +1,195 @@
+{
+  "name": "mr-checkout-fetch-failure",
+  "description": "Derived from mr-review-success. glab returns the MR with sha = diff_refs.head_sha = a well-formed SHA that the remote does not have, so internal/mergerequest/mergerequest.go Prepare passes the identity and diff-ref checks, creates $TMPDIR/rival-mr-N (os.MkdirTemp), runs git init and remote add, and `git fetch ... origin <base> <head>` fails. git() wraps it as 'git fetch: exit status 128' (stderr only in ExitError); Prepare returns 'prepare MR checkout: ...' and its deferred snapshot.Close removes the checkout. cmd/model_command.go prepareReview fails before any session or queue work, so only `codex login status` ran. expect.dirs proves tmp/ exists and is empty.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          }
+        ]
+      },
+      "glab": {
+        "responses": [
+          {
+            "argv": [
+              "api",
+              "--hostname",
+              "gitlab.example.com",
+              "projects/group%2Fsub%2Fapp/merge_requests/42"
+            ],
+            "times": 1,
+            "expect": {
+              "cwd": "<ROOT>/work",
+              "env": {
+                "GITLAB_TOKEN": null,
+                "GITLAB_ACCESS_TOKEN": null,
+                "OAUTH_TOKEN": null,
+                "CI_JOB_TOKEN": null,
+                "GITLAB_HOST": null,
+                "GITLAB_URI": null,
+                "GL_HOST": null,
+                "DEBUG": null,
+                "GIT_TERMINAL_PROMPT": "0",
+                "GLAB_CHECK_UPDATE": "false"
+              }
+            },
+            "stdout": "{\"iid\":42,\"web_url\":\"https://gitlab.example.com/group/sub/app/-/merge_requests/42\",\"sha\":\"1111111111111111111111111111111111111111\",\"source_branch\":\"feature\",\"target_branch\":\"main\",\"diff_refs\":{\"base_sha\":\"090479deb9ac7429fee542c439eadf972316cb84\",\"head_sha\":\"1111111111111111111111111111111111111111\"}}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "GITLAB_TOKEN": "wrong-host-token",
+    "GITLAB_ACCESS_TOKEN": "wrong-host-token",
+    "OAUTH_TOKEN": "wrong-host-token",
+    "CI_JOB_TOKEN": "wrong-host-token",
+    "GITLAB_HOST": "other.example.com",
+    "GITLAB_URI": "https://other.example.com",
+    "GL_HOST": "other.example.com",
+    "DEBUG": "1",
+    "GIT_CONFIG_GLOBAL": "<ROOT>/gitcfg/global.config"
+  },
+  "fixtures": [
+    {
+      "write": "remote/code.txt",
+      "text": "base\n"
+    },
+    {
+      "git": "remote",
+      "args": [
+        "init",
+        "-q"
+      ]
+    },
+    {
+      "git": "remote",
+      "args": [
+        "add",
+        "code.txt"
+      ]
+    },
+    {
+      "git": "remote",
+      "args": [
+        "commit",
+        "-q",
+        "-m",
+        "base"
+      ]
+    },
+    {
+      "write": "remote/code.txt",
+      "text": "MR content\n"
+    },
+    {
+      "git": "remote",
+      "args": [
+        "commit",
+        "-qam",
+        "MR head"
+      ]
+    },
+    {
+      "write": "work/code.txt",
+      "text": "caller base\n"
+    },
+    {
+      "git": "work",
+      "args": [
+        "init",
+        "-q"
+      ]
+    },
+    {
+      "git": "work",
+      "args": [
+        "add",
+        "code.txt"
+      ]
+    },
+    {
+      "git": "work",
+      "args": [
+        "commit",
+        "-q",
+        "-m",
+        "caller"
+      ]
+    },
+    {
+      "git": "work",
+      "args": [
+        "remote",
+        "add",
+        "origin",
+        "https://gitlab.example.com/group/sub/app.git"
+      ]
+    },
+    {
+      "write": "work/code.txt",
+      "text": "dirty caller file\n"
+    },
+    {
+      "write": "work/untracked.txt",
+      "text": "untracked\n"
+    },
+    {
+      "write": "gitcfg/rewrite.config",
+      "text": "[url \"<ROOT>/remote\"]\n\tinsteadOf = https://gitlab.example.com/group/sub/app.git\n"
+    },
+    {
+      "write": "gitcfg/global.config",
+      "text": "[protocol]\n\tallow = never\n[protocol \"file\"]\n\tallow = always\n[includeIf \"gitdir:**/tmp/rival-mr-*/\"]\n\tpath = <ROOT>/gitcfg/rewrite.config\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review https://gitlab.example.com/group/sub/app/-/merge_requests/42",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "prepare MR checkout: git fetch: exit status 128"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "files": [
+      {
+        "path": "<ROOT>/work/code.txt",
+        "text": "dirty caller file\n"
+      },
+      {
+        "path": "<ROOT>/work/untracked.txt",
+        "text": "untracked\n"
+      }
+    ],
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ],
+    "calls": {
+      "codex": 1,
+      "glab": 1
+    }
+  }
+}

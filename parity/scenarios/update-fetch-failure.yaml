@@ -1,0 +1,38 @@
+{
+  "name": "update-fetch-failure",
+  "description": "cmd/update.go: FetchLatest gets HTTP 500 -> fmt.Errorf(\"status %d\") wrapped as 'check latest version: status 500'; Execute prints it on stderr, exit 1. The progress prefix 'Checking for updates... ' is already on stdout.",
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "Checking for updates... ",
+        "stderr_lines": [
+          "check latest version: status 500"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 500,
+        "json": {
+          "message": "boom"
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "mr-no-matching-remote",
-  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). The only remote is the fork https://gitlab.example.com/fork/app.git, so matchingRemote fails before glab runs. No checkout, session or queue work happens; cmd/root.go Execute prints the error on stderr and exits 1.",
+  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). The only remote is the fork https://gitlab.example.com/fork/app.git, so matchingRemote fails before glab runs. No checkout, session or queue work happens; cmd/root.go Execute prints the error on stderr and exits 1. expect.dirs: <ROOT>/tmp (TMPDIR) exists and is empty: matchingRemote fails before os.MkdirTemp, so no checkout was created.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -67,6 +67,12 @@
     "home_files": [],
     "calls": {
       "codex": 1
-    }
+    },
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
   }
 }

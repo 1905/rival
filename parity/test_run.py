@@ -516,6 +516,136 @@ class RedirectTest(RunnerCase):
                 self.assertTrue(os.path.exists(os.path.join(r.root, "in", "prompt.txt")))
 
 
+class SemanticFileTest(RunnerCase):
+    """Concurrent reviewers: first-seen UUID order is a race, so sessions bind by their fields."""
+
+    CODEX = "11111111-1111-4111-8111-111111111111"
+    CLAUDE = "22222222-2222-4222-8222-222222222222"
+
+    GROUP = "33333333-3333-4333-8333-333333333333"
+
+    def raced(self, first, second, codex_event_id=None, group=None):
+        """Writes both sessions and logs both start events in the given order."""
+        actions = []
+        for cli, sid in (first, second):
+            log = {"level": "info", "app": "rival", "time": TIME, "message": "starting plan reviewer",
+                   "session": codex_event_id if (cli == "codex" and codex_event_id) else sid, "reviewer": cli}
+            actions.append({"log": log})
+        for cli, sid in (first, second):
+            body = {"id": sid, "cli": cli, "model": cli + "-model", "status": "completed",
+                    "group": group if (group and cli == "claude") else self.GROUP}
+            actions.append({"write": ["<HOME>/.rival/sessions/%s.json" % sid, json.dumps(body)]})
+        return actions
+
+    def sc(self, actions):
+        events = [{"level": "info", "message": "starting plan reviewer",
+                   "fields": {"session": "<ID:%s>" % cli.upper(), "reviewer": cli}} for cli in ("codex", "claude")]
+        sessions = "<HOME>/.rival/sessions/*.json"
+        return scenario(
+            [step(actions, ok(log_events=events))],
+            home_files=[".rival/sessions/<ID:CODEX>.json", ".rival/sessions/<ID:CLAUDE>.json"],
+            expect={"files": [
+                {"glob": sessions, "where": {"cli": "codex"}, "bind": {"CODEX": "id", "GROUP": "group"},
+                 "json": {"id": "<ID:CODEX>", "model": "codex-model", "status": "completed"}},
+                {"glob": sessions, "where": {"cli": "claude"}, "bind": {"CLAUDE": "id", "GROUP": "group"},
+                 "json": {"id": "<ID:CLAUDE>", "model": "claude-model", "status": "completed"}},
+            ]})
+
+    def test_binding_passes_in_either_arrival_order(self):
+        codex, claude = ("codex", self.CODEX), ("claude", self.CLAUDE)
+        self.assertPass(self.run_sc(self.sc(self.raced(codex, claude))))
+        self.assertPass(self.run_sc(self.sc(self.raced(claude, codex))))
+
+    def test_swapped_association_fails(self):
+        # The codex start event names the claude session.
+        r = self.run_sc(self.sc(self.raced(("codex", self.CODEX), ("claude", self.CLAUDE),
+                                           codex_event_id=self.CLAUDE)))
+        self.assertProblem(r, "expected log event not seen")
+
+    def test_wrong_model_in_bound_file_fails(self):
+        sc = self.sc(self.raced(("codex", self.CODEX), ("claude", self.CLAUDE)))
+        sc["expect"]["files"][0]["json"]["model"] = "claude-model"
+        self.assertProblem(self.run_sc(sc), r"selected by .* JSON differs")
+
+    def test_shared_binding_must_agree(self):
+        other = "44444444-4444-4444-8444-444444444444"
+        r = self.run_sc(self.sc(self.raced(("codex", self.CODEX), ("claude", self.CLAUDE), group=other)))
+        self.assertProblem(r, "differs from the UUID already bound to GROUP")
+
+    def test_where_must_select_exactly_one_file(self):
+        sc = self.sc(self.raced(("codex", self.CODEX), ("claude", self.CLAUDE)))
+        sc["expect"]["files"][0]["where"] = {"status": "completed"}
+        self.assertProblem(self.run_sc(sc), r"files\[0\] glob .*: 2 files match, want 1")
+        sc["expect"]["files"][0]["where"] = {"cli": "grok"}
+        self.assertProblem(self.run_sc(sc), r"files\[0\] glob .*: 0 files match, want 1")
+
+    def test_schema(self):
+        base = {"name": "x", "steps": [step([], ok())]}
+        g = {"glob": "<HOME>/*.json", "where": {"cli": "codex"}, "json": {}}
+        bad = [
+            {"home_files": ["<ID:NOPE>"]},
+            {"home_files": [], "files": [dict(g, where={})]},
+            {"home_files": [], "files": [dict(g, path="<HOME>/x")]},
+            {"home_files": [], "files": [{"glob": "<HOME>/*", "where": {"a": 1}, "absent": True}]},
+            {"home_files": [], "files": [dict(g, bind={"lower": "id"})]},
+            {"home_files": [], "files": [dict(g, bind={"A": ""})]},
+            {"home_files": [], "files": [dict(g, bind=["A"])]},
+            {"home_files": [], "files": [{"path": "<HOME>/x", "where": {"a": 1}, "json": {}}]},
+            {"home_files": [], "dirs": [{"path": "<ROOT>/tmp"}]},
+            {"home_files": [], "dirs": [{"path": "<ROOT>/tmp", "entries": "x"}]},
+        ]
+        for expect in bad:
+            with self.assertRaises(run.ScenarioError, msg=expect):
+                run.validate(dict(base, expect=expect))
+        run.validate(dict(base, expect={"home_files": ["<ID:A>"], "files": [dict(g, bind={"A": "id"})]}))
+
+
+class StdoutRegexTest(RunnerCase):
+    def test_structural_stdout(self):
+        rx = {"$regex": "(?s)(?=.*\\bqueue\\b)(?!.*forbidden).*"}
+        self.assertPass(self.run_sc(scenario([step([{"out": "a\nqueue\nb\n"}], ok(rx))])))
+        r = self.run_sc(scenario([step([{"out": "queue forbidden\n"}], ok(rx))]))
+        self.assertProblem(r, "stdout does not match")
+        with self.assertRaises(run.ScenarioError):
+            scenario([step([], ok({"$regex": "("}))])
+        with self.assertRaises(run.ScenarioError):
+            scenario([step([], ok({"$regex": "x", "extra": 1}))])
+
+
+class Sha256Test(RunnerCase):
+    def test_raw_bytes_are_hashed_without_normalisation(self):
+        import hashlib
+        text = '{"checked_at":"%s"}' % TIME
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        sc = scenario([step([], ok())], home_files=["kept.json"],
+                      fixtures=[{"write": "home/kept.json", "text": text}],
+                      expect={"files": [{"path": "<HOME>/kept.json", "sha256": digest}]})
+        self.assertPass(self.run_sc(sc))
+        # A rewritten timestamp normalises to the same <TIME> text, but not the same bytes.
+        sc["steps"] = [step([{"write": ["<HOME>/kept.json", '{"checked_at":"2026-10-02T09:00:01Z"}']}], ok())]
+        self.assertProblem(self.run_sc(sc), r"file <HOME>/kept.json sha256 [0-9a-f]{64}, want " + digest)
+
+    def test_schema(self):
+        base = {"name": "x", "steps": [step([], ok())]}
+        for f in ({"path": "<HOME>/a", "sha256": "ABC"}, {"path": "<HOME>/a", "sha256": "0" * 64, "text": ""}):
+            with self.assertRaises(run.ScenarioError, msg=f):
+                run.validate(dict(base, expect={"home_files": [], "files": [f]}))
+
+
+class DirTest(RunnerCase):
+    def test_empty_dir_passes_and_leftovers_fail(self):
+        sc = scenario([step([{"write": ["<ROOT>/tmp/keep/x", "1"]}], ok())],
+                      expect={"dirs": [{"path": "<ROOT>/tmp", "entries": ["keep"]},
+                                       {"path": "<ROOT>/work", "entries": []}]})
+        self.assertPass(self.run_sc(sc))
+        sc["expect"]["dirs"][0]["entries"] = []
+        self.assertProblem(self.run_sc(sc), r"dir <ROOT>/tmp entries differ\n.*expected: \[\]\n.*actual:   \['keep'\]")
+
+    def test_missing_dir_is_not_an_empty_dir(self):
+        sc = scenario([step([], ok())], expect={"dirs": [{"path": "<ROOT>/tmp/gone", "entries": []}]})
+        self.assertProblem(self.run_sc(sc), r"dir <ROOT>/tmp/gone missing")
+
+
 class ProcessTest(RunnerCase):
     def test_late_detached_output_is_checked(self):
         # The child writes only after the parent's exit was checked; it is gone before the sweep.

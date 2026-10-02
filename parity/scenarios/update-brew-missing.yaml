@@ -1,0 +1,50 @@
+{
+  "name": "update-brew-missing",
+  "description": "cmd/update.go with no brew on PATH (fakes.absent): exec.Command(\"brew\") records the LookPath error, `brew upgrade` fails, 'brew upgrade failed, trying reinstall...', and the reinstall fails the same way -> 'brew reinstall: exec: \"brew\": executable file not found in $PATH', exit 1.",
+  "fakes": {
+    "absent": [
+      "brew"
+    ]
+  },
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n",
+        "stderr_lines": [
+          "brew reinstall: exec: \"brew\": executable file not found in $PATH"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "v9.9.9"
+        }
+      }
+    }
+  }
+}

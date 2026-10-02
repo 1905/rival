@@ -9,12 +9,14 @@ mod merge_request;
 mod model_command;
 mod model_run;
 mod model_specs;
+mod queue_sessions;
 mod root;
 mod signals;
 mod startup_fds;
 #[cfg(test)]
 mod testutil;
 mod tree;
+mod update_cmd;
 mod wait;
 mod workdir;
 
