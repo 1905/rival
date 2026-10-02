@@ -126,6 +126,13 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - Notarization or Windows code signing (unsigned binaries; note in README).
 - New commands or flag changes.
 
+## As-built notes — implementation in progress, 2026-10-02
+
+- `.env` uses a direct godotenv v1.5.1 parser port. dotenvy changed duplicate-key and expansion behavior.
+- `gostd.rs` shares Go duration, quoting, case-folding and error-text semantics. Its Unicode 15.0.0 tables come from the release toolchain, Go 1.25.14, with the BSD license retained in `licenses/Go-LICENSE`.
+- macOS process identity uses `sysctl kern.proc.pid`, matching Go. `proc_pidinfo` cannot inspect some processes Go can inspect.
+- YAML uses serde-saphyr 1.3.0. Compatibility limit: Rival validation messages and the `parse <path>:` prefix match Go; malformed-YAML parser details use Rust's wording.
+
 ## Rollout
 
 - **P1** core foundations + contract tests. One branch, merged the same day it is green.

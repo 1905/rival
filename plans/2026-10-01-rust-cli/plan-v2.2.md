@@ -1,7 +1,7 @@
 # Rust CLI + TUI — Implementation Plan v2.2
 
 **Date:** 2026-10-01
-**Status:** reviewed (Codex 6/10, 7 findings applied) — awaiting approval
+**Status:** in-progress — approved for implementation 2026-10-02
 **Changes from v2.0:** Go review fixes (branch `fix/go-review-findings`, 2026-10-01) wired in: port base is master *after* that merge; Tasks 2.3, 2.6/2.7, 3.1/3.2 carry the fixed behaviour and its regression tests.
 **Changes from v2.1:** Codex plan review (6/10, 7 findings, all confirmed) applied: exit_code contract, detach inherits stdio, Windows stop via the owning process + Job Object, isolated `update` scenarios, stderr expectations, Swift decode test in branch CI, unpublished 6-target build gate.
 **Changes from v1.1 (user, 2026-10-01):** no Go-vs-Rust parity harness and no Go reference binary. CLI logic is ported exactly from the Go source and proven by the ported Go unit tests + contract tests + Rust golden tests. TUI is "about the same design", free to improve; Go TUI code is read only for logic (filter, paging, kill safety, watcher). TUI frame-by-frame look-alike checks removed.
@@ -52,58 +52,62 @@
 **Remove (P6):** `rival/` (moved to /tmp/trash, `git add -A`)
 **Out of scope:** `app/` (Swift), the cask, `scripts/` of the app.
 
+**As-built layout, P1:** session is `src/session/{mod,summary,reaper,tests}.rs`; JSON compatibility helpers are in `src/gojson.rs`; Go standard-library compatibility helpers and Unicode tables are in `src/gostd{,_tables}.rs`. These share serialization and sorting behavior across later modules.
+
 ## Self-test sanity check (before P1)
 
-- [ ] Clean `master` **with `fix/go-review-findings` merged** (the port copies the fixed Go logic); `cargo --version` 1.98.x; `go version` 1.27.x
-- [ ] `cd rival && go test ./... && golangci-lint`-equivalent green (lint via `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./...`, the local binary is too old)
+- [x] Clean `master` **with `fix/go-review-findings` merged** (`066cb1a`); cargo 1.98.1; Go 1.27.1.
+- [x] Baseline: 707 Go tests passed across 17 packages; golangci-lint v2.14.0 passed (2026-10-02).
 
 ---
 
 ## P1 — foundations + scenario runner (`feature/rust-p1-core`)
 
 ### Task 1.1 — workspace `light`
-- [ ] `Cargo.toml` workspace (`crates/rival-core`, `crates/rival`), `rust-toolchain.toml` 1.98, release profile lto/codegen-units 1/strip; binary name `rival`. `.gitignore` `target/`.
-- [ ] `cargo build` → 0 warnings; `cargo run -p rival -- version` prints a placeholder.
+- [x] `Cargo.toml` workspace (`crates/rival-core`, `crates/rival`), `rust-toolchain.toml` 1.98, release profile lto/codegen-units 1/strip; binary name `rival`. `.gitignore` `target/`.
+- [x] `cargo build` → 0 warnings; `cargo run -p rival -- version` prints `rival dev`.
 
 ### Task 1.2 — paths + logging `heavy`
 Port: `main.go` (logger, .env), path helpers from `config`/`session`. Rust: `paths.rs`, `logging.rs`.
-- [ ] `logging::init()` → global JSON-lines writer to stderr with zerolog field names/order; `logging::info().str(k,v).int(k,v).msg(m)`-style builder (no `tracing`); levels debug/info/warn/error.
-- [ ] Test: a line produced by Rust and the same call in Go (golden string in the test) parse to equal maps.
-- [ ] `dotenvy` load from cwd, silent on missing.
+- [x] `logging::init()` → global JSON-lines writer to stderr with zerolog field names/order; `logging::info().str(k,v).int(k,v).msg(m)`-style builder (no `tracing`); levels debug/info/warn/error.
+- [x] Test: a line produced by Rust and the same call in Go (golden string in the test) parse to equal maps.
+- [x] Load `.env` from cwd, silent on missing. As built: direct godotenv parser port; dotenvy differed on duplicate keys and expansion.
 
 ### Task 1.3 — session model, save, summary, reaper `heavy`
 Port: `internal/session/{session,summary,reaper}.go` + tests `{session,save,summary,reaper}_test.go`.
-- [ ] `Session` struct field order = Go; serde attrs reproduce `omitempty` exactly: value fields skip zero/empty, pointer fields are `Option` and skip only `None`; custom time serialiser matching Go `time.Time` JSON.
-- [ ] Writer tests for `exit_code` unset (key absent), `0` (present, 0) and nonzero.
-- [ ] Atomic save, load, list, summary (no prompt), reaper (orphan → failed) with `procinfo`.
-- [ ] All Go cases ported → `cargo test -p rival-core session summary reaper` green.
+- [x] `Session` struct field order = Go; serde attrs reproduce `omitempty` exactly: value fields skip zero/empty, pointer fields are `Option` and skip only `None`; custom time serialiser matching Go `time.Time` JSON.
+- [x] Writer tests for `exit_code` unset (key absent), `0` (present, 0) and nonzero.
+- [x] Atomic save, load, list, summary (no prompt), reaper (orphan → failed) with `procinfo`.
+- [x] All Go cases ported → `cargo test -p rival-core session summary reaper` green.
 
 ### Task 1.4 — config `heavy`
 Port: `internal/config/config.go` (1,069 lines) + `{config,codex,kimi,security,antislop}_test.go`.
-- [ ] Pick the YAML crate: a serde-compatible, maintained crate (release within the last 12 months on crates.io; not the archived `serde_yaml`). Record the choice and its version in the report.
-- [ ] Same defaults, env overrides, `UserConfigError` messages, model labels, public error/log scrubbing (`PublicRuntimeError`, `PublicRuntimeLog`, `replaceConcreteModelIDs`), `KimiAPIKeyFrom`.
-- [ ] Ported tests green.
+- [x] Pick the YAML crate: serde-saphyr 1.3.0, released 2026-09-16. Research and source links in `research.md`.
+- [x] Same defaults, env overrides, Rival validation errors, model labels, public error/log scrubbing (`PublicRuntimeError`, `PublicRuntimeLog`, `replaceConcreteModelIDs`), `KimiAPIKeyFrom`. Compatibility limit: malformed YAML uses serde-saphyr's parser detail after the original `parse <path>:` prefix.
+- [x] Ported config tests green: 64 tests, including signed duration overflow.
 
 ### Task 1.5 — logfmt + procinfo `light`
-Port: `internal/logfmt`, `internal/procinfo` (darwin `proc_pidinfo`, linux `/proc/<pid>/stat`, other → None) + tests.
+Port: `internal/logfmt`, `internal/procinfo` (darwin `sysctl kern.proc.pid`, linux `/proc/<pid>/stat`, other → None) + tests. As built: use Go's sysctl interface; proc_pidinfo could not inspect another user's process.
 - [ ] Green on macOS; Linux path covered by `#[cfg]` tests that run in CI.
 
 ### Task 1.6 — testdata + contract tests `heavy`
-- [ ] `testdata/sessions/*.json` + `logs/` = the fake fixtures in `app/Tests/Fixtures` (copy); `expected.json` lists decoded fields per file.
-- [ ] Go test `rival/internal/session/testdata_contract_test.go`: decode all → equals `expected.json`; plus "Go writes a session from expected values; bytes equal the Rust writer's output for the same input" (Rust golden files under `testdata/written/`).
-- [ ] Rust `crates/rival-core/tests/contract.rs`: same in reverse.
-- [ ] `go test ./internal/session/ -run Contract` + `cargo test -p rival-core --test contract` green.
+- [x] `testdata/sessions/*.json` + `logs/` = the fake fixtures in `app/Tests/Fixtures` (copy); `expected.json` lists decoded fields per file.
+- [x] Go test `rival/internal/session/testdata_contract_test.go`: decode all → equals `expected.json`; plus "Go writes a session from expected values; bytes equal the Rust writer's output for the same input" (Rust golden files under `testdata/written/`).
+- [x] Rust `crates/rival-core/tests/contract.rs`: same in reverse.
+- [x] `go test ./internal/session/ -run Contract` + `cargo test -p rival-core --test contract` green.
 
 ### Task 1.7 — scenario runner (Rust only) `heavy`
-- [ ] `parity/run.py --bin <rival> [--scenario <glob>]`: per scenario, a temp HOME, PATH = `parity/fakes` first, run the Rust binary, collect stdout, **stderr split into plain lines and JSON log events**, exit code and `~/.rival/**`; normalise UUIDs/pids/times/temp paths; compare to the scenario's `expect:` block: exit code, stdout golden, `stderr_lines` (exact plain lines, e.g. `rival: detached pid=<PID>`, usage/validation errors from `root.go:144-149`, `Update available: …` from `update/check.go:108`), `log_events` (level + message + required fields, order-insensitive), session fields, files present; exit 1 on mismatch. Plain stderr lines are allowed alongside JSON; an unexpected plain line fails the scenario.
-- [ ] `parity/fakes/`: Python fakes `codex`, `claude`, `grok`, `opencode`, `glab`, `docker`, **`brew`** driven by `FAKE_<NAME>_SCRIPT=<file>` (canned output, exit code, delay, quota text); fake `brew --prefix rival` points into the scenario's temp dir, so `rival update` never touches the installed binary.
-- [ ] Update endpoint: the Rust update client reads `RIVAL_UPDATE_API` (base URL override, honoured only in debug builds; scenarios run the debug binary) and the runner serves canned release JSON from a local HTTP server (`http.server` on 127.0.0.1). Scenarios run with no external network; a guard in the runner fails the scenario if the fake `brew` reports a non-temp prefix.
-- [ ] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
+- [x] `parity/run.py --bin <rival> [--scenario <glob>]`: per scenario, a temp HOME, PATH = `parity/fakes` first, run the Rust binary, collect stdout, **stderr split into plain lines and JSON log events**, exit code and `~/.rival/**`; normalise UUIDs/pids/times/temp paths; compare to the scenario's `expect:` block: exit code, stdout golden, `stderr_lines` (exact plain lines, e.g. `rival: detached pid=<PID>`, usage/validation errors from `root.go:144-149`, `Update available: …` from `update/check.go:108`), `log_events` (level + message + required fields, order-insensitive), session fields, files present; exit 1 on mismatch. Plain stderr lines are allowed alongside JSON; an unexpected plain line fails the scenario.
+- [x] `parity/fakes/`: Python fakes `codex`, `claude`, `grok`, `opencode`, `glab`, `docker`, **`brew`** driven by `FAKE_<NAME>_SCRIPT=<file>` (canned output, exit code, delay, quota text); fake `brew --prefix rival` points into the scenario's temp dir, so `rival update` never touches the installed binary.
+- [ ] Update endpoint: the Rust update client reads `RIVAL_UPDATE_API` (base URL override, honoured only in debug builds; scenarios run the debug binary) and the runner serves canned release JSON from a local HTTP server (`http.server` on 127.0.0.1). Scenarios run with no external network; a guard in the runner fails the scenario if the fake `brew` reports a non-temp prefix. Runner server/guard verified; client implementation remains Task 3.4.
+- [x] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
 - [ ] Self-test: 3 scenarios (`version`, `sessions` on empty home, `queue`) pass once Task 3.4 lands; until then the runner's own unit tests.
 
+Runner validation: 50 unit tests pass, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, and inherited stdin after unlink. Initial CLI scenarios remain pending Task 3.4.
+
 ### Task 1.8 — CI `light`
-- [ ] `.github/workflows/ci.yml`: `cargo test --workspace` + `cargo clippy -D warnings` on macos-15 and ubuntu-latest; Go tests unchanged.
-- [ ] macos-15 job also runs `cd app && swift test --filter SessionDecodingTests` plus a new Swift test that decodes every file in `testdata/written/` (the Rust writer's golden output, regenerated and checked by the Rust contract test). Required check from P1 on.
+- [x] `.github/workflows/ci.yml`: `cargo test --workspace` + `cargo clippy -D warnings` on macos-15 and ubuntu-latest; Go tests unchanged.
+- [x] macos-15 job also runs `cd app && swift test --filter SessionDecodingTests` plus new Swift tests that decode every file in `testdata/written/` (the Rust writer's golden output, checked by the Rust contract test without regeneration). Required check from P1 on. Local Swift filter: 14 passed.
 
 ### Gate P1 `gate`
 - [ ] Orchestrator: workspace tests green, Go contract green, runner unit tests green, CI green after push of the branch. Merge to `master`.
@@ -270,6 +274,9 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Codex double-printed answer not deduped | same | Swift dedupes |
 | CLI output parser (`review::parse`, Go port) and TUI Result parser (`result`, app port) are two implementations | `crates/rival-core/src/{review/parse,result}.rs` | unify after P6: CLI moves to `result` once parity no longer binds it |
 | (implementers append here) | | |
+| Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
+| Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |
+| Credential walk compares cleaned paths to raw HOME | `config` API-key lookup | A trailing slash or unclean HOME can allow walking above it; preserved. |
 
 ## Type-consistency check
 

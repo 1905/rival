@@ -1,0 +1,93 @@
+name: CI
+
+# Light CI for the Rust port (plan task 1.8). The Go release workflow
+# (release.yml) is untouched. Nothing here calls a real reviewer CLI, Docker,
+# a provider API or inference: every test isolates HOME / RIVAL_HOME itself.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Release toolchain; Go 1.27 changes encoding/json defaults that the session
+  # contract test pins.
+  GO_VERSION: "1.25.14"
+  GOTOOLCHAIN: go1.25.14
+  # The full parity scenario run starts with P3 (CLI commands ported). Flip this
+  # to "true" then; while it is "false" the skip is reported as a warning.
+  PARITY_SCENARIOS: "false"
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98"
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: rival/go.sum
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      # Includes crates/rival-core/tests/contract.rs, which compares fresh
+      # writer bytes with the committed testdata/written golden files. The
+      # golden generator is #[ignore]d and never runs here.
+      - name: cargo test
+        run: cargo test --workspace --locked
+
+      - name: go test (includes the session contract)
+        working-directory: rival
+        run: |
+          go version
+          go test ./...
+
+      - name: Session contract (Go, verbose)
+        working-directory: rival
+        run: go test ./internal/session/ -run '^TestContract' -count=1 -v
+
+      # No step may rewrite or add golden files.
+      - name: Fixtures unchanged
+        run: |
+          git status --porcelain -- testdata/
+          test -z "$(git status --porcelain -- testdata/)"
+
+      - name: Parity runner self-tests
+        run: python3 -m unittest discover -s parity -p 'test_*.py'
+
+      - name: Parity scenarios
+        run: |
+          if [ "$PARITY_SCENARIOS" != "true" ]; then
+            echo "::warning::Parity scenarios skipped: PARITY_SCENARIOS=$PARITY_SCENARIOS (enabled from P3)."
+            exit 0
+          fi
+          cargo build -p rival --locked
+          python3 parity/run.py --bin target/debug/rival
+
+      # The app decodes the Rust writer's golden files (testdata/written).
+      - name: Swift session decoding
+        if: runner.os == 'macOS'
+        working-directory: app
+        run: |
+          swift --version
+          swift test --filter SessionDecodingTests

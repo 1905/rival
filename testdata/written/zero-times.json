@@ -1,0 +1,21 @@
+{
+  "id": "d0000000-0002-4000-8000-000000000002",
+  "cli": "codex",
+  "mode": "",
+  "model": "",
+  "effort": "",
+  "status": "running",
+  "start_time": "0001-01-01T00:00:00Z",
+  "queued_at": "0001-01-01T00:00:00Z",
+  "queue_position": 3,
+  "end_time": "0001-01-01T00:00:00Z",
+  "exit_code": 0,
+  "work_dir": "",
+  "log_file": "",
+  "output_bytes": 9007199254740993,
+  "output_lines": 1,
+  "pid": 1,
+  "pid_start": 9223372036854775807,
+  "owner_pid": 2,
+  "owner_pid_start": 1
+}

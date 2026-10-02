@@ -20,3 +20,6 @@ worktrees/
 app/.build/
 app/dist/
 __pycache__/
+
+# rust build output
+target/

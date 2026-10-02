@@ -1,0 +1,750 @@
+//! Rival's state directory, Go path semantics, and `.env` files.
+//!
+//! Go: `config.SessionDirPath` / `QueueDirPath` join `.rival/...` onto
+//! `os.UserHomeDir()` and fall back to a relative `.rival` when the home
+//! directory is unknown. `RIVAL_HOME` is a Rust-port addition: when set, it is
+//! the rival root itself (no `.rival` appended).
+//!
+//! The `.env` reader is a direct port of `github.com/joho/godotenv` v1.5.1
+//! (`parser.go`), which Go uses both at startup and for API-key lookup.
+
+use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+use regex::{Captures, Regex};
+
+const ROOT_DIR: &str = ".rival";
+
+/// The variable Go's `os.UserHomeDir` reads.
+pub const HOME_VAR: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Paths {
+    pub root: PathBuf,
+}
+
+impl Paths {
+    /// `<home>/.rival`.
+    pub fn from_home(home: &Path) -> Self {
+        Paths {
+            root: clean(&home.join(ROOT_DIR)),
+        }
+    }
+
+    /// Reads `RIVAL_HOME`, then `HOME` (`USERPROFILE` on Windows).
+    pub fn from_env() -> Self {
+        Self::from_vars(std::env::var_os("RIVAL_HOME"), std::env::var_os(HOME_VAR))
+    }
+
+    /// Pure form of [`Paths::from_env`]. Empty values count as unset, like
+    /// Go's `os.UserHomeDir` erroring on an empty `$HOME`.
+    pub fn from_vars(rival_home: Option<OsString>, home: Option<OsString>) -> Self {
+        if let Some(root) = rival_home.filter(|v| !v.is_empty()) {
+            return Paths {
+                root: PathBuf::from(root),
+            };
+        }
+        match home.filter(|v| !v.is_empty()) {
+            Some(home) => Self::from_home(Path::new(&home)),
+            None => Paths {
+                root: Path::new(".").join(ROOT_DIR),
+            },
+        }
+    }
+
+    pub fn sessions_dir(&self) -> PathBuf {
+        self.root.join("sessions")
+    }
+
+    pub fn queue_dir(&self) -> PathBuf {
+        self.root.join("queue")
+    }
+
+    pub fn config_file(&self) -> PathBuf {
+        self.root.join("config.yaml")
+    }
+}
+
+/// Go: `filepath.Clean` (Unix rules), purely lexical.
+pub fn clean(path: &Path) -> PathBuf {
+    let bytes = path.as_os_str().as_encoded_bytes();
+    if bytes.is_empty() {
+        return PathBuf::from(".");
+    }
+    let rooted = bytes[0] == b'/';
+    let mut parts: Vec<&[u8]> = Vec::new();
+    for elem in bytes.split(|&b| b == b'/') {
+        match elem {
+            b"" | b"." => {}
+            b".." => {
+                if parts.last().is_some_and(|last| *last != b"..") {
+                    parts.pop();
+                } else if !rooted {
+                    parts.push(elem);
+                }
+            }
+            _ => parts.push(elem),
+        }
+    }
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    if rooted {
+        out.push(b'/');
+    }
+    out.extend_from_slice(&parts.join(&b'/'));
+    if out.is_empty() {
+        out.push(b'.');
+    }
+    // SAFETY: `out` is pieces of a valid OsStr encoding split and joined only
+    // at ASCII '/' bytes, plus ASCII '/' and '.'.
+    PathBuf::from(unsafe { OsString::from_encoded_bytes_unchecked(out) })
+}
+
+/// Go: `filepath.Abs`. `cwd` is the snapshotted `os.Getwd()` result; `None`
+/// stands for a `Getwd` error, which makes a relative path fail.
+pub fn abs(cwd: Option<&Path>, path: &Path) -> Option<PathBuf> {
+    if path.is_absolute() {
+        return Some(clean(path));
+    }
+    cwd.map(|cwd| clean(&cwd.join(path)))
+}
+
+/// Go: `os.Getwd` on Unix. An absolute `$PWD` naming the current directory
+/// wins (so symlinked paths stay as the shell spelled them); otherwise the
+/// kernel's answer.
+pub fn getwd(pwd: Option<&OsStr>) -> Option<PathBuf> {
+    #[cfg(unix)]
+    if let Some(pwd) = pwd.filter(|p| p.as_encoded_bytes().first() == Some(&b'/')) {
+        use std::os::unix::fs::MetadataExt;
+        let dot = std::fs::metadata(".").ok()?;
+        if let Ok(d) = std::fs::metadata(pwd)
+            && d.dev() == dot.dev()
+            && d.ino() == dot.ino()
+        {
+            return Some(PathBuf::from(pwd));
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = pwd;
+    std::env::current_dir().ok()
+}
+
+/// A `.env` file that could not be read or parsed.
+#[derive(Debug)]
+pub enum DotenvError {
+    Io(std::io::Error),
+    Parse(String),
+}
+
+impl fmt::Display for DotenvError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DotenvError::Io(e) => e.fmt(f),
+            DotenvError::Parse(msg) => f.write_str(msg),
+        }
+    }
+}
+
+impl std::error::Error for DotenvError {}
+
+/// Go: `godotenv.Read(path)`. The whole file parses or nothing is returned.
+/// A key assigned twice keeps its last value. `$VAR` expansion sees only
+/// keys assigned earlier in the same file, never the process environment.
+pub fn read_dotenv(path: &Path) -> Result<HashMap<String, String>, DotenvError> {
+    let data = std::fs::read(path).map_err(DotenvError::Io)?;
+    parse_dotenv(&String::from_utf8_lossy(&data))
+}
+
+/// Go: `godotenv.Unmarshal`.
+pub fn parse_dotenv(src: &str) -> Result<HashMap<String, String>, DotenvError> {
+    let mut out = HashMap::new();
+    parse_into(src, &mut out).map_err(DotenvError::Parse)?;
+    Ok(out)
+}
+
+/// Go: `_ = godotenv.Load()`. Reads `./.env` only (no parent search); a
+/// missing or unparseable file is silently ignored, and existing process
+/// variables win, even when empty.
+///
+/// # Safety
+///
+/// Calls `std::env::set_var`. The caller must guarantee that no other thread
+/// exists yet and that nothing reads the environment concurrently: call it
+/// first thing in `main`.
+pub unsafe fn load_dotenv() {
+    load_dotenv_with(
+        Path::new(".env"),
+        |key| std::env::var_os(key).is_some(),
+        // SAFETY: the caller upholds this function's single-thread contract.
+        |key, value| unsafe { std::env::set_var(key, value) },
+    );
+}
+
+/// Testable core of [`load_dotenv`]: Go's `loadFile(filename, false)`.
+/// `is_set` answers for the environment as it was before loading. Entries Go's
+/// `os.Setenv` would reject (empty key, `=` or NUL in the key, NUL in the
+/// value) are skipped, as Go ignores that error.
+pub fn load_dotenv_with(
+    path: &Path,
+    is_set: impl Fn(&str) -> bool,
+    mut set: impl FnMut(&str, &str),
+) {
+    let Ok(vars) = read_dotenv(path) else {
+        return;
+    };
+    for (key, value) in &vars {
+        if key.is_empty() || key.contains(['=', '\0']) || value.contains('\0') {
+            continue;
+        }
+        if !is_set(key) {
+            set(key, value);
+        }
+    }
+}
+
+fn parse_into(src: &str, out: &mut HashMap<String, String>) -> Result<(), String> {
+    let src = src.replace("\r\n", "\n");
+    let mut cutset: &str = &src;
+    while let Some(start) = statement_start(cutset) {
+        let (key, left) = locate_key_name(start)?;
+        let (value, left) = extract_var_value(left, out)?;
+        out.insert(key, value);
+        cutset = left;
+    }
+    Ok(())
+}
+
+/// godotenv `isSpace`: a space but not a line break.
+fn is_space(c: char) -> bool {
+    matches!(c, '\t' | '\x0b' | '\x0c' | '\r' | ' ' | '\u{85}' | '\u{a0}')
+}
+
+/// godotenv `getStatementStart`: skips blank space and comment lines.
+fn statement_start(mut src: &str) -> Option<&str> {
+    loop {
+        let pos = src.find(|c: char| !c.is_whitespace())?;
+        src = &src[pos..];
+        if !src.starts_with('#') {
+            return Some(src);
+        }
+        src = &src[src.find('\n')?..];
+    }
+}
+
+/// godotenv `locateKeyName`.
+fn locate_key_name(src: &str) -> Result<(String, &str), String> {
+    let mut src = src.trim_start_matches(is_space);
+    if let Some(trimmed) = src.strip_prefix("export")
+        && trimmed.chars().next().is_some_and(is_space)
+    {
+        src = trimmed.trim_start_matches(is_space);
+    }
+
+    let mut key = "";
+    let mut offset = 0;
+    // Go ranges over bytes here and widens each byte to a rune.
+    for (i, &b) in src.as_bytes().iter().enumerate() {
+        let c = char::from(b);
+        if is_space(c) {
+            continue;
+        }
+        match b {
+            b'=' | b':' => {
+                key = &src[..i];
+                offset = i + 1;
+                break;
+            }
+            b'_' => {}
+            _ => {
+                if c.is_alphabetic() || c.is_numeric() || c == '.' {
+                    continue;
+                }
+                return Err(format!(
+                    "unexpected character {} in variable name near {}",
+                    crate::gostd::quote(&c.to_string()),
+                    crate::gostd::quote(src)
+                ));
+            }
+        }
+    }
+    if src.is_empty() {
+        return Err("zero length string".to_string());
+    }
+    let key = key.trim_end_matches(char::is_whitespace).to_string();
+    Ok((key, src[offset..].trim_start_matches(is_space)))
+}
+
+/// godotenv `extractVarValue`.
+fn extract_var_value<'a>(
+    src: &'a str,
+    vars: &HashMap<String, String>,
+) -> Result<(String, &'a str), String> {
+    let quote = match src.as_bytes().first() {
+        Some(&q @ (b'"' | b'\'')) => q,
+        _ => {
+            let end_of_line = match src.find(['\n', '\r']) {
+                Some(end) => end,
+                None if src.is_empty() => return Ok((String::new(), "")),
+                None => src.len(),
+            };
+            let line: Vec<char> = src[..end_of_line].chars().collect();
+            let mut end_of_var = line.len();
+            if end_of_var == 0 {
+                return Ok((String::new(), &src[end_of_line..]));
+            }
+            // The last " #" starts an inline comment.
+            for i in (0..end_of_var).rev() {
+                if line[i] == '#' && i > 0 && is_space(line[i - 1]) {
+                    end_of_var = i;
+                    break;
+                }
+            }
+            let value: String = line[..end_of_var].iter().collect();
+            let value = expand_variables(value.trim_matches(is_space), vars);
+            return Ok((value, &src[end_of_line..]));
+        }
+    };
+
+    let bytes = src.as_bytes();
+    for i in 1..bytes.len() {
+        if bytes[i] != quote || bytes[i - 1] == b'\\' {
+            continue;
+        }
+        let q = char::from(quote);
+        let inner = src[..i].trim_end_matches(q).trim_start_matches(q);
+        let value = if quote == b'"' {
+            expand_variables(&expand_escapes(inner), vars)
+        } else {
+            inner.to_string()
+        };
+        return Ok((value, &src[i + 1..]));
+    }
+
+    let end = src.find('\n').unwrap_or(src.len());
+    Err(format!("unterminated quoted value {}", &src[..end]))
+}
+
+static ESCAPE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\\.").unwrap());
+static UNESCAPE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\\([^$])").unwrap());
+static EXPAND_VAR_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(\\)?(\$)(\()?\{?([A-Z0-9_]+)?\}?").unwrap());
+
+/// godotenv `expandEscapes`: `\n` and `\r` become control characters, then
+/// any other backslash pair except `\$` drops its backslash.
+fn expand_escapes(s: &str) -> String {
+    let out = ESCAPE_RE.replace_all(s, |caps: &Captures| match &caps[0][1..] {
+        "n" => "\n".to_string(),
+        "r" => "\r".to_string(),
+        _ => caps[0].to_string(),
+    });
+    UNESCAPE_RE.replace_all(&out, "${1}").into_owned()
+}
+
+/// godotenv `expandVariables`. Go also tests `submatch[2] == "("`, which can
+/// never hold (group 2 is always `$`), so `$(NAME` expands like `$NAME`.
+fn expand_variables(v: &str, vars: &HashMap<String, String>) -> String {
+    EXPAND_VAR_RE
+        .replace_all(v, |caps: &Captures| {
+            if caps.get(1).is_some() {
+                return caps[0][1..].to_string();
+            }
+            match caps.get(4) {
+                Some(name) => vars.get(name.as_str()).cloned().unwrap_or_default(),
+                None => caps[0].to_string(),
+            }
+        })
+        .into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_vars_picks_root() {
+        let cases = [
+            (
+                "RIVAL_HOME is the root itself",
+                Some("/r"),
+                Some("/h"),
+                "/r",
+            ),
+            ("HOME gets .rival", None, Some("/h"), "/h/.rival"),
+            (
+                "empty RIVAL_HOME falls to HOME",
+                Some(""),
+                Some("/h"),
+                "/h/.rival",
+            ),
+            ("no home: relative .rival like Go", None, None, "./.rival"),
+            ("empty HOME: relative .rival", None, Some(""), "./.rival"),
+        ];
+        for (name, rival_home, home, want) in cases {
+            let got = Paths::from_vars(rival_home.map(OsString::from), home.map(OsString::from));
+            assert_eq!(got.root, PathBuf::from(want), "{name}");
+        }
+    }
+
+    #[test]
+    fn subpaths_match_go_layout() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = Paths::from_home(tmp.path());
+        // Go: filepath.Join(home, ".rival/sessions") and ".rival/queue".
+        assert_eq!(p.sessions_dir(), tmp.path().join(".rival/sessions"));
+        assert_eq!(p.queue_dir(), tmp.path().join(".rival/queue"));
+        assert_eq!(p.config_file(), tmp.path().join(".rival/config.yaml"));
+    }
+
+    // Cases from Go's path/filepath TestClean (Unix).
+    #[test]
+    fn clean_matches_go_filepath_clean() {
+        let cases = [
+            ("abc", "abc"),
+            ("abc/def", "abc/def"),
+            (".", "."),
+            ("..", ".."),
+            ("../..", "../.."),
+            ("../../abc", "../../abc"),
+            ("/abc", "/abc"),
+            ("/", "/"),
+            ("", "."),
+            ("abc/", "abc"),
+            ("/abc/def/", "/abc/def"),
+            ("//abc", "/abc"),
+            ("abc//def//ghi", "abc/def/ghi"),
+            ("abc/./def", "abc/def"),
+            ("/./abc/def", "/abc/def"),
+            ("abc/.", "abc"),
+            ("abc/def/ghi/../jkl", "abc/def/jkl"),
+            ("abc/def/../ghi/../jkl", "abc/jkl"),
+            ("abc/def/..", "abc"),
+            ("abc/def/../..", "."),
+            ("/abc/def/../..", "/"),
+            ("abc/def/../../..", ".."),
+            ("/abc/def/../../..", "/"),
+            ("abc/def/../../../ghi/jkl/../../../mno", "../../mno"),
+            ("/../abc", "/abc"),
+            ("abc/./../def", "def"),
+            ("abc//./../def", "def"),
+            ("abc/../../././../def", "../../def"),
+        ];
+        for (input, want) in cases {
+            assert_eq!(clean(Path::new(input)), PathBuf::from(want), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn abs_joins_cwd_and_cleans() {
+        let cwd = Path::new("/work/dir");
+        assert_eq!(
+            abs(Some(cwd), Path::new("sub/../x")),
+            Some("/work/dir/x".into())
+        );
+        assert_eq!(abs(Some(cwd), Path::new("")), Some("/work/dir".into()));
+        assert_eq!(abs(Some(cwd), Path::new("/a/./b/")), Some("/a/b".into()));
+        assert_eq!(abs(None, Path::new("/a")), Some("/a".into()));
+        assert_eq!(abs(None, Path::new("rel")), None);
+    }
+
+    #[test]
+    fn getwd_prefers_a_matching_pwd() {
+        let real = std::env::current_dir().unwrap();
+        assert_eq!(getwd(Some(real.as_os_str())), Some(real.clone()));
+        // A relative or wrong PWD falls back to the kernel's answer.
+        assert_eq!(getwd(Some(OsStr::new("relative"))), Some(real.clone()));
+        let other = tempfile::tempdir().unwrap();
+        assert_eq!(getwd(Some(other.path().as_os_str())), Some(real.clone()));
+        assert_eq!(getwd(None), Some(real));
+    }
+
+    fn parsed(src: &str) -> HashMap<String, String> {
+        parse_dotenv(src).unwrap_or_else(|e| panic!("parse {src:?}: {e}"))
+    }
+
+    fn map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    // godotenv_test.go TestParsing, TestTrailingNewlines and the fixtures.
+    #[test]
+    fn dotenv_parses_like_godotenv() {
+        let cases: &[(&str, &str, &str)] = &[
+            ("FOO=bar", "FOO", "bar"),
+            ("FOO =bar", "FOO", "bar"),
+            ("FOO= bar", "FOO", "bar"),
+            (r#"FOO="bar""#, "FOO", "bar"),
+            ("FOO='bar'", "FOO", "bar"),
+            (r#"FOO="escaped\"bar""#, "FOO", r#"escaped"bar"#),
+            (r#"FOO="'d'""#, "FOO", "'d'"),
+            ("OPTION_A: 1", "OPTION_A", "1"),
+            ("OPTION_A: Foo=bar", "OPTION_A", "Foo=bar"),
+            ("OPTION_A=1:B", "OPTION_A", "1:B"),
+            ("export OPTION_A=2", "OPTION_A", "2"),
+            (r"export OPTION_B='\n'", "OPTION_B", r"\n"),
+            ("export exportFoo=2", "exportFoo", "2"),
+            ("exportFOO=2", "exportFOO", "2"),
+            ("export_FOO =2", "export_FOO", "2"),
+            ("export.FOO= 2", "export.FOO", "2"),
+            ("export\tOPTION_A=2", "OPTION_A", "2"),
+            ("  export OPTION_A=2", "OPTION_A", "2"),
+            ("\texport OPTION_A=2", "OPTION_A", "2"),
+            (r#"FOO="bar\nbaz""#, "FOO", "bar\nbaz"),
+            ("FOO.BAR=foobar", "FOO.BAR", "foobar"),
+            ("FOO=foobar=", "FOO", "foobar="),
+            ("FOO=bar ", "FOO", "bar"),
+            ("KEY=value value", "KEY", "value value"),
+            ("KEY=value value\n", "KEY", "value value"),
+            ("KEY: value value", "KEY", "value value"),
+            ("KEY: value value\n", "KEY", "value value"),
+            ("FOO=bar # this is foo", "FOO", "bar"),
+            (r#"FOO="bar#baz" # comment"#, "FOO", "bar#baz"),
+            ("FOO='bar#baz' # comment", "FOO", "bar#baz"),
+            (r#"FOO="bar#baz#bang" # comment"#, "FOO", "bar#baz#bang"),
+            (r#"FOO="ba#r""#, "FOO", "ba#r"),
+            ("FOO='ba#r'", "FOO", "ba#r"),
+            (r#"FOO="bar\n\ b\az""#, "FOO", "bar\n baz"),
+            (r#"FOO="bar\\\n\ b\az""#, "FOO", "bar\\\n baz"),
+            (r#"FOO="bar\\r\ b\az""#, "FOO", "bar\\r baz"),
+            (r#"="value""#, "", "value"),
+            (" KEY =value", "KEY", "value"),
+            ("   KEY=value", "KEY", "value"),
+            ("\tKEY=value", "KEY", "value"),
+            // Unquoted spaces inside a key are skipped, not an error.
+            ("MY KEY=v", "MY KEY", "v"),
+            // Only a space before '#' starts a comment; the last one wins.
+            ("bar=foo#baz", "bar", "foo#baz"),
+            ("A=x #y #z", "A", "x #y"),
+            (r##"baz="foo"#bar"##, "baz", "foo"),
+            ("WIN=crlf\r\n", "WIN", "crlf"),
+        ];
+        for &(input, key, want) in cases {
+            let got = parsed(input);
+            assert_eq!(
+                got.get(key).map(String::as_str),
+                Some(want),
+                "{input:?} -> {got:?}"
+            );
+        }
+        assert!(parse_dotenv("lol$wut").is_err());
+    }
+
+    #[test]
+    fn dotenv_fixtures_match_godotenv() {
+        let plain = "OPTION_A=1\nOPTION_B=2\nOPTION_C= 3\nOPTION_D =4\nOPTION_E = 5\nOPTION_F = \nOPTION_G=\nOPTION_H=1 2";
+        assert_eq!(
+            parsed(plain),
+            map(&[
+                ("OPTION_A", "1"),
+                ("OPTION_B", "2"),
+                ("OPTION_C", "3"),
+                ("OPTION_D", "4"),
+                ("OPTION_E", "5"),
+                ("OPTION_F", ""),
+                ("OPTION_G", ""),
+                ("OPTION_H", "1 2"),
+            ])
+        );
+        let quoted = "OPTION_A='1'\nOPTION_B='2'\nOPTION_C=''\nOPTION_D='\\n'\nOPTION_E=\"1\"\nOPTION_F=\"2\"\nOPTION_G=\"\"\nOPTION_H=\"\\n\"\nOPTION_I = \"echo 'asd'\"\nOPTION_J='line 1\nline 2'\nOPTION_K='line one\nthis is \\'quoted\\'\none more line'\nOPTION_L=\"line 1\nline 2\"\nOPTION_M=\"line one\nthis is \\\"quoted\\\"\none more line\"\n";
+        assert_eq!(
+            parsed(quoted),
+            map(&[
+                ("OPTION_A", "1"),
+                ("OPTION_B", "2"),
+                ("OPTION_C", ""),
+                ("OPTION_D", "\\n"),
+                ("OPTION_E", "1"),
+                ("OPTION_F", "2"),
+                ("OPTION_G", ""),
+                ("OPTION_H", "\n"),
+                ("OPTION_I", "echo 'asd'"),
+                ("OPTION_J", "line 1\nline 2"),
+                ("OPTION_K", "line one\nthis is \\'quoted\\'\none more line"),
+                ("OPTION_L", "line 1\nline 2"),
+                ("OPTION_M", "line one\nthis is \"quoted\"\none more line"),
+            ])
+        );
+        let comments = "# Full line comment\nfoo=bar # baz\nbar=foo#baz\nbaz=\"foo\"#bar\n";
+        assert_eq!(
+            parsed(comments),
+            map(&[("foo", "bar"), ("bar", "foo#baz"), ("baz", "foo")])
+        );
+        let equals = "export OPTION_A='postgres://localhost:5432/database?sslmode=disable'\n";
+        assert_eq!(
+            parsed(equals),
+            map(&[(
+                "OPTION_A",
+                "postgres://localhost:5432/database?sslmode=disable"
+            )])
+        );
+        let url = "TEST_URLS=\"stratum+tcp://stratum.antpool.com:3333\nstratum+tcp://stratum.antpool.com:443\"";
+        assert_eq!(
+            parsed(url),
+            map(&[(
+                "TEST_URLS",
+                "stratum+tcp://stratum.antpool.com:3333\nstratum+tcp://stratum.antpool.com:443"
+            )])
+        );
+        assert!(parse_dotenv("INVALID LINE\nfoo=bar\n").is_err());
+    }
+
+    // godotenv_test.go TestSubstitutions and TestExpanding.
+    #[test]
+    fn dotenv_expands_only_earlier_file_keys() {
+        let subst = "OPTION_A=1\nOPTION_B=${OPTION_A}\nOPTION_C=$OPTION_B\nOPTION_D=${OPTION_A}${OPTION_B}\nOPTION_E=${OPTION_NOT_DEFINED}\n";
+        assert_eq!(
+            parsed(subst),
+            map(&[
+                ("OPTION_A", "1"),
+                ("OPTION_B", "1"),
+                ("OPTION_C", "1"),
+                ("OPTION_D", "11"),
+                ("OPTION_E", ""),
+            ])
+        );
+        let cases: &[(&str, &[(&str, &str)])] = &[
+            ("FOO=test\nBAR=$FOO", &[("FOO", "test"), ("BAR", "test")]),
+            (
+                "FOO=test\nBAR=${FOO}bar",
+                &[("FOO", "test"), ("BAR", "testbar")],
+            ),
+            ("BAR=$FOO", &[("BAR", "")]),
+            (
+                "FOO=test\nBAR=\"quote $FOO\"",
+                &[("FOO", "test"), ("BAR", "quote test")],
+            ),
+            ("BAR='quote $FOO'", &[("BAR", "quote $FOO")]),
+            (r#"FOO="foo\$BAR""#, &[("FOO", "foo$BAR")]),
+            (r#"FOO="foo\${BAR}""#, &[("FOO", "foo${BAR}")]),
+            (
+                "FOO=test\nBAR=\"foo\\${FOO} ${FOO}\"",
+                &[("FOO", "test"), ("BAR", "foo${FOO} test")],
+            ),
+            // Only [A-Z0-9_] names expand; an underscore name is one name.
+            ("A_B=1\nX=$A_B", &[("A_B", "1"), ("X", "1")]),
+            ("lower=1\nX=$lower", &[("lower", "1"), ("X", "$lower")]),
+            ("X=${lower}", &[("X", "${lower}")]),
+            ("X=$", &[("X", "$")]),
+            // Later keys are not visible yet; a later assignment wins.
+            ("X=$Y\nY=1", &[("X", ""), ("Y", "1")]),
+            (
+                "A=1\nB=$A\nA=2\nC=$A",
+                &[("A", "2"), ("B", "1"), ("C", "2")],
+            ),
+            // Go's dead `submatch[2] == "("` check: `$(NAME` expands.
+            ("A=1\nB=$(A)", &[("A", "1"), ("B", "1)")]),
+        ];
+        for &(input, want) in cases {
+            assert_eq!(parsed(input), map(want), "{input:?}");
+        }
+        // The process environment is never consulted: PATH is set in every
+        // test process but expands to empty here.
+        assert!(std::env::var_os("PATH").is_some());
+        assert_eq!(parsed("X=$PATH")["X"], "");
+    }
+
+    #[test]
+    fn dotenv_duplicate_keys_last_wins() {
+        assert_eq!(parsed("A=1\nA=2\n"), map(&[("A", "2")]));
+        assert_eq!(parsed("A=1\nexport A='3'\n"), map(&[("A", "3")]));
+    }
+
+    // godotenv_test.go TestLinesToIgnore.
+    #[test]
+    fn dotenv_ignores_blank_and_comment_lines() {
+        for input in ["\n", "\r\n", "\t\t ", "# Comment", "\t # comment"] {
+            assert_eq!(statement_start(input), None, "{input:?}");
+            assert!(parsed(input).is_empty(), "{input:?}");
+        }
+        assert_eq!(
+            statement_start(r"export OPTION_B='\n'"),
+            Some(r"export OPTION_B='\n'")
+        );
+    }
+
+    #[test]
+    fn dotenv_rejects_bad_files_whole() {
+        for input in [
+            "A=1\nB='unterminated\n",
+            "A=1\nB=\"unterminated",
+            "A=1\nnot a statement\n",
+            "A=1\nexport ",
+            "A=\"x\"junk\n",
+        ] {
+            assert!(parse_dotenv(input).is_err(), "{input:?}");
+        }
+        // A trailing key with no '=' parses under the empty key, like Go.
+        assert_eq!(parsed("A=1\nFOO"), map(&[("A", "1"), ("", "FOO")]));
+    }
+
+    fn load(contents: Option<&str>, existing: &[(&str, &str)]) -> HashMap<String, String> {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".env");
+        if let Some(text) = contents {
+            std::fs::write(&path, text).unwrap();
+        }
+        let before = map(existing);
+        let mut env = before.clone();
+        load_dotenv_with(
+            &path,
+            |k| before.contains_key(k),
+            |k, v| {
+                env.insert(k.to_string(), v.to_string());
+            },
+        );
+        env
+    }
+
+    #[test]
+    fn dotenv_missing_file_is_silent() {
+        assert!(load(None, &[]).is_empty());
+    }
+
+    #[test]
+    fn dotenv_directory_is_an_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(matches!(read_dotenv(tmp.path()), Err(DotenvError::Io(_))));
+    }
+
+    #[test]
+    fn dotenv_sets_new_vars_and_existing_win() {
+        let env = load(
+            Some("A=1\nB=\"two\"\n# c\nEXISTING=file\nEMPTY=file\nA=last\n"),
+            &[("EXISTING", "process"), ("EMPTY", "")],
+        );
+        assert_eq!(
+            env,
+            map(&[
+                ("A", "last"),
+                ("B", "two"),
+                ("EXISTING", "process"),
+                ("EMPTY", ""),
+            ])
+        );
+    }
+
+    #[test]
+    fn dotenv_expansion_ignores_process_env() {
+        let env = load(Some("A=$EXISTING\nB=${A}x\n"), &[("EXISTING", "process")]);
+        assert_eq!(env, map(&[("EXISTING", "process"), ("A", ""), ("B", "x")]));
+    }
+
+    #[test]
+    fn dotenv_skips_entries_setenv_would_reject() {
+        let env = load(Some("=v\nOK=1\n"), &[]);
+        assert_eq!(env.get("OK").map(String::as_str), Some("1"));
+        assert!(!env.contains_key(""));
+        let env = load(Some("Z=\"a\0b\"\nY=2\n"), &[]);
+        assert_eq!(env, map(&[("Y", "2")]));
+    }
+
+    #[test]
+    fn dotenv_parse_error_sets_nothing() {
+        let env = load(Some("A=1\nB='unterminated\n"), &[]);
+        assert!(env.is_empty(), "{env:?}");
+    }
+}

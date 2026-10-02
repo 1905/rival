@@ -1,0 +1,663 @@
+"""Unit tests for the parity runner and fakes, against a purpose-built temp binary.
+
+Run: python3 -m unittest discover -s parity -p 'test_*.py'
+No real reviewer CLI, Go binary or network is involved: the "rival" here is a
+small Python interpreter of JSON actions, and every path lives in a temp dir.
+"""
+
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+import run  # puts parity/fakes on sys.path
+import fakecli  # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# The binary under test: argv[1] is a JSON list of single-key actions.
+FAKE_RIVAL = r'''#!{python} -IB
+import json, os, shutil, subprocess, sys, time, urllib.request
+
+def act(actions):
+    for a in actions:
+        (k, v), = a.items()
+        if k == "out":
+            sys.stdout.write(v); sys.stdout.flush()
+        elif k == "err":
+            sys.stderr.write(v); sys.stderr.flush()
+        elif k == "log":
+            sys.stderr.write(json.dumps(v) + "\n"); sys.stderr.flush()
+        elif k == "call":
+            exe = shutil.which(v["argv"][0])
+            if exe is None:
+                sys.stdout.write("missing %s\n" % v["argv"][0]); continue
+            r = subprocess.run([exe] + v["argv"][1:], input=v.get("stdin", "").encode(),
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=v.get("cwd"))
+            sys.stdout.write("%s exit=%d out=%r err=%r\n" % (v["argv"][0], r.returncode,
+                             r.stdout.decode(), r.stderr.decode()))
+        elif k == "env":
+            with open(v, "w") as f:
+                json.dump(dict(os.environ), f)
+        elif k == "write":
+            os.makedirs(os.path.dirname(v[0]), exist_ok=True)
+            with open(v[0], "w") as f:
+                f.write(v[1])
+        elif k == "wait_for":
+            while not os.path.exists(v):
+                time.sleep(0.02)
+        elif k == "sleep":
+            time.sleep(v)
+        elif k in ("detach", "detach_inherit"):
+            # detach_inherit keeps stdin too, as Go's detach does.
+            child = subprocess.Popen([sys.argv[0], json.dumps(v)], start_new_session=True,
+                                     stdin=None if k == "detach_inherit" else subprocess.DEVNULL)
+            sys.stderr.write("rival: detached pid=%d\n" % child.pid); sys.stderr.flush()
+        elif k == "stdin":
+            sys.stdout.write(sys.stdin.read()); sys.stdout.flush()
+        elif k == "exists":
+            sys.stdout.write("exists=%s\n" % os.path.exists(v)); sys.stdout.flush()
+        elif k == "pidfile":
+            with open(v + ".tmp", "w") as f:
+                f.write(str(os.getpid()))
+            os.rename(v + ".tmp", v)
+        elif k == "exec_clean":
+            # Replaces this process with one whose environment has no task token.
+            os.execve(sys.executable, [sys.executable, "-c", "import time; time.sleep(%r)" % v], {{}})
+        elif k == "http":
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({{}}))
+            sys.stdout.write(opener.open(os.environ["RIVAL_UPDATE_API"] + v, timeout=5).read().decode())
+        elif k == "exit":
+            sys.exit(v)
+
+act(json.loads(sys.argv[1]) if len(sys.argv) > 1 else [])
+'''
+
+TIME = "2026-10-02T09:00:00Z"
+
+
+def step(actions, expect=None, **kw):
+    s = dict(kw, run=[json.dumps(actions)])
+    if expect is not None:
+        s["expect"] = expect
+    return s
+
+
+def ok(stdout="", **kw):
+    return dict({"exit_code": 0, "stdout": stdout}, **kw)
+
+
+def scenario(steps, home_files=(), **kw):
+    sc = {"name": kw.pop("name", "t"), "steps": steps, "expect": dict({"home_files": list(home_files)}, **kw.pop("expect", {}))}
+    sc.update(kw)
+    run.validate(sc)
+    return sc
+
+
+class RunnerCase(unittest.TestCase):
+    maxDiff = None
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="parity-test-")
+        self.addCleanup(self.tmp.cleanup)
+        self.bin = os.path.join(self.tmp.name, "fake-rival")
+        with open(self.bin, "w") as f:
+            f.write(FAKE_RIVAL.format(python=sys.executable))
+        os.chmod(self.bin, 0o755)
+        self.work = os.path.join(self.tmp.name, "runs")
+        os.makedirs(self.work)
+        # An injected parent environment; os.environ is never mutated.
+        self.parent = {"USER": "tester", "OPENAI_API_KEY": "sk-leak", "ANTHROPIC_API_KEY": "leak",
+                       "PATH": os.environ.get("PATH", ""), "HTTPS_PROXY": "http://proxy.invalid:1"}
+
+    def run_sc(self, sc):
+        return run.run_scenario(sc, self.bin, self.work, parent_env=self.parent)
+
+    def assertPass(self, result):
+        self.assertEqual((result.problems, result.unsafe), ([], []), "root: %s" % result.root)
+
+    def assertProblem(self, result, pattern):
+        joined = "\n".join(result.problems)
+        self.assertRegex(joined, pattern)
+
+
+class BasicTest(RunnerCase):
+    def test_stdout_exit_and_plain_stderr(self):
+        sc = scenario([step([{"out": "hi\n"}, {"err": "rival: detached pid=777\n"}, {"exit": 3}],
+                            {"exit_code": 3, "stdout": "hi\n", "stderr_lines": ["rival: detached pid=<PID1>"]})])
+        self.assertPass(self.run_sc(sc))
+
+    def test_mismatches_are_reported(self):
+        sc = scenario([step([{"out": "hi\n"}, {"err": "surprise\n"}, {"exit": 1}], ok("bye\n"))])
+        r = self.run_sc(sc)
+        self.assertProblem(r, "exit code 1, want 0")
+        self.assertProblem(r, "stdout differs")
+        self.assertProblem(r, "plain stderr lines differ")
+
+    def test_log_events(self):
+        log_a = {"level": "info", "app": "rival", "session": "0b7c6a43-5d1e-4c2f-9a8b-1c2d3e4f5a6b",
+                 "pid": 4321, "time": TIME, "message": "reaping orphaned session"}
+        log_b = {"level": "warn", "app": "rival", "time": TIME, "message": "second"}
+        expect = ok(log_events=[
+            {"level": "warn", "message": "second"},
+            {"level": "info", "message": "reaping orphaned session", "fields": {"session": "<UUID1>", "pid": "<PID1>"}},
+        ])
+        self.assertPass(self.run_sc(scenario([step([{"log": log_a}, {"log": log_b}], expect)])))
+        # An unexpected extra event fails even when every expected one is seen.
+        r = self.run_sc(scenario([step([{"log": log_a}, {"log": log_b}, {"log": log_b}], expect)]))
+        self.assertProblem(r, "unexpected log event")
+        # A JSON line without zerolog's shape fails.
+        r = self.run_sc(scenario([step([{"log": {"level": "info", "message": "m"}}],
+                                       ok(log_events=[{"level": "info", "message": "m"}]))]))
+        self.assertProblem(r, "malformed log event")
+
+    def test_home_files_and_file_checks(self):
+        u = "0b7c6a43-5d1e-4c2f-9a8b-1c2d3e4f5a6b"
+        session = {"id": u, "status": "completed", "pid": 99, "exit_code": 0, "output_bytes": 12,
+                   "start_time": TIME, "work_dir": "<ROOT>/work"}
+        sc = scenario(
+            [step([{"write": ["<HOME>/.rival/sessions/%s.json" % u, json.dumps(session)]}], ok())],
+            home_files=[".rival/config.yaml", ".rival/sessions/<UUID1>.json"],
+            fixtures=[{"write": "home/.rival/config.yaml", "text": "efforts: {}\n"}],
+            expect={"files": [
+                {"path": "<HOME>/.rival/sessions/<UUID1>.json",
+                 "json": {"id": "<UUID1>", "status": "completed", "pid": "<PID1>", "exit_code": 0,
+                          "output_bytes": 12, "start_time": "<TIME>", "work_dir": "<ROOT>/work"}},
+                {"path": "<HOME>/.rival/config.yaml", "text": "efforts: {}\n"},
+                {"path": "<HOME>/.rival/queue/.lock", "absent": True},
+            ]},
+        )
+        # Placeholders in argv reach the binary as real paths and normalise back.
+        self.assertPass(self.run_sc(sc))
+        sc["expect"]["files"][0]["json"]["output_bytes"] = 13
+        self.assertProblem(self.run_sc(sc), "JSON differs")
+
+    def test_schema_rejects_typos_and_missing_expectations(self):
+        bad = [
+            {"name": "x", "steps": [{"run": [], "expect": ok()}], "expect": {}},
+            {"name": "x", "steps": [{"run": [], "expect": {"exit_code": 0}}], "expect": {"home_files": []}},
+            {"name": "x", "steps": [{"run": [], "expect": ok(), "stdout": ""}], "expect": {"home_files": []}},
+            {"name": "x", "steps": [{"run": [], "expect": ok(), "env": {"PATH": "/usr/bin"}}], "expect": {"home_files": []}},
+            {"name": "x", "steps": [{"run": [], "expect": ok(), "env": {"FAKE_CODEX_SCRIPT": "/x"}}], "expect": {"home_files": []}},
+            {"name": "x", "steps": [{"start": "a", "run": []}], "expect": {"home_files": []}},
+            {"name": "x", "steps": [{"wait": "a", "expect": ok()}], "expect": {"home_files": []}},
+            {"name": "x", "system_tools": ["codex"], "steps": [{"run": [], "expect": ok()}], "expect": {"home_files": []}},
+            {"name": "x", "fixtures": [{"git": "r", "args": ["clone", "https://example.invalid/x"]}],
+             "steps": [{"run": [], "expect": ok()}], "expect": {"home_files": []}},
+            {"name": "x", "fakes": {"scripts": {"codex": {"responses": [{"argv": []}]}}},
+             "steps": [{"run": [], "expect": ok()}], "expect": {"home_files": []}},
+        ]
+        for sc in bad:
+            with self.subTest(sc=sc), self.assertRaises(run.ScenarioError):
+                run.validate(sc)
+
+    def test_schema_reports_bad_shapes_and_duplicates(self):
+        def sc(steps=None, **kw):
+            return dict({"name": "x", "steps": steps or [{"run": [], "expect": ok()}],
+                         "expect": {"home_files": []}}, **kw)
+        cases = {
+            "env: want an object": sc(env=["A"]),
+            r"steps\[0\]\.env: want an object": sc([{"run": [], "expect": ok(), "env": "A=1"}]),
+            "fixtures: want a list": sc(fixtures={"write": "a"}),
+            r"fixtures\[0\]: want an object": sc(fixtures=["a"]),
+            "'git' is always linked": sc(system_tools=["git"]),
+            "'ps' is listed twice": sc(system_tools=["ps", "ps"]),
+            "update_server.routes: want an object": sc(update_server={"routes": []}),
+            "expect.files: want a list": dict(sc(), expect={"home_files": [], "files": {}}),
+            "at most one of stdin, stdin_file": sc([{"run": [], "expect": ok(), "stdin": "", "stdin_file": "a"}]),
+            "unlink_stdin: needs stdin_file": sc([{"run": [], "expect": ok(), "unlink_stdin": True}]),
+            "unlink_stdin: want true": sc([{"run": [], "expect": ok(), "stdin_file": "a", "unlink_stdin": False}]),
+            r"stdout_file: want a string": sc([{"run": [], "expect": ok(), "stdout_file": 1}]),
+            r"'\./o\.log' is already a named output": sc([{"run": [], "expect": ok(), "stdout_file": "o.log"},
+                                                     {"run": [], "expect": ok(), "stderr_file": "./o.log"}]),
+            "'same' is already a named output": sc([{"run": [], "expect": ok(), "stdout_file": "same",
+                                                     "stderr_file": "same"}]),
+        }
+        for message, bad in cases.items():
+            with self.subTest(message), self.assertRaisesRegex(run.ScenarioError, message):
+                run.validate(bad)
+
+    def test_invalid_scenario_file_is_a_report(self):
+        sdir = os.path.join(self.tmp.name, "scenarios")
+        os.makedirs(sdir)
+        with open(os.path.join(sdir, "a.yaml"), "w") as f:
+            json.dump({"name": "x", "env": ["A"], "steps": [{"run": [], "expect": ok()}],
+                       "expect": {"home_files": []}}, f)
+        out = subprocess.run([sys.executable, os.path.join(HERE, "run.py"), "--bin", self.bin,
+                              "--scenarios-dir", sdir, "--work-dir", self.work],
+                             env={"PATH": "/usr/bin:/bin"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertEqual((out.returncode, out.stderr), (1, b""))
+        self.assertIn(b"FAIL a.yaml\n    env: want an object\n", out.stdout)
+
+    def test_fixture_paths_stay_in_root(self):
+        sc = scenario([step([], ok())], fixtures=[{"write": "../escape", "text": "x"}])
+        self.assertProblem(self.run_sc(sc), "leaves the task root")
+
+    def test_git_fixture_is_local(self):
+        sc = scenario(
+            [step([{"out": "ok\n"}], ok("ok\n"), cwd="work/repo")],
+            fixtures=[{"write": "work/repo/a.txt", "text": "a\n"},
+                      {"git": "work/repo", "args": ["init", "-q"]},
+                      {"git": "work/repo", "args": ["add", "a.txt"]},
+                      {"git": "work/repo", "args": ["commit", "-q", "-m", "init"]}])
+        r = self.run_sc(sc)
+        self.assertPass(r)
+        head = subprocess.run(["git", "-C", os.path.join(r.root, "work/repo"), "log", "--format=%an %ad", "--date=iso-strict"],
+                              stdout=subprocess.PIPE, check=True).stdout.decode()
+        self.assertEqual(head, "Rival Parity 2026-01-01T00:00:00+00:00\n")
+
+
+class EnvTest(RunnerCase):
+    def test_allowlisted_environment(self):
+        sc = scenario([step([{"env": "<ROOT>/env.json"}], ok())], env={"CI": None, "EXTRA": "<HOME>/x"})
+        r = self.run_sc(sc)
+        self.assertPass(r)
+        with open(os.path.join(r.root, "env.json")) as f:
+            env = json.load(f)
+        home = os.path.join(r.root, "home")
+        self.assertNotIn("OPENAI_API_KEY", env)
+        self.assertNotIn("ANTHROPIC_API_KEY", env)
+        self.assertNotIn("HTTPS_PROXY", env)
+        self.assertNotIn("CI", env)
+        self.assertEqual(env["USER"], "tester")
+        self.assertEqual(env["HOME"], home)
+        self.assertEqual(env["USERPROFILE"], home)
+        self.assertEqual(env["RIVAL_HOME"], os.path.join(home, ".rival"))
+        self.assertEqual(env["RIVAL_NO_TELEMETRY"], "1")
+        self.assertEqual(env["RIVAL_NO_UPDATE_CHECK"], "1")
+        self.assertEqual(env["EXTRA"], home + "/x")
+        self.assertRegex(env["RIVAL_UPDATE_API"], r"^http://127\.0\.0\.1:\d+$")
+        self.assertEqual(env["PATH"], os.path.join(r.root, "bin") + os.pathsep + os.path.join(r.root, "sysbin"))
+        self.assertEqual(sorted(os.listdir(os.path.join(r.root, "sysbin"))), ["git"])
+        self.assertEqual(env["TMPDIR"], os.path.join(r.root, "tmp"))
+
+    def test_absent_fake_fails_lookpath(self):
+        sc = scenario([step([{"call": {"argv": ["docker", "info"]}}, {"call": {"argv": ["claude", "-p"]}}],
+                            ok("missing docker\nclaude exit=97 out='' err=%r\n" % (
+                                "fake claude: unscripted call (FAKE_CLAUDE_SCRIPT unset)\n",)))],
+                      fakes={"absent": ["docker"]})
+        r = self.run_sc(sc)
+        self.assertFalse(os.path.exists(os.path.join(r.root, "bin", "docker")))
+        # The unscripted claude call fails the scenario even though stdout matched.
+        self.assertEqual(r.problems, ["fake claude: unscripted call (FAKE_CLAUDE_SCRIPT unset)",
+                                      "fake claude called 1 times, want 0: [['-p']]"])
+
+
+class FakeTest(RunnerCase):
+    def codex_script(self):
+        return {"responses": [
+            {"argv": ["login", "status"], "times": 1, "stdout": "Logged in using ChatGPT\n", "exit": 0},
+            {"argv_prefix": ["exec"], "times": 1, "stderr": "You've hit your usage limit.\n", "exit": 1,
+             "expect": {"stdin": "review this", "cwd": "<ROOT>/work", "env": {"RIVAL_NO_TELEMETRY": "1", "CI": "1",
+                                                                             "OPENAI_API_KEY": None}}},
+            {"argv_prefix": ["exec"], "times": 1, "stdout": "{\"ok\":true}\n", "exit": 0,
+             "expect": {"stdin": {"$regex": "second.*"}}},
+        ]}
+
+    def test_per_invocation_responses_and_counts(self):
+        calls = [{"call": {"argv": ["codex", "login", "status"]}},
+                 {"call": {"argv": ["codex", "exec", "--json", "-"], "stdin": "review this"}},
+                 {"call": {"argv": ["codex", "exec", "--json", "-"], "stdin": "second try"}}]
+        want = ("codex exit=0 out='Logged in using ChatGPT\\n' err=''\n"
+                "codex exit=1 out='' err=\"You've hit your usage limit.\\n\"\n"
+                "codex exit=0 out='{\"ok\":true}\\n' err=''\n")
+        sc = scenario([step(calls, ok(want))], fakes={"scripts": {"codex": self.codex_script()}},
+                      expect={"calls": {"codex": 3}})
+        self.assertPass(self.run_sc(sc))
+
+    def test_expectation_violation_and_unmatched_argv(self):
+        calls = [{"call": {"argv": ["codex", "exec"], "stdin": "wrong"}},
+                 {"call": {"argv": ["codex", "review"]}}]
+        script = self.codex_script()
+        script["responses"][0]["times"] = 1
+        sc = scenario([step(calls, ok("codex exit=1 out='' err=\"You've hit your usage limit.\\n\"\n"
+                                       "codex exit=97 out='' err=\"fake codex: no scripted response for argv ['review']\\n\"\n"))],
+                      fakes={"scripts": {"codex": script}}, expect={"calls": {"codex": 2}})
+        r = self.run_sc(sc)
+        self.assertProblem(r, r"fake codex \['exec'\]: stdin 'wrong' does not match 'review this'")
+        self.assertProblem(r, r"no scripted response for argv \['review'\]")
+        self.assertProblem(r, r"responses\[0\] used 0 times, want 1")
+
+    def test_fake_waits_and_signals(self):
+        script = {"responses": [{"argv": ["run"], "touch": "<ROOT>/sync/started", "wait_for": "<ROOT>/sync/go",
+                                 "stdout": "done\n", "exit": 0}]}
+        sc = scenario([
+            {"start": "a", "run": [json.dumps([{"call": {"argv": ["grok", "run"]}}])]},
+            {"wait_file": "sync/started", "timeout": 10},
+            step([{"out": "second\n"}], ok("second\n")),
+            {"touch": "sync/go"},
+            {"wait": "a", "expect": ok("grok exit=0 out='done\\n' err=''\n")},
+        ], fixtures=[{"mkdir": "sync"}], fakes={"scripts": {"grok": script}}, expect={"calls": {"grok": 1}})
+        self.assertPass(self.run_sc(sc))
+
+    def test_fake_script_outside_root_is_refused(self):
+        root = tempfile.mkdtemp(dir=self.tmp.name)
+        os.makedirs(os.path.join(root, ".parity", "fakes"))
+        outside = os.path.join(self.tmp.name, "codex.json")
+        with open(outside, "w") as f:
+            json.dump({"responses": [{"argv": [], "exit": 0}]}, f)
+        r = self.call_fake("codex", [], root, {"FAKE_CODEX_SCRIPT": outside})
+        self.assertEqual(r.returncode, fakecli.EXIT_UNSCRIPTED)
+        with open(fakecli.calls_path(root, "codex")) as f:
+            self.assertIn("outside the task root", json.loads(f.readline())["error"])
+
+    def call_fake(self, name, argv, root, extra_env):
+        lib = os.path.join(HERE, "fakes")
+        code = "import sys; sys.path.insert(0, %r); import fakecli; sys.argv[0] = %r; sys.exit(fakecli.main(%r))" % (lib, name, name)
+        env = dict({"PATH": "/usr/bin:/bin", "FAKE_TASK_ROOT": root}, **extra_env)
+        return subprocess.run([sys.executable, "-IB", "-c", code] + argv, env=env, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+class BrewGuardTest(RunnerCase):
+    def brew(self, prefix):
+        return {"responses": [
+            {"argv": ["upgrade", "1905/tap/rival"], "exit": 0},
+            {"argv": ["--prefix", "rival"], "stdout": prefix + "\n", "exit": 0},
+        ]}
+
+    def test_unsafe_prefix_stops_before_the_binary_runs(self):
+        sc = scenario([step([{"write": ["<ROOT>/ran", "x"]}], ok())],
+                      fakes={"scripts": {"brew": self.brew("/opt/homebrew/opt/rival")}})
+        r = self.run_sc(sc)
+        self.assertFalse(r.ok)
+        self.assertRegex(r.unsafe[0], "outside the task root")
+        self.assertFalse(os.path.exists(os.path.join(r.root, "ran")))
+
+    def test_fake_brew_rejects_unsafe_prefix_at_runtime(self):
+        root = tempfile.mkdtemp(dir=self.tmp.name)
+        os.makedirs(os.path.join(root, ".parity", "fakes"))
+        script = os.path.join(root, ".parity", "fakes", "brew.json")
+        with open(script, "w") as f:
+            json.dump(self.brew("/usr/local"), f)
+        r = FakeTest.call_fake(self, "brew", ["--prefix", "rival"], root, {"FAKE_BREW_SCRIPT": script})
+        self.assertEqual((r.returncode, r.stdout), (fakecli.EXIT_UNSAFE, b""))
+        # The runner turns the fake's report into an unsafe result.
+        task = run.Task(scenario([step([], ok())]), self.bin, root, {})
+        task.check_calls()
+        self.assertRegex(task.result.unsafe[0], "fake brew: brew prefix '/usr/local' is outside")
+        main_out = self.main_with_unsafe()
+        self.assertEqual(main_out, 3)
+
+    def main_with_unsafe(self):
+        sdir = os.path.join(self.tmp.name, "scenarios")
+        os.makedirs(sdir)
+        sc = scenario([step([], ok())], fakes={"scripts": {"brew": self.brew("/usr/local")}})
+        with open(os.path.join(sdir, "a.yaml"), "w") as f:
+            json.dump(sc, f)
+        with open(os.devnull, "w") as null:
+            stdout, sys.stdout = sys.stdout, null
+            try:
+                return run.main(["--bin", self.bin, "--scenarios-dir", sdir, "--work-dir", self.work])
+            finally:
+                sys.stdout = stdout
+
+    def test_safe_prefix_with_copied_binary(self):
+        prefix = "<ROOT>/brew/opt/rival"
+        sc = scenario(
+            [step([{"call": {"argv": ["brew", "upgrade", "1905/tap/rival"]}},
+                   {"call": {"argv": ["brew", "--prefix", "rival"]}}],
+                  ok("brew exit=0 out='' err=''\nbrew exit=0 out='<ROOT>/brew/opt/rival\\n' err=''\n"))],
+            home_files=[], fixtures=[{"copy_bin": "brew/opt/rival/bin/rival"}],
+            fakes={"scripts": {"brew": self.brew(prefix)}}, expect={"calls": {"brew": 2}})
+        r = self.run_sc(sc)
+        self.assertPass(r)
+        self.assertTrue(os.access(os.path.join(r.root, "brew/opt/rival/bin/rival"), os.X_OK))
+
+    def test_safe_prefix_needs_prepopulated_binary(self):
+        sc = scenario([step([], ok())], fakes={"scripts": {"brew": self.brew("<ROOT>/brew/opt/rival")}})
+        self.assertProblem(self.run_sc(sc), "add a copy_bin fixture")
+
+
+class HttpTest(RunnerCase):
+    def test_local_release_server(self):
+        path = "/repos/1905/rival/releases/latest"
+        sc = scenario([step([{"http": path}], ok('{"tag_name": "v9.9.9"}'))],
+                      update_server={"routes": {path: {"status": 200, "json": {"tag_name": "v9.9.9"}}}},
+                      expect={"http_requests": [{"method": "GET", "path": path}]})
+        self.assertPass(self.run_sc(sc))
+
+    def test_unexpected_request_fails(self):
+        sc = scenario([step([{"http": "/elsewhere"}], ok())])
+        r = self.run_sc(sc)
+        self.assertProblem(r, "exit code 1")
+        self.assertProblem(r, r"update server requests differ.*\n.*\n  actual:   \[\('GET', '/elsewhere'\)\]")
+
+
+class RedirectTest(RunnerCase):
+    """Task 2.2's case: arbitrary redirect names, stdin unlinked once the detached parent exits."""
+
+    def redirect_scenario(self, want_stdout):
+        reader = [{"wait_for": "<ROOT>/sync/go"}, {"exists": "<ROOT>/in/prompt.txt"}, {"stdin": True},
+                  {"err": "child read\n"}]
+        return scenario([
+            step([{"detach_inherit": reader}],
+                 ok(want_stdout, stderr_lines=["rival: detached pid=<PID1>", "child read"]),
+                 stdin_file="in/prompt.txt", unlink_stdin=True,
+                 stdout_file="out/review result.log", stderr_file="logs/errors.txt"),
+            {"touch": "sync/go"},
+            {"wait_idle": True, "timeout": 10},
+        ], fixtures=[{"write": "in/prompt.txt", "text": "review this diff\n"}, {"mkdir": "sync"}],
+            expect={"files": [{"path": "<ROOT>/in/prompt.txt", "absent": True},
+                              {"path": "<ROOT>/logs/errors.txt", "text": "rival: detached pid=%s\nchild read\n"
+                               % "<PID1>"}]})
+
+    def test_detached_reader_survives_unlinked_stdin(self):
+        r = self.run_sc(self.redirect_scenario("exists=False\nreview this diff\n"))
+        self.assertPass(r)
+        with open(os.path.join(r.root, "out", "review result.log")) as f:
+            self.assertEqual(f.read(), "exists=False\nreview this diff\n")
+        self.assertEqual(sorted(os.listdir(os.path.join(r.root, ".parity", "steps"))), [])
+
+    def test_named_stdout_is_still_checked_exactly(self):
+        r = self.run_sc(self.redirect_scenario("exists=False\nsomething else\n"))
+        self.assertEqual(len(r.problems), 1, r.problems)
+        self.assertProblem(r, r"stdout differs\n(.|\n)*'review this diff\\n'")
+
+    def test_redirect_paths_must_be_task_owned(self):
+        cases = {
+            r"stdin_file '\.parity/scenario\.json' is inside the runner's \.parity dir": {"stdin_file": ".parity/scenario.json"},
+            r"stdin_file 'in/missing' is not an existing regular file": {"stdin_file": "in/missing"},
+            r"stdin_file 'in/link' is not an existing regular file": {"stdin_file": "in/link"},
+            r"stdout_file 'in/prompt.txt' already exists": {"stdout_file": "in/prompt.txt"},
+            r"path '\.\./outside' leaves the task root": {"stderr_file": "../outside"},
+        }
+        for message, redirect in cases.items():
+            with self.subTest(message):
+                sc = scenario([step([{"write": ["<ROOT>/ran", "x"]}], ok(), **redirect)],
+                              fixtures=[{"write": "in/prompt.txt", "text": "x\n"}])
+                task = run.Task(sc, self.bin, tempfile.mkdtemp(dir=self.work), self.parent)
+                os.makedirs(os.path.join(task.root, "in"))
+                os.symlink("prompt.txt", os.path.join(task.root, "in", "link"))
+                r = task.run()
+                self.assertEqual(len(r.problems), 1, r.problems)
+                self.assertRegex(r.problems[0], "^ScenarioError: " + message)
+                self.assertFalse(os.path.exists(os.path.join(r.root, "ran")))
+                self.assertTrue(os.path.exists(os.path.join(r.root, "in", "prompt.txt")))
+
+
+class ProcessTest(RunnerCase):
+    def test_late_detached_output_is_checked(self):
+        # The child writes only after the parent's exit was checked; it is gone before the sweep.
+        def sc(lines):
+            return scenario([
+                step([{"detach": [{"wait_for": "<ROOT>/sync/go"}, {"err": "late line\n"}]}],
+                     ok(stderr_lines=lines)),
+                {"touch": "sync/go"},
+                {"wait_idle": True, "timeout": 10},
+            ], fixtures=[{"mkdir": "sync"}])
+        r = self.run_sc(sc(["rival: detached pid=<PID1>"]))
+        self.assertEqual(len(r.problems), 1, r.problems)
+        self.assertProblem(r, r"plain stderr lines differ\n.*\n  actual:   \['rival: detached pid=<PID1>', 'late line'\]")
+        self.assertPass(self.run_sc(sc(["rival: detached pid=<PID1>", "late line"])))
+
+    def test_exit_code_is_checked_per_step(self):
+        sc = scenario([step([{"exit": 2}], ok()), step([{"exit": 0}], ok())])
+        r = self.run_sc(sc)
+        self.assertEqual(r.problems, ["steps[0] %s: exit code 2, want 0" % [json.dumps([{"exit": 2}])]])
+
+    def test_signals_are_deferred_inside_critical_sections(self):
+        sig = run.Signals()
+        with self.assertRaises(run.Interrupted) as caught:
+            with sig.deferred():
+                sig.handler(signal.SIGTERM, None)
+                self.assertEqual(sig.pending, signal.SIGTERM)
+        self.assertEqual((caught.exception.signum, caught.exception.name), (signal.SIGTERM, "SIGTERM"))
+        # Cleanup after the first signal cannot be interrupted again.
+        sig.handler(signal.SIGINT, None)
+        with self.assertRaises(run.Interrupted):
+            run.Signals().handler(signal.SIGINT, None)
+
+    def test_signal_cleans_task_processes_and_spares_others(self):
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            with self.subTest(signal.Signals(signum).name):
+                self.check_signal_cleanup(signum)
+
+    def check_signal_cleanup(self, signum):
+        name = signal.Signals(signum).name
+        sdir = os.path.join(self.tmp.name, "scenarios-" + name)
+        work = os.path.join(self.tmp.name, "work-" + name)
+        os.makedirs(sdir)
+        # The step's own process drops the token (exec_clean): only tracking can find it.
+        sc = scenario([step([{"detach": [{"pidfile": "<ROOT>/child.pid"}, {"sleep": 60}]},
+                             {"wait_for": "<ROOT>/child.pid"}, {"pidfile": "<ROOT>/parent.pid"},
+                             {"exec_clean": 60}], ok(), timeout=120)])
+        with open(os.path.join(sdir, "a.yaml"), "w") as f:
+            json.dump(sc, f)
+        other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                 env={"PATH": "/usr/bin:/bin"})
+        runner = subprocess.Popen([sys.executable, os.path.join(HERE, "run.py"), "--bin", self.bin,
+                                   "--scenarios-dir", sdir, "--work-dir", work],
+                                  env={"PATH": "/usr/bin:/bin"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            pids = self.wait_pids(work)
+            self.assertTrue(all(_alive(p) for p in pids))
+            runner.send_signal(signum)
+            out, err = runner.communicate(timeout=20)
+            self.assertEqual((runner.returncode, err), (128 + signum, b""), out)
+            self.assertIn(("interrupted by %s; task processes cleaned up" % name).encode(), out)
+            self.assertIn(("interrupted by %s: run stopped" % name).encode(), out)
+            deadline = time.monotonic() + 5
+            while any(_alive(p) for p in pids) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertEqual([p for p in pids if _alive(p)], [])
+            self.assertIsNone(other.poll())
+        finally:
+            for p in (runner, other):
+                if p.poll() is None:
+                    p.kill()
+                p.communicate()
+
+    def wait_pids(self, work):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            roots = os.listdir(work) if os.path.isdir(work) else []
+            files = [os.path.join(work, r, n) for r in roots for n in ("parent.pid", "child.pid")]
+            if roots and all(os.path.exists(f) for f in files):
+                # parent.pid is written just before exec_clean; give the exec a moment.
+                time.sleep(0.3)
+                pids = []
+                for f in files:
+                    with open(f) as fh:
+                        pids.append(int(fh.read()))
+                return pids
+            time.sleep(0.05)
+        self.fail("scenario processes never started under %s" % work)
+
+    def test_detached_child_shares_redirect_and_wait_idle(self):
+        sc = scenario([
+            {"start": "a", "run": [json.dumps([{"detach": [{"sleep": 0.3}, {"err": "child done\n"}]}, {"out": "parent\n"}])]},
+            {"wait_idle": True, "timeout": 10},
+            {"wait": "a", "expect": ok("parent\n", stderr_lines=["rival: detached pid=<PID1>", "child done"])},
+        ])
+        self.assertPass(self.run_sc(sc))
+
+    def test_leaked_process_is_killed_and_fails(self):
+        sc = scenario([step([{"detach": [{"sleep": 60}]}], ok(stderr_lines=["rival: detached pid=<PID1>"]))])
+        started = time.monotonic()
+        r = self.run_sc(sc)
+        self.assertProblem(r, "leaked task processes")
+        self.assertLess(time.monotonic() - started, 15)
+        token = re.search(r"leaked task processes \[(\d+)", "\n".join(r.problems))
+        self.assertIsNotNone(token)
+        pid = int(token.group(1))
+        time.sleep(0.2)
+        self.assertFalse(_alive(pid))
+
+    def test_step_timeout_kills_the_process_group(self):
+        sc = scenario([step([{"sleep": 30}], ok(), timeout=0.5)])
+        started = time.monotonic()
+        r = self.run_sc(sc)
+        self.assertLess(time.monotonic() - started, 10)
+        self.assertProblem(r, "timed out; process group killed")
+
+    def test_owned_pids_only_sees_the_token(self):
+        token = "unit-%d" % os.getpid()
+        env = {"PATH": "/usr/bin:/bin", run.TOKEN_VAR: token}
+        mine = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], env=env)
+        other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], env={"PATH": "/usr/bin:/bin"})
+        try:
+            deadline = time.monotonic() + 5
+            while mine.pid not in run.owned_pids(token) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertEqual(run.owned_pids(token), [mine.pid])
+            self.assertEqual(run.kill_owned(token), [mine.pid])
+            mine.wait(5)
+            self.assertIsNone(other.poll())
+        finally:
+            for p in (mine, other):
+                if p.poll() is None:
+                    p.kill()
+                p.wait()
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+class ScenarioFilesTest(unittest.TestCase):
+    def test_all_scenarios_validate(self):
+        # Later tasks add scenarios: the initial three must stay, and every file must validate.
+        names = [n for n in sorted(os.listdir(run.SCENARIOS_DIR)) if n.endswith(".yaml")]
+        self.assertLessEqual({"queue-empty.yaml", "sessions-empty.yaml", "version.yaml"}, set(names))
+        for n in names:
+            with self.subTest(n):
+                run.load_scenario(os.path.join(run.SCENARIOS_DIR, n))
+
+    # Committed expectations: they must keep holding after the Go tree is removed.
+    # Source: rival/cmd/root.go `const banner` and `var Version = "dev"`, printed by
+    # rival/cmd/version.go as fmt.Print(banner) then fmt.Printf("  %s\\n", Version).
+    GO_BANNER = ("\n"
+                 "         _             __\n"
+                 "   _____(_)   ______ _/ /\n"
+                 "  / ___/ / | / / __ `/ /\n"
+                 " / /  / /| |/ / /_/ / /\n"
+                 "/_/  /_/ |___/\\__,_/_/\n")
+    EXPECTED_STDOUT = {
+        "version": GO_BANNER + "  dev\n",
+        # rival/cmd/sessions.go sessionsAction: fmt.Println("No sessions found.")
+        "sessions-empty": "No sessions found.\n",
+        # rival/cmd/queue.go queueListAction: fmt.Println("Queue is empty.")
+        "queue-empty": "Queue is empty.\n",
+    }
+
+    def test_initial_scenarios_match_committed_go_output(self):
+        for name, stdout in self.EXPECTED_STDOUT.items():
+            with self.subTest(name):
+                sc = run.load_scenario(os.path.join(run.SCENARIOS_DIR, name + ".yaml"))
+                self.assertEqual(len(sc["steps"]), 1)
+                self.assertEqual(sc["steps"][0]["expect"], {"exit_code": 0, "stdout": stdout,
+                                                            "stderr_lines": [], "log_events": []})
+
+
+if __name__ == "__main__":
+    unittest.main()

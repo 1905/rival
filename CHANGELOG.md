@@ -6,6 +6,13 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 
 ## [Unreleased]
 
+### In progress — Rust CLI port
+- Added the Rust workspace, configuration, session storage, log parsing, and macOS/Linux process identity support.
+- Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
+- Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
+- The command port, TUI, Windows support, and release switch remain unfinished. The shipped CLI is still Go.
+- Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
+
 ### Changed
 - `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
 

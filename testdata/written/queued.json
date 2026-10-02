@@ -1,0 +1,18 @@
+{
+  "id": "a1b2c3d4-0002-4000-8000-000000000002",
+  "cli": "claude",
+  "mode": "review",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "prompt_preview": "Review the billing extension",
+  "status": "queued",
+  "start_time": "2026-09-26T11:12:00.018889+08:00",
+  "queued_at": "2026-09-26T11:12:00.018889+08:00",
+  "queue_position": 2,
+  "work_dir": "/Users/dev/src/acme-api",
+  "log_file": "/Users/dev/.rival/sessions/a1b2c3d4-0002-4000-8000-000000000002.log",
+  "output_bytes": 0,
+  "output_lines": 0,
+  "pid": 44001,
+  "pid_start": 1790392320018000000
+}

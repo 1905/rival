@@ -1,0 +1,22 @@
+{
+  "id": "d0000000-0003-4000-8000-000000000003",
+  "cli": "codex",
+  "mode": "review",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "review_scope": "internal/core/",
+  "prompt": "Literal � kept. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx🦀 tail \u003c\u0026\u003e \u2028 done",
+  "prompt_preview": "Literal � kept. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\ufffd\ufffd",
+  "prompt_hash": "08aee962c08ddd8073c5d824c060c6f3b85687167ff963a9fb189dbeaea1132d",
+  "status": "queued",
+  "start_time": "2026-10-02T09:15:00.25+03:00",
+  "queued_at": "2026-10-02T09:15:00.25+03:00",
+  "work_dir": "/Users/dev/src/acme-api",
+  "log_file": "/Users/dev/.rival/sessions/d0000000-0003-4000-8000-000000000003.log",
+  "output_bytes": 0,
+  "output_lines": 0,
+  "pid": 50001,
+  "pid_start": 1790928900250000000,
+  "owner_pid": 50001,
+  "owner_pid_start": 1790928900250000000
+}

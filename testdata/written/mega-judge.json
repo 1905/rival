@@ -1,0 +1,22 @@
+{
+  "id": "005591bb-caed-4620-b6b2-ea97a729a103",
+  "group_id": "8a138d95-3176-4afb-aad1-a59e12b879c8",
+  "cli": "codex",
+  "mode": "consilium",
+  "model": "gpt-5.5",
+  "effort": "xhigh",
+  "review_scope": "internal/core/core.billing_extension.go",
+  "prompt": "# Consilium Judge — Final Code Review Verdict",
+  "prompt_preview": "# Consilium Judge — Final Code Review Verdict",
+  "prompt_hash": "3769b9c9",
+  "status": "completed",
+  "start_time": "2026-05-28T14:27:55.018889+08:00",
+  "end_time": "2026-05-28T14:29:17.717611+08:00",
+  "exit_code": 0,
+  "duration": "1m23s",
+  "work_dir": "/Users/dev/src/acme-api",
+  "log_file": "/Users/dev/.rival/sessions/005591bb-caed-4620-b6b2-ea97a729a103.log",
+  "output_bytes": 3090,
+  "output_lines": 1,
+  "pid": 60430
+}

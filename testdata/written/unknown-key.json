@@ -1,0 +1,18 @@
+{
+  "id": "c0000000-0002-4000-8000-000000000002",
+  "cli": "grok",
+  "mode": "security",
+  "model": "grok-4.6",
+  "effort": "low",
+  "status": "completed",
+  "start_time": "2026-09-20T08:00:00+02:00",
+  "end_time": "2026-09-20T08:03:00+02:00",
+  "exit_code": 0,
+  "duration": "3m0s",
+  "work_dir": "/Users/dev/src/rival",
+  "log_file": "/Users/dev/.rival/sessions/c0000000-0002-4000-8000-000000000002.log",
+  "output_bytes": 100,
+  "output_lines": 2,
+  "account": "work",
+  "pid": 1234
+}

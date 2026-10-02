@@ -1,0 +1,18 @@
+{
+  "id": "a1b2c3d4-0004-4000-8000-000000000004",
+  "cli": "codex",
+  "mode": "review",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "status": "failed",
+  "start_time": "2026-09-25T09:00:00.5Z",
+  "end_time": "2026-09-25T09:00:42.5Z",
+  "exit_code": 1,
+  "duration": "42s",
+  "work_dir": "/Users/dev/src/orbit-web",
+  "log_file": "/Users/dev/.rival/sessions/a1b2c3d4-0004-4000-8000-000000000004.log",
+  "output_bytes": 512,
+  "output_lines": 4,
+  "error": "codex: quota exceeded (429)",
+  "pid": 40000
+}

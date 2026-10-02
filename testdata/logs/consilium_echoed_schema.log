@@ -1,0 +1,625 @@
+OpenAI Codex v0.130.0
+--------
+workdir: /Users/dev/src/rival
+model: retired-sol-id
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5a92-a058-7b03-851b-9c997a6e7d8f
+--------
+user
+Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.
+
+# Consilium Judge — Final Code Review Verdict
+
+Review scope: rival/internal/review/parse.go
+
+## Instructions
+
+You are the final judge for this code review.
+
+You are given independent reviewer findings from different providers in structured JSON.
+
+Your job is to:
+- merge duplicate findings (same file + same line + same problem = one finding, all reporters in found_by)
+- keep true high-signal issues
+- drop weak, speculative, or redundant findings
+- assign final severity and confidence
+- produce a concise final review
+
+Rules:
+- Do not invent new findings that are absent from reviewer inputs.
+- Prefer findings supported by multiple reviewers. Consensus bonus: findings reported by 2+ reviewers independently get +2 confidence.
+- If only one reviewer reported an issue, keep it only if the evidence is concrete and confidence >= 6.
+- Prioritize product regressions, correctness, build-breaks, security, and broken critical flows.
+- De-prioritize cleanup, style, and low-value noise.
+- Every finding MUST reference an exact file path and line number.
+- Keep the final output short and dense.
+
+Severity levels:
+- critical: Data loss, security vulnerability, crash in production
+- high: Significant bug, race condition, missing error handling
+- medium: Logic issue, performance problem, architectural concern
+- low: Minor issue, edge case, improvement suggestion
+
+## Reviewer Findings (3 reviewers)
+
+=== REVIEW FROM claude (claude-claude-5) [role: code_quality] ===
+
+{
+  "summary": "parse.go is well-structured with excellent comments explaining the 'last valid JSON' strategy. Two DX issues stand out: ParseReviewerOutput and ParseConsiliumOutput are near-identical copy-paste, and the heuristic in extractJSON silently degrades on edge cases without giving callers any signal.",
+  "findings": [
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 11,
+      "severity": "medium",
+      "category": "architecture",
+      "title": "ParseReviewerOutput and ParseConsiliumOutput are copy-paste twins",
+      "body": "The two public functions differ only in the type parameter passed to json.Unmarshal and the word 'consilium' in one error message. This is textbook generic-function territory. When a third output type appears (or the extraction logic needs a tweak), a developer must remember to update both copies identically — a maintenance trap.",
+      "suggestion": "Extract a generic helper: `func parseOutput[T any](raw, label string) (*T, error)` that both public functions delegate to. Keeps the public API stable while eliminating duplication. If Go 1.18+ generics feel too heavy, a helper taking `any` + doing a two-step unmarshal into json.RawMessage then reflect is fine too, but generics are cleaner here.",
+      "confidence": 9
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 53,
+      "severity": "low",
+      "category": "ux",
+      "title": "extractJSON heuristic uses fragile string search for 'findings' key",
+      "body": "`strings.Contains(objs[i], `\"findings\"`)` matches any occurrence of the literal bytes `\"findings\"` anywhere in the JSON text — including inside a string value (e.g., a finding body that says `see \"findings\" section`). This is unlikely today but is a latent footgun: a developer debugging a misparse won't suspect this heuristic because the comment says 'contains a findings key', implying structural checking.",
+      "suggestion": "For a cheap structural check: unmarshal into `map[string]json.RawMessage` and test `_, ok := m[\"findings\"]`. This is only run on a small number of already-validated JSON blobs, so the cost is negligible, and it eliminates the false-positive risk entirely.",
+      "confidence": 7
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 47,
+      "severity": "low",
+      "category": "ux",
+      "title": "extractJSON silently falls back with no diagnostic signal",
+      "body": "When no object contains `\"findings\"`, the function silently returns the last JSON object (line 57). This is a reasonable fallback, but callers (and developers debugging parsing failures) get zero signal that the heuristic missed — the returned object may unmarshal into a zero-value struct with no findings, which looks like a clean review. A log line or a second return value indicating 'fallback used' would surface the ambiguity.",
+      "suggestion": "Return a second boolean (`fallback bool`) or log at debug level when the `\"findings\"` heuristic doesn't match any object. This lets callers decide whether to warn the user that the output may be a schema echo rather than a real review.",
+      "confidence": 7
+    }
+  ]
+}
+
+=== END REVIEW ===
+
+=== REVIEW FROM kimi-k3 [role: arch_security] ===
+
+{
+  "summary": "The review of rival/internal/review/parse.go revealed three significant issues: a state-tracking bug where quotes before braces cause parsing to fail completely, a quadratic complexity risk during invalid brace scanning, and a logic bug where schema placeholders from the prompt are returned as false findings if the model fails or returns findings-free output.",
+  "findings": [
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 67,
+      "severity": "high",
+      "category": "bug",
+      "title": "State-tracking context loss in jsonObjects",
+      "body": "The function jsonObjects starts scanning for matching braces from the index of the first '{' byte (remaining[start:]) rather than tracking the state from the beginning of the string. If there are any curly braces inside string literals or comments before the actual JSON payload (e.g., in the echoed user prompt, shell commands, or markdown explanations), the parser starts with inStr = false at the '{' and misinterprets the subsequent double-quotes and braces. This can cause it to completely fail to extract a valid JSON payload.",
+      "suggestion": "Scan the string sequentially from index 0, maintaining string and escape state, and push/pop brace indexes from a stack to accurately match braces.",
+      "confidence": 10
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 52,
+      "severity": "high",
+      "category": "architecture",
+      "title": "Echoed prompt schema fallback hides missing/invalid LLM outputs",
+      "body": "In extractJSON, the function loops backward over all found JSON objects to return the last one containing the 'findings' key, falling back to the last valid JSON object if none contain it. However, because the CLI prompt always includes the JSON output contract (which contains the 'findings' schema placeholder), the prompt itself is always parsed as a valid JSON object containing 'findings'. If the model's actual output is missing, malformed, or fails to include the 'findings' key, the loop will match the schema placeholder in the prompt instead of falling back to the last valid object. This results in the tool silently parsing and returning the mock findings from the prompt (e.g. path/to/file line 42) as real issues.",
+      "suggestion": "Skip any extracted JSON objects that contain the schema placeholder file path ('path/to/file'), or ensure that we only search for findings within JSON objects generated after the prompt text.",
+      "confidence": 10
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 118,
+      "severity": "medium",
+      "category": "performance",
+      "title": "Quadratic parsing complexity in jsonObjects",
+      "body": "In jsonObjects, if a candidate substring is invalid JSON, the code advances remaining by only one character (remaining = remaining[start+1:]) and rescans the remainder of the string. In the presence of many nested curly braces (e.g., in nested source code blocks or logs containing Go/C structures), this results in quadratic O(N^2) time complexity, leading to high CPU usage and potential denial of service.",
+      "suggestion": "Use a single-pass scanner to parse and validate braces, advancing past the matched candidate block instead of backtracking and rescanning.",
+      "confidence": 9
+    }
+  ]
+}
+
+=== END REVIEW ===
+
+=== REVIEW FROM codex (retired-sol-id) [role: bug_hunter] ===
+
+{
+  "summary": "...",
+  "findings": []
+}
+
+=== END REVIEW ===
+
+## Output Format
+
+Return JSON only. No prose, no markdown, no explanation outside the JSON. Your entire response must be a single valid JSON object matching this schema:
+
+```json
+{
+  "summary": "1-3 sentence overall review summary",
+  "findings": [
+    {
+      "file": "path/to/file",
+      "line": 42,
+      "severity": "critical|high|medium|low",
+      "category": "bug|security|performance|concurrency|architecture|tests|ux",
+      "title": "brief title",
+      "body": "concrete explanation tied to code",
+      "suggestion": "concrete fix",
+      "confidence": 8,
+      "found_by": ["sol", "kimi-k3", "claude"]
+    }
+  ],
+  "recommendation": {
+    "status": "approve|request_changes|comment",
+    "summary": "1-2 sentence recommendation"
+  }
+}
+```
+
+2026-05-24T15:20:22.284015Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when AuthRequired(AuthRequiredError { www_authenticate_header: "Bearer error=\"invalid_request\", error_description=\"No access token was provided in this request\", resource_metadata=\"https://api.githubcopilot.com/.well-known/oauth-protected-resource/mcp/\"" })
+exec
+/bin/zsh -lc "pwd && rg --files | rg '("'^|/)parse'"\\.go"'$|AGENTS'"\\.md"'$'"'" in /Users/dev/src/rival
+ succeeded in 0ms:
+/Users/dev/src/rival
+internal/review/parse.go
+
+exec
+/bin/zsh -lc "nl -ba internal/review/parse.go | sed -n '1,180p'" in /Users/dev/src/rival
+ succeeded in 0ms:
+     1	package review
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"strings"
+     7	)
+     8	
+     9	// ParseReviewerOutput extracts structured JSON from raw CLI output.
+    10	// CLIs often wrap JSON in markdown fences or add prose before/after.
+    11	func ParseReviewerOutput(raw string) (*ReviewerOutput, error) {
+    12		jsonStr := extractJSON(raw)
+    13		if jsonStr == "" {
+    14			return nil, fmt.Errorf("no JSON found in output")
+    15		}
+    16	
+    17		var out ReviewerOutput
+    18		if err := json.Unmarshal([]byte(jsonStr), &out); err != nil {
+    19			return nil, fmt.Errorf("unmarshal reviewer output: %w", err)
+    20		}
+    21		return &out, nil
+    22	}
+    23	
+    24	// ParseConsiliumOutput extracts structured consilium JSON from raw CLI output.
+    25	func ParseConsiliumOutput(raw string) (*ConsiliumOutput, error) {
+    26		jsonStr := extractJSON(raw)
+    27		if jsonStr == "" {
+    28			return nil, fmt.Errorf("no JSON found in consilium output")
+    29		}
+    30	
+    31		var out ConsiliumOutput
+    32		if err := json.Unmarshal([]byte(jsonStr), &out); err != nil {
+    33			return nil, fmt.Errorf("unmarshal consilium output: %w", err)
+    34		}
+    35		return &out, nil
+    36	}
+    37	
+    38	// extractJSON returns the review payload JSON embedded in raw CLI output.
+    39	//
+    40	// CLI logs are noisy: some CLIs (notably Codex) echo the *entire input prompt*
+    41	// to stdout before answering, and that prompt contains the JSON schema example
+    42	// from the output contract. A naive "first JSON object" search would therefore
+    43	// return the schema placeholder ("path/to/file", line 42, …) instead of the
+    44	// model's real answer, which is emitted last. To avoid that we collect every
+    45	// valid top-level JSON object and return the LAST one that looks like a review
+    46	// payload (contains a "findings" key), falling back to the last valid object.
+    47	func extractJSON(s string) string {
+    48		objs := jsonObjects(s)
+    49		if len(objs) == 0 {
+    50			return ""
+    51		}
+    52		for i := len(objs) - 1; i >= 0; i-- {
+    53			if strings.Contains(objs[i], `"findings"`) {
+    54				return objs[i]
+    55			}
+    56		}
+    57		return objs[len(objs)-1]
+    58	}
+    59	
+    60	// jsonObjects returns every balanced, valid top-level JSON object found in s,
+    61	// in order of appearance. String contents (including braces and escapes) are
+    62	// skipped so braces inside string literals don't confuse the matcher.
+    63	func jsonObjects(s string) []string {
+    64		var out []string
+    65		remaining := s
+    66		for {
+    67			start := strings.Index(remaining, "{")
+    68			if start < 0 {
+    69				break
+    70			}
+    71	
+    72			depth := 0
+    73			inStr := false
+    74			esc := false
+    75			found := -1
+    76			for i := start; i < len(remaining); i++ {
+    77				if esc {
+    78					esc = false
+    79					continue
+    80				}
+    81				c := remaining[i]
+    82				if c == '\\' && inStr {
+    83					esc = true
+    84					continue
+    85				}
+    86				if c == '"' {
+    87					inStr = !inStr
+    88					continue
+    89				}
+    90				if inStr {
+    91					continue
+    92				}
+    93				switch c {
+    94				case '{':
+    95					depth++
+    96				case '}':
+    97					depth--
+    98					if depth == 0 {
+    99						found = i
+   100					}
+   101				}
+   102				if found >= 0 {
+   103					break
+   104				}
+   105			}
+   106	
+   107			if found < 0 {
+   108				// Unbalanced from here on — nothing more to find.
+   109				break
+   110			}
+   111	
+   112			candidate := remaining[start : found+1]
+   113			if json.Valid([]byte(candidate)) {
+   114				out = append(out, candidate)
+   115				remaining = remaining[found+1:]
+   116			} else {
+   117				// Not valid (e.g. a partial brace in prose) — advance past this '{'.
+   118				remaining = remaining[start+1:]
+   119			}
+   120		}
+   121		return out
+   122	}
+
+exec
+/bin/zsh -lc 'rg -n "extractJSON|jsonObjects|ParseReviewerOutput|ParseConsiliumOutput|path/to/file|findings" internal/review' in /Users/dev/src/rival
+ succeeded in 0ms:
+internal/review/prompt.go:36:// BuildConsiliumPrompt builds the judge prompt with all reviewer findings + scope context.
+internal/review/prompt.go:45:	// Reviewer findings
+internal/review/prompt.go:89:- prefer fewer, stronger findings over many weak ones
+internal/review/prompt.go:93:- read the code in the review scope before producing findings
+internal/review/prompt.go:121:- prioritize findings that require reasoning across files or flows
+internal/review/prompt.go:126:- read the code in the review scope before producing findings
+internal/review/prompt.go:158:- prefer fewer, stronger findings over many weak ones
+internal/review/prompt.go:161:- read the code in the review scope before producing findings
+internal/review/prompt.go:172:You are given independent reviewer findings from different providers in structured JSON.
+internal/review/prompt.go:175:- merge duplicate findings (same file + same line + same problem = one finding, all reporters in found_by)
+internal/review/prompt.go:177:- drop weak, speculative, or redundant findings
+internal/review/prompt.go:182:- Do not invent new findings that are absent from reviewer inputs.
+internal/review/prompt.go:183:- Prefer findings supported by multiple reviewers. Consensus bonus: findings reported by 2+ reviewers independently get +2 confidence.
+internal/review/prompt.go:207:  "findings": [
+internal/review/prompt.go:209:      "file": "path/to/file",
+internal/review/prompt.go:222:If the code is solid, return: {"summary": "...", "findings": []}
+internal/review/prompt.go:235:		Findings []any  `json:"findings"`
+internal/review/prompt.go:244:		return fmt.Sprintf(`{"summary":"%s failed: internal marshal error","findings":[]}`, cli)
+internal/review/prompt.go:257:  "findings": [
+internal/review/prompt.go:259:      "file": "path/to/file",
+internal/review/format.go:30:		sb.WriteString("No findings above confidence threshold.\n\n")
+internal/review/parse.go:9:// ParseReviewerOutput extracts structured JSON from raw CLI output.
+internal/review/parse.go:11:func ParseReviewerOutput(raw string) (*ReviewerOutput, error) {
+internal/review/parse.go:12:	jsonStr := extractJSON(raw)
+internal/review/parse.go:24:// ParseConsiliumOutput extracts structured consilium JSON from raw CLI output.
+internal/review/parse.go:25:func ParseConsiliumOutput(raw string) (*ConsiliumOutput, error) {
+internal/review/parse.go:26:	jsonStr := extractJSON(raw)
+internal/review/parse.go:38:// extractJSON returns the review payload JSON embedded in raw CLI output.
+internal/review/parse.go:43:// return the schema placeholder ("path/to/file", line 42, …) instead of the
+internal/review/parse.go:46:// payload (contains a "findings" key), falling back to the last valid object.
+internal/review/parse.go:47:func extractJSON(s string) string {
+internal/review/parse.go:48:	objs := jsonObjects(s)
+internal/review/parse.go:53:		if strings.Contains(objs[i], `"findings"`) {
+internal/review/parse.go:60:// jsonObjects returns every balanced, valid top-level JSON object found in s,
+internal/review/parse.go:63:func jsonObjects(s string) []string {
+internal/review/parse_test.go:21:  "findings": [
+internal/review/parse_test.go:23:      "file": "path/to/file",
+internal/review/parse_test.go:35:{"summary":"Found a real issue.","findings":[{"file":"rival/main.go","line":10,"severity":"high","category":"bug","title":"real bug","body":"real explanation","confidence":9}]}
+internal/review/parse_test.go:39:func TestParseReviewerOutput_IgnoresEchoedSchemaExample(t *testing.T) {
+internal/review/parse_test.go:40:	out, err := ParseReviewerOutput(codexStyleReviewerLog)
+internal/review/parse_test.go:42:		t.Fatalf("ParseReviewerOutput: %v", err)
+internal/review/parse_test.go:48:		t.Fatalf("findings = %+v, want the real finding at rival/main.go", out.Findings)
+internal/review/parse_test.go:50:	if out.Findings[0].File == "path/to/file" {
+internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
+internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+internal/review/parse_test.go:76:func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {
+internal/review/parse_test.go:77:	out, err := ParseConsiliumOutput(codexStyleConsiliumLog)
+internal/review/parse_test.go:79:		t.Fatalf("ParseConsiliumOutput: %v", err)
+internal/review/parse_test.go:88:		t.Fatalf("findings = %+v, want the real finding", out.Findings)
+internal/review/parse_test.go:93:	raw := `prefix noise {"summary":"ok","findings":[]} trailing`
+internal/review/parse_test.go:94:	got := extractJSON(raw)
+internal/review/parse_test.go:96:		t.Fatalf("extractJSON = %q, want the single payload object", got)
+internal/review/parse_test.go:101:	if got := extractJSON("no json here at all"); got != "" {
+internal/review/parse_test.go:102:		t.Fatalf("extractJSON = %q, want empty", got)
+internal/review/types.go:6:	Findings []ReviewerFinding `json:"findings"`
+internal/review/types.go:52:	Findings       []Finding      `json:"findings"`
+internal/review/consilium.go:11:// FilterByConfidence drops findings below the threshold.
+internal/review/consilium.go:12:func FilterByConfidence(findings []Finding, threshold int) []Finding {
+internal/review/consilium.go:14:	for _, f := range findings {
+internal/review/consilium.go:37:func SortFindings(findings []Finding) {
+internal/review/consilium.go:38:	sort.Slice(findings, func(i, j int) bool {
+internal/review/consilium.go:39:		si := severityRank(findings[i].Severity)
+internal/review/consilium.go:40:		sj := severityRank(findings[j].Severity)
+internal/review/consilium.go:44:		return findings[i].Confidence > findings[j].Confidence
+internal/review/runner.go:120:		parsed, parseErr := ParseReviewerOutput(r.RawOutput)
+internal/review/runner.go:269:	output, err := ParseConsiliumOutput(string(logData))
+
+exec
+/bin/zsh -lc 'rg -n "JSON output contract|path/to/file|findings" .' in /Users/dev/src/rival
+ succeeded in 0ms:
+./internal/review/prompt.go:12:// scope context with role-specific instructions and JSON output contract.
+./internal/review/prompt.go:36:// BuildConsiliumPrompt builds the judge prompt with all reviewer findings + scope context.
+./internal/review/prompt.go:45:	// Reviewer findings
+./internal/review/prompt.go:89:- prefer fewer, stronger findings over many weak ones
+./internal/review/prompt.go:93:- read the code in the review scope before producing findings
+./internal/review/prompt.go:121:- prioritize findings that require reasoning across files or flows
+./internal/review/prompt.go:126:- read the code in the review scope before producing findings
+./internal/review/prompt.go:158:- prefer fewer, stronger findings over many weak ones
+./internal/review/prompt.go:161:- read the code in the review scope before producing findings
+./internal/review/prompt.go:172:You are given independent reviewer findings from different providers in structured JSON.
+./internal/review/prompt.go:175:- merge duplicate findings (same file + same line + same problem = one finding, all reporters in found_by)
+./internal/review/prompt.go:177:- drop weak, speculative, or redundant findings
+./internal/review/prompt.go:182:- Do not invent new findings that are absent from reviewer inputs.
+./internal/review/prompt.go:183:- Prefer findings supported by multiple reviewers. Consensus bonus: findings reported by 2+ reviewers independently get +2 confidence.
+./internal/review/prompt.go:207:  "findings": [
+./internal/review/prompt.go:209:      "file": "path/to/file",
+./internal/review/prompt.go:222:If the code is solid, return: {"summary": "...", "findings": []}
+./internal/review/prompt.go:235:		Findings []any  `json:"findings"`
+./internal/review/prompt.go:244:		return fmt.Sprintf(`{"summary":"%s failed: internal marshal error","findings":[]}`, cli)
+./internal/review/prompt.go:257:  "findings": [
+./internal/review/prompt.go:259:      "file": "path/to/file",
+./internal/review/parse.go:43:// return the schema placeholder ("path/to/file", line 42, …) instead of the
+./internal/review/parse.go:46:// payload (contains a "findings" key), falling back to the last valid object.
+./internal/review/parse.go:53:		if strings.Contains(objs[i], `"findings"`) {
+./internal/review/consilium.go:11:// FilterByConfidence drops findings below the threshold.
+./internal/review/consilium.go:12:func FilterByConfidence(findings []Finding, threshold int) []Finding {
+./internal/review/consilium.go:14:	for _, f := range findings {
+./internal/review/consilium.go:37:func SortFindings(findings []Finding) {
+./internal/review/consilium.go:38:	sort.Slice(findings, func(i, j int) bool {
+./internal/review/consilium.go:39:		si := severityRank(findings[i].Severity)
+./internal/review/consilium.go:40:		sj := severityRank(findings[j].Severity)
+./internal/review/consilium.go:44:		return findings[i].Confidence > findings[j].Confidence
+./internal/review/parse_test.go:21:  "findings": [
+./internal/review/parse_test.go:23:      "file": "path/to/file",
+./internal/review/parse_test.go:35:{"summary":"Found a real issue.","findings":[{"file":"rival/main.go","line":10,"severity":"high","category":"bug","title":"real bug","body":"real explanation","confidence":9}]}
+./internal/review/parse_test.go:48:		t.Fatalf("findings = %+v, want the real finding at rival/main.go", out.Findings)
+./internal/review/parse_test.go:50:	if out.Findings[0].File == "path/to/file" {
+./internal/review/parse_test.go:66:  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
+./internal/review/parse_test.go:72:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+./internal/review/parse_test.go:73:{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+./internal/review/parse_test.go:88:		t.Fatalf("findings = %+v, want the real finding", out.Findings)
+./internal/review/parse_test.go:93:	raw := `prefix noise {"summary":"ok","findings":[]} trailing`
+./internal/review/format.go:30:		sb.WriteString("No findings above confidence threshold.\n\n")
+./internal/review/types.go:6:	Findings []ReviewerFinding `json:"findings"`
+./internal/review/types.go:52:	Findings       []Finding      `json:"findings"`
+./cmd/review.go:23:then merge findings via a consilium judge for a unified verdict.
+
+exec
+/bin/zsh -lc "nl -ba internal/review/parse_test.go | sed -n '1,140p'" in /Users/dev/src/rival
+ succeeded in 0ms:
+     1	package review
+     2	
+     3	import (
+     4		"strings"
+     5		"testing"
+     6	)
+     7	
+     8	// codexStyleReviewerLog mimics a Codex reviewer log: the CLI echoes the full
+     9	// input prompt (which contains the JSON *schema example* from the output
+    10	// contract) before streaming its real answer last.
+    11	const codexStyleReviewerLog = `OpenAI Codex
+    12	user
+    13	Review scope: rival/
+    14	
+    15	## Output Format
+    16	Return JSON only.
+    17	
+    18	` + "```json" + `
+    19	{
+    20	  "summary": "1-3 sentence reviewer summary",
+    21	  "findings": [
+    22	    {
+    23	      "file": "path/to/file",
+    24	      "line": 42,
+    25	      "severity": "critical|high|medium|low",
+    26	      "title": "brief title",
+    27	      "confidence": 8
+    28	    }
+    29	  ]
+    30	}
+    31	` + "```" + `
+    32	
+    33	exec /bin/zsh -lc "nl -ba main.go"
+    34	codex
+    35	{"summary":"Found a real issue.","findings":[{"file":"rival/main.go","line":10,"severity":"high","category":"bug","title":"real bug","body":"real explanation","confidence":9}]}
+    36	tokens used 1234
+    37	`
+    38	
+    39	func TestParseReviewerOutput_IgnoresEchoedSchemaExample(t *testing.T) {
+    40		out, err := ParseReviewerOutput(codexStyleReviewerLog)
+    41		if err != nil {
+    42			t.Fatalf("ParseReviewerOutput: %v", err)
+    43		}
+    44		if out.Summary != "Found a real issue." {
+    45			t.Fatalf("summary = %q, want the real answer (not the schema example)", out.Summary)
+    46		}
+    47		if len(out.Findings) != 1 || out.Findings[0].File != "rival/main.go" {
+    48			t.Fatalf("findings = %+v, want the real finding at rival/main.go", out.Findings)
+    49		}
+    50		if out.Findings[0].File == "path/to/file" {
+    51			t.Fatal("parsed the schema placeholder instead of the real answer")
+    52		}
+    53	}
+    54	
+    55	// codexStyleConsiliumLog mimics a Codex consilium-judge log: it echoes the
+    56	// consilium prompt (with the schema example, including the found_by field) and
+    57	// then emits the real verdict last — sometimes twice (streamed + final).
+    58	const codexStyleConsiliumLog = `OpenAI Codex
+    59	user
+    60	# Consilium Judge
+    61	
+    62	## Output Format
+    63	` + "```json" + `
+    64	{
+    65	  "summary": "1-3 sentence overall review summary",
+    66	  "findings": [{"file": "path/to/file", "line": 42, "found_by": ["sol", "kimi-k3", "claude"]}],
+    67	  "recommendation": {"status": "approve|request_changes|comment", "summary": "1-2 sentence recommendation"}
+    68	}
+    69	` + "```" + `
+    70	
+    71	codex
+    72	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+    73	{"summary":"Real verdict.","findings":[{"file":"rival/cmd/root.go","line":39,"severity":"medium","title":"startup scan","body":"x","confidence":10,"found_by":["kimi-k3","claude"]}],"recommendation":{"status":"request_changes","summary":"fix the races"}}
+    74	`
+    75	
+    76	func TestParseConsiliumOutput_IgnoresEchoedSchemaExample(t *testing.T) {
+    77		out, err := ParseConsiliumOutput(codexStyleConsiliumLog)
+    78		if err != nil {
+    79			t.Fatalf("ParseConsiliumOutput: %v", err)
+    80		}
+    81		if out.Summary != "Real verdict." {
+    82			t.Fatalf("summary = %q, want the real verdict (not the schema example)", out.Summary)
+    83		}
+    84		if out.Recommendation.Status != "request_changes" {
+    85			t.Fatalf("recommendation = %q, want request_changes (real), got the schema placeholder", out.Recommendation.Status)
+    86		}
+    87		if len(out.Findings) != 1 || out.Findings[0].File != "rival/cmd/root.go" {
+    88			t.Fatalf("findings = %+v, want the real finding", out.Findings)
+    89		}
+    90	}
+    91	
+    92	func TestExtractJSON_BareSingleObject(t *testing.T) {
+    93		raw := `prefix noise {"summary":"ok","findings":[]} trailing`
+    94		got := extractJSON(raw)
+    95		if !strings.Contains(got, `"summary":"ok"`) {
+    96			t.Fatalf("extractJSON = %q, want the single payload object", got)
+    97		}
+    98	}
+    99	
+   100	func TestExtractJSON_NoJSON(t *testing.T) {
+   101		if got := extractJSON("no json here at all"); got != "" {
+   102			t.Fatalf("extractJSON = %q, want empty", got)
+   103		}
+   104	}
+
+codex
+{
+  "summary": "The parser handles the intended happy path, but its JSON extraction still has correctness holes around echoed prompt/schema objects and noisy brace-heavy logs. The maintainability-only duplication finding is not worth blocking on.",
+  "findings": [
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 53,
+      "severity": "high",
+      "category": "bug",
+      "title": "Echoed schema can be parsed as real review output",
+      "body": "extractJSON searches every valid JSON object in the full CLI log and returns the last one containing \"findings\". If the CLI echoes the prompt's JSON output contract and the model emits no valid review payload afterward, the schema example with placeholder data such as path/to/file can be selected and unmarshaled as real findings instead of producing a parse failure.",
+      "suggestion": "Ignore prompt/schema JSON explicitly, or only scan the answer region. Also validate candidate payloads structurally and reject known placeholder schema values before returning them.",
+      "confidence": 10,
+      "found_by": [
+        "kimi-k3"
+      ]
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 67,
+      "severity": "medium",
+      "category": "bug",
+      "title": "Stray brace before payload can prevent extraction",
+      "body": "jsonObjects starts each candidate at the next '{' with inStr reset to false. A brace in earlier prose, code, or quoted text can be treated as a JSON start; if that candidate never balances under the reset string state, found stays negative and the loop breaks, so a later valid JSON payload is never considered.",
+      "suggestion": "Use a single pass over the full string that maintains quote and escape state globally, or continue scanning for later candidate starts after an unbalanced non-JSON region instead of breaking.",
+      "confidence": 9,
+      "found_by": [
+        "kimi-k3"
+      ]
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 118,
+      "severity": "medium",
+      "category": "performance",
+      "title": "Invalid brace candidates can cause quadratic scanning",
+      "body": "When a balanced candidate is not valid JSON, jsonObjects advances by one byte and rescans the remainder. Large logs or code blocks with many nested braces can make this repeatedly scan overlapping suffixes, producing O(N^2) behavior.",
+      "suggestion": "Replace the retry-by-one-byte loop with a single-pass scanner that records balanced object ranges and validates each range once.",
+      "confidence": 8,
+      "found_by": [
+        "kimi-k3"
+      ]
+    }
+  ],
+  "recommendation": {
+    "status": "request_changes",
+    "summary": "Fix the extraction logic before approving; it can silently return prompt placeholders as findings or miss valid payloads in noisy output."
+  }
+}
+tokens used
+78,402
+{
+  "summary": "The parser handles the intended happy path, but its JSON extraction still has correctness holes around echoed prompt/schema objects and noisy brace-heavy logs. The maintainability-only duplication finding is not worth blocking on.",
+  "findings": [
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 53,
+      "severity": "high",
+      "category": "bug",
+      "title": "Echoed schema can be parsed as real review output",
+      "body": "extractJSON searches every valid JSON object in the full CLI log and returns the last one containing \"findings\". If the CLI echoes the prompt's JSON output contract and the model emits no valid review payload afterward, the schema example with placeholder data such as path/to/file can be selected and unmarshaled as real findings instead of producing a parse failure.",
+      "suggestion": "Ignore prompt/schema JSON explicitly, or only scan the answer region. Also validate candidate payloads structurally and reject known placeholder schema values before returning them.",
+      "confidence": 10,
+      "found_by": [
+        "kimi-k3"
+      ]
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 67,
+      "severity": "medium",
+      "category": "bug",
+      "title": "Stray brace before payload can prevent extraction",
+      "body": "jsonObjects starts each candidate at the next '{' with inStr reset to false. A brace in earlier prose, code, or quoted text can be treated as a JSON start; if that candidate never balances under the reset string state, found stays negative and the loop breaks, so a later valid JSON payload is never considered.",
+      "suggestion": "Use a single pass over the full string that maintains quote and escape state globally, or continue scanning for later candidate starts after an unbalanced non-JSON region instead of breaking.",
+      "confidence": 9,
+      "found_by": [
+        "kimi-k3"
+      ]
+    },
+    {
+      "file": "rival/internal/review/parse.go",
+      "line": 118,
+      "severity": "medium",
+      "category": "performance",
+      "title": "Invalid brace candidates can cause quadratic scanning",
+      "body": "When a balanced candidate is not valid JSON, jsonObjects advances by one byte and rescans the remainder. Large logs or code blocks with many nested braces can make this repeatedly scan overlapping suffixes, producing O(N^2) behavior.",
+      "suggestion": "Replace the retry-by-one-byte loop with a single-pass scanner that records balanced object ranges and validates each range once.",
+      "confidence": 8,
+      "found_by": [
+        "kimi-k3"
+      ]
+    }
+  ],
+  "recommendation": {
+    "status": "request_changes",
+    "summary": "Fix the extraction logic before approving; it can silently return prompt placeholders as findings or miss valid payloads in noisy output."
+  }
+}

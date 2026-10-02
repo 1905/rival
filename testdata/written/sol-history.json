@@ -1,0 +1,22 @@
+{
+  "id": "00080ac4-80be-4646-a2cc-44110d1acdf4",
+  "cli": "codex",
+  "mode": "raw",
+  "model": "gpt-5.6-sol",
+  "effort": "high",
+  "prompt_preview": "full review of the ESP32 firmware source",
+  "status": "completed",
+  "start_time": "2026-08-14T19:54:36.372991+08:00",
+  "queued_at": "2026-08-14T19:54:36.371596+08:00",
+  "end_time": "2026-08-14T20:09:14.007572+08:00",
+  "exit_code": 0,
+  "duration": "14m38s",
+  "work_dir": "/Users/dev/hardware/relay-sync",
+  "log_file": "/Users/dev/.rival/sessions/00080ac4-80be-4646-a2cc-44110d1acdf4.log",
+  "output_bytes": 10823,
+  "output_lines": 97,
+  "pid": 43952,
+  "pid_start": 1786708476373568000,
+  "owner_pid": 43897,
+  "owner_pid_start": 1786708475482218000
+}
