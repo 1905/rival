@@ -164,13 +164,16 @@ Port: `internal/review/{types,prompt,parse,review_format,slots,security}.go` + t
 Port: `internal/review/{plan,planrun}.go` + `{plan,planrun,antislop,selection}_test.go`.
 - [x] Concurrent plan/document reviews, requested result order, per-model effort, final-answer parsing, timeout/quota handling and cleanup ported with all named Go cases.
 
-**Task 2.7 verification:** controller workspace check: 532 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Forty-two focused orchestration tests include simultaneous reviewers, one batch ticket, persisted outcomes and panic cleanup. Four new review scenarios are authored; all 38 schemas validate. Scenario execution and code-review/security command parsing remain P3. Hosted CI is pending.
+**Task 2.7 verification:** controller workspace check: 532 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37033031072](https://github.com/1905/rival/actions/runs/37033031072) passed on macOS and Linux for `86c3ee7`, including Swift session decoding. Forty-two focused orchestration tests include simultaneous reviewers, one batch ticket, persisted outcomes and panic cleanup. Four new review scenarios are authored; all 38 schemas validate. Scenario execution and code-review/security command parsing remain P3.
 
 ### Task 2.8 — merge requests `heavy`
 Port: `internal/mergerequest/mergerequest.go` + test, `cmd/merge_request.go` + `mr_guard_test.go` (glab via `Command`, host-scoped credentials).
+- [x] MR target validation, pinned snapshots, token filtering, patch framing/limit and cleanup ported with all seven Go core test cases. The command helper/guard is tested; its full command-path assertions remain Task 3.1.
+
+**Task 2.8 verification:** controller workspace check: 570 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Thirty-two MR tests and five command-helper tests cover identity, caller repository preservation, cancellation during fetch and symlink-safe cleanup. The URL helper is private and preserves Go's relevant parsing rules. Seven MR scenarios are authored; all 45 schemas validate without execution. Hosted CI is pending. Malformed JSON detail, invalid UTF-8 presentation and removal-error path detail retain the recorded compatibility limits.
 
 ### Gate P2 `gate`
-- [ ] Scenarios written for queue (2 concurrent runs), detach + wait (success, failure, crash, timeout), each executor with fake success/failure/quota, plan/antislop/security JSON outputs, MR with fake glab. They run once P3 wires the commands; P2 is gated on the ported unit tests.
+- [x] Scenarios written for queue (2 concurrent runs), detach + wait (success, failure, crash, timeout), each public executor with fake success/failure/quota, plan/antislop/security JSON outputs, MR with fake glab. All 45 schemas validate. They run once P3 wires the commands; P2 is gated on the ported unit tests. The unused native Kimi adapter is covered by its ported unit tests.
 - [ ] Merge each P2 branch the day it is green.
 
 ---
@@ -298,6 +301,8 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Kimi adapter restricts tools only for the exact `review` mode | `executor.kimiRunOpts` | All other modes get full-auto options. Current callers use raw/review; task-mode behavior is a latent source bug. |
 | Queue wait I/O errors are reported as cancellation | `review.WaitForGroupSlot` | Every non-timeout wait failure becomes `cancelled while queued`. Preserved in the port. |
 | Plan output accepts an empty summary | `review.ParsePlanOutput` | A valid rating plus empty findings can render as a clean plan without a Summary line. Review/security validation is stricter. |
+| An encoded MR marker is not detected | `mergerequest.Contains` | It checks the raw input; `%2F-%2Fmerge_requests%2F42` can fall through as an ordinary scope. Preserved. |
+| MR command cancellation kills only the immediate Git/glab child | `mergerequest.git`, `Prepare` | Go uses `CommandContext` with no pipe-drain limit. A descendant holding a pipe can delay return after cancellation. This differs from the fixed provider executor and is preserved. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

@@ -1,0 +1,72 @@
+{
+  "name": "mr-no-matching-remote",
+  "description": "`rival command codex` with `review <MR-URL>` on stdin (cmd/model_command.go runModelCommand: ParseCodexArgs -> IsReview, resolveEffort, CodexPreflightFor runs `codex login status`, then prepareReview -> cmd/merge_request.go prepareReviewTarget -> mergerequest.Prepare). The only remote is the fork https://gitlab.example.com/fork/app.git, so matchingRemote fails before glab runs. No checkout, session or queue work happens; cmd/root.go Execute prints the error on stderr and exits 1.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "GITLAB_TOKEN": "wrong-host-token",
+    "GITLAB_ACCESS_TOKEN": "wrong-host-token",
+    "OAUTH_TOKEN": "wrong-host-token",
+    "CI_JOB_TOKEN": "wrong-host-token",
+    "GITLAB_HOST": "other.example.com",
+    "GITLAB_URI": "https://other.example.com",
+    "GL_HOST": "other.example.com",
+    "DEBUG": "1"
+  },
+  "fixtures": [
+    {
+      "git": "work",
+      "args": [
+        "init",
+        "-q"
+      ]
+    },
+    {
+      "git": "work",
+      "args": [
+        "remote",
+        "add",
+        "origin",
+        "https://gitlab.example.com/fork/app.git"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review https://gitlab.example.com/group/sub/app/-/merge_requests/42",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "no Git remote matches MR project gitlab.example.com/group/sub/app; use --workdir for that repository (or add its target remote for a fork MR)"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "codex": 1
+    }
+  }
+}

@@ -79,15 +79,19 @@
 - SlotRelease frees an acquired ticket on every return path. Tests verify partial mark-running rollback, cancellation, timeout and queue-unavailable fallback with temporary paths and injected stderr.
 - Controller verification passed 490 workspace tests, formatting and Clippy. CI 37030778213 passed on macOS and Linux at `b8f9bab`, including Swift decoding. Runtime use of final-answer helpers remains Task2.7/P3.
 
-### MR URL parsing — source findings, not yet implemented
+### MR URL parsing and snapshots
 
 - Go preserves host spelling and explicit ports, lowercases schemes, and does not resolve path dot segments during parsing. A bare trailing query marker survives Rival's clearing of RawQuery through ForceQuery. Task2.8 must test these differences before selecting a URL helper. [Go 1.25.14 URL source](https://raw.githubusercontent.com/golang/go/go1.25.14/src/net/url/url.go)
+- Task2.8 now covers those rules in a private MR URL helper. An initial general URL implementation was reduced to the operations MR validation uses. Host/project bytes remain exact for identity checks; invalid UTF-8 in displayed errors or provider prompts remains lossy.
+- Real local Git fixtures prove exact base/head checkout, the 512 KiB patch limit, disabled hooks and unchanged caller files/index/refs. Test Git processes deny network protocols. Fake glab checks host-specific authentication and rejected stale/mismatched responses.
+- Cancellation during fetch removes an already-created snapshot. Close tests remove regular files and symlinks while preserving outside targets. Scoped cancellation also runs during unwinding. The Go child-only kill and unbounded pipe-EOF behavior are preserved; provider process-group cleanup is separate.
+- Controller verification passed 570 workspace tests, formatting and Clippy. All 45 scenario schemas validate; command execution remains P3. Malformed MR JSON uses serde_json's error detail. Removal failures name the snapshot path rather than Go's failing child entry. Hosted verification is pending.
 
 ### Concurrent review runs
 
 - Task2.7 starts all selected reviewers before joining in requested order. Bounded fake reviewers prove concurrent execution, stable results, per-model efforts and a single queue ticket for the whole batch.
 - Two controller findings were corrected: unfinished-session finalization and run-context cancellation now also execute during unwinding. Panic tests reload the failed session and verify that the parent context remains live.
-- Controller verification passed 532 workspace tests, formatting and Clippy. Thirty-eight scenario schemas validate; command execution remains pending P3. Plan and document runtime parsing now uses the final-answer helper. Code-review/security command paths remain P3.
+- Controller verification passed 532 workspace tests, formatting and Clippy. CI 37033031072 passed on macOS and Linux at `86c3ee7`, including Swift decoding. Thirty-eight scenario schemas validate; command execution remains pending P3. Plan and document runtime parsing now uses the final-answer helper. Code-review/security command paths remain P3.
 
 ### Isolated MR transport fixture
 

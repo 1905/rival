@@ -93,7 +93,7 @@ impl Formatter for GoFormatter<'_> {
 
 /// Decodes the rune at the start of `s` the way Go's `utf8.DecodeRune` does:
 /// `None` with width 1 for an invalid byte, `None` with width 0 for empty input.
-fn decode_rune(s: &[u8]) -> (Option<char>, usize) {
+pub(crate) fn decode_rune(s: &[u8]) -> (Option<char>, usize) {
     let Some(&lead) = s.first() else {
         return (None, 0);
     };

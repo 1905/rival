@@ -1,0 +1,24 @@
+{
+  "name": "mr-raw-prompt-rejected",
+  "description": "`rival command codex` with a raw prompt that names an MR URL (Go cmd/mr_guard_test.go TestModelCommandRejectsMRInRawPrompt). runModelCommand calls rejectUnresolvedMR(raw) for a non-review prompt before effort, preflight or any MR resolve; Execute prints the error and exits 1. Neither codex nor glab runs (both fakes are present but unscripted, so any call fails the scenario).",
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "сделай ревью МР https://gitlab.example.com/group/sub/app/-/merge_requests/42",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival-codex review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

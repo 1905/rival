@@ -272,6 +272,52 @@ pub(crate) fn create_temp(cfg: &Config, pattern: &str) -> Result<(File, String),
     Err(format!("createtemp {prefix}*{suffix}: file already exists"))
 }
 
+/// Go `os.MkdirTemp("", pattern)` on Unix: the last `*` becomes a random
+/// number; the directory is created `0700`. Returns its name. The error text
+/// is Go's: `mkdir <name>: <errno>`, `stat <dir>: <errno>` when the temp dir
+/// itself is missing, or after 10000 collisions
+/// `mkdirtemp <dir>/<dir>/<prefix>*<suffix>: file already exists` (Go
+/// repeats the dir there).
+pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> {
+    if pattern.contains('/') {
+        return Err(format!(
+            "mkdirtemp {pattern}: pattern contains path separator"
+        ));
+    }
+    let (prefix, suffix) = match pattern.rfind('*') {
+        Some(i) => (&pattern[..i], &pattern[i + 1..]),
+        None => (pattern, ""),
+    };
+    let dir = temp_dir(cfg);
+    let prefix = if dir.ends_with('/') {
+        format!("{dir}{prefix}")
+    } else {
+        format!("{dir}/{prefix}")
+    };
+    for _ in 0..10000 {
+        let name = format!("{prefix}{}{suffix}", next_random());
+        let mut builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        match builder.create(&name) {
+            Ok(()) => return Ok(name),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => {
+                if e.kind() == io::ErrorKind::NotFound
+                    && let Err(stat) = std::fs::metadata(&dir)
+                    && stat.kind() == io::ErrorKind::NotFound
+                {
+                    return Err(format!("stat {dir}: {}", io_text(&stat)));
+                }
+                return Err(format!("mkdir {name}: {}", io_text(&e)));
+            }
+        }
+    }
+    Err(format!(
+        "mkdirtemp {dir}/{prefix}*{suffix}: file already exists"
+    ))
+}
+
 /// Go `nextRandom`: a random `uint32` in decimal.
 fn next_random() -> String {
     (uuid::Uuid::new_v4().as_u128() as u32).to_string()
@@ -484,6 +530,48 @@ mod tests {
             "{err}"
         );
         assert!(err.ends_with(".md: no such file or directory"), "{err}");
+    }
+
+    #[test]
+    fn mkdir_temp_names_and_errors_match_go() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        let name = mkdir_temp(&cfg(&[("TMPDIR", d)]), "rival-mr-*").unwrap();
+        let digits = name.strip_prefix(&format!("{d}/rival-mr-")).unwrap();
+        assert!(
+            !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()),
+            "{name}"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let meta = std::fs::metadata(&name).unwrap();
+            assert!(meta.is_dir());
+            assert_eq!(meta.permissions().mode() & 0o777, 0o700);
+        }
+
+        let slash = format!("{d}/");
+        let name = mkdir_temp(&cfg(&[("TMPDIR", &slash)]), "plain").unwrap();
+        assert!(name.starts_with(&format!("{d}/plain")), "{name}");
+
+        let missing = format!("{d}/missing");
+        assert_eq!(
+            mkdir_temp(&cfg(&[("TMPDIR", &missing)]), "rival-mr-*").unwrap_err(),
+            format!("stat {missing}: no such file or directory")
+        );
+        assert_eq!(
+            mkdir_temp(&cfg(&[("TMPDIR", d)]), "a/b*").unwrap_err(),
+            "mkdirtemp a/b*: pattern contains path separator"
+        );
+        // A file in the way of the parent is ENOTDIR from mkdir itself.
+        let file = format!("{d}/file");
+        std::fs::write(&file, "x").unwrap();
+        let err = mkdir_temp(&cfg(&[("TMPDIR", &file)]), "rival-mr-*").unwrap_err();
+        assert!(
+            err.starts_with(&format!("mkdir {file}/rival-mr-"))
+                && err.ends_with(": not a directory"),
+            "{err}"
+        );
     }
 
     #[cfg(unix)]
