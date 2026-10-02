@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import difflib
+import faulthandler
 import fnmatch
 import glob
 import http.server
@@ -21,6 +22,7 @@ import os
 import re
 import shutil
 import signal
+import socketserver
 import stat
 import subprocess
 import sys
@@ -353,7 +355,12 @@ SIGNALS = Signals()
 
 def owned_pids(token):
     """PIDs of live processes whose environment carries this task's token."""
-    needle = "%s=%s" % (TOKEN_VAR, token)
+    return pids_with_env(TOKEN_VAR, token)
+
+
+def pids_with_env(var, value):
+    """PIDs of live processes (not this one) whose environment has var=value; value has no spaces."""
+    needle = "%s=%s" % (var, value)
     me = os.getpid()
     found = []
     if sys.platform.startswith("linux"):
@@ -463,7 +470,14 @@ class UpdateServer:
             def log_message(self, *args):
                 pass
 
-        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        class Server(http.server.ThreadingHTTPServer):
+            def server_bind(self):
+                # HTTPServer.server_bind calls socket.getfqdn(): a reverse DNS lookup,
+                # which may leave the machine. The handler never uses the name.
+                socketserver.TCPServer.server_bind(self)
+                self.server_name, self.server_port = "127.0.0.1", self.server_address[1]
+
+        self.httpd = Server(("127.0.0.1", 0), Handler)
         self.httpd.daemon_threads = True
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
@@ -956,6 +970,8 @@ def main(argv=None):
     work_dir = args.work_dir or tempfile.mkdtemp(prefix="rival-parity-")
     os.makedirs(work_dir, exist_ok=True)
     previous = SIGNALS.install()
+    # `kill -USR1 <runner>` prints every thread's stack to stderr: evidence for a stalled run.
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
     failed = 0
     try:
         for path in paths:
@@ -984,6 +1000,7 @@ def main(argv=None):
         print("interrupted by %s: run stopped; roots kept under %s" % (sig.name, work_dir), flush=True)
         return 128 + sig.signum
     finally:
+        faulthandler.unregister(signal.SIGUSR1)
         SIGNALS.restore(previous)
     print("%d/%d scenarios passed; roots kept under %s" % (len(paths) - failed, len(paths), work_dir))
     return 1 if failed else 0

@@ -103,7 +103,7 @@ Port: `internal/logfmt`, `internal/procinfo` (darwin `sysctl kern.proc.pid`, lin
 - [x] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
 - [ ] Self-test: 3 scenarios (`version`, `sessions` on empty home, `queue`) pass once Task 3.4 lands; until then the runner's own unit tests.
 
-Runner validation: 50 unit tests pass, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, and inherited stdin after unlink. Initial CLI scenarios remain pending Task 3.4.
+Runner validation: 55 unit tests pass locally, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, inherited stdin after unlink, and bounded startup diagnostics. Hosted verification is pending. Initial CLI scenarios remain pending Task 3.4.
 
 ### Task 1.8 — CI `light`
 - [x] `.github/workflows/ci.yml`: `cargo test --workspace` + `cargo clippy -D warnings` on macos-15 and ubuntu-latest; Go tests unchanged.

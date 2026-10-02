@@ -11,6 +11,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
 - Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
 - Fixed existing Go test fixtures that required an installed OpenCode CLI or raced stdin writes.
+- Added bounded runner startup diagnostics and task-owned failure cleanup. Local update fixtures avoid reverse DNS lookups.
 - The command port, TUI, Windows support, and release switch remain unfinished. The shipped CLI is still Go.
 - Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
 

@@ -13,6 +13,7 @@ python3 -m unittest discover -s parity -p 'test_*.py'               # the runner
 
 - Exit codes: `0` all passed, `1` a scenario failed, `2` bad arguments, `3` a safety guard fired (the run stops).
 - SIGTERM or SIGINT: the runner kills the running scenario's processes, reports it, and exits `128+signal` (`143`, `130`).
+- SIGUSR1: the runner prints every thread's stack to stderr and keeps running. Use it on a stalled run. Send it only after the first scenario root exists: before that, the handler may not be registered and SIGUSR1 kills the runner.
 - Requirements: Python 3.9+ standard library only, on macOS or Linux.
 - Scenario roots are never deleted. The last line prints their parent directory.
 - Use the debug binary. Only debug builds honour `RIVAL_UPDATE_API`. A release build would query GitHub.

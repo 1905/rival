@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+import unittest.mock
 
 import run  # puts parity/fakes on sys.path
 import fakecli  # noqa: E402
@@ -22,7 +23,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # The binary under test: argv[1] is a JSON list of single-key actions.
 FAKE_RIVAL = r'''#!{python} -IB
-import json, os, shutil, subprocess, sys, time, urllib.request
+import faulthandler, json, os, shutil, signal, subprocess, sys, time, urllib.request
+
+faulthandler.register(signal.SIGUSR1, all_threads=True)  # stack dump into the step's stderr
 
 def act(actions):
     for a in actions:
@@ -66,9 +69,15 @@ def act(actions):
             with open(v + ".tmp", "w") as f:
                 f.write(str(os.getpid()))
             os.rename(v + ".tmp", v)
+        elif k == "stack_ready":
+            # Handshake: SIGUSR1 is registered above, so a stack request cannot kill this pid.
+            os.makedirs(v, exist_ok=True)
+            open(os.path.join(v, str(os.getpid())), "w").close()
         elif k == "exec_clean":
-            # Replaces this process with one whose environment has no task token.
-            os.execve(sys.executable, [sys.executable, "-c", "import time; time.sleep(%r)" % v], {{}})
+            # Replaces this process with one that has no task token and no SIGUSR1 handler.
+            # PARITY_TEST_OWNER is test-only: fallback cleanup finds it, the runner never reads it.
+            os.execve(sys.executable, [sys.executable, "-c", "import time; time.sleep(%r)" % v],
+                      {{"PARITY_TEST_OWNER": os.environ["FAKE_TASK_ROOT"]}})
         elif k == "http":
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({{}}))
             sys.stdout.write(opener.open(os.environ["RIVAL_UPDATE_API"] + v, timeout=5).read().decode())
@@ -247,9 +256,10 @@ class BasicTest(RunnerCase):
                       {"git": "work/repo", "args": ["commit", "-q", "-m", "init"]}])
         r = self.run_sc(sc)
         self.assertPass(r)
-        head = subprocess.run(["git", "-C", os.path.join(r.root, "work/repo"), "log", "--format=%an %ad", "--date=iso-strict"],
+        # Unix seconds: Git versions spell a UTC iso-strict date as "Z" or "+00:00".
+        head = subprocess.run(["git", "-C", os.path.join(r.root, "work/repo"), "log", "--format=%an %cn %at %ct"],
                               stdout=subprocess.PIPE, check=True).stdout.decode()
-        self.assertEqual(head, "Rival Parity 2026-01-01T00:00:00+00:00\n")
+        self.assertEqual(head, "Rival Parity Rival Parity 1767225600 1767225600\n")  # 2026-01-01T00:00:00Z
 
 
 class EnvTest(RunnerCase):
@@ -428,6 +438,14 @@ class HttpTest(RunnerCase):
         self.assertProblem(r, "exit code 1")
         self.assertProblem(r, r"update server requests differ.*\n.*\n  actual:   \[\('GET', '/elsewhere'\)\]")
 
+    def test_server_start_does_no_name_lookup(self):
+        # Stock HTTPServer.server_bind calls socket.getfqdn(), a reverse DNS query.
+        with unittest.mock.patch("socket.getfqdn", side_effect=AssertionError("getfqdn called")):
+            server = run.UpdateServer({})
+        self.addCleanup(server.close)
+        self.assertEqual(server.httpd.server_name, "127.0.0.1")
+        self.assertRegex(server.url, r"^http://127\.0\.0\.1:\d+$")
+
 
 class RedirectTest(RunnerCase):
     """Task 2.2's case: arbitrary redirect names, stdin unlinked once the detached parent exits."""
@@ -518,24 +536,31 @@ class ProcessTest(RunnerCase):
             with self.subTest(signal.Signals(signum).name):
                 self.check_signal_cleanup(signum)
 
-    def check_signal_cleanup(self, signum):
-        name = signal.Signals(signum).name
-        sdir = os.path.join(self.tmp.name, "scenarios-" + name)
-        work = os.path.join(self.tmp.name, "work-" + name)
+    def start_runner(self, label, actions, bin_path=None):
+        """run.py as a subprocess on a one-step scenario. Returns (runner, work dir, unrelated sleeper)."""
+        sdir = os.path.join(self.tmp.name, "scenarios-" + label)
+        work = os.path.join(self.tmp.name, "work-" + label)
         os.makedirs(sdir)
-        # The step's own process drops the token (exec_clean): only tracking can find it.
-        sc = scenario([step([{"detach": [{"pidfile": "<ROOT>/child.pid"}, {"sleep": 60}]},
-                             {"wait_for": "<ROOT>/child.pid"}, {"pidfile": "<ROOT>/parent.pid"},
-                             {"exec_clean": 60}], ok(), timeout=120)])
         with open(os.path.join(sdir, "a.yaml"), "w") as f:
-            json.dump(sc, f)
+            json.dump(scenario([step(actions, ok(), timeout=120)]), f)
         other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
                                  env={"PATH": "/usr/bin:/bin"})
-        runner = subprocess.Popen([sys.executable, os.path.join(HERE, "run.py"), "--bin", self.bin,
+        self.addCleanup(other.communicate)
+        self.addCleanup(other.kill)
+        runner = subprocess.Popen([sys.executable, os.path.join(HERE, "run.py"), "--bin", bin_path or self.bin,
                                    "--scenarios-dir", sdir, "--work-dir", work],
                                   env={"PATH": "/usr/bin:/bin"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return runner, work, other
+
+    def check_signal_cleanup(self, signum):
+        name = signal.Signals(signum).name
+        # The step's own process drops the token (exec_clean): only tracking can find it.
+        runner, work, other = self.start_runner(name, [
+            {"stack_ready": "<ROOT>/ready"},
+            {"detach": [{"stack_ready": "<ROOT>/ready"}, {"pidfile": "<ROOT>/child.pid"}, {"sleep": 60}]},
+            {"wait_for": "<ROOT>/child.pid"}, {"pidfile": "<ROOT>/parent.pid"}, {"exec_clean": 60}])
         try:
-            pids = self.wait_pids(work)
+            pids = self.wait_pids(work, runner)
             self.assertTrue(all(_alive(p) for p in pids))
             runner.send_signal(signum)
             out, err = runner.communicate(timeout=20)
@@ -548,17 +573,20 @@ class ProcessTest(RunnerCase):
             self.assertEqual([p for p in pids if _alive(p)], [])
             self.assertIsNone(other.poll())
         finally:
-            for p in (runner, other):
-                if p.poll() is None:
-                    p.kill()
-                p.communicate()
+            if runner.returncode is None:
+                _stop_runner(runner)
+            _kill_task_leftovers(work)
 
-    def wait_pids(self, work):
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            roots = os.listdir(work) if os.path.isdir(work) else []
-            files = [os.path.join(work, r, n) for r in roots for n in ("parent.pid", "child.pid")]
-            if roots and all(os.path.exists(f) for f in files):
+    def wait_pids(self, work, runner, bound=10):
+        """PIDs of the step's process and its detached child, once both pidfiles exist.
+
+        A runner exit or a stall fails with bounded evidence: which pidfiles arrived,
+        the runner's output and stacks, and every step's stdout/stderr.
+        """
+        started = time.monotonic()
+        while time.monotonic() - started < bound and runner.poll() is None:
+            files = [os.path.join(r, n) for r in _roots(work) for n in ("parent.pid", "child.pid")]
+            if files and all(os.path.exists(f) for f in files):
                 # parent.pid is written just before exec_clean; give the exec a moment.
                 time.sleep(0.3)
                 pids = []
@@ -567,7 +595,91 @@ class ProcessTest(RunnerCase):
                         pids.append(int(fh.read()))
                 return pids
             time.sleep(0.05)
-        self.fail("scenario processes never started under %s" % work)
+        self.fail(_readiness_report(work, runner, time.monotonic() - started))
+
+    def test_readiness_failure_reports_stall_and_cleans_up(self):
+        # parent.pid never arrives: the report must show the stacks and stop the task.
+        # plain.pid has no stack_ready handshake, so it must not get SIGUSR1.
+        ready = "<ROOT>/ready"
+        runner, work, other = self.start_runner("stall", [
+            {"stack_ready": ready},
+            {"detach": [{"stack_ready": ready}, {"pidfile": "<ROOT>/child.pid"}, {"sleep": 60}]},
+            {"detach": [{"pidfile": "<ROOT>/plain.pid"}, {"sleep": 60}]},
+            {"pidfile": "<ROOT>/stalled.pid"}, {"wait_for": "<ROOT>/never"}])
+        names = ("child.pid", "plain.pid", "stalled.pid")
+        try:
+            started = time.monotonic()
+            while not any(all(os.path.exists(os.path.join(r, n)) for n in names) for r in _roots(work)):
+                if time.monotonic() - started > 10 or runner.poll() is not None:
+                    self.fail(_readiness_report(work, runner, time.monotonic() - started))
+                time.sleep(0.05)
+            (root,) = _roots(work)
+            pids = {}
+            for n in names:
+                with open(os.path.join(root, n)) as f:
+                    pids[n] = int(f.read())
+            child = pids["child.pid"]
+            with self.assertRaises(AssertionError) as caught:
+                self.wait_pids(work, runner, bound=0.2)
+        finally:
+            if runner.returncode is None:
+                _stop_runner(runner)
+            _kill_task_leftovers(work)
+        report = str(caught.exception)
+        self.assertIn("runner still running; stack dumps requested with SIGUSR1 from runner %d and "
+                      "registered fakes %s" % (runner.pid, sorted([child, pids["stalled.pid"]])), report)
+        self.assertIn("runner stopped by SIGTERM or its own exit", report)
+        self.assertIn("interrupted by SIGTERM: run stopped", report)
+        self.assertIn("root %s: pidfiles ['child.pid']" % root, report)
+        runner_err = report.split("runner stderr:\n", 1)[1].split("\nroot ", 1)[0]
+        self.assertIn("most recent call first", runner_err)
+        self.assertIn("in run_steps", runner_err)
+        step_err = report.split("step file 01.stderr:\n", 1)[1]
+        self.assertIn("rival: detached pid=%d" % child, step_err)
+        self.assertIn("most recent call first", step_err)
+        self.assertIn("in act", step_err)
+        self.assertEqual([p for p in pids.values() if _alive(p)], [])
+        self.assertIsNone(other.poll())
+
+    def test_readiness_failure_skips_sigusr1_before_registration(self):
+        # No scenario root yet: the runner may not have registered SIGUSR1, whose default kills it.
+        runner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                  env={"PATH": "/usr/bin:/bin"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.addCleanup(lambda: runner.poll() is None and runner.kill())
+        work = os.path.join(self.tmp.name, "work-unregistered")
+        os.makedirs(work)
+        report = _readiness_report(work, runner, 0.0)
+        self.assertIn("runner still running before its first scenario root; "
+                      "SIGUSR1 not sent (handler not proven registered)", report)
+        self.assertEqual(runner.returncode, -signal.SIGTERM)
+
+    def test_leftover_cleanup_matches_owner_marker_only(self):
+        # Fallback after a forced runner kill: the token-less exec_clean process goes, others stay.
+        work = os.path.join(self.tmp.name, "work-leftovers")
+        os.makedirs(os.path.join(work, "root"))
+        (root,) = _roots(work)
+        sleep = [sys.executable, "-c", "import time; time.sleep(60)"]
+        owned = subprocess.Popen(sleep, env={"PARITY_TEST_OWNER": root})
+        foreign = subprocess.Popen(sleep, env={"PARITY_TEST_OWNER": root + "-other"})
+        bare = subprocess.Popen(sleep, env={"PATH": "/usr/bin:/bin"})
+        for p in (owned, foreign, bare):
+            self.addCleanup(p.wait)
+            self.addCleanup(lambda p=p: p.poll() is None and p.kill())
+        deadline = time.monotonic() + 5
+        while owned.pid not in run.pids_with_env("PARITY_TEST_OWNER", root) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        _kill_task_leftovers(work)
+        self.assertEqual(owned.wait(5), -signal.SIGKILL)
+        self.assertEqual((foreign.poll(), bare.poll()), (None, None))
+
+    def test_readiness_failure_reports_early_runner_exit(self):
+        runner, work, _ = self.start_runner("exit", [], bin_path=os.path.join(self.tmp.name, "missing"))
+        with self.assertRaises(AssertionError) as caught:
+            self.wait_pids(work, runner)
+        report = str(caught.exception)
+        self.assertIn("runner exited early with code 2", report)
+        self.assertIn("is not an executable file", report)
+        self.assertIn("no scenario root under the work dir", report)
 
     def test_detached_child_shares_redirect_and_wait_idle(self):
         sc = scenario([
@@ -622,6 +734,95 @@ def _alive(pid):
     except ProcessLookupError:
         return False
     return True
+
+
+def _roots(work):
+    """Scenario roots under a runner's --work-dir, as the runner's realpaths."""
+    if not os.path.isdir(work):
+        return []
+    return [os.path.realpath(os.path.join(work, n)) for n in sorted(os.listdir(work))]
+
+
+def _tail(data, limit=4000):
+    text = data.decode("utf-8", "replace")
+    return text if len(text) <= limit else "[%d chars cut]...%s" % (len(text) - limit, text[-limit:])
+
+
+def _signal_pids(pids, signum):
+    for pid in pids:
+        try:
+            os.kill(pid, signum)
+        except ProcessLookupError:
+            pass
+
+
+def _stop_runner(runner, grace=20):
+    """SIGTERM, so the runner cleans its own task processes; SIGKILL after grace.
+
+    Returns (stdout, stderr, forced).
+    """
+    if runner.poll() is None:
+        runner.send_signal(signal.SIGTERM)
+    try:
+        out, err = runner.communicate(timeout=grace)
+        return out, err, False
+    except subprocess.TimeoutExpired:
+        runner.kill()
+        out, err = runner.communicate()
+        return out, err, True
+
+
+def _kill_task_leftovers(work):
+    """SIGKILLs processes whose environment names a task root under work.
+
+    FAKE_TASK_ROOT tags every fake-rival process; PARITY_TEST_OWNER tags the exec_clean
+    process, which has no runner token. Unrelated processes carry neither root.
+    """
+    for root in _roots(work):
+        _signal_pids(run.pids_with_env("FAKE_TASK_ROOT", root) + run.pids_with_env("PARITY_TEST_OWNER", root),
+                     signal.SIGKILL)
+
+
+def _stack_ready(root):
+    """Fake PIDs that finished the stack_ready handshake and still carry this root.
+
+    The environment check drops a PID that exec'd (exec resets the handler) or was reused.
+    """
+    ready = os.path.join(root, "ready")
+    marked = {int(n) for n in os.listdir(ready) if n.isdigit()} if os.path.isdir(ready) else set()
+    return sorted(marked & set(run.pids_with_env("FAKE_TASK_ROOT", root)))
+
+
+def _readiness_report(work, runner, elapsed):
+    """Bounded evidence for a run that never got ready; also stops the run and its processes."""
+    lines = ["scenario processes not ready under %s after %.1fs" % (work, elapsed)]
+    if runner.poll() is not None:
+        lines.append("runner exited early with code %s" % runner.returncode)
+    elif not _roots(work):
+        # SIGUSR1's default action kills; only a scenario root proves main() registered faulthandler.
+        lines.append("runner still running before its first scenario root; "
+                     "SIGUSR1 not sent (handler not proven registered)")
+    else:
+        # faulthandler in the runner and each handshaked fake prints its stacks to its stderr.
+        fakes = [p for r in _roots(work) for p in _stack_ready(r)]
+        lines.append("runner still running; stack dumps requested with SIGUSR1 from runner %d and "
+                     "registered fakes %s" % (runner.pid, fakes))
+        _signal_pids([runner.pid] + fakes, signal.SIGUSR1)
+        time.sleep(0.5)
+    out, err, forced = _stop_runner(runner)
+    _kill_task_leftovers(work)
+    lines.append("runner stopped by %s" % ("SIGKILL after 20s" if forced else "SIGTERM or its own exit"))
+    lines += ["runner stdout:\n" + _tail(out), "runner stderr:\n" + _tail(err)]
+    if not _roots(work):
+        lines.append("no scenario root under the work dir")
+    for root in _roots(work):
+        arrived = [n for n in ("child.pid", "parent.pid") if os.path.exists(os.path.join(root, n))]
+        lines.append("root %s: pidfiles %s; entries %s" % (root, arrived, sorted(os.listdir(root))))
+        steps = os.path.join(root, ".parity", "steps")
+        for name in sorted(os.listdir(steps)) if os.path.isdir(steps) else ():
+            with open(os.path.join(steps, name), "rb") as f:
+                lines.append("step file %s:\n%s" % (name, _tail(f.read())))
+    return "\n".join(lines)
 
 
 class ScenarioFilesTest(unittest.TestCase):
