@@ -221,10 +221,11 @@ Port: `cmd/{queue,sessions,version,update}.go` + `update_{check_,}test.go`, `int
 
 ### Task 4.1 — data side `heavy`
 Port: `internal/sessionview/{cache,group}.go` + tests, `internal/dashboard/watcher.go` (notify crate).
-- [x] Prompt-free cache, grouped summaries and owned watcher implemented in `rival_core::sessionview`. All 17 named Go cache/group cases and the loader case are ported. Controller verification: 851 workspace tests passed, six intentional helper/generator ignores; formatting and Clippy passed. Hosted P4 checks remain pending.
+- [x] Prompt-free cache, grouped summaries and owned watcher implemented in `rival_core::sessionview`. All 17 named Go cache/group cases and the loader case are ported. Controller verification: 851 workspace tests passed, six intentional helper/generator ignores; formatting and Clippy passed. CI 37056093124 passed on macOS/Linux at `3856094`, including all 84 CLI scenarios and Swift decoding.
 
 ### Task 4.2 — model, keys, layout, styles `heavy`
 Use `internal/dashboard/{model,keys,layout,styles}.go` for logic (key map, loader, layout rules). Design: about the same as today (dim-phosphor palette from master `3989a88`, same panes), free to improve spacing and readability. Port only the logic tests from `{keys,layout,loader}_test.go`; style tests are rewritten for the Rust design.
+- [x] Model, mode-based keys, help, loader, geometry and theme implemented. All 17 named key/layout/loader cases plus the P4.1 watcher case are covered. Controller: 915 workspace tests passed, six intentional ignores; formatting and Clippy passed. List/detail content remains assigned to 4.3/4.4; actual terminal wiring remains 4.5. Hosted verification pending.
 
 ### Task 4.3 — list, pagination `heavy`
 Logic from `session_list.go` (filter, sections, pagination); port `{list_model,pagination}_test.go`; rendering tests written fresh.

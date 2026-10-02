@@ -16,6 +16,10 @@ mod startup_fds;
 #[cfg(test)]
 mod testutil;
 mod tree;
+// Task 4.5 wires the dashboard to the root command; until then only its
+// tests use it.
+#[allow(dead_code)]
+mod tui;
 mod update_cmd;
 mod wait;
 mod workdir;

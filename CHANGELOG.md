@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Added TUI keyboard modes, loading progress, resize handling and theme. Text clipping keeps joined emoji and combining characters intact. Local validation: 915 workspace tests passed; full list/detail content and terminal wiring remain in progress.
 - Added cached session summaries, grouped status and elapsed time, and a file watcher with cancellation and cleanup. Local validation: 851 workspace tests passed; interactive TUI and native Windows acceptance remain pending.
 - Added the Rust workspace, configuration, session storage, log parsing, and macOS/Linux process identity support.
 - Added Rust queue tickets, FIFO locking, cancellation, and independent-process queue tests. CLI wiring remains pending.

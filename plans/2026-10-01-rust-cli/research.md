@@ -169,3 +169,25 @@ Each provider still gets a nested Job for independent cancellation. It starts su
 `DETACHED_PROCESS` removes the console connection. Inherited console handles cannot provide the promised stream behavior without a console. The selected detach flags preserve the existing console whenever any standard handle is console-backed. Fully redirected streams can also use `DETACHED_PROCESS`. `CREATE_NO_WINDOW` does not repair this and is ignored beside `DETACHED_PROCESS`. Native tests must cover console, mixed and fully redirected handles after the launcher exits. Closing the console itself removes that I/O resource. [Console creation](https://learn.microsoft.com/en-us/windows/console/creation-of-a-console), [Console handles](https://learn.microsoft.com/en-us/windows/console/console-handles), [Creation flags](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags).
 
 The third finding concerns Go retirement. P6 must remove source-reading checks and Go CI steps while retaining prompt hashes and fixture contracts. Full Rust and runner suites must pass again after removal. A pre-removal green run does not satisfy that gate.
+
+## TUI session data — 2026-10-03
+
+The cache reuses unchanged summaries by file size and modification time. Group reducers preserve status precedence, member ordering and whole-group elapsed time. The watcher sends the first snapshot and then watches JSON/log changes. Its owned guard cancels and joins the worker, including a blocked send. Initial progress never blocks.
+
+Controller validation passed 851 workspace tests, formatting and Clippy. CI 37056093124 passed on macOS/Linux at `3856094`, including all 84 CLI scenarios and Swift decoding. The new tests cover the 17 Go group/cache cases, the loader case, real file notifications, cancelled/full-channel sends and shutdown.
+
+The macOS notify backend is FSEvents, whereas Go uses kqueue. A rename away can therefore trigger an extra refresh. Watch setup errors use notify's detail. Equal-start-time summaries retain filename order; Go's map iteration leaves ties unspecified. These are TUI data differences, with no session-file format change. Interactive acceptance remains pending.
+
+## VHS terminal setup — 2026-10-03
+
+The first Go baseline recording stayed blank. Waiting for the actual empty-state text also failed. A local PTY probe under RTK 0.48.0 returned `isatty = [true, false, false]`: even `rtk proxy` gives its child output pipes. Its passthrough runner uses the streaming layer. [RTK runner source](https://raw.githubusercontent.com/rtk-ai/rtk/v0.48.0/src/core/runner.rs).
+
+The task-owned capture helper now reattaches stdout/stderr to its VHS `/dev/tty` before executing Rival. A native empty-state screenshot then passed and showed the installed Go v4.1.1 TUI. The recorder uses a private HOME and disables telemetry/update checks. Its dummy process was reaped; a cwd-scoped process check found no surviving Rival/VHS/browser processes. Full Go/Rust fixture comparison remains pending P4.
+
+## TUI model and geometry — 2026-10-03
+
+The model routes keys by list, filter, detail, search and confirmation modes. Text input cannot trigger list shortcuts; Ctrl+C exits from every mode. Layout retains the 60×16 minimum, preview from 120 columns, 50-run pages and compact header below 30 rows. The model takes injected events and a clock; it does not perform file or terminal I/O.
+
+Controller checks passed 915 workspace tests, formatting and Clippy. The 64 new tests cover the Go key/layout/loader cases, input routing, resize bounds, timer ownership and styles. A draft clipping bug split joined emoji. Grapheme-based clipping now has regressions for emoji, flags, combining marks and CJK text. Line-input editing still uses characters, like Go's rune-based input; a long input can start its visible window inside a cluster.
+
+Ratatui uses the crossterm backend. Its lockfile also lists optional backends; earlier dependency versions remain intact. The logo gradient uses the app's linear RGB blend. Colors use RGB without Go's terminal-profile downsampling. Full list/detail content and terminal cleanup remain in later P4 tasks; no interactive Rust acceptance is claimed here.
