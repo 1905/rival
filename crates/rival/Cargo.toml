@@ -14,7 +14,9 @@ anyhow = "1.0.104"
 chrono = "0.4.45"
 clap = { version = "4.6.7", default-features = false, features = ["std", "help", "usage", "error-context", "string"] }
 clap_complete = { version = "4.6.11", default-features = false }
-crossterm = "0.29.0"
+# use-dev-tty: poll-based reader that falls back to /dev/tty when stdin is a
+# pipe (mio cannot register that fd), like bubbletea's Program.Run.
+crossterm = { version = "0.29.0", features = ["use-dev-tty"] }
 libc = "0.2.189"
 ratatui = "0.30.2"
 regex = "1.13.1"

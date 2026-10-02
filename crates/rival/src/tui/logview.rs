@@ -257,6 +257,7 @@ pub struct LogSlot {
 
 impl LogSlot {
     /// The cached read, if any.
+    #[cfg(test)]
     pub fn entry(&self) -> Option<&LogEntry> {
         self.entry.as_ref()
     }

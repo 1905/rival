@@ -216,8 +216,28 @@ Raw, Prompt and Info now have complete detail views, search, follow and member s
 
 Unlike Go's inline update calls, Rust returns jobs for file reads, prompt loads, stops and log opening. Loading notes remain visible until the first result arrives. The runtime owns their execution in Task 4.5. A stop job reloads the stored status before acting, so a completed run cannot be failed merely because the stop waited in the queue. PID start-time verification still runs immediately before signaling. Full prompts survive the failure save.
 
-The first opener draft spawned a cleanup thread per request. The accepted code returns an owned outcome instead. A runtime-held collection reaps finished launchers and expires copies after ten minutes. All three launcher streams use the null device. If the TUI exits before a launcher finishes, its copy stays in the temp directory so the viewer can still consume it. Dropped, undelivered outcomes follow the same policy. This leftover-copy limit is explicit; Go left all copies after early exit. Linux and Windows opener selection remain assigned to 4.5/P5.
+The first opener draft spawned a cleanup thread per request. The accepted code returns an owned outcome instead. A runtime-held collection reaps finished launchers and expires copies after ten minutes. All three launcher streams use the null device. Task 4.5 corrected the exit policy: every unexpired copy stays after exit, including copies whose launchers already finished. Launcher exit does not prove the application read the path. Dropped, undelivered outcomes follow the same policy. This leftover-copy limit is explicit; no cleanup daemon survives Rival. Linux uses `xdg-open`; Windows remains P5.
 
-Controller verification: 1,068 workspace tests passed with eight intentional helper/generator ignores; formatting and Clippy passed. The TUI subset has 218 tests, including six new complete frame goldens. Fake launcher tests reap their exact children on normal return and panic. No real viewer or provider ran. All named Go log, viewport and kill-safety cases are covered, plus detail and preview cases. Interactive Rust acceptance remains pending.
+Controller verification: 1,068 workspace tests passed with eight intentional helper/generator ignores; formatting and Clippy passed. CI 37065274686 passed on macOS/Linux at `720d2be`, including all 84 CLI scenarios and Swift decoding. The TUI subset has 218 tests, including six new complete frame goldens. Fake launcher tests reap their exact children on normal return and panic. No real viewer or provider ran. All named Go log, viewport and kill-safety cases are covered, plus detail and preview cases. Interactive Rust acceptance remains pending.
 
 Compatibility limits: read/seek errors currently use an `open <path>:` prefix. Search highlighting follows rune boundaries, so a match inside a joined grapheme can split styles across spans. Metadata values retain Go's unsanitized behavior. Wrapping retains Go's pending-whitespace width quirk. These do not change the CLI or session contract.
+
+## Release host and Apple SDK research — 2026-10-03
+
+- `fsevent-sys` 4.1.0 links the CoreServices framework. Its cached source confirms the dependency at `src/fsevent.rs:76`.
+- [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild#caveats) requires a macOS SDK for framework links when cross-compiling. It detects `SDKROOT` on macOS.
+- [cargo-xwin](https://github.com/rust-cross/cargo-xwin#prerequisite) supports macOS with LLVM installed. A full LLVM installation is recommended upstream.
+- Implementation choice: use hosted macOS for the six-target CLI release job, with the installed Apple SDK and LLVM. This avoids an unofficial SDK download. The separate app release job remains unchanged.
+- Status: researched, not build-verified. P6 must produce all six unpublished archives and validate their contents before the release switch is accepted.
+
+## Terminal runtime acceptance — 2026-10-03
+
+The runtime now owns input polling, two job workers, watcher threads, timers and log copies. Pending work keeps only the latest preview, detail and prompt request, plus eight stop/open actions. Rejected actions show a notice. Injected failure tests cover partial watcher startup, queue saturation and terminal restoration before blocking cleanup. Input polling stops before cooked mode returns.
+
+Controller checks passed: 1,091 workspace tests, eight intentional helper/generator ignores, formatting, Clippy and build. Seven real PTY cases passed on binary SHA256 `e7785eaccae965d8cbe4f7fdc81c458f046337b3b1c0857b725d47568e82c8a5`: q, raw Ctrl+C, SIGINT, SIGTERM, resize, watcher error and piped stdin. SIGINT returns 1 with the Go error text; the others return 0. All restore terminal modes, alternate screen and cursor. Only Darwin's documented PENDIN pending-input state is excluded from the mode comparison.
+
+The first piped-stdin smoke failed with `Failed to initialize input reader`. Crossterm 0.29.0 defaults to its mio event source. Its [use-dev-tty feature](https://docs.rs/crate/crossterm/0.29.0/features#use-dev-tty) selects the poll-based source. Cached upstream `src/event/source/unix.rs`, `unix/tty.rs` and `file_descriptor.rs` confirm that it preserves stdin-versus-controlling-TTY selection. Enabling that feature fixed the actual PTY case. No global descriptor replacement was added.
+
+The initial resize smoke failure was a controller matcher error: Ratatui skips blank cells with cursor moves. The helper now matches visible words after removing control sequences and whitespace. The terminal had resized correctly.
+
+Update notices are buffered while the TUI owns the screen and printed after restoration. Later signals during shutdown are ignored until cleanup ends. Initial session scans still finish before their worker joins, after terminal restoration. Panic text can be lost with the alternate screen; cleanup still runs. Viewer lifecycle checks use injected launchers; a real desktop viewer was not opened. Hosted CI and the full Result/VHS gate remain pending.

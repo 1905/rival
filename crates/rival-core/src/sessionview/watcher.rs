@@ -7,9 +7,11 @@
 //! [`watch_sessions`] runs the initial scan on the caller's thread, sends the
 //! first [`SessionEvent`], and then hands the directory watch to one worker
 //! thread owned by the returned [`SessionWatcher`]. The worker stops when the
-//! parent context is cancelled, when the event receiver is dropped, or when
-//! the [`SessionWatcher`] is dropped. Dropping it also joins the worker, so
-//! no thread or OS watch outlives it.
+//! parent context is cancelled or the [`SessionWatcher`] is dropped or
+//! stopped; dropping it also joins the worker, so no thread or OS watch
+//! outlives it. A dropped event receiver alone does not stop an idle
+//! worker: a `SyncSender` only sees the disconnect on its next send, which
+//! needs a file event first. Owners must cancel or drop the watcher.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -59,7 +61,9 @@ impl SessionWatcher {
     pub fn stop(self) {}
 
     /// Waits for the worker to exit without cancelling it first. It exits
-    /// once the parent context is cancelled or the event receiver is gone.
+    /// once the parent context is cancelled, or at the first send after the
+    /// event receiver is gone; an idle worker with no receiver keeps
+    /// waiting, so cancel the parent before calling this.
     pub fn join(mut self) {
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();

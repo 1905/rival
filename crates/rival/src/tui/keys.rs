@@ -27,6 +27,7 @@ pub enum Mode {
 }
 
 impl Mode {
+    #[cfg(test)]
     pub const ALL: [Mode; 5] = [
         Mode::List,
         Mode::Filter,
@@ -159,7 +160,8 @@ const MEMBERS: Binding = Binding::new(&["[", "]"], "[/]", "member");
 const PAGES: Binding = Binding::new(&["n", "p"], "n/p", "page");
 
 impl KeyMap {
-    /// Every binding with its field name, for tests and docs.
+    /// Every binding with its field name, for tests.
+    #[cfg(test)]
     pub fn all(&self) -> [(&'static str, Binding); 27] {
         [
             ("up", self.up),

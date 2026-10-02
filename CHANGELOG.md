@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Wired the interactive TUI with background jobs, signal handling and terminal cleanup. Update notices wait until exit. Fixed piped-input startup and quick-quit log opening. Local validation: 1,091 workspace tests and seven real terminal checks passed; Result and native Windows acceptance remain pending.
 - Added Raw, Prompt and Info detail tabs, search, follow mode, group-member selection and log previews. Stop jobs recheck completed sessions and process identity. Log copies have owned cleanup. Local validation: 1,068 workspace tests passed; terminal wiring and Result remain pending.
 - Added TUI text/status filtering, calendar sections, stable selection and 50-run pages. Six full frame goldens and daylight-saving regressions pass. Local validation: 966 workspace tests passed; detail views and terminal acceptance remain pending.
 - Added TUI keyboard modes, loading progress, resize handling and theme. Text clipping keeps joined emoji and combining characters intact. Local validation: 915 workspace tests passed; full list/detail content and terminal wiring remain in progress.

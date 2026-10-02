@@ -25,12 +25,17 @@ fn push(events: &Events, what: impl Into<String>) {
 
 fn hooks(events: &Events, detach: DetachOutcome) -> RootHooks {
     let (r, u, d) = (Arc::clone(events), Arc::clone(events), Arc::clone(events));
+    let t = Arc::clone(events);
     RootHooks {
         reap: Arc::new(move |_| push(&r, "reap")),
-        update_check: Arc::new(move |_| push(&u, "update")),
+        update_check: Arc::new(move |_, _| push(&u, "update")),
         detach: Box::new(move || {
             push(&d, "detach");
             detach
+        }),
+        tui: Box::new(move |_| {
+            push(&t, "tui");
+            Ok(())
         }),
     }
 }
@@ -174,33 +179,132 @@ fn parse_errors_and_help_skip_the_pre_run() {
     }
 }
 
+/// `rival tui` turns the process-wide logger off. Tests that run it hold
+/// this lock and turn logging back on before they release it, so their
+/// background hooks never see another test's flag.
+static LOGGING: Mutex<()> = Mutex::new(());
+
+fn run_tui(fix: &Fixture, hooks: &RootHooks, events: &Events) -> Run {
+    let _serial = LOGGING.lock().unwrap_or_else(|p| p.into_inner());
+    let r = run_with(fix, &mut FakeStdin::new(""), hooks, events, &["tui"]);
+    logging::set_enabled(true);
+    r
+}
+
 #[test]
 fn tui_suppresses_logging_and_reaps_in_the_background() {
     let fix = Fixture::new();
     let events = recorder();
-    let (r, u) = (Arc::clone(&events), Arc::clone(&events));
+    let (r, u, t) = (
+        Arc::clone(&events),
+        Arc::clone(&events),
+        Arc::clone(&events),
+    );
+    // The reap cannot finish before the TUI has started: it waits for the
+    // TUI's signal. A root that reaped before running the TUI would make the
+    // reap time out instead.
+    let (started_tx, started_rx) = mpsc::channel::<()>();
+    let started_rx = Mutex::new(started_rx);
     let hooks = RootHooks {
         reap: Arc::new(move |_| {
-            std::thread::sleep(Duration::from_millis(150));
-            push(&r, format!("reap logging={}", logging::is_enabled()));
+            let waited = started_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10));
+            let state = if waited.is_ok() {
+                "after tui start"
+            } else {
+                "timed out"
+            };
+            push(
+                &r,
+                format!("reap {state} logging={}", logging::is_enabled()),
+            );
         }),
-        update_check: Arc::new(move |_| push(&u, "update")),
+        update_check: Arc::new(move |_, _| push(&u, "update")),
         detach: Box::new(|| DetachOutcome::Continue),
+        tui: Box::new(move |_| {
+            push(&t, format!("tui logging={}", logging::is_enabled()));
+            let _ = started_tx.send(());
+            Ok(())
+        }),
     };
-    let r = run_with(&fix, &mut FakeStdin::new(""), &hooks, &events, &["tui"]);
-    logging::set_enabled(true);
-    // The command (pending here) ran without waiting for the reap, and the
-    // root joined the reap before returning.
-    assert!(
-        r.events.contains(&"reap logging=false".to_string()),
+    let r = run_tui(&fix, &hooks, &events);
+    // The TUI ran while the reap was still going, with logging already
+    // off, and the root joined the reap before returning. The update check
+    // is independent and may land anywhere.
+    let ordered: Vec<&str> = r
+        .events
+        .iter()
+        .map(String::as_str)
+        .filter(|e| *e != "update")
+        .collect();
+    assert_eq!(
+        ordered,
+        ["tui logging=false", "reap after tui start logging=false"],
         "{:?}",
         r.events
     );
+    assert_eq!((r.code, r.stdout.as_str(), r.stderr.as_str()), (0, "", ""));
+}
+
+/// Go `cmd/tui.go`: `fmt.Errorf("tui: %w", err)`, exit 1.
+#[test]
+fn tui_errors_get_the_tui_prefix() {
+    let fix = Fixture::new();
+    let events = recorder();
+    let mut hooks = hooks(&events, DetachOutcome::Continue);
+    hooks.tui = Box::new(|_| Err(crate::tui::runtime::INTERRUPTED.to_string()));
+    let r = run_tui(&fix, &hooks, &events);
     assert_eq!(r.code, 1);
     assert_eq!(
         r.stderr,
-        "rival tui: not available in this build yet (Task 4.5 of the Rust port)\n"
+        "tui: program was killed: program was interrupted\n"
     );
+}
+
+/// An update notice that arrives while the TUI owns the screen is held
+/// back and printed after the TUI returned (its terminal restored), before
+/// the TUI's error, if any. No HTTP: the check is injected.
+#[test]
+fn an_update_notice_during_the_tui_waits_for_the_restored_terminal() {
+    const NOTICE: &str = "\n  Update available: v1.0.0 → v9.9.9 — run 'rival update'\n\n";
+    for (result, want_stderr) in [
+        (Ok(()), NOTICE.to_string()),
+        (
+            Err("program was killed: program was interrupted".to_string()),
+            format!("{NOTICE}tui: program was killed: program was interrupted\n"),
+        ),
+    ] {
+        let fix = Fixture::new();
+        let events = recorder();
+        let (u, t) = (Arc::clone(&events), Arc::clone(&events));
+        let (printed_tx, printed_rx) = mpsc::channel();
+        let printed_rx = Mutex::new(printed_rx);
+        let hooks = RootHooks {
+            reap: Arc::new(|_| {}),
+            update_check: Arc::new(move |_, out| {
+                let _ = out.write_all(NOTICE.as_bytes());
+                push(&u, "notice written");
+                let _ = printed_tx.send(());
+            }),
+            detach: Box::new(|| DetachOutcome::Continue),
+            tui: Box::new(move |_| {
+                // The TUI is running: wait until the check has written.
+                printed_rx
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(10))
+                    .expect("the check never ran");
+                push(&t, "tui restored");
+                result.clone()
+            }),
+        };
+        let r = run_tui(&fix, &hooks, &events);
+        assert_eq!(r.events, ["notice written", "tui restored"]);
+        assert_eq!(r.stderr, want_stderr);
+        assert_eq!(r.stdout, "");
+    }
 }
 
 #[test]
@@ -210,11 +314,12 @@ fn update_check_wait_is_bounded() {
     let u = Arc::clone(&events);
     let hooks = RootHooks {
         reap: Arc::new(|_| {}),
-        update_check: Arc::new(move |_| {
+        update_check: Arc::new(move |_, _| {
             std::thread::sleep(Duration::from_secs(3));
             push(&u, "update done");
         }),
         detach: Box::new(|| DetachOutcome::Continue),
+        tui: Box::new(|_| Ok(())),
     };
     let args = vec!["version".to_string()];
     let mut stdout = Vec::new();
@@ -261,7 +366,7 @@ fn fast_update_check_finishes_before_exit() {
 #[test]
 fn wait_for_update_check_waits_out_its_budget_for_a_hung_check() {
     // The sender stays alive and never sends: a hung check.
-    let (_done, wait) = mpsc::channel::<()>();
+    let (_done, wait) = mpsc::channel::<Vec<u8>>();
     let mut bg = Background {
         reap: None,
         update: Some(wait),

@@ -3,8 +3,8 @@
 //! [`model::Model`] owns the state and routes [`model::Msg`]s by
 //! [`keys::Mode`]; it renders through ratatui and never touches the terminal
 //! itself. The session watcher and cache are library code in
-//! `rival_core::sessionview`; the runtime that wires them to a real terminal
-//! comes with Task 4.5.
+//! `rival_core::sessionview`; [`runtime`] wires them, the job workers and
+//! the model to the real terminal.
 
 pub mod detail_view;
 pub mod input;
@@ -15,6 +15,7 @@ pub mod layout;
 pub mod logview;
 pub mod model;
 pub mod preview;
+pub mod runtime;
 pub mod session_list;
 pub mod styles;
 #[cfg(test)]

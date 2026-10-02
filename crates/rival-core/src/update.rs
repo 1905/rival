@@ -70,15 +70,17 @@ pub fn check(current: &str, cfg: &Config, now: Clock<'_>, fetch: Fetch<'_>, out:
     print_if_newer(current, &latest, out);
 }
 
-/// The production check: the real clock, GitHub, and the process stderr.
-pub fn check_production(current: &str, cfg: &Config) {
+/// The production check: the real clock and GitHub. `out` is the process
+/// stderr, except under the TUI, whose root buffers the notice until the
+/// terminal is restored.
+pub fn check_production(current: &str, cfg: &Config, out: &mut dyn Write) {
     let url = releases_url(cfg);
     check(
         current,
         cfg,
         &|| Local::now().fixed_offset(),
         &|| fetch_latest(&url),
-        &mut io::stderr(),
+        out,
     );
 }
 

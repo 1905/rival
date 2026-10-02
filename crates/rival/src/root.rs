@@ -229,22 +229,33 @@ impl CmdEnv<'_> {
 
 pub type ConfigHook = Arc<dyn Fn(&Config) + Send + Sync>;
 
+/// Go `update.Check(Version)`, printing its notice to the writer.
+pub type UpdateHook = Arc<dyn Fn(&Config, &mut dyn Write) + Send + Sync>;
+
+/// Runs the dashboard. The error is the text after "tui: ".
+pub type TuiHook = Box<dyn Fn(&Config) -> Result<(), String>>;
+
 /// The root's side effects, injectable for tests.
 pub struct RootHooks {
     /// Go `reap()`: fail orphaned sessions, then drop dead queue tickets.
     pub reap: ConfigHook,
     /// Go `update.Check(Version)`.
-    pub update_check: ConfigHook,
+    pub update_check: UpdateHook,
     /// Go `detachIfRequested(true)`.
     pub detach: Box<dyn Fn() -> DetachOutcome>,
+    /// Go `tea.NewProgram(dashboard.New()).Run()`.
+    pub tui: TuiHook,
 }
 
 impl RootHooks {
     pub fn production() -> Self {
         RootHooks {
             reap: Arc::new(reap),
-            update_check: Arc::new(|cfg| update::check_production(rival_core::VERSION, cfg)),
+            update_check: Arc::new(|cfg, out| {
+                update::check_production(rival_core::VERSION, cfg, out);
+            }),
             detach: Box::new(|| detach::detach_if_requested(true)),
+            tui: Box::new(crate::tui::runtime::run),
         }
     }
 }
@@ -319,7 +330,9 @@ pub(crate) struct Exit {
 #[derive(Default)]
 struct Background {
     reap: Option<JoinHandle<()>>,
-    update: Option<mpsc::Receiver<()>>,
+    /// The check's end. It carries the notice the check buffered instead of
+    /// printing (the TUI's); other commands print at once and send nothing.
+    update: Option<mpsc::Receiver<Vec<u8>>>,
 }
 
 impl Background {
@@ -331,11 +344,13 @@ impl Background {
         }
     }
 
-    /// Go `waitForUpdateCheck`: at most [`UPDATE_CHECK_WAIT`].
-    fn wait_for_update_check(&mut self, limit: Duration) {
-        if let Some(done) = self.update.take() {
-            let _ = done.recv_timeout(limit);
-        }
+    /// Go `waitForUpdateCheck`: at most [`UPDATE_CHECK_WAIT`]. Returns the
+    /// buffered notice, if the check finished and buffered one.
+    fn wait_for_update_check(&mut self, limit: Duration) -> Vec<u8> {
+        self.update
+            .take()
+            .and_then(|done| done.recv_timeout(limit).ok())
+            .unwrap_or_default()
     }
 }
 
@@ -385,12 +400,15 @@ fn execute_inner(
                 };
             }
             PreRun::Fail(err) => Err(err),
-            PreRun::Continue => dispatch(env, &mut root, &inv),
+            PreRun::Continue => dispatch(env, hooks, &mut root, &inv),
         },
     };
     // Both exit paths below end the process, so the joins happen first.
     bg.wait_for_reap();
-    bg.wait_for_update_check(update_wait);
+    // The TUI's notice was held back while it owned the screen; the
+    // terminal is restored by now.
+    let notice = bg.wait_for_update_check(update_wait);
+    let _ = env.stderr.write_all(&notice);
     match result {
         Ok(()) => Exit {
             code: 0,
@@ -424,7 +442,8 @@ fn pre_run(
     {
         return PreRun::Exit(code);
     }
-    if inv.id == CommandId::Tui {
+    let tui = inv.id == CommandId::Tui;
+    if tui {
         // The TUI owns the terminal: a log line on stderr (the background
         // reaper logs each orphan it fails) would draw over the screen.
         logging::set_enabled(false);
@@ -438,32 +457,27 @@ fn pre_run(
     let cfg = env.cfg.clone();
     let check = Arc::clone(&hooks.update_check);
     std::thread::spawn(move || {
-        check(&cfg);
-        let _ = done.send(());
+        // Go prints the notice on stderr whenever the check ends. Under the
+        // TUI that would draw over the screen, so the notice is buffered
+        // and the root prints it after the terminal is restored.
+        let mut held = Vec::new();
+        if tui {
+            check(&cfg, &mut held);
+        } else {
+            check(&cfg, &mut io::stderr());
+        }
+        let _ = done.send(held);
     });
     bg.update = Some(wait);
     PreRun::Continue
 }
 
-/// Which later task ports a command that is not wired yet.
-fn pending_task(id: CommandId) -> Option<&'static str> {
-    match id {
-        CommandId::Tui => Some("Task 4.5"),
-        _ => None,
-    }
-}
-
 fn dispatch(
     env: &mut CmdEnv<'_>,
+    hooks: &RootHooks,
     root: &mut clap::Command,
     inv: &Invocation,
 ) -> Result<(), CmdError> {
-    if let Some(task) = pending_task(inv.id) {
-        return Err(CmdError::plain(format!(
-            "{}: not available in this build yet ({task} of the Rust port)",
-            inv.command_path()
-        )));
-    }
     match inv.id {
         CommandId::Root => {
             let _ = write!(
@@ -496,6 +510,8 @@ fn dispatch(
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),
         CommandId::Update => update_cmd::update_action(env),
+        // Go `cmd/tui.go`: `fmt.Errorf("tui: %w", err)`.
+        CommandId::Tui => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),

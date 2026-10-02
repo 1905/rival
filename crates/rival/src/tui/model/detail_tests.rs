@@ -1200,8 +1200,10 @@ fn o_opens_the_log_through_a_job() {
         text.contains("=== gpt-6-astra JUDGE ===\nJUDGE-OUTPUT"),
         "{text}"
     );
+    // Finding 10: fresh copies outlive the TUI; the viewer may not have
+    // read them yet. They sit in the harness's temp dir.
     views.close();
-    assert!(launched().iter().all(|p| !p.exists()));
+    assert!(launched().iter().all(|p| p.exists()));
 }
 
 /// A stop result that lands after the user left the run still updates its

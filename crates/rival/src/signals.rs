@@ -1,7 +1,7 @@
 //! Go `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)`.
 //!
-//! While at least one scope is open, SIGINT and SIGTERM cancel every open
-//! scope's context instead of killing the process. When the last scope
+//! While at least one scope is open, SIGINT and SIGTERM notify every open
+//! scope instead of killing the process. When the last scope
 //! closes, the dispositions that were in place before the first scope come
 //! back, so outside a scope the signals act as before (Go: `stop()` →
 //! `signal.Stop`).
@@ -10,19 +10,38 @@
 //! feature also traps SIGHUP and cannot unregister, and
 //! `signal-hook-registry`'s unregister does not restore the previous
 //! handler. The handler only writes the signal number to a non-blocking
-//! pipe (async-signal-safe); one watcher thread reads it and cancels the
+//! pipe (async-signal-safe); one watcher thread reads it and notifies the
 //! open scopes.
+//!
+//! A scope either cancels a context ([`notify_context`], every command) or
+//! calls a function with the signal ([`notify`], the TUI, which must tell
+//! SIGINT from SIGTERM as bubbletea does).
+
+use std::sync::Arc;
 
 use rival_core::cancel::{CancelFunc, Context};
 
+/// Which handled signal arrived.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Signal {
+    /// SIGINT.
+    Interrupt,
+    /// SIGTERM.
+    Terminate,
+}
+
+/// What an open scope does when a signal arrives. It runs on the signal
+/// watcher thread, never inside the signal handler.
+type Sink = Arc<dyn Fn(Signal) + Send + Sync>;
+
 /// Keeps the scope's signal handling alive. Dropping it is Go's deferred
-/// `stop()`: the context is cancelled and, for the last open scope, the
-/// previous signal dispositions come back.
+/// `stop()`: the context (if any) is cancelled and, for the last open
+/// scope, the previous signal dispositions come back.
 #[must_use = "dropping the guard ends signal handling for the scope"]
 pub struct NotifyGuard {
     #[cfg(unix)]
     id: u64,
-    cancel: CancelFunc,
+    cancel: Option<CancelFunc>,
 }
 
 /// Opens a scope: a child of `parent` that SIGINT or SIGTERM cancels. An
@@ -30,29 +49,48 @@ pub struct NotifyGuard {
 /// half-installed and no scope is open.
 pub fn notify_context(parent: &Context) -> Result<(Context, NotifyGuard), String> {
     let (ctx, cancel) = parent.with_cancel();
-    #[cfg(unix)]
-    let id = match unix::register(cancel.clone()) {
-        Ok(id) => id,
+    let sink = {
+        let cancel = cancel.clone();
+        Arc::new(move |_: Signal| cancel.cancel())
+    };
+    match open(sink) {
+        Ok(mut guard) => {
+            guard.cancel = Some(cancel);
+            Ok((ctx, guard))
+        }
         Err(e) => {
             cancel.cancel();
-            return Err(e);
+            Err(e)
         }
-    };
-    Ok((
-        ctx,
-        NotifyGuard {
-            #[cfg(unix)]
-            id,
-            cancel,
-        },
-    ))
+    }
+}
+
+/// Opens a scope that calls `on_signal` for every SIGINT and SIGTERM while
+/// the guard lives. The same install, restore and error rules as
+/// [`notify_context`] apply. Not unix: no signal is delivered (Task 5).
+pub fn notify(on_signal: impl Fn(Signal) + Send + Sync + 'static) -> Result<NotifyGuard, String> {
+    open(Arc::new(on_signal))
+}
+
+fn open(sink: Sink) -> Result<NotifyGuard, String> {
+    #[cfg(unix)]
+    let id = unix::register(sink)?;
+    #[cfg(not(unix))]
+    drop(sink);
+    Ok(NotifyGuard {
+        #[cfg(unix)]
+        id,
+        cancel: None,
+    })
 }
 
 impl Drop for NotifyGuard {
     fn drop(&mut self) {
         #[cfg(unix)]
         unix::unregister(self.id);
-        self.cancel.cancel();
+        if let Some(cancel) = &self.cancel {
+            cancel.cancel();
+        }
     }
 }
 
@@ -63,7 +101,7 @@ mod unix {
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicI32, Ordering};
 
-    use rival_core::cancel::CancelFunc;
+    use super::{Signal, Sink};
 
     const SIGNALS: [libc::c_int; 2] = [libc::SIGINT, libc::SIGTERM];
 
@@ -72,7 +110,7 @@ mod unix {
 
     struct State {
         next_id: u64,
-        scopes: Vec<(u64, CancelFunc)>,
+        scopes: Vec<(u64, Sink)>,
         /// The dispositions saved when the first scope opened.
         saved: Option<[libc::sigaction; 2]>,
     }
@@ -160,11 +198,19 @@ mod unix {
                 loop {
                     match reader.read(&mut buf) {
                         Ok(0) => return,
-                        Ok(_) => {
-                            let scopes: Vec<CancelFunc> =
-                                lock().scopes.iter().map(|(_, c)| c.clone()).collect();
-                            for cancel in scopes {
-                                cancel.cancel();
+                        Ok(n) => {
+                            // Called outside the lock: a sink may be slow.
+                            let scopes: Vec<Sink> =
+                                lock().scopes.iter().map(|(_, s)| s.clone()).collect();
+                            for &byte in &buf[..n] {
+                                let sig = if libc::c_int::from(byte) == libc::SIGINT {
+                                    Signal::Interrupt
+                                } else {
+                                    Signal::Terminate
+                                };
+                                for sink in &scopes {
+                                    sink(sig);
+                                }
                             }
                         }
                         Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
@@ -180,7 +226,7 @@ mod unix {
         Ok(())
     }
 
-    pub(super) fn register(cancel: CancelFunc) -> Result<u64, String> {
+    pub(super) fn register(sink: Sink) -> Result<u64, String> {
         let mut st = lock();
         if st.saved.is_none() {
             ensure_pipe()?;
@@ -188,7 +234,7 @@ mod unix {
         }
         let id = st.next_id;
         st.next_id += 1;
-        st.scopes.push((id, cancel));
+        st.scopes.push((id, sink));
         Ok(id)
     }
 
@@ -333,6 +379,38 @@ mod tests {
                 std::thread::sleep(Duration::from_secs(10));
                 report.push("survived".into());
             }
+            "notify" => {
+                // A function scope sees which signal arrived; a context
+                // scope open at the same time is still cancelled.
+                let (tx, rx) = std::sync::mpsc::channel();
+                let guard = notify(move |sig| {
+                    let _ = tx.send(sig);
+                })
+                .unwrap();
+                let (ctx, ctx_guard) = notify_context(&Context::background()).unwrap();
+                let wait = Duration::from_secs(10);
+                // SAFETY: the scope's handler is installed; it only writes
+                // to the pipe.
+                unsafe { libc::raise(libc::SIGINT) };
+                let first = rx.recv_timeout(wait);
+                // SAFETY: as above.
+                unsafe { libc::raise(libc::SIGTERM) };
+                let second = rx.recv_timeout(wait);
+                report.push(format!(
+                    "first={first:?} second={second:?} ctx_cancelled={}",
+                    ctx.wait_timeout(wait).is_some()
+                ));
+                drop(ctx_guard);
+                report.push(format!(
+                    "still_ours={}",
+                    unix::current_handler(libc::SIGTERM) == unix::handler_address()
+                ));
+                drop(guard);
+                report.push(format!(
+                    "restored={}",
+                    unix::current_handler(libc::SIGTERM) == libc::SIG_DFL
+                ));
+            }
             "setup_failure" => {
                 let ours = unix::handler_address();
                 let before = unix::current_handler(libc::SIGINT);
@@ -444,6 +522,18 @@ mod tests {
             assert_eq!(report, "cancelled=true all_scopes=true", "{mode}");
             assert_eq!(status.signal(), Some(sig), "{mode}: {status}");
         }
+    }
+
+    #[test]
+    fn notify_tells_sigint_from_sigterm() {
+        let (report, status) = run_helper("notify");
+        assert!(status.success(), "{status}");
+        assert_eq!(
+            report,
+            "first=Ok(Interrupt) second=Ok(Terminate) ctx_cancelled=true\n\
+             still_ours=true\n\
+             restored=true"
+        );
     }
 
     #[test]

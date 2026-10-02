@@ -41,11 +41,8 @@ impl Viewport {
         self.lines.len()
     }
 
-    pub fn lines(&self) -> &[Line<'static>] {
-        &self.lines
-    }
-
     /// Go: `GetContent`. The plain text of every line.
+    #[cfg(test)]
     pub fn content_text(&self) -> String {
         self.lines
             .iter()

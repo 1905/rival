@@ -129,6 +129,8 @@ pub enum Msg {
     Prompts(PromptsResult),
     /// A [`Job::Stop`] finished.
     Stopped(StopResult),
+    /// The runtime could not queue a stop or a log open; the text says so.
+    Rejected(String),
 }
 
 /// What the runtime must do after an update.
@@ -235,12 +237,9 @@ impl Model {
     }
 
     /// Whether the user asked to quit.
+    #[cfg(test)]
     pub fn quitting(&self) -> bool {
         self.quitting
-    }
-
-    pub fn mode(&self) -> Mode {
-        self.mode
     }
 
     fn now(&self) -> DateTime<FixedOffset> {
@@ -451,6 +450,13 @@ impl Model {
             }
             Msg::Stopped(res) => {
                 self.apply_stop(res);
+                Vec::new()
+            }
+            Msg::Rejected(text) => {
+                // Stop and open-log keys exist only on the detail screen.
+                if self.in_detail() {
+                    self.detail.notice = text;
+                }
                 Vec::new()
             }
         }
@@ -769,6 +775,7 @@ impl Model {
         self.list_body_height()
     }
 
+    #[cfg(test)]
     pub(crate) fn list_inner_width(&self) -> usize {
         if self.lay.show_preview {
             return self.lay.list_w.saturating_sub(2).max(1);

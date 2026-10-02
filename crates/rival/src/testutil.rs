@@ -317,8 +317,9 @@ pub fn execute(fix: &Fixture, stdin: &mut FakeStdin, args: &[&str]) -> (i32, Str
 
     let hooks = RootHooks {
         reap: Arc::new(|_| {}),
-        update_check: Arc::new(|_| {}),
+        update_check: Arc::new(|_, _| {}),
         detach: Box::new(|| DetachOutcome::Continue),
+        tui: Box::new(|_| Err("the TUI does not run in tests".into())),
     };
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     let prepare = no_mr();

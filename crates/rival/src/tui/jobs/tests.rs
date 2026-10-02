@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(unix)]
+use crate::tui::testkit::{finished_launcher, running_launcher};
 use crate::tui::testkit::{harness, launched, set_launch_fails};
 
 fn solo_log(h: &crate::tui::testkit::Harness, body: &str) -> OpenLogRequest {
@@ -23,6 +25,12 @@ fn opened(out: JobOutput) -> OpenedLog {
 fn viewer_command_is_the_go_opener() {
     let cmd = viewer_command(Path::new("/tmp/rival-log-x.txt"));
     assert_eq!(cmd.get_program(), VIEWER);
+    let want = if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    assert_eq!(VIEWER, want);
     let args: Vec<_> = cmd.get_args().collect();
     assert_eq!(args, ["/tmp/rival-log-x.txt"]);
 }
@@ -111,10 +119,11 @@ fn group_open_writes_every_member() {
     );
 }
 
-/// Copies live for the TTL while the TUI runs and go on exit; no thread is
-/// involved.
+/// Copies live for the TTL while the TUI runs; no thread is involved. On
+/// exit a fresh copy stays even with no launcher (finding 10: the viewer may
+/// not have read it), and an expired one goes.
 #[test]
-fn log_views_expire_copies_and_clean_up_on_close() {
+fn log_views_expire_copies_and_keep_fresh_ones_on_close() {
     let h = harness();
     let mut views = LogViews::default();
     let first = opened(h.env.run(Job::OpenLog(solo_log(&h, "1\n"))));
@@ -125,103 +134,17 @@ fn log_views_expire_copies_and_clean_up_on_close() {
     views.sweep(t0 + LOG_VIEW_TTL);
     assert!(!p1.exists() && views.is_empty(), "kept past its TTL");
 
-    let second = opened(h.env.run(Job::OpenLog(solo_log(&h, "2\n"))));
-    let p2 = second.path.clone();
-    views.adopt(second);
+    let old = opened(h.env.run(Job::OpenLog(solo_log(&h, "2\n"))));
+    let (p2, t2) = (old.path.clone(), old.opened_at);
+    views.adopt(old);
+    views.close_at(t2 + LOG_VIEW_TTL);
+    assert!(!p2.exists(), "exit kept an expired copy");
+
+    let fresh = opened(h.env.run(Job::OpenLog(solo_log(&h, "3\n"))));
+    let p3 = fresh.path.clone();
+    views.adopt(fresh);
     drop(views);
-    assert!(!p2.exists(), "exit left a copy whose launcher was done");
-}
-
-/// A test-owned stand-in for a launcher that has not exited: `sh` blocked
-/// on its stdin pipe. The `Child` goes to the exit policy, which drops it
-/// without waiting; the guard keeps the pipe, so the helper runs until the
-/// guard drops. Bind the guard before the `LogViews` so it drops last.
-#[cfg(unix)]
-fn running_launcher() -> (Child, HelperGuard) {
-    let mut child = quiet_command("/bin/sh")
-        .args(["-c", "read x"])
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let guard = HelperGuard {
-        pid: libc::pid_t::try_from(child.id()).unwrap(),
-        stdin: child.stdin.take(),
-    };
-    (child, guard)
-}
-
-/// Reaps exactly one helper on drop, also when the test panics: it closes
-/// the pipe and waits up to `HELPER_DEADLINE`, then kills and reaps that
-/// PID. The PID cannot be reused before this reap, so the kill is scoped.
-#[cfg(unix)]
-struct HelperGuard {
-    pid: libc::pid_t,
-    stdin: Option<std::process::ChildStdin>,
-}
-
-#[cfg(unix)]
-const HELPER_DEADLINE: Duration = Duration::from_secs(5);
-
-#[cfg(unix)]
-impl HelperGuard {
-    /// One `waitpid` call; `true` once the PID is reaped or no longer ours.
-    fn try_reap(&self, flags: libc::c_int) -> bool {
-        loop {
-            let mut status = 0;
-            // SAFETY: waitpid on this test's own child PID with a valid
-            // status pointer.
-            let r = unsafe { libc::waitpid(self.pid, &mut status, flags) };
-            if r == 0 {
-                return false;
-            }
-            if r == self.pid || io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
-                return true;
-            }
-        }
-    }
-}
-
-#[cfg(unix)]
-impl Drop for HelperGuard {
-    fn drop(&mut self) {
-        drop(self.stdin.take());
-        let panicking = std::thread::panicking();
-        let deadline = Instant::now()
-            + if panicking {
-                Duration::ZERO
-            } else {
-                HELPER_DEADLINE
-            };
-        loop {
-            if self.try_reap(libc::WNOHANG) {
-                return;
-            }
-            if Instant::now() >= deadline {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        // SAFETY: the PID is still an unreaped child of this test, so it
-        // names the helper and nothing else.
-        unsafe { libc::kill(self.pid, libc::SIGKILL) };
-        self.try_reap(0);
-        assert!(
-            panicking,
-            "helper {} ignored its closed stdin and was killed",
-            self.pid
-        );
-    }
-}
-
-/// A launcher that already exited (and was waited for).
-#[cfg(unix)]
-fn finished_launcher() -> Child {
-    let mut child = quiet_command("/bin/sh")
-        .args(["-c", "exit 0"])
-        .spawn()
-        .unwrap();
-    child.wait().unwrap();
-    child
+    assert!(p3.exists(), "exit removed a fresh copy");
 }
 
 fn copy(h: &crate::tui::testkit::Harness, name: &str) -> PathBuf {
@@ -230,44 +153,86 @@ fn copy(h: &crate::tui::testkit::Harness, name: &str) -> PathBuf {
     path
 }
 
-/// Controller finding 5: quitting before the launcher has read the path
-/// keeps the copy; a launcher that is done lets it go. Nothing is waited
-/// for or killed.
+/// Blocks until `pid` has exited, without reaping it.
+#[cfg(unix)]
+fn wait_exited_unreaped(pid: libc::pid_t) {
+    // SAFETY: zeroed siginfo_t is a valid out buffer for waitid.
+    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    // SAFETY: waitid on this test's own child with a valid out pointer;
+    // WNOWAIT leaves the child waitable.
+    let r = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            libc::id_t::try_from(pid).unwrap(),
+            &mut info,
+            libc::WEXITED | libc::WNOWAIT,
+        )
+    };
+    assert_eq!(r, 0, "waitid: {}", io::Error::last_os_error());
+}
+
+/// Whether `pid` is still an unreaped child of this test.
+#[cfg(unix)]
+fn unreaped(pid: libc::pid_t) -> bool {
+    let mut status = 0;
+    // SAFETY: waitpid on this test's own child PID with a valid status
+    // pointer; WNOHANG never blocks.
+    let r = unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) };
+    r != -1
+}
+
+/// Controller findings 5 and 10: quitting keeps every fresh copy, whether
+/// its launcher still runs or is done (plain `open` returns before the app
+/// reads the path). A done launcher is reaped; nothing is waited for or
+/// killed.
 #[cfg(unix)]
 #[test]
-fn close_keeps_a_copy_while_its_launcher_runs() {
+fn close_keeps_fresh_copies_and_reaps_done_launchers() {
     let h = harness();
     let (busy, done) = (copy(&h, "busy.txt"), copy(&h, "done.txt"));
     let (launcher, _helper) = running_launcher();
+    let finished = quiet_command("/bin/sh")
+        .args(["-c", "exit 0"])
+        .spawn()
+        .unwrap();
+    let pid = libc::pid_t::try_from(finished.id()).unwrap();
+    wait_exited_unreaped(pid);
     let mut views = LogViews::default();
     views.adopt(OpenedLog::new(busy.clone(), Some(launcher), Instant::now()));
-    views.adopt(OpenedLog::new(
-        done.clone(),
-        Some(finished_launcher()),
-        Instant::now(),
-    ));
+    views.adopt(OpenedLog::new(done.clone(), Some(finished), Instant::now()));
     views.close();
     assert!(
         busy.exists(),
         "close removed a copy its launcher may still need"
     );
-    assert!(!done.exists(), "close kept a copy whose launcher was done");
+    assert!(
+        done.exists(),
+        "close removed a fresh copy the viewer may not have read"
+    );
+    assert!(!unreaped(pid), "close left the exited launcher a zombie");
     assert!(views.is_empty());
 }
 
-/// An outcome dropped without being adopted follows the same policy.
+/// An outcome dropped without being adopted follows the same policy: a
+/// fresh copy stays, with a running launcher, a done one, or none.
 #[cfg(unix)]
 #[test]
 fn a_dropped_outcome_follows_the_exit_policy() {
     let h = harness();
-    let busy = copy(&h, "busy.txt");
+    let (busy, done) = (copy(&h, "busy.txt"), copy(&h, "done.txt"));
     let (launcher, _helper) = running_launcher();
     drop(OpenedLog::new(busy.clone(), Some(launcher), Instant::now()));
-    assert!(busy.exists());
+    drop(OpenedLog::new(
+        done.clone(),
+        Some(finished_launcher()),
+        Instant::now(),
+    ));
+    assert!(busy.exists() && done.exists());
     let out = opened(h.env.run(Job::OpenLog(solo_log(&h, "x\n"))));
+    assert!(!out.has_launcher());
     let path = out.path.clone();
     drop(out);
-    assert!(!path.exists(), "a dropped outcome leaked its copy");
+    assert!(path.exists(), "a dropped fresh outcome lost its copy");
 }
 
 /// Past the TTL the copy goes even while the launcher runs (Go's timer did

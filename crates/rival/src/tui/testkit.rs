@@ -91,6 +91,101 @@ fn fake_terminate(pid: i64) -> io::Result<()> {
     Ok(())
 }
 
+/// A test-owned stand-in for a viewer launcher that has not exited: `sh`
+/// blocked on its stdin pipe. The `Child` goes to the exit policy, which
+/// drops it without waiting; the guard keeps the pipe, so the helper runs
+/// until the guard drops. Bind the guard before the `LogViews` so it drops
+/// last.
+#[cfg(unix)]
+pub fn running_launcher() -> (std::process::Child, HelperGuard) {
+    let mut child = super::jobs::quiet_command("/bin/sh")
+        .args(["-c", "read x"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let guard = HelperGuard {
+        pid: libc::pid_t::try_from(child.id()).unwrap(),
+        stdin: child.stdin.take(),
+    };
+    (child, guard)
+}
+
+/// Reaps exactly one helper on drop, also when the test panics: it closes
+/// the pipe and waits up to `HELPER_DEADLINE`, then kills and reaps that
+/// PID. The PID cannot be reused before this reap, so the kill is scoped.
+#[cfg(unix)]
+#[derive(Debug)]
+pub struct HelperGuard {
+    pid: libc::pid_t,
+    stdin: Option<std::process::ChildStdin>,
+}
+
+#[cfg(unix)]
+const HELPER_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
+#[cfg(unix)]
+impl HelperGuard {
+    /// One `waitpid` call; `true` once the PID is reaped or no longer ours.
+    fn try_reap(&self, flags: libc::c_int) -> bool {
+        loop {
+            let mut status = 0;
+            // SAFETY: waitpid on this test's own child PID with a valid
+            // status pointer.
+            let r = unsafe { libc::waitpid(self.pid, &mut status, flags) };
+            if r == 0 {
+                return false;
+            }
+            if r == self.pid || io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+                return true;
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+impl Drop for HelperGuard {
+    fn drop(&mut self) {
+        use std::time::{Duration, Instant};
+        drop(self.stdin.take());
+        let panicking = std::thread::panicking();
+        let deadline = Instant::now()
+            + if panicking {
+                Duration::ZERO
+            } else {
+                HELPER_DEADLINE
+            };
+        loop {
+            if self.try_reap(libc::WNOHANG) {
+                return;
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        // SAFETY: the PID is still an unreaped child of this test, so it
+        // names the helper and nothing else.
+        unsafe { libc::kill(self.pid, libc::SIGKILL) };
+        self.try_reap(0);
+        assert!(
+            panicking,
+            "helper {} ignored its closed stdin and was killed",
+            self.pid
+        );
+    }
+}
+
+/// A launcher that already exited (and was waited for).
+#[cfg(unix)]
+pub fn finished_launcher() -> std::process::Child {
+    let mut child = super::jobs::quiet_command("/bin/sh")
+        .args(["-c", "exit 0"])
+        .spawn()
+        .unwrap();
+    child.wait().unwrap();
+    child
+}
+
 /// `logfmt::read_tail`, counted.
 fn counting_read_tail(path: &Path, max_bytes: i64) -> io::Result<(Vec<u8>, bool)> {
     READS.set(READS.get() + 1);

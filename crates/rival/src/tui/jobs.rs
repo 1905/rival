@@ -66,6 +66,7 @@ pub enum JobOutput {
     Nothing,
 }
 
+#[cfg(test)]
 impl JobOutput {
     /// The model's message, if the job produced one.
     pub fn into_msg(self) -> Option<Msg> {
@@ -82,10 +83,14 @@ impl JobOutput {
 pub type Launch = fn(&Path) -> io::Result<Option<Child>>;
 
 /// The opener program. Go runs `exec.Command("open", path)`, the macOS
-/// opener, on every platform. Linux (`xdg-open`) and Windows (ShellExecute)
-/// openers are not ported yet: Task 5.1 / the P5 audit adds them here and
-/// nowhere else.
+/// opener, on every platform. Rust uses `open` on macOS and `xdg-open` on
+/// the other unix hosts; where it is not installed the launch fails and the
+/// copy is removed again, as for any failed launch. The Windows opener
+/// (ShellExecute) is Task 5.1 and goes here too.
+#[cfg(target_os = "macos")]
 pub const VIEWER: &str = "open";
+#[cfg(not(target_os = "macos"))]
+pub const VIEWER: &str = "xdg-open";
 
 /// A command whose stdin, stdout and stderr are the null device, as Go's
 /// `exec.Cmd` leaves them: it can neither read the TUI's keys nor print over
@@ -137,6 +142,7 @@ impl OpenedLog {
     }
 
     /// Whether a launcher process is still held (not yet seen to exit).
+    #[cfg(test)]
     pub fn has_launcher(&self) -> bool {
         self.launcher.is_some()
     }
@@ -158,19 +164,19 @@ impl OpenedLog {
         }
     }
 
-    /// The exit policy. A copy whose launcher has exited is removed: the
-    /// viewer has been handed the file. A copy whose launcher still runs is
-    /// left in the temp dir, because removing it could pull the file from
-    /// under the viewer the user asked for (`open` may not have read the
-    /// path yet). The launcher is neither waited for nor killed; it is
-    /// reparented when the TUI exits. Go left every copy behind on exit, as
-    /// its 10-minute timer died with the process.
-    pub fn release(&mut self) {
+    /// The exit policy at `now`. An exited launcher is reaped; a running one
+    /// is neither waited for nor killed, and is reparented when the TUI
+    /// exits. A copy younger than [`LOG_VIEW_TTL`] stays in the temp dir even
+    /// when its launcher is done or there was none: plain `open` returns once
+    /// LaunchServices has the request, before the app reads the path. Only an
+    /// expired copy is removed. Go left every copy behind on exit, as its
+    /// 10-minute timer died with the process.
+    fn release(&mut self, now: Instant) {
         if self.settled {
             return;
         }
         self.reap();
-        if self.launcher.is_none() {
+        if now.saturating_duration_since(self.opened_at) >= LOG_VIEW_TTL {
             self.remove();
         } else {
             self.settled = true;
@@ -180,7 +186,7 @@ impl OpenedLog {
 
 impl Drop for OpenedLog {
     fn drop(&mut self) {
-        self.release();
+        self.release(Instant::now());
     }
 }
 
@@ -188,9 +194,10 @@ impl Drop for OpenedLog {
 /// runtime keeps one for the TUI's lifetime and calls [`LogViews::sweep`]
 /// from its tick: it reaps finished launchers and removes copies older than
 /// [`LOG_VIEW_TTL`]. On exit [`LogViews::close`] (also run on drop) applies
-/// [`OpenedLog::release`] to every copy still held. Known limit: a copy
-/// whose launcher has not exited by then stays in the temp dir, as every
-/// copy did in Go.
+/// the exit policy of `OpenedLog::release` to every copy still held. Known
+/// limit: no process outlives the TUI to finish the TTL, so every copy
+/// younger than the TTL at exit stays in the temp dir for the OS to clean,
+/// as every copy did in Go.
 #[derive(Debug, Default)]
 pub struct LogViews {
     views: Vec<OpenedLog>,
@@ -202,10 +209,12 @@ impl LogViews {
     }
 
     /// How many copies or launchers are still held.
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.views.len()
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.views.is_empty()
     }
@@ -224,8 +233,12 @@ impl LogViews {
 
     /// On exit: releases every copy still held.
     pub fn close(&mut self) {
+        self.close_at(Instant::now());
+    }
+
+    fn close_at(&mut self, now: Instant) {
         for mut v in self.views.drain(..) {
-            v.release();
+            v.release(now);
         }
     }
 }
