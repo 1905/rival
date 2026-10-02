@@ -527,15 +527,14 @@ fn local_zone_switches_offset_at_dst() {
         "{}::local_zone_switches_offset_at_dst",
         module_path!().split_once("::").unwrap().1
     );
-    let mut child = Command::new(std::env::current_exe().unwrap())
-        .args([name.as_str(), "--exact", "--nocapture", "--test-threads=1"])
+    let mut cmd = Command::new(std::env::current_exe().unwrap());
+    cmd.args([name.as_str(), "--exact", "--nocapture", "--test-threads=1"])
         .env(CHILD, "1")
         // Europe/Berlin as a POSIX rule, so no tz database is needed.
         .env("TZ", "CET-1CEST,M3.5.0,M10.5.0/3")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+        .stderr(Stdio::piped());
+    let mut child = rival_core::executor::process::spawn(&mut cmd).unwrap();
     let deadline = Instant::now() + Duration::from_secs(60);
     let mut timed_out = false;
     while child.try_wait().unwrap().is_none() {

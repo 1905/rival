@@ -106,8 +106,8 @@ fn cross_process_fifo() {
     for (i, label) in labels.iter().enumerate() {
         let log = root.path().join(format!("{label}.out"));
         let out = fs::File::create(&log).unwrap();
-        let child = Command::new(&exe)
-            .args([TEST_NAME, "--exact", "--nocapture", "--test-threads=1"])
+        let mut cmd = Command::new(&exe);
+        cmd.args([TEST_NAME, "--exact", "--nocapture", "--test-threads=1"])
             .env(HELPER_ENV, "1")
             .env("RIVAL_QUEUE_DIR", &dir)
             .env("RIVAL_QUEUE_LABEL", label)
@@ -119,9 +119,10 @@ fn cross_process_fifo() {
             .env("RIVAL_HOME", root.path().join("rival-home"))
             .stdin(Stdio::null())
             .stdout(out.try_clone().unwrap())
-            .stderr(out)
-            .spawn()
+            .stderr(out);
+        let child = crate::executor::process::spawn(&mut cmd)
             .unwrap_or_else(|e| panic!("start {label}: {e}"));
+        drop(cmd);
         helpers.children.push((label.to_string(), child));
         // Enqueue order is deterministic: the next helper starts only once
         // this one's ticket is on disk.

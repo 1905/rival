@@ -97,9 +97,11 @@ impl Drop for NotifyGuard {
 #[cfg(unix)]
 mod unix {
     use std::io::{self, Read};
-    use std::os::fd::FromRawFd;
+    use std::os::fd::IntoRawFd;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicI32, Ordering};
+
+    use rival_core::executor::process;
 
     use super::{Signal, Sink};
 
@@ -126,10 +128,11 @@ mod unix {
     }
 
     fn os_err(what: &str) -> String {
-        format!(
-            "{what}: {}",
-            rival_core::gostd::os_error_text(&io::Error::last_os_error())
-        )
+        io_err(what, &io::Error::last_os_error())
+    }
+
+    fn io_err(what: &str, err: &io::Error) -> String {
+        format!("{what}: {}", rival_core::gostd::os_error_text(err))
     }
 
     extern "C" fn on_signal(sig: libc::c_int) {
@@ -157,43 +160,17 @@ mod unix {
     }
 
     /// Creates the pipe and its watcher thread once. On failure everything
-    /// created so far is closed.
+    /// created so far is closed. The pipe is close-on-exec (shared fork lock
+    /// on macOS, see `process::pipe`); its write end is nonblocking.
     fn ensure_pipe() -> Result<(), String> {
         if PIPE_WRITE.load(Ordering::Acquire) >= 0 {
             return Ok(());
         }
-        let mut fds = [0 as libc::c_int; 2];
-        // SAFETY: pipe writes two descriptors into the array.
-        if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
-            return Err(os_err("pipe"));
-        }
-        let close_both = || {
-            // SAFETY: closing descriptors this function created.
-            unsafe {
-                libc::close(fds[0]);
-                libc::close(fds[1]);
-            }
-        };
-        // SAFETY: flag updates on descriptors we own.
-        let flags_ok = unsafe {
-            libc::fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC) != -1
-                && libc::fcntl(fds[1], libc::F_SETFD, libc::FD_CLOEXEC) != -1
-                && {
-                    let fl = libc::fcntl(fds[1], libc::F_GETFL);
-                    fl != -1 && libc::fcntl(fds[1], libc::F_SETFL, fl | libc::O_NONBLOCK) != -1
-                }
-        };
-        if !flags_ok {
-            let err = os_err("fcntl");
-            close_both();
-            return Err(err);
-        }
-        let read_fd = fds[0];
+        let (mut reader, writer) = process::pipe().map_err(|e| io_err("pipe", &e))?;
+        process::set_nonblocking(&writer).map_err(|e| io_err("fcntl", &e))?;
         let spawned = std::thread::Builder::new()
             .name("rival-signals".into())
             .spawn(move || {
-                // SAFETY: the watcher owns the read end from here.
-                let mut reader = unsafe { std::fs::File::from_raw_fd(read_fd) };
                 let mut buf = [0u8; 16];
                 loop {
                     match reader.read(&mut buf) {
@@ -218,11 +195,12 @@ mod unix {
                     }
                 }
             });
+        // A failed start drops the closure, which closes the read end; the
+        // write end closes on return.
         if let Err(e) = spawned {
-            close_both();
             return Err(format!("start signal watcher: {e}"));
         }
-        PIPE_WRITE.store(fds[1], Ordering::Release);
+        PIPE_WRITE.store(writer.into_raw_fd(), Ordering::Release);
         Ok(())
     }
 
@@ -472,23 +450,22 @@ mod tests {
     fn run_helper(mode: &str) -> (String, std::process::ExitStatus) {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("report");
-        let mut child = Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                HELPER_TEST,
-                "--ignored",
-                "--quiet",
-                "--test-threads=1",
-            ])
-            .env(HELPER_OUT, &out)
-            .env(HELPER_MODE, mode)
-            .env("HOME", dir.path())
-            .env("RIVAL_HOME", dir.path().join(".rival"))
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
+        let mut cmd = Command::new(std::env::current_exe().unwrap());
+        cmd.args([
+            "--exact",
+            HELPER_TEST,
+            "--ignored",
+            "--quiet",
+            "--test-threads=1",
+        ])
+        .env(HELPER_OUT, &out)
+        .env(HELPER_MODE, mode)
+        .env("HOME", dir.path())
+        .env("RIVAL_HOME", dir.path().join(".rival"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        let mut child = rival_core::executor::process::spawn(&mut cmd).unwrap();
         let deadline = Instant::now() + Duration::from_secs(30);
         let status = loop {
             if let Some(status) = child.try_wait().unwrap() {

@@ -6,14 +6,61 @@
 //! keep the crate compiling; P5 replaces them with a Windows Job Object
 //! backend (group kill) and cancellable pipe IO.
 
+#[cfg(all(test, target_os = "macos"))]
+mod spawn_tests;
+
 use std::ffi::OsStr;
 use std::fmt;
-use std::io;
+use std::io::{self, PipeReader, PipeWriter};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command};
 
 use crate::gostd;
 use crate::paths;
+
+/// Go `syscall.ForkLock` on macOS. std's `io::pipe` there is `pipe(2)`
+/// followed by two separate close-on-exec calls; a fork between them gives
+/// the child both pipe ends. Pipe creation holds this lock shared, every
+/// Rival spawn holds it exclusively, as Go's `os.Pipe` and `forkExec` do.
+///
+/// It covers only Rival's own [`pipe`] and [`spawn`] calls. A library that
+/// creates descriptors or forks on its own does not take it.
+#[cfg(target_os = "macos")]
+static FORK_LOCK: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
+/// Runs `create` while no Rival spawn can fork (Go `ForkLock.RLock`).
+/// Other platforms keep std's behavior unchanged and take no lock: Linux
+/// uses `pipe2(O_CLOEXEC)`, Windows creates non-inheritable handles.
+fn with_pipe_lock<T>(create: impl FnOnce() -> T) -> T {
+    #[cfg(target_os = "macos")]
+    let _guard = FORK_LOCK
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    create()
+}
+
+/// Go `os.Pipe`: std's `io::pipe` under the fork lock. Every pipe Rival
+/// creates outside a spawn goes through here.
+pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
+    with_pipe_lock(io::pipe)
+}
+
+/// `cmd.spawn()` under the fork lock (Go `forkExec`'s `acquireForkLock`).
+/// The lock covers std's own stdio and error pipes, which it creates inside
+/// `spawn`, and is released when the child has exec'd or failed to; never
+/// held while the caller waits for or reads from the child. Nothing locks
+/// in the forked child. Other platforms spawn exactly as std does.
+///
+/// Callers keep std's stream defaults: an unset stream is inherited, as
+/// with `Command::spawn`. A converted `output()` sets null stdin and piped
+/// stdout/stderr itself, then calls `Child::wait_with_output`.
+pub fn spawn(cmd: &mut Command) -> io::Result<Child> {
+    #[cfg(target_os = "macos")]
+    let _guard = FORK_LOCK
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    cmd.spawn()
+}
 
 /// Go `exec.ErrNotFound`.
 const ERR_NOT_FOUND: &str = "executable file not found in $PATH";
@@ -428,7 +475,7 @@ pub(crate) enum Io {
 /// The cancellation bound depends on it, so a failure is an error, not a
 /// silent fallback to blocking IO. EINTR is retried.
 #[cfg(unix)]
-pub(crate) fn set_nonblocking(fd: &impl std::os::fd::AsRawFd) -> io::Result<()> {
+pub fn set_nonblocking(fd: &impl std::os::fd::AsRawFd) -> io::Result<()> {
     let fd = fd.as_raw_fd();
     let fcntl = |cmd: libc::c_int, arg: libc::c_int| loop {
         // SAFETY: fcntl on a descriptor we own.
@@ -447,7 +494,7 @@ pub(crate) fn set_nonblocking(fd: &impl std::os::fd::AsRawFd) -> io::Result<()> 
 }
 
 #[cfg(not(unix))]
-pub(crate) fn set_nonblocking<T>(_fd: &T) -> io::Result<()> {
+pub fn set_nonblocking<T>(_fd: &T) -> io::Result<()> {
     Ok(())
 }
 

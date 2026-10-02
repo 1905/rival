@@ -1,6 +1,6 @@
 use super::*;
 #[cfg(unix)]
-use crate::tui::testkit::{finished_launcher, running_launcher};
+use crate::tui::testkit::{exiting_launcher, finished_launcher, running_launcher};
 use crate::tui::testkit::{harness, launched, set_launch_fails};
 
 fn solo_log(h: &crate::tui::testkit::Harness, body: &str) -> OpenLogRequest {
@@ -42,9 +42,10 @@ fn viewer_command_is_the_go_opener() {
 #[test]
 fn quiet_command_uses_null_streams() {
     let script = "for f in 0 1 2; do [ /dev/fd/$f -ef /dev/null ] || exit 1$f; done";
-    let status = quiet_command("/bin/sh")
-        .args(["-c", script])
-        .status()
+    let mut cmd = quiet_command("/bin/sh");
+    cmd.args(["-c", script]);
+    let status = process::spawn(&mut cmd)
+        .and_then(|mut child| child.wait())
         .unwrap();
     assert!(status.success(), "a stream is not /dev/null: {status}");
 }
@@ -191,10 +192,7 @@ fn close_keeps_fresh_copies_and_reaps_done_launchers() {
     let h = harness();
     let (busy, done) = (copy(&h, "busy.txt"), copy(&h, "done.txt"));
     let (launcher, _helper) = running_launcher();
-    let finished = quiet_command("/bin/sh")
-        .args(["-c", "exit 0"])
-        .spawn()
-        .unwrap();
+    let finished = exiting_launcher();
     let pid = libc::pid_t::try_from(finished.id()).unwrap();
     wait_exited_unreaped(pid);
     let mut views = LogViews::default();

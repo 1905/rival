@@ -5,8 +5,9 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
+use rival_core::executor::process;
 use rival_core::paths::Paths;
 
 use super::*;
@@ -34,8 +35,8 @@ impl Fixture {
     }
 
     fn git(&self, dir: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .args(args)
+        let mut cmd = Command::new("git");
+        cmd.args(args)
             .current_dir(dir)
             .env_clear()
             .envs(&self.vars)
@@ -45,7 +46,12 @@ impl Fixture {
                 ("GIT_COMMITTER_NAME", "test"),
                 ("GIT_COMMITTER_EMAIL", "test@test"),
             ])
-            .output()
+            // `output()`'s defaults, spawned under the fork lock.
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let out = process::spawn(&mut cmd)
+            .and_then(std::process::Child::wait_with_output)
             .unwrap();
         assert!(
             out.status.success(),

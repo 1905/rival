@@ -16,7 +16,7 @@ use std::process::{Command, Stdio};
 
 use crate::config::Config;
 use crate::executor::oscmd::{exit_status_text, look_path};
-use crate::executor::process::set_exec;
+use crate::executor::process::{self, set_exec};
 use crate::executor::subprocess::{dedup_env, spawn_error_text};
 use crate::paths;
 
@@ -138,7 +138,10 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let out = cmd.output().map_err(|e| fork_error(&e))?;
+    // `output()` with the fork lock released before the reads and the wait.
+    let out = process::spawn(&mut cmd)
+        .and_then(std::process::Child::wait_with_output)
+        .map_err(|e| fork_error(&e))?;
     if !out.status.success() {
         return Err(exit_status_text(out.status));
     }

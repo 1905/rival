@@ -14,7 +14,7 @@ use ratatui::backend::TestBackend;
 use rival_core::session::Session;
 use rival_core::sessionview::SessionEvent;
 
-use crate::tui::jobs::{LOG_VIEW_TTL, OpenedLog, PromptsRequest, quiet_command};
+use crate::tui::jobs::{LOG_VIEW_TTL, OpenedLog, PromptsRequest};
 use crate::tui::kill::StopRequest;
 use crate::tui::logview::{LogKey, LogPane, LogRequest};
 use crate::tui::result_view::{ResultRequest, ResultTarget};
@@ -486,10 +486,7 @@ fn opened_copies_are_swept_while_nothing_is_live() {
     let copy = h.env.temp_dir.join("rival-log-old.txt");
     fs::write(&copy, "old\n").unwrap();
     // Exits at once, but nobody has waited for it yet.
-    let launcher = quiet_command("/bin/sh")
-        .args(["-c", "exit 0"])
-        .spawn()
-        .unwrap();
+    let launcher = testkit::exiting_launcher();
     tx.send(Event::Job(JobOutput::Opened(OpenedLog::new(
         copy.clone(),
         Some(launcher),

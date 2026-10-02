@@ -688,7 +688,9 @@ fn run_fd_helper(close: &'static [i32]) -> String {
             Ok(())
         });
     }
-    let status = cmd.status().unwrap();
+    let status = rival_core::executor::process::spawn(&mut cmd)
+        .and_then(|mut child| child.wait())
+        .unwrap();
     assert!(status.success(), "helper failed: {status}");
     std::fs::read_to_string(&out).unwrap()
 }

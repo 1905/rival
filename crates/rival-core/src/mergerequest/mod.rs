@@ -750,7 +750,7 @@ fn output(
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| fork_error(&e))?;
+    let mut child = process::spawn(&mut cmd).map_err(|e| fork_error(&e))?;
     drop(cmd);
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();

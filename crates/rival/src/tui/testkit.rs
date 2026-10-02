@@ -98,11 +98,10 @@ fn fake_terminate(pid: i64) -> io::Result<()> {
 /// last.
 #[cfg(unix)]
 pub fn running_launcher() -> (std::process::Child, HelperGuard) {
-    let mut child = super::jobs::quiet_command("/bin/sh")
-        .args(["-c", "read x"])
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut cmd = super::jobs::quiet_command("/bin/sh");
+    cmd.args(["-c", "read x"])
+        .stdin(std::process::Stdio::piped());
+    let mut child = rival_core::executor::process::spawn(&mut cmd).unwrap();
     let guard = HelperGuard {
         pid: libc::pid_t::try_from(child.id()).unwrap(),
         stdin: child.stdin.take(),
@@ -178,12 +177,17 @@ impl Drop for HelperGuard {
 /// A launcher that already exited (and was waited for).
 #[cfg(unix)]
 pub fn finished_launcher() -> std::process::Child {
-    let mut child = super::jobs::quiet_command("/bin/sh")
-        .args(["-c", "exit 0"])
-        .spawn()
-        .unwrap();
+    let mut child = exiting_launcher();
     child.wait().unwrap();
     child
+}
+
+/// A launcher that exits at once; nobody has waited for it yet.
+#[cfg(unix)]
+pub fn exiting_launcher() -> std::process::Child {
+    let mut cmd = super::jobs::quiet_command("/bin/sh");
+    cmd.args(["-c", "exit 0"]);
+    rival_core::executor::process::spawn(&mut cmd).unwrap()
 }
 
 /// `logfmt::read_tail`, counted.

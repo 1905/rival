@@ -368,7 +368,7 @@ pub fn run_subprocess(
     let env = child_env(req);
 
     let pipe = |what: &str| {
-        let (r, w) = io::pipe()
+        let (r, w) = process::pipe()
             .map_err(|e| anyhow!("{what} pipe: {}: {}", process::PIPE_SYSCALL, io_text(&e)))?;
         anyhow::Ok((r, w))
     };
@@ -410,7 +410,7 @@ pub fn run_subprocess(
         cmd.stdin(Stdio::from(stdin_r))
             .stdout(Stdio::from(stdout_w))
             .stderr(Stdio::from(stderr_w));
-        let spawned = image.and_then(|()| cmd.spawn());
+        let spawned = image.and_then(|()| process::spawn(&mut cmd));
         // Closes our copies of the child's pipe ends (Go closes childIOFiles
         // after Start), so EOF arrives once the provider side is done.
         drop(cmd);

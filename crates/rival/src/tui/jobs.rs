@@ -14,6 +14,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use rival_core::executor::process;
 use rival_core::logfmt;
 use rival_core::paths::Paths;
 use rival_core::session::Session;
@@ -115,7 +116,7 @@ pub fn viewer_command(path: &Path) -> Command {
 
 /// Go: `exec.Command("open", path).Start()`.
 pub fn launch_viewer(path: &Path) -> io::Result<Option<Child>> {
-    viewer_command(path).spawn().map(Some)
+    process::spawn(&mut viewer_command(path)).map(Some)
 }
 
 /// How long an opened log copy lives while the TUI runs (Go: 10 minutes).

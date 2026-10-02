@@ -1,0 +1,84 @@
+{
+  "binary": "/Users/kass/dev/rival/worktrees/rust-cli/target/debug/rival",
+  "sha256": "21006a79d5451aa58ea6092c330f9fea0e4060e3dd7eeec920436396eaff46ff",
+  "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-runtime-rust-5.0-tu9ribvo",
+  "cases": [
+    {
+      "name": "quit",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 3635
+    },
+    {
+      "name": "ctrl-c",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 3635
+    },
+    {
+      "name": "sigint",
+      "exit_code": 1,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 3685
+    },
+    {
+      "name": "sigterm",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 3635
+    },
+    {
+      "name": "resize",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 6571
+    },
+    {
+      "name": "watcher-error",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": true,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 227
+    },
+    {
+      "name": "stdin-pipe",
+      "exit_code": 0,
+      "raw_during_run": true,
+      "terminal_modes_restored": true,
+      "pending_input_state_changed": false,
+      "entered_alt_screen": true,
+      "left_alt_screen": true,
+      "cursor_restored": true,
+      "output_bytes": 3635
+    }
+  ]
+}

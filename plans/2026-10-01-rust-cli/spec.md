@@ -134,9 +134,10 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - macOS process identity uses `sysctl kern.proc.pid`, matching Go. `proc_pidinfo` cannot inspect some processes Go can inspect.
 - YAML uses serde-saphyr 1.3.0. Compatibility limit: Rival validation messages and the `parse <path>:` prefix match Go; malformed-YAML parser details use Rust's wording.
 - P3 is merged at `bb95462`. All 84 scenarios pass on macOS/Linux; two real Rust-driven reviews rendered in the unchanged Swift app.
+- P4 is merged at `fff4ac3`. The interactive TUI and Result tab passed 1,205 workspace tests, seven real terminal cleanup cases, a real-watcher transition check and 33 screenshot checks. Hosted macOS/Linux CI passed all 84 scenarios and Swift decoding. The terminal uses the app's dim palette and an eight-entry Result cache.
 - P5 implementation correction, not yet verified: an owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. This replaces the original flag recipe and closes the documented suspended-child orphan interval; plan v2.3 carries native regression requirements.
 
-- P5 process correction, not yet verified: Go 1.25.14 locks pipe setup against process launch on macOS. Rust 1.98.1 pipe setup is non-atomic there, and the port omitted that lock. Plan v2.4 adds the missing synchronization. The intermittent P4 cancellation failure remains unexplained.
+- P5 process correction: the missing macOS pipe/spawn synchronization is implemented. An isolated forced-overlap regression detects a deliberately bypassed guard. All 1,207 workspace tests and seven terminal checks pass locally. The guard covers Rival calls, not foreign libraries. The intermittent P4 cancellation failure remains unexplained; hosted verification remains pending.
 
 ## Rollout
 

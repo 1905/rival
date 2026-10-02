@@ -206,26 +206,30 @@ impl Fixture {
     }
 
     fn git_raw(&self, dir: &Path, args: &[&str]) -> Vec<u8> {
-        let out = Command::new(&self.git_path)
-            .args([
-                "-c",
-                "protocol.allow=never",
-                "-c",
-                "protocol.file.allow=always",
-            ])
-            .args(args)
-            .current_dir(dir)
-            .env_clear()
-            .env("PATH", "/usr/bin:/bin")
-            .env("HOME", self.root.join("home"))
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_AUTHOR_NAME", "Test")
-            .env("GIT_COMMITTER_NAME", "Test")
-            .env("GIT_AUTHOR_EMAIL", "test@example.com")
-            .env("GIT_COMMITTER_EMAIL", "test@example.com")
-            .stdin(Stdio::null())
-            .output()
+        let mut cmd = Command::new(&self.git_path);
+        cmd.args([
+            "-c",
+            "protocol.allow=never",
+            "-c",
+            "protocol.file.allow=always",
+        ])
+        .args(args)
+        .current_dir(dir)
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("HOME", self.root.join("home"))
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_AUTHOR_NAME", "Test")
+        .env("GIT_COMMITTER_NAME", "Test")
+        .env("GIT_AUTHOR_EMAIL", "test@example.com")
+        .env("GIT_COMMITTER_EMAIL", "test@example.com")
+        .stdin(Stdio::null())
+        // `output()`'s defaults, spawned under the fork lock.
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+        let out = process::spawn(&mut cmd)
+            .and_then(std::process::Child::wait_with_output)
             .unwrap();
         assert!(
             out.status.success(),

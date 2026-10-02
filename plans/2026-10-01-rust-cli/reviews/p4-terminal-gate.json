@@ -1,5 +1,5 @@
 {
-  "status": "visual and local checks passed; hosted CI pending",
+  "status": "passed and merged",
   "captures": [
     {
       "output": "/Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/p4-visual-pat97kbu",
@@ -255,5 +255,7 @@
   "workspace_passed": 1205,
   "workspace_ignored": 9,
   "fmt": "passed",
-  "clippy": "passed with -D warnings"
+  "clippy": "passed with -D warnings",
+  "head": "fff4ac3f064c9595718df541ca3db900918094b2",
+  "ci": "https://github.com/1905/rival/actions/runs/37077005267"
 }

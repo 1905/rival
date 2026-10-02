@@ -69,7 +69,7 @@ pub(crate) fn run(
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
         }
         Output::Combined => {
-            let (r, w) = match io::pipe() {
+            let (r, w) = match process::pipe() {
                 Ok(pair) => pair,
                 Err(e) => return (Vec::new(), Err(format!("pipe: {}", io_text(&e)))),
             };
@@ -88,7 +88,7 @@ pub(crate) fn run(
         },
     }
 
-    let spawned = cmd.spawn();
+    let spawned = process::spawn(&mut cmd);
     // Drops our copies of the pipe's write ends so the read sees EOF.
     drop(cmd);
     let mut child = match spawned {

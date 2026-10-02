@@ -6,7 +6,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use rival_core::executor::oscmd;
+use rival_core::executor::{oscmd, process};
 use rival_core::paths::{self, HOME_VAR};
 use rival_core::update;
 
@@ -202,7 +202,7 @@ fn output(env: &CmdEnv<'_>, name: &str, args: &[&str]) -> Result<Vec<u8>, String
 }
 
 fn spawn(cmd: &mut Command, path: &Path) -> Result<std::process::Child, String> {
-    cmd.spawn().map_err(|e| oscmd::fork_error(path, &e))
+    process::spawn(cmd).map_err(|e| oscmd::fork_error(path, &e))
 }
 
 fn exit_result(status: std::process::ExitStatus) -> Result<(), String> {

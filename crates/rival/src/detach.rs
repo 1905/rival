@@ -16,6 +16,8 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
+use rival_core::executor::process;
+
 /// Marks the re-exec'd child so it does not detach again. Same name as Go.
 pub const DETACHED_ENV: &str = "RIVAL_DETACHED";
 
@@ -108,7 +110,7 @@ pub fn spawn_detached(exe: &Path, args: &[OsString], stderr: &mut dyn Write) -> 
 /// written, the caller could never learn the PID, so the child is killed
 /// rather than left untrackable.
 pub fn start_and_report(mut child: Command, stderr: &mut dyn Write) -> DetachOutcome {
-    let mut spawned: Child = match child.spawn() {
+    let mut spawned: Child = match process::spawn(&mut child) {
         Ok(spawned) => spawned,
         Err(err) => {
             let _ = writeln!(

@@ -351,14 +351,11 @@ fn tree_snapshot_readers_report_a_zombie() {
             let _ = self.0.wait();
         }
     }
-    let child = Reap(
-        std::process::Command::new("/usr/bin/true")
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .unwrap(),
-    );
+    let mut cmd = std::process::Command::new("/usr/bin/true");
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let child = Reap(process::spawn(&mut cmd).unwrap());
     let pid = child.0.id() as i32;
     // Polls for the exit without reaping (WNOWAIT) or blocking (WNOHANG).
     // A zero si_pid means the child has not exited yet.
