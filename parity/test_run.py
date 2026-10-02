@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FAKE_RIVAL = r'''#!{python} -IB
 import faulthandler, json, os, shutil, signal, subprocess, sys, time, urllib.request
 
-faulthandler.register(signal.SIGUSR1, all_threads=True)  # stack dump into the step's stderr
+STACK_FILES = []  # faulthandler writes to these fds; keep them open while registered
 
 def act(actions):
     for a in actions:
@@ -70,8 +70,12 @@ def act(actions):
                 f.write(str(os.getpid()))
             os.rename(v + ".tmp", v)
         elif k == "stack_ready":
-            # Handshake: SIGUSR1 is registered above, so a stack request cannot kill this pid.
+            # Handshake: the <pid> marker appears only after SIGUSR1 is registered, so a
+            # stack request cannot kill this pid. Each process dumps into its own
+            # <pid>.stack file: fakes sharing the step's stderr would interleave.
             os.makedirs(v, exist_ok=True)
+            STACK_FILES.append(open(os.path.join(v, "%d.stack" % os.getpid()), "w"))
+            faulthandler.register(signal.SIGUSR1, file=STACK_FILES[-1], all_threads=True)
             open(os.path.join(v, str(os.getpid())), "w").close()
         elif k == "exec_clean":
             # Replaces this process with one that has no task token and no SIGUSR1 handler.
@@ -644,13 +648,18 @@ class ProcessTest(RunnerCase):
         self.assertIn("runner stopped by SIGTERM or its own exit", report)
         self.assertIn("interrupted by SIGTERM: run stopped", report)
         self.assertIn("root %s: pidfiles ['child.pid']" % root, report)
-        runner_err = report.split("runner stderr:\n", 1)[1].split("\nroot ", 1)[0]
+        runner_err = _report_section(report, "runner stderr:")
         self.assertIn("most recent call first", runner_err)
         self.assertIn("in run_steps", runner_err)
-        step_err = report.split("step file 01.stderr:\n", 1)[1]
+        # Fakes dump into their own files: two dumps into one stderr interleaved on CI.
+        step_err = _report_section(report, "step file 01.stderr:")
         self.assertIn("rival: detached pid=%d" % child, step_err)
-        self.assertIn("most recent call first", step_err)
-        self.assertIn("in act", step_err)
+        self.assertNotIn("most recent call first", step_err)
+        for pid in (child, pids["stalled.pid"]):
+            with self.subTest(fake=pid):
+                stack = _report_section(report, "fake %d stack file:" % pid)
+                self.assertIn("most recent call first", stack)
+                self.assertIn("in act", stack)
         self.assertEqual([p for p in pids.values() if _alive(p)], [])
         self.assertIsNone(other.poll())
 
@@ -809,6 +818,7 @@ def _stack_ready(root):
 def _readiness_report(work, runner, elapsed):
     """Bounded evidence for a run that never got ready; also stops the run and its processes."""
     lines = ["scenario processes not ready under %s after %.1fs" % (work, elapsed)]
+    fakes = {}  # root -> handshaked fake PIDs that were asked for stacks
     if runner.poll() is not None:
         lines.append("runner exited early with code %s" % runner.returncode)
     elif not _roots(work):
@@ -816,12 +826,17 @@ def _readiness_report(work, runner, elapsed):
         lines.append("runner still running before its first scenario root; "
                      "SIGUSR1 not sent (handler not proven registered)")
     else:
-        # faulthandler in the runner and each handshaked fake prints its stacks to its stderr.
-        fakes = [p for r in _roots(work) for p in _stack_ready(r)]
+        # The runner dumps into its stderr pipe; each handshaked fake into its own stack file.
+        fakes = {r: _stack_ready(r) for r in _roots(work)}
+        pids = sorted(p for ps in fakes.values() for p in ps)
         lines.append("runner still running; stack dumps requested with SIGUSR1 from runner %d and "
-                     "registered fakes %s" % (runner.pid, fakes))
-        _signal_pids([runner.pid] + fakes, signal.SIGUSR1)
-        time.sleep(0.5)
+                     "registered fakes %s" % (runner.pid, pids))
+        _signal_pids([runner.pid] + pids, signal.SIGUSR1)
+        stacks = [_stack_file(r, p) for r, ps in fakes.items() for p in ps]
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not all(os.path.getsize(s) for s in stacks):
+            time.sleep(0.05)
+        time.sleep(0.5)  # the runner's own dump goes to a pipe that cannot be polled here
     out, err, forced = _stop_runner(runner)
     _kill_task_leftovers(work)
     lines.append("runner stopped by %s" % ("SIGKILL after 20s" if forced else "SIGTERM or its own exit"))
@@ -835,7 +850,21 @@ def _readiness_report(work, runner, elapsed):
         for name in sorted(os.listdir(steps)) if os.path.isdir(steps) else ():
             with open(os.path.join(steps, name), "rb") as f:
                 lines.append("step file %s:\n%s" % (name, _tail(f.read())))
+        for pid in fakes.get(root, ()):
+            with open(_stack_file(root, pid), "rb") as f:
+                lines.append("fake %d stack file:\n%s" % (pid, _tail(f.read())))
     return "\n".join(lines)
+
+
+def _stack_file(root, pid):
+    """Where a fake that passed the stack_ready handshake writes its SIGUSR1 stack dump."""
+    return os.path.join(root, "ready", "%d.stack" % pid)
+
+
+def _report_section(report, header):
+    """The report text after header, up to the next report header line."""
+    text = report.split(header + "\n", 1)[1]
+    return re.split(r"\n(?=runner |root |step file |fake \d+ stack file:)", text, maxsplit=1)[0]
 
 
 class ScenarioFilesTest(unittest.TestCase):

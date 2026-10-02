@@ -97,3 +97,8 @@
 
 - `git remote get-url` expands URL rewriting, so an unconditional fixture rewrite would break remote identity validation. A conditional include limits rewriting to `**/tmp/rival-mr-*/`. [Git remote documentation](https://git-scm.com/docs/git-remote.html), [Git conditional includes](https://git-scm.com/docs/git-config/2.44.3.html)
 - A local probe verified unchanged caller HTTPS identity, snapshot-only local rewriting and disabled network protocols. Absolute patterns through macOS `/var` symlinks failed; the narrow directory pattern passed. The full MR scenario remains unrun until P3.
+## Runner diagnostic interleaving — 2026-10-03
+
+CI 37037313215 passed the Rust checks but failed one Linux runner self-test. Two fake processes dumped stacks into the same step stderr file. Their writes interleaved, splitting the expected `in act` frame text. The failure output directly shows both stacks combined. This is a diagnostic fixture failure, not an observed Rust runtime failure.
+
+The narrow repair gives each registered fake a task-owned stack file. The readiness report collects each separately. Assertions still require a useful stack from every signalled fake and verify owned-process cleanup. Hosted verification remains pending.
