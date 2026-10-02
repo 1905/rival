@@ -8,7 +8,7 @@
 //! explicit values instead of mutating globals.
 
 use std::collections::{BTreeMap, HashMap};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -872,6 +872,8 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
 pub struct Config {
     paths: Paths,
     env: HashMap<String, String>,
+    /// Go `os.Environ()`: every entry in process order, non-UTF-8 included.
+    environ: Vec<OsString>,
     cwd: Option<PathBuf>,
     user: Option<UserConfig>,
     user_err: Option<ConfigError>,
@@ -883,6 +885,7 @@ impl fmt::Debug for Config {
         f.debug_struct("Config")
             .field("paths", &self.paths)
             .field("env", &format_args!("<{} vars>", self.env.len()))
+            .field("environ", &format_args!("<{} entries>", self.environ.len()))
             .field("cwd", &self.cwd)
             .field("user", &self.user)
             .field("user_err", &self.user_err)
@@ -894,11 +897,22 @@ impl Config {
     /// Production constructor: snapshots the process environment and the
     /// working directory (Go `os.Getwd`), then reads the user config.
     pub fn load(paths: &Paths) -> Self {
-        let env: HashMap<String, String> = std::env::vars_os()
-            .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
+        let vars: Vec<(OsString, OsString)> = std::env::vars_os().collect();
+        let env: HashMap<String, String> = vars
+            .iter()
+            .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v.to_str()?.to_string())))
             .collect();
         let cwd = paths::getwd(env.get("PWD").map(OsStr::new));
-        Self::new(paths.clone(), env, cwd)
+        let environ = vars
+            .into_iter()
+            .map(|(k, v)| {
+                let mut kv = k;
+                kv.push("=");
+                kv.push(v);
+                kv
+            })
+            .collect();
+        Self::new(paths.clone(), env, cwd).with_environ(environ)
     }
 
     /// Explicit constructor for tests and embedders. Reads
@@ -906,9 +920,13 @@ impl Config {
     /// when no home directory is known (here: neither `RIVAL_HOME` nor
     /// `HOME` is set and non-empty in `env`).
     pub fn new(paths: Paths, env: HashMap<String, String>, cwd: Option<PathBuf>) -> Self {
+        let mut environ: Vec<OsString> =
+            env.iter().map(|(k, v)| format!("{k}={v}").into()).collect();
+        environ.sort();
         let mut cfg = Config {
             paths,
             env,
+            environ,
             cwd,
             user: None,
             user_err: None,
@@ -932,6 +950,20 @@ impl Config {
 
     pub fn paths(&self) -> &Paths {
         &self.paths
+    }
+
+    /// Go `os.Environ()` for child processes. [`Config::load`] keeps the
+    /// process order and non-UTF-8 entries; [`Config::new`] builds it from
+    /// `env`, sorted by entry.
+    pub fn environ(&self) -> &[OsString] {
+        &self.environ
+    }
+
+    /// Replaces the ordered child-process env (tests and embedders). The
+    /// `env` getters are not changed.
+    pub fn with_environ(mut self, environ: Vec<OsString>) -> Self {
+        self.environ = environ;
+        self
     }
 
     pub fn user_config(&self) -> Option<&UserConfig> {

@@ -9,6 +9,7 @@ use std::fmt::Display;
 use std::io::Write;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Local, SecondsFormat};
 
@@ -42,6 +43,8 @@ enum Value {
     Str(String),
     Int(i64),
     Bool(bool),
+    /// A JSON number already in Go's text form.
+    Number(String),
 }
 
 /// One log line under construction. Finish it with [`Event::msg`].
@@ -90,6 +93,19 @@ impl Event {
 
     pub fn bool(mut self, key: &str, value: bool) -> Self {
         self.fields.push((key.to_string(), Value::Bool(value)));
+        self
+    }
+
+    /// Go zerolog `Dur`: milliseconds as a float (`DurationFieldUnit` =
+    /// ms, `DurationFieldInteger` = false), so 5s prints `5000` and 1.5ms
+    /// prints `1.5`. Rust's shortest float text equals Go's
+    /// `strconv.FormatFloat(v, 'f', -1, 64)` only below 1e21 ms; zerolog
+    /// prints 'e' from there. Go's signed `time.Duration` (at most ~9.2e15
+    /// ms) never gets there; a larger Rust `Duration` would print wrong.
+    pub fn dur(mut self, key: &str, d: Duration) -> Self {
+        let ms = d.as_nanos() as f64 / 1e6;
+        self.fields
+            .push((key.to_string(), Value::Number(format!("{ms}"))));
         self
     }
 
@@ -156,6 +172,7 @@ fn push_pair(line: &mut String, key: &str, value: &Value) {
         Value::Str(s) => line.push_str(&json_string(s)),
         Value::Int(n) => line.push_str(&n.to_string()),
         Value::Bool(b) => line.push_str(if *b { "true" } else { "false" }),
+        Value::Number(n) => line.push_str(n),
     }
 }
 
@@ -306,6 +323,25 @@ mod tests {
             assert_eq!(keys(&rust), keys(go), "{name}: key order differs");
             assert_eq!(rust, go, "{name}: bytes differ");
         }
+    }
+
+    // Expected text derived from the zerolog v1.33.0 source (not a Go run):
+    // Dur → AppendDuration(float64(d)/float64(time.Millisecond)) →
+    // appendFloat(v, 64, -1) = strconv 'f' -1, as 1ns = 1e-6ms is not below
+    // the 1e-6 'e' cutoff. Calls: Str("session","s1"), Dur("grace",5s),
+    // Dur("d",1500µs), Dur("z",0), Dur("n",1ns).
+    const GO_DUR: &str = r#"{"level":"warn","app":"rival","session":"s1","grace":5000,"d":1.5,"z":0,"n":0.000001,"time":"2026-10-02T14:05:09+03:00","message":"m"}"#;
+
+    #[test]
+    fn dur_matches_go_zerolog_float_milliseconds() {
+        let line = warn()
+            .str("session", "s1")
+            .dur("grace", Duration::from_secs(5))
+            .dur("d", Duration::from_micros(1500))
+            .dur("z", Duration::ZERO)
+            .dur("n", Duration::from_nanos(1))
+            .format("m", plus3(2026, 10, 2, 14, 5, 9));
+        assert_eq!(line, GO_DUR);
     }
 
     #[test]

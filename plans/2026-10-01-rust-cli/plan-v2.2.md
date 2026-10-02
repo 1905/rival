@@ -129,10 +129,16 @@ Port: `cmd/{detach,detach_unix,detach_other,wait}.go` + `wait_test.go`. Rust: `c
 
 **P2a verification:** detach/wait functions implemented; 36 focused Rust tests pass. The full workspace has 257 passing tests and two ignored helper/generator entries. All 58 runner self-tests pass. Build, formatting and Clippy pass locally. The seven new detach/wait scenarios validate against source-derived sample output; actual command execution waits for P3. The scenario checks link short IDs to full UUID markers. Closed-before-startup stderr remains a P3 compatibility item (see `research.md`); the detach checkbox stays open until resolved. Redirect/unlink timing is stated explicitly in its scenario.
 
+**P2a delivered:** `a073d03ced62500fd1ac9157b2e2bddfa72d9747` merged and pushed after [CI 37018189761](https://github.com/1905/rival/actions/runs/37018189761) passed on macOS/Linux, including Go contracts, runner self-tests and Swift decoding. P2b continues on `feature/rust-p2b-review`.
+
+**Post-merge CI follow-up:** master run 37018628122 passed on macOS but failed an existing Go test on Linux. `TestCodexPlanUsesCodexRuntimeAndStructuredOutput` let its fake provider exit without consuming stdin, producing intermittent EPIPE. Fixture-only correction `734f1a3` passed the isolated Go suite and [CI 37021481661](https://github.com/1905/rival/actions/runs/37021481661), then merged separately. Runtime behavior is unchanged; P2b Rust work remains in progress.
+
 ### Task 2.3 — subprocess + quota `heavy`
 Port: `internal/executor/{subprocess,quota}.go` + tests.
-- [ ] Process group per provider (Unix `setpgid` via `pre_exec`), timeout/cancel kills the **whole group**, output draining bounded by the same wait delay as the fixed Go code; output capture to the log file with byte/line counts; quota detection strings.
-- [ ] Regression test ported from the Go fix: a fake launcher spawns a child that ignores SIGTERM and holds stdout open → the run returns within the bound and the child is dead.
+- [x] Process group per provider (Unix `CommandExt::process_group(0)`), timeout/cancel kills the **whole group**, five-second pipe drain, exact byte/line counts, and quota detection. Nonblocking pipe IO avoids cross-thread close assumptions.
+- [x] Regression test ported from the Go fix: a fake launcher spawns a child that ignores SIGTERM and holds stdout open → the run returns within the bound and the child is dead. Both deadline and manual cancellation tested; an escaped helper also proves the stdin/stdout/stderr drain bound.
+
+**Task 2.3 verification:** controller workspace check: 296 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Tests use temporary session paths and injected child environments. Linux verification is pending in branch CI. `gitscope::repository_env` was pulled forward for subprocess filtering. `Config::environ()` preserves non-UTF-8 environment entries; Rust `Command` sorts the final environment keys. Windows process operations remain explicit P5 placeholders.
 
 ### Task 2.4 — executors `heavy`
 Port: `internal/executor/{codex,claude,claude_docker,grok,kimi,opencode}.go` + tests.
@@ -276,6 +282,8 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Codex double-printed answer not deduped | same | Swift dedupes |
 | CLI output parser (`review::parse`, Go port) and TUI Result parser (`result`, app port) are two implementations | `crates/rival-core/src/{review/parse,result}.rs` | unify after P6: CLI moves to `result` once parity no longer binds it |
 | Force-clearing a running ticket permits another run before its holder finishes | `queue.Clear(true)` | Running holders do not self-heal. Preserved; only waiting tickets re-create themselves. |
+| Git scope detection inherits repository overrides | `gitscope.gitCmd` | `Resolve`/`DiffStat` do not use `RepositoryEnv`; inherited `GIT_DIR` can redirect discovery. Preserve during the port. |
+| File-list merging only removes duplicates across its two inputs | `gitscope.mergeFileLists` | Duplicates inside either input remain. Preserve during the port. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

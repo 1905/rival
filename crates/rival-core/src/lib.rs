@@ -2,6 +2,8 @@
 
 pub mod cancel;
 pub mod config;
+pub mod executor;
+pub mod gitscope;
 pub mod gojson;
 pub mod gostd;
 pub mod logfmt;

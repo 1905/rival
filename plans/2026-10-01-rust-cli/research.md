@@ -46,7 +46,7 @@
 
 ## P2 source checks
 
-- Cached `fd-lock` 4.0.4 source (`src/sys/unix/mod.rs`) uses `rustix::fs::flock` on macOS/Linux. This matches the Go queue's lock mechanism. Three independent helper processes now pass the FIFO and mutual-exclusion check locally. Hosted verification remains pending for P2a.
+- Cached `fd-lock` 4.0.4 source (`src/sys/unix/mod.rs`) uses `rustix::fs::flock` on macOS/Linux. This matches the Go queue's lock mechanism. Three independent helper processes pass the FIFO and mutual-exclusion check locally and in P2a CI 37018189761 on macOS/Linux.
 
 ### Detach standard streams
 

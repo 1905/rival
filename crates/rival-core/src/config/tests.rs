@@ -1628,3 +1628,18 @@ fn overflowing_budgets_keep_go_signed_wrap() {
     assert_eq!(c.run_timeout_budget(2), Some(-4_046_744_073_709_551_616));
     assert_eq!(c.max_run_wait(), -4_046_741_973_709_551_616);
 }
+
+#[test]
+fn environ_comes_from_env_sorted_and_can_be_replaced() {
+    let c = cfg(&[("B", "2"), ("A", "x=y"), ("PATH", "/bin")]);
+    let want: Vec<OsString> = ["A=x=y", "B=2", "PATH=/bin"].map(OsString::from).into();
+    assert_eq!(c.environ(), want.as_slice());
+
+    let ordered: Vec<OsString> = ["Z=1", "A=1"].map(OsString::from).into();
+    let c = c.with_environ(ordered.clone());
+    assert_eq!(c.environ(), ordered.as_slice());
+    // The getters still read the original snapshot.
+    assert_eq!(c.getenv("B"), "2");
+    assert!(format!("{c:?}").contains("environ: <2 entries>"));
+    assert!(!format!("{c:?}").contains("Z=1"));
+}
