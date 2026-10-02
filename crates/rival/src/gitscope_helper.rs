@@ -70,6 +70,7 @@ pub fn lens_prompt(cfg: &Config, kind: PromptKind) -> impl Fn(&str) -> String + 
 }
 
 /// Renders the code-mode antislop prompt for `scope`.
+#[allow(dead_code, reason = "Task 3.2 wires antislop")]
 pub fn antislop_code_prompt(scope: &str) -> String {
     ANTISLOP_CODE_PROMPT.replace("{SCOPE}", scope)
 }

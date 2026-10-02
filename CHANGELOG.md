@@ -24,6 +24,9 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Fixed the Go Codex plan fixture to consume stdin before exit, removing an intermittent Linux CI broken-pipe failure.
 - Added bounded runner startup diagnostics and task-owned failure cleanup. Local update fixtures avoid reverse DNS lookups.
 - Separated fake-process stack dumps so concurrent diagnostics cannot corrupt each other's output.
+- Added clap command parsing, model command/run execution, shared absolute workdir handling, help and shell completion. Eleven fake-provider and detach/wait scenarios pass locally.
+- Added scoped SIGINT/SIGTERM cancellation and closed-standard-descriptor compatibility. Linked debug/release checks pass on macOS; native Linux verification is pending.
+- Fixed a cancellation test fixture that published readiness before its expected output.
 - The command port, TUI, Windows support, and release switch remain unfinished. The shipped CLI is still Go.
 - Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
 

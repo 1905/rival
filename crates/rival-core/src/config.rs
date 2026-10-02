@@ -897,22 +897,35 @@ impl Config {
     /// Production constructor: snapshots the process environment and the
     /// working directory (Go `os.Getwd`), then reads the user config.
     pub fn load(paths: &Paths) -> Self {
-        let vars: Vec<(OsString, OsString)> = std::env::vars_os().collect();
-        let env: HashMap<String, String> = vars
-            .iter()
-            .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v.to_str()?.to_string())))
-            .collect();
-        let cwd = paths::getwd(env.get("PWD").map(OsStr::new));
-        let environ = vars
-            .into_iter()
-            .map(|(k, v)| {
-                let mut kv = k;
-                kv.push("=");
-                kv.push(v);
-                kv
-            })
-            .collect();
+        let (env, environ, cwd) = process_snapshot();
         Self::new(paths.clone(), env, cwd).with_environ(environ)
+    }
+
+    /// Go reads `config.yaml` once at package init, before `main` loads
+    /// `.env`, but calls `os.Getenv`, `os.Environ` and `os.UserHomeDir` at
+    /// each use. This re-snapshots the process environment (and the working
+    /// directory) after `.env` is loaded and takes the post-`.env` `paths`,
+    /// while keeping the user config and its load error from [`Config::load`].
+    pub fn reload_env(self, paths: Paths) -> Self {
+        let (env, environ, cwd) = process_snapshot();
+        self.with_runtime_env(paths, env, environ, cwd)
+    }
+
+    /// Pure form of [`Config::reload_env`]: replaces the paths, the `env`
+    /// getters, the child environ and the working directory. The user config
+    /// and its load error stay as they were; the config file is not read.
+    pub fn with_runtime_env(
+        mut self,
+        paths: Paths,
+        env: HashMap<String, String>,
+        environ: Vec<OsString>,
+        cwd: Option<PathBuf>,
+    ) -> Self {
+        self.paths = paths;
+        self.env = env;
+        self.environ = environ;
+        self.cwd = cwd;
+        self
     }
 
     /// Explicit constructor for tests and embedders. Reads
@@ -1281,6 +1294,26 @@ impl Config {
         let abs = paths::abs(self.cwd.as_deref(), workdir).unwrap_or_default();
         WORKDIR_PREAMBLE.replace("{WORKDIR}", &abs.to_string_lossy())
     }
+}
+
+/// The process environment as `(UTF-8 getters, ordered environ, getwd)`.
+fn process_snapshot() -> (HashMap<String, String>, Vec<OsString>, Option<PathBuf>) {
+    let vars: Vec<(OsString, OsString)> = std::env::vars_os().collect();
+    let env: HashMap<String, String> = vars
+        .iter()
+        .filter_map(|(k, v)| Some((k.to_str()?.to_string(), v.to_str()?.to_string())))
+        .collect();
+    let cwd = paths::getwd(env.get("PWD").map(OsStr::new));
+    let environ = vars
+        .into_iter()
+        .map(|(k, v)| {
+            let mut kv = k;
+            kv.push("=");
+            kv.push(v);
+            kv
+        })
+        .collect();
+    (env, environ, cwd)
 }
 
 #[cfg(test)]

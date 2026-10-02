@@ -56,6 +56,13 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --locked
 
+      # The fd-state loader constructor must survive the final link in both
+      # the debug and the LTO release binary (Rust only promises object-file
+      # retention for #[used]). Runs rival with fd 0 or 2 closed; both cases
+      # stop before any provider, queue or network work.
+      - name: Startup fd constructor (debug + LTO release)
+        run: python3 scripts/check-startup-fds.py
+
       - name: go test (includes the session contract)
         working-directory: rival
         run: |

@@ -101,4 +101,19 @@
 
 CI 37037313215 passed the Rust checks but failed one Linux runner self-test. Two fake processes dumped stacks into the same step stderr file. Their writes interleaved, splitting the expected `in act` frame text. The failure output directly shows both stacks combined. This is a diagnostic fixture failure, not an observed Rust runtime failure.
 
-The narrow repair gives each registered fake a task-owned stack file. The readiness report collects each separately. Assertions still require a useful stack from every signalled fake and verify owned-process cleanup. Hosted verification remains pending.
+The narrow repair gives each registered fake a task-owned stack file. The readiness report collects each separately. Assertions still require a useful stack from every signalled fake and verify owned-process cleanup. All 58 runner tests passed locally. CI 37038456086 passed on macOS and Linux for `9f6f562`.
+## Scoped signal cancellation — 2026-10-03
+
+Cached `ctrlc` 3.5.2 source shows one permanent handler; its `termination` feature also intercepts SIGHUP. Cached `signal-hook-registry` 1.4.8 documents that unregistering the last action does not restore the previous/default handler. Neither is a direct match for Go's scoped SIGINT/SIGTERM subscription. `signal-hook` 0.3.18 remains an available implementation option where its semantics fit.
+
+[POSIX signal actions](https://man7.org/linux/man-pages/man2/sigaction.2.html) can save and restore the previous disposition. If the port uses that interface, pipe/thread/flag/action setup must handle errors. Signal-delivery tests must use isolated helpers so they cannot cancel other concurrent unit tests. The implementation and native-host proof are still in progress.
+
+## Root and model commands — 2026-10-03
+
+The command tree uses clap for parsing, with narrow adapters for Rival's existing validation errors and values. The initial duplicate Cobra parser was replaced before acceptance. Config loading preserves Go's pre-dotenv user config and wait default while refreshing both runtime environment representations afterward.
+
+SIGINT/SIGTERM use a scoped self-pipe handler that restores prior dispositions. Pipe, fcntl, thread and sigaction setup errors propagate. Isolated child tests prove real signal cancellation, restoration and recovery after an actual descriptor-limit setup failure.
+
+The macOS loader constructor records closed standard descriptors before Rust sanitizes them. Controller checks passed for debug and LTO release binaries: closed stdin returns the expected read error; closed or broken stderr exits 1 without leaving a task-owned detached child. Stdin stayed open during the child-liveness check. Linux final-link proof remains pending CI.
+
+Controller checks: 669 workspace tests, formatting, Clippy and 11 fake-provider/detach/wait scenarios passed. One older subprocess fixture failed because it published a PID before echoing its required output. It now emits the output first; its timeout and manual-cancel assertions remain unchanged. Full P3 scenarios and real-review checks remain pending.

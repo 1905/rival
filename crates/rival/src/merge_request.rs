@@ -45,6 +45,10 @@ impl Drop for ReviewTarget {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "commands inject the resolver; kept for Task 3.2 callers"
+)]
 /// Go `prepareReviewTarget` with the real resolver
 /// ([`mergerequest::prepare`]) and stdout.
 pub fn prepare_review_target(

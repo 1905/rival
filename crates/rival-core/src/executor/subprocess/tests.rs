@@ -373,11 +373,13 @@ fn launcher_grandchild_case(deadline: Option<Duration>) {
     let dir = fx.work.path().to_path_buf();
     let pid_file = dir.join("grandchild.pid");
     // The subshell ignores SIGTERM; SIG_IGN survives exec, so the sleep does too.
+    // The pid file is published only after the marker line is written, so a
+    // cancel on the pid file cannot kill the launcher before its echo.
     let launcher = write_script(
         &dir,
         "launcher.sh",
         &format!(
-            "( trap '' TERM; exec sleep 20 ) &\necho $! > {}.tmp\nmv {0}.tmp {0}\necho launcher-started\nsleep 20\n",
+            "( trap '' TERM; exec sleep 20 ) &\necho $! > {}.tmp\necho launcher-started\nmv {0}.tmp {0}\nsleep 20\n",
             shell_quote(pid_file.to_str().unwrap())
         ),
     );

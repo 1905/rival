@@ -170,11 +170,11 @@ Port: `internal/review/{plan,planrun}.go` + `{plan,planrun,antislop,selection}_t
 Port: `internal/mergerequest/mergerequest.go` + test, `cmd/merge_request.go` + `mr_guard_test.go` (glab via `Command`, host-scoped credentials).
 - [x] MR target validation, pinned snapshots, token filtering, patch framing/limit and cleanup ported with all seven Go core test cases. The command helper/guard is tested; its full command-path assertions remain Task 3.1.
 
-**Task 2.8 verification:** controller workspace check: 570 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Thirty-two MR tests and five command-helper tests cover identity, caller repository preservation, cancellation during fetch and symlink-safe cleanup. The URL helper is private and preserves Go's relevant parsing rules. Seven MR scenarios are authored; all 45 schemas validate without execution. CI 37037313215 passed Rust checks but failed a Linux runner diagnostic assertion after two fake stack dumps interleaved. The fixture now captures each process separately; all 58 runner tests pass locally. Hosted verification of that repair is pending. Malformed JSON detail, invalid UTF-8 presentation and removal-error path detail retain the recorded compatibility limits.
+**Task 2.8 verification:** controller workspace check: 570 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Thirty-two MR tests and five command-helper tests cover identity, caller repository preservation, cancellation during fetch and symlink-safe cleanup. The URL helper is private and preserves Go's relevant parsing rules. Seven MR scenarios are authored; all 45 schemas validate without execution. CI 37037313215 passed Rust checks but failed a Linux runner diagnostic assertion after two fake stack dumps interleaved. The fixture now captures each process separately; all 58 runner tests pass locally. [CI 37038456086](https://github.com/1905/rival/actions/runs/37038456086) passed on macOS/Linux for `9f6f562`, including Swift decoding. Malformed JSON detail, invalid UTF-8 presentation and removal-error path detail retain the recorded compatibility limits.
 
 ### Gate P2 `gate`
 - [x] Scenarios written for queue (2 concurrent runs), detach + wait (success, failure, crash, timeout), each public executor with fake success/failure/quota, plan/antislop/security JSON outputs, MR with fake glab. All 45 schemas validate. They run once P3 wires the commands; P2 is gated on the ported unit tests. The unused native Kimi adapter is covered by its ported unit tests.
-- [ ] Merge each P2 branch the day it is green.
+- [x] Merge each P2 branch the day it is green. P2b `9f6f5626aa5c4d1330ee113fcb758582f89e10a7` merged and pushed after CI 37038456086 passed. Local `master` and `origin/master` match the tested revision. P3 continues on `feature/rust-p3-commands`.
 
 ---
 
@@ -182,8 +182,10 @@ Port: `internal/mergerequest/mergerequest.go` + test, `cmd/merge_request.go` + `
 
 ### Task 3.1 — root + model specs `heavy`
 Port: `cmd/{root,model_specs,model_command,model_run,command,run,command_codex,command_claude,command_grok,command_k3,run_claude,run_grok,run_k3}.go` + `{model_spec,model_commands,grok_command}_test.go`.
-- [ ] clap tree with the exact command/flag names from `cli-surface.md`; `PersistentPreRunE` behaviour (config error, detach, reap, update check) in the same order.
-- [ ] `--workdir` resolved to an absolute, cleaned path once at command entry (one helper shared by every command that takes it), before preflight and session creation; same error text as the fixed Go helper; ported tests (relative subdir, `.`, absolute, missing; session stores absolute `work_dir`).
+- [x] clap tree with the exact command/flag names from `cli-surface.md`; `PersistentPreRunE` behaviour (config error, detach, reap, update check) in the same order.
+- [x] `--workdir` resolved to an absolute, cleaned path once at command entry (one helper shared by every command that takes it), before preflight and session creation; same error text as the fixed Go helper; ported tests (relative subdir, `.`, absolute, missing; session stores absolute `work_dir`).
+
+**Task 3.1 verification:** controller checks passed: 669 workspace tests, six ignored helper/generator entries, formatting and Clippy. Eleven fake-provider success/failure and detach/wait scenarios passed. Linked debug and LTO release binaries preserve closed stdin/stderr behavior on macOS. Closed or broken stderr leaves no task-owned child alive. CI now checks both linked profiles on macOS/Linux; hosted results are pending. Model command/run MR tests cover snapshot lifetime and caller credentials. Update/telemetry production hooks remain Task 3.4; the root hook ordering is tested. A subprocess fixture now emits its output marker before publishing readiness, removing an observed cancellation race.
 
 ### Task 3.2 — plan / antislop / security commands `heavy`
 (Use the shared `--workdir` helper from Task 3.1; parsing via `final_answer` per Task 2.6.)

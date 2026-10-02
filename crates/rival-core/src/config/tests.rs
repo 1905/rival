@@ -63,6 +63,51 @@ fn home_config(home: &Path, extra: &[(&str, &str)]) -> Config {
 
 const MIN: Duration = Duration::from_secs(60);
 
+// ---- startup order: config.yaml before .env, getenv after ----
+
+#[test]
+fn runtime_env_refresh_keeps_the_initial_user_config_and_error() {
+    let (home, initial) = loaded("efforts:\n  codex: high\n");
+    assert_eq!(initial.default_effort_for_model(CODEX_MODEL), "high");
+    // The file changes after the first load: a refresh must not re-read it.
+    fs::write(
+        home.path().join(".rival/config.yaml"),
+        "efforts:\n  codex: low\n",
+    )
+    .unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let refreshed = initial.with_runtime_env(
+        Paths::from_home(other.path()),
+        env_map(&[("RIVAL_RUN_TIMEOUT", "7m"), ("FROM_DOTENV", "1")]),
+        vec![OsString::from("FROM_DOTENV=1"), OsString::from("Z=2")],
+        Some(other.path().to_path_buf()),
+    );
+    assert_eq!(refreshed.default_effort_for_model(CODEX_MODEL), "high");
+    assert_eq!(refreshed.getenv("FROM_DOTENV"), "1");
+    assert_eq!(
+        refreshed.getenv(paths::HOME_VAR),
+        "",
+        "env replaced, not merged"
+    );
+    assert_eq!(refreshed.run_timeout(), 7 * MIN);
+    assert_eq!(
+        refreshed.environ(),
+        [OsString::from("FROM_DOTENV=1"), OsString::from("Z=2")]
+    );
+    assert_eq!(refreshed.cwd(), Some(other.path()));
+    assert_eq!(refreshed.paths(), &Paths::from_home(other.path()));
+
+    let (_home, bad) = loaded("efforts:\n  codex: bogus\n");
+    let err = bad.user_config_error().unwrap().clone();
+    let refreshed = bad.with_runtime_env(
+        Paths::from_home(other.path()),
+        HashMap::new(),
+        Vec::new(),
+        None,
+    );
+    assert_eq!(refreshed.user_config_error(), Some(&err));
+}
+
 // ---- config_test.go ----
 
 #[test]

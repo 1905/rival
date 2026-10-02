@@ -39,7 +39,12 @@ pub fn detach_if_requested(detach: bool) -> DetachOutcome {
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     let mut stderr = io::stderr();
     match std::env::current_exe() {
-        Ok(exe) => spawn_detached(&exe, &args, &mut stderr),
+        Ok(exe) => spawn_unless_std_fd_closed(
+            &exe,
+            &args,
+            &mut stderr,
+            crate::startup_fds::any_closed_at_start(),
+        ),
         Err(err) => {
             let _ = writeln!(
                 stderr,
@@ -49,6 +54,28 @@ pub fn detach_if_requested(detach: bool) -> DetachOutcome {
             DetachOutcome::Exit(1)
         }
     }
+}
+
+/// Go hands fds 0-2 to the child as they are. When one was closed at
+/// startup, `StartProcess` fails with EBADF before any child runs, and the
+/// parent exits 1. Rust reopened that fd on /dev/null before `main`, so
+/// `std_fd_closed` is the state the loader constructor recorded.
+pub fn spawn_unless_std_fd_closed(
+    exe: &Path,
+    args: &[OsString],
+    stderr: &mut dyn Write,
+    std_fd_closed: bool,
+) -> DetachOutcome {
+    if std_fd_closed {
+        let err = io::Error::from_raw_os_error(libc::EBADF);
+        let _ = writeln!(
+            stderr,
+            "rival: detach failed: {}",
+            start_error_text(exe.as_os_str(), &err)
+        );
+        return DetachOutcome::Exit(1);
+    }
+    spawn_detached(exe, args, stderr)
 }
 
 /// Go: `!detach || os.Getenv(detachedEnv) == "1"` negated. `marker` is the
@@ -181,6 +208,23 @@ mod tests {
                 "rival: detach failed: fork/exec {}: no such file or directory\n",
                 exe.display()
             )
+        );
+    }
+
+    #[test]
+    fn closed_std_fd_at_startup_fails_like_go_start_without_a_child() {
+        let mut err = Vec::new();
+        // /bin/sleep would print a pid line if anything were spawned.
+        let out = spawn_unless_std_fd_closed(
+            Path::new("/bin/sleep"),
+            &[OsString::from("30")],
+            &mut err,
+            true,
+        );
+        assert_eq!(out, DetachOutcome::Exit(1));
+        assert_eq!(
+            String::from_utf8(err).unwrap(),
+            "rival: detach failed: fork/exec /bin/sleep: bad file descriptor\n"
         );
     }
 
