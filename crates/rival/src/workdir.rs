@@ -44,7 +44,7 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
 
 /// Go `os.Getwd`'s error, re-read: the config snapshot keeps only the
 /// failure.
-fn getwd_error() -> String {
+pub(crate) fn getwd_error() -> String {
     match std::env::current_dir() {
         Err(e) => format!("getwd: {}", gostd::os_error_text(&e)),
         Ok(_) => "getwd: no such file or directory".to_string(),

@@ -1,3 +1,6 @@
+mod command_antislop;
+mod command_plan;
+mod command_security;
 mod detach;
 mod gitscope_helper;
 mod gocsv;

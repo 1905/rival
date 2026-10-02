@@ -382,18 +382,7 @@ fn wait_summarizes_finished_sessions_from_the_configured_home() {
 #[test]
 fn pending_commands_fail_plainly_after_the_pre_run() {
     for (args, path, task) in [
-        (&["command", "plan"][..], "rival command plan", "Task 3.2"),
-        (
-            &["command", "antislop"],
-            "rival command antislop",
-            "Task 3.2",
-        ),
-        (
-            &["command", "security", "--which"],
-            "rival command security",
-            "Task 3.2",
-        ),
-        (&["install"], "rival install", "Task 3.3"),
+        (&["install"][..], "rival install", "Task 3.3"),
         (&["queue"], "rival queue", "Task 3.4"),
         (&["queue", "clear"], "rival queue clear", "Task 3.4"),
         (&["sessions"], "rival sessions", "Task 3.4"),

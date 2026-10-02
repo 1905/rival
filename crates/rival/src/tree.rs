@@ -414,7 +414,6 @@ impl Invocation {
     }
 
     /// `GetStringSlice`: every occurrence's CSV fields, in order.
-    #[allow(dead_code, reason = "read by the Task 3.2 plan/antislop actions")]
     pub fn strings(&self, name: &str) -> Vec<String> {
         match self.matches.try_get_many::<Vec<String>>(name) {
             Ok(Some(values)) => values.flatten().cloned().collect(),

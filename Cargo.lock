@@ -471,6 +471,7 @@ dependencies = [
  "regex",
  "rival-core",
  "tempfile",
+ "uuid",
 ]
 
 [[package]]

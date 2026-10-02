@@ -19,6 +19,7 @@ use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
+use crate::{command_antislop, command_plan, command_security};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -75,6 +76,12 @@ pub trait StdinSource {
     /// Go `os.Stdin.Stat()` succeeded and reports a character device (a
     /// terminal, or `/dev/null`).
     fn is_char_device(&self) -> bool;
+    /// Go `os.Stdin.Stat()` failed (fd 0 closed or invalid). Only
+    /// `command security` tells this apart from a non-terminal stdin: it
+    /// skips the read instead of failing it.
+    fn stat_failed(&self) -> bool {
+        false
+    }
     /// Go `io.ReadAll(os.Stdin)`. The error is Go's `*PathError` text.
     fn read_all(&mut self) -> Result<Vec<u8>, String>;
 }
@@ -90,6 +97,10 @@ impl StdinSource for ProcessStdin {
             return false;
         }
         stdin_is_char_device()
+    }
+
+    fn stat_failed(&self) -> bool {
+        startup_fds::closed_at_start(0) || !stdin_stat_ok()
     }
 
     fn read_all(&mut self) -> Result<Vec<u8>, String> {
@@ -117,10 +128,23 @@ fn stdin_is_char_device() -> bool {
     st.st_mode & libc::S_IFMT == libc::S_IFCHR
 }
 
+#[cfg(unix)]
+fn stdin_stat_ok() -> bool {
+    // SAFETY: fstat writes into a zeroed stat buffer we own.
+    let mut st: libc::stat = unsafe { std::mem::zeroed() };
+    unsafe { libc::fstat(0, &mut st) == 0 }
+}
+
 #[cfg(not(unix))]
 fn stdin_is_char_device() -> bool {
     use std::io::IsTerminal;
     io::stdin().is_terminal()
+}
+
+/// Windows is Task 5.
+#[cfg(not(unix))]
+fn stdin_stat_ok() -> bool {
+    true
 }
 
 /// Unbuffered stdout, like Go's `os.Stdout`: every write reaches fd 1 at
@@ -378,9 +402,6 @@ fn pre_run(
 /// Which later task ports a command that is not wired yet.
 fn pending_task(id: CommandId) -> Option<&'static str> {
     match id {
-        CommandId::CommandPlan | CommandId::CommandAntislop | CommandId::CommandSecurity => {
-            Some("Task 3.2")
-        }
         CommandId::Install => Some("Task 3.3"),
         CommandId::Queue | CommandId::QueueClear | CommandId::Sessions | CommandId::Update => {
             Some("Task 3.4")
@@ -425,6 +446,9 @@ fn dispatch(
         CommandId::CommandClaude => model_command(env, inv, claude_spec),
         CommandId::CommandGrok => model_command(env, inv, grok_spec),
         CommandId::CommandK3 => model_command(env, inv, k3_spec),
+        CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
+        CommandId::CommandAntislop => command_antislop::command_antislop_action(env, inv),
+        CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),

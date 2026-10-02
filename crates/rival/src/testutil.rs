@@ -53,6 +53,11 @@ impl Fixture {
         Self::build(&[], None, Some(yaml))
     }
 
+    /// [`Fixture::with_config_yaml`] plus extra env entries.
+    pub fn with_config_and_env(yaml: &str, extra: &[(&str, &str)]) -> Fixture {
+        Self::build(extra, None, Some(yaml))
+    }
+
     fn build(extra: &[(&str, &str)], cwd: Option<PathBuf>, yaml: Option<&str>) -> Fixture {
         let home = tempfile::tempdir().unwrap();
         if let Some(yaml) = yaml {
@@ -87,6 +92,8 @@ impl Fixture {
 pub struct FakeStdin {
     pub data: Vec<u8>,
     pub char_device: bool,
+    /// Go `os.Stdin.Stat()` fails (closed fd 0).
+    pub stat_failed: bool,
     pub read_error: Option<String>,
     /// Panics on read, to prove a workflow never reached it.
     pub forbid_read: bool,
@@ -98,6 +105,7 @@ impl FakeStdin {
         FakeStdin {
             data: input.as_bytes().to_vec(),
             char_device: false,
+            stat_failed: false,
             read_error: None,
             forbid_read: false,
             reads: 0,
@@ -108,6 +116,10 @@ impl FakeStdin {
 impl StdinSource for FakeStdin {
     fn is_char_device(&self) -> bool {
         self.char_device
+    }
+
+    fn stat_failed(&self) -> bool {
+        self.stat_failed
     }
 
     fn read_all(&mut self) -> Result<Vec<u8>, String> {
@@ -275,6 +287,58 @@ pub fn run_command_with(
     with_env(fix, &mut stdin, prepare, |env| {
         crate::model_command::run_model_command(env, &spec, workdir, true)
     })
+}
+
+/// `rival <args>` parsed by the real tree.
+pub fn invocation(args: &[&str]) -> crate::tree::Invocation {
+    let mut root = crate::tree::build(&crate::tree::Defaults { wait_timeout: 0 });
+    let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    match crate::tree::parse(&mut root, &args) {
+        Ok(crate::tree::Parsed::Run(inv)) => inv,
+        Ok(crate::tree::Parsed::Help(path)) => panic!("{args:?} asked for help on {path:?}"),
+        Err(e) => panic!("{args:?}: {e}"),
+    }
+}
+
+/// `rival <args>` through the root with no-op reap, update check and
+/// detach. Commands must fail before any provider runs.
+pub fn execute(fix: &Fixture, stdin: &mut FakeStdin, args: &[&str]) -> (i32, String, String) {
+    use std::sync::Arc;
+
+    use crate::detach::DetachOutcome;
+    use crate::root::RootHooks;
+
+    let hooks = RootHooks {
+        reap: Arc::new(|_| {}),
+        update_check: Arc::new(|_| {}),
+        detach: Box::new(|| DetachOutcome::Continue),
+    };
+    let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    let prepare = no_mr();
+    let mut stdout: Vec<u8> = Vec::new();
+    let mut stderr: Vec<u8> = Vec::new();
+    let code = {
+        let mut env = CmdEnv {
+            cfg: &fix.cfg,
+            stdin,
+            stdout: &mut stdout,
+            stderr: &mut stderr,
+            prepare_mr: &*prepare,
+            signals: false,
+        };
+        crate::root::execute_with_wait(
+            &mut env,
+            &hooks,
+            &crate::tree::Defaults { wait_timeout: 0 },
+            &args,
+            std::time::Duration::from_secs(5),
+        )
+    };
+    (
+        code,
+        String::from_utf8(stdout).unwrap(),
+        String::from_utf8(stderr).unwrap(),
+    )
 }
 
 /// A resolver that must never be called.

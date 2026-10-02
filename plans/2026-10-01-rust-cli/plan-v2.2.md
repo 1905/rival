@@ -155,7 +155,7 @@ Port: `internal/parser/{parser,review}.go`, `internal/gitscope/{env,gitscope}.go
 ### Task 2.6 — review: types, prompt, parse, format `heavy`
 Port: `internal/review/{types,prompt,parse,review_format,slots,security}.go` + tests.
 - [x] Prompts byte-identical. Source comparisons and independent length/SHA-256 pins cover all six prompt pieces and both assembled review prompts.
-- [ ] Every parse of a provider log goes through `final_answer` first (code review, plan, antislop, security), as in the fixed Go code; port the regression tests (tool-printed assessment JSON + unstructured final answer → parse failure).
+- [x] Every parse of a provider log goes through `final_answer` first (code review, plan, antislop, security), as in the fixed Go code; port the regression tests (tool-printed assessment JSON + unstructured final answer → parse failure).
 - [x] `FinalAnswer`, `jsonObjects`, `ParseReviewerOutput`, `ParsePlanOutput`, placeholder filters, severity order — ported with **Go** behavior. Tests pin both known gaps listed below.
 
 **Task 2.6 verification:** controller workspace check: 490 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37030778213](https://github.com/1905/rival/actions/runs/37030778213) passed on macOS and Linux for `b8f9bab`, including Swift session decoding. Eighty-two focused review tests cover Go JSON decoding, prompts, output, security validation and queue rollback/release. The Task 2.5 lens wrapper is complete. Pure plan parsing/formatting was pulled forward from Task 2.7. Provider-log helpers apply `final_answer`; runtime call sites remain Task 2.7/P3, so that checkbox stays open.
@@ -185,11 +185,15 @@ Port: `cmd/{root,model_specs,model_command,model_run,command,run,command_codex,c
 - [x] clap tree with the exact command/flag names from `cli-surface.md`; `PersistentPreRunE` behaviour (config error, detach, reap, update check) in the same order.
 - [x] `--workdir` resolved to an absolute, cleaned path once at command entry (one helper shared by every command that takes it), before preflight and session creation; same error text as the fixed Go helper; ported tests (relative subdir, `.`, absolute, missing; session stores absolute `work_dir`).
 
-**Task 3.1 verification:** controller checks passed: 669 workspace tests, six ignored helper/generator entries, formatting and Clippy. Eleven fake-provider success/failure and detach/wait scenarios passed. Linked debug and LTO release binaries preserve closed stdin/stderr behavior on macOS. Closed or broken stderr leaves no task-owned child alive. CI now checks both linked profiles on macOS/Linux; hosted results are pending. Model command/run MR tests cover snapshot lifetime and caller credentials. Update/telemetry production hooks remain Task 3.4; the root hook ordering is tested. A subprocess fixture now emits its output marker before publishing readiness, removing an observed cancellation race.
+**Task 3.1 verification:** controller checks passed: 669 workspace tests, six ignored helper/generator entries, formatting and Clippy. Eleven fake-provider success/failure and detach/wait scenarios passed. Linked debug and LTO release binaries preserve closed stdin/stderr behavior on macOS. Closed or broken stderr leaves no task-owned child alive. [CI 37044718890](https://github.com/1905/rival/actions/runs/37044718890) passed both linked profiles on macOS/Linux at `3023181`, including Swift decoding. Model command/run MR tests cover snapshot lifetime and caller credentials. Update/telemetry production hooks remain Task 3.4; the root hook ordering is tested. A subprocess fixture now emits its output marker before publishing readiness, removing an observed cancellation race.
 
 ### Task 3.2 — plan / antislop / security commands `heavy`
 (Use the shared `--workdir` helper from Task 3.1; parsing via `final_answer` per Task 2.6.)
 Port: `cmd/{command_plan,command_antislop,command_security}.go` + tests, `review_output_test.go`.
+
+- [x] Commands wired with the shared workdir helper, source validation order, final-answer parsing and security completion-save failure handling.
+
+**Task 3.2 verification:** controller checks passed: 734 workspace tests, six ignored helper/generator entries, formatting, Clippy and build. All 12 plan/antislop/security scenarios passed, including the eight new validation and runtime-failure cases. All 53 scenario schemas validate. Sixty-five new command tests cover the named Go cases and security's distinct closed-stdin branch. A second subprocess fixture now emits its marker before starting the process that publishes readiness. Hosted CI is pending. Windows stdin/path handling remains P5; invalid UTF-8 input remains the recorded command-boundary limitation.
 
 ### Task 3.3 — install + skills `heavy`
 Port: `internal/skills/{embed,codex}.go` + tests, `cmd/install.go` + test. `include_dir!` over `crates/rival-core/skills/` (a copy of `rival/internal/skills/*`; `scripts/bump-skill-versions.sh` updated to bump both until P6).

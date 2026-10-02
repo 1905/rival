@@ -1,0 +1,92 @@
+{
+  "name": "security-k3-nonzero-exit",
+  "description": "`rival command security` with scope `src/` on stdin; the opencode run exits 3. cmd/command_security.go reads the log, fails the session with 'kimi-k3 exited with code 3' (review.RunTimeoutReason fallback, no deadline), prints config.PublicRuntimeLog of the log on stdout (plain text passes unchanged) and returns ExitCodeError{3}; Execute prints the message on stderr and exits 3.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\nReview scope: src/\n\n## Role: Security Reviewer\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "provider crashed\n",
+            "exit": 3
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 3,
+        "stdout": "provider crashed\n",
+        "stderr_lines": [
+          "kimi-k3 exited with code 3"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting security reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "model": "kimi-k3"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 3,
+          "cli": "opencode",
+          "model": "moonshotai/kimi-k3",
+          "effort": "max",
+          "mode": "security",
+          "review_scope": "src/",
+          "work_dir": "<ROOT>/work",
+          "error": "kimi-k3 exited with code 3"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "provider crashed\n"
+      }
+    ],
+    "calls": {
+      "opencode": 1
+    }
+  }
+}

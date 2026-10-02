@@ -1,0 +1,32 @@
+{
+  "name": "plan-effort-conflict",
+  "description": "`rival command plan --effort high` with `-re xhigh plan.md` on stdin. cmd/command_plan.go: the flag is Changed, so mergePlanEffort(\"high\", true, \"xhigh\") returns the conflict error. The action prints it on stdout and returns ExitCodeError{1}; cmd/root.go Execute prints it again on stderr. The plan file exists, but the conflict fires before resolvePlanPath. No session, no queue ticket, no reviewer.",
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan",
+        "--effort",
+        "high"
+      ],
+      "stdin": "-re xhigh plan.md",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "reasoning effort conflicts: command uses \"high\" but plan arguments request \"xhigh\"\n",
+        "stderr_lines": [
+          "reasoning effort conflicts: command uses \"high\" but plan arguments request \"xhigh\""
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

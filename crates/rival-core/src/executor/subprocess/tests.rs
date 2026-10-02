@@ -524,17 +524,19 @@ fn holder_helper() {
     unsafe { libc::_exit(0) };
 }
 
-/// The launcher script: starts the holder (this test binary in helper mode)
-/// in the background, prints a line, then runs `tail`. A background job's
-/// stdin is /dev/null in a non-interactive shell, so the provider stdin is
-/// passed through fd 3 explicitly.
+/// The launcher script: prints a line, starts the holder (this test binary in
+/// helper mode) in the background, then runs `tail`. The line is in the
+/// stdout pipe before the holder can write its record, so a cancel on that
+/// record never lands before the line. A background job's stdin is /dev/null
+/// in a non-interactive shell, so the provider stdin is passed through fd 3
+/// explicitly.
 fn escaped_launcher(dir: &Path, tail: &str) -> PathBuf {
     let exe = std::env::current_exe().unwrap();
     write_script(
         dir,
         "launcher.sh",
         &format!(
-            "exec 3<&0\n{} --exact {HOLDER_TEST} --ignored --quiet 0<&3 3<&- &\nexec 3<&-\necho launcher-started\n{tail}\n",
+            "exec 3<&0\necho launcher-started\n{} --exact {HOLDER_TEST} --ignored --quiet 0<&3 3<&- &\nexec 3<&-\n{tail}\n",
             shell_quote(exe.to_str().unwrap())
         ),
     )

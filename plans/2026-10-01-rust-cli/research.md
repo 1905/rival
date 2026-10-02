@@ -114,6 +114,20 @@ The command tree uses clap for parsing, with narrow adapters for Rival's existin
 
 SIGINT/SIGTERM use a scoped self-pipe handler that restores prior dispositions. Pipe, fcntl, thread and sigaction setup errors propagate. Isolated child tests prove real signal cancellation, restoration and recovery after an actual descriptor-limit setup failure.
 
-The macOS loader constructor records closed standard descriptors before Rust sanitizes them. Controller checks passed for debug and LTO release binaries: closed stdin returns the expected read error; closed or broken stderr exits 1 without leaving a task-owned detached child. Stdin stayed open during the child-liveness check. Linux final-link proof remains pending CI.
+The macOS loader constructor records closed standard descriptors before Rust sanitizes them. Controller checks passed for debug and LTO release binaries: closed stdin returns the expected read error; closed or broken stderr exits 1 without leaving a task-owned detached child. Stdin stayed open during the child-liveness check. CI 37044718890 passed the linked debug/release checks on both macOS and Linux at `3023181`, including the existing Swift decode contract.
 
 Controller checks: 669 workspace tests, formatting, Clippy and 11 fake-provider/detach/wait scenarios passed. One older subprocess fixture failed because it published a PID before echoing its required output. It now emits the output first; its timeout and manual-cancel assertions remain unchanged. Full P3 scenarios and real-review checks remain pending.
+
+## Telemetry port checks — 2026-10-03
+
+The cached Sentry0.49.3 Cargo.toml.orig defines `ureq` and `rustls` as separate features. Disable defaults and request both to avoid the default reqwest/native-tls stack. The built-in ureq transport sends through a standard background thread; it is not the Go synchronous transport. Use the SDK transport and its bounded flush rather than inventing a second sender. [Sentry transport documentation](https://docs.rs/sentry/0.49.3/sentry/transports/index.html)
+
+Go's `cmd.Execute` defers `telemetry.RecoverPanic`, which calls `sentry.Recover`, which calls `recover`. That extra wrapper prevents recovery: Go requires the recover call directly in the deferred function. The cached sentry-go0.43.0 source confirms this call chain. This is a source-derived bug, not a live panic measurement. Preserve the port's stated no-silent-bug-fix rule and record this exception before choosing panic capture behavior. [Go recovery specification](https://go.dev/ref/spec#Handling_panics)
+
+## Plan, antislop and security commands — 2026-10-03
+
+The three commands now use the existing review orchestration and final-answer helpers. Tests preserve native/stdin model and effort conflicts, path spacing and escaping, preflight order, scope fallback and both output streams. Security's failed stdin stat skips the read; model/plan/antislop retain their read-error behavior.
+
+Security completion-save errors return exit 1. If the session directory also prevents the failure save, its stored session remains running, as in Go. The test checks this limit instead of claiming successful persistence. Windows home/path/stat behavior remains assigned to P5.
+
+Controller verification passed 734 workspace tests, formatting, Clippy, build and all 12 plan/antislop/security scenarios. All 53 scenario schemas validate. The escaped-pipe fixture had the same unguarded marker order as the earlier launcher fixture. Its marker now precedes helper startup; bounded draining, descriptor forwarding and identity checks are unchanged. Native hosted verification is pending.
