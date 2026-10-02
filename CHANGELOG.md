@@ -13,7 +13,8 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Scenario checks now link short session IDs to full UUIDs and reject unknown or ambiguous prefixes.
 - Added provider subprocess execution, quota detection, process-group cancellation, and bounded pipe draining. Required macOS and Linux CI checks pass.
 - Ported Codex, Claude native/Docker, Grok, K3 and OpenCode adapters with exact argument and environment tests. Added 22 command scenarios; execution remains pending P3.
-- Fixed the Rust macOS launch path to reject invalid executable formats, matching Go. Local regression checks pass; hosted verification is pending.
+- Fixed the Rust macOS launch path to reject invalid executable formats, matching Go. Regression checks pass on hosted macOS and Linux.
+- Ported prompt and review argument parsing, Git scope detection, and diff preambles. Local source-derived tests pass; command wiring remains pending P3.
 - Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
 - Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
 - Fixed existing Go test fixtures that required an installed OpenCode CLI or raced stdin writes.

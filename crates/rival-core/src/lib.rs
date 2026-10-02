@@ -8,6 +8,7 @@ pub mod gojson;
 pub mod gostd;
 pub mod logfmt;
 pub mod logging;
+pub mod parser;
 pub mod paths;
 pub mod procinfo;
 pub mod queue;

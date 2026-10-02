@@ -13,12 +13,12 @@ pub mod codex;
 pub mod grok;
 pub mod kimi;
 pub mod opencode;
-mod oscmd;
+pub(crate) mod oscmd;
 pub mod process;
 pub mod quota;
 pub mod subprocess;
 #[cfg(test)]
-mod testutil;
+pub(crate) mod testutil;
 
 pub use claude::{claude_auth_hint, claude_preflight, run_claude};
 pub use claude_docker::claude_docker_preflight;

@@ -2,6 +2,8 @@
 #[allow(dead_code)]
 mod detach;
 #[allow(dead_code)]
+mod gitscope_helper;
+#[allow(dead_code)]
 mod wait;
 
 fn main() {

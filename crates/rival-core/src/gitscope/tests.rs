@@ -1,0 +1,284 @@
+//! Go: `internal/gitscope/gitscope_test.go`, plus Rust-only pins of the
+//! source behavior (env, PWD, merge quirks, DiffStat).
+//!
+//! The tests run the installed `git` in temp repos. The child env is
+//! explicit: the process `PATH` (read only), a temp `HOME`, and
+//! `GIT_CONFIG_NOSYSTEM=1`. Nothing reads or changes this worktree's repo.
+
+use std::collections::HashMap;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use super::*;
+use crate::executor::testutil::{path_str, write_exe};
+use crate::paths::Paths;
+
+struct Fixture {
+    home: tempfile::TempDir,
+    vars: HashMap<String, String>,
+}
+
+impl Fixture {
+    fn new() -> Fixture {
+        let home = tempfile::tempdir().unwrap();
+        let mut vars = HashMap::new();
+        let path = std::env::var("PATH").unwrap_or_default();
+        vars.insert("PATH".to_string(), path);
+        vars.insert("HOME".to_string(), path_str(home.path()));
+        vars.insert("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string());
+        Fixture { home, vars }
+    }
+
+    fn config(&self) -> Config {
+        self.config_with(Vec::new(), Some(self.home.path().to_path_buf()))
+    }
+
+    /// `extra` entries are appended to the child env after the base vars.
+    fn config_with(&self, extra: Vec<OsString>, cwd: Option<PathBuf>) -> Config {
+        let cfg = Config::new(Paths::from_home(self.home.path()), self.vars.clone(), cwd);
+        let mut environ = cfg.environ().to_vec();
+        environ.extend(extra);
+        cfg.with_environ(environ)
+    }
+
+    /// Go `initRepo`: init, `checkout -b main`, one commit of a.go.
+    fn init_repo(&self) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        self.git(dir.path(), &["init"]);
+        self.git(dir.path(), &["checkout", "-b", "main"]);
+        std::fs::write(dir.path().join("a.go"), "package a").unwrap();
+        self.git(dir.path(), &["add", "."]);
+        self.git(dir.path(), &["commit", "-m", "init"]);
+        dir
+    }
+
+    fn git(&self, dir: &Path, args: &[&str]) {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env_clear()
+            .envs(&self.vars)
+            .envs([
+                ("GIT_AUTHOR_NAME", "test"),
+                ("GIT_AUTHOR_EMAIL", "test@test"),
+                ("GIT_COMMITTER_NAME", "test"),
+                ("GIT_COMMITTER_EMAIL", "test@test"),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+fn s(p: &Path) -> String {
+    path_str(p)
+}
+
+#[test]
+fn resolve_dirty_files() {
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    std::fs::write(dir.path().join("b.go"), "package b").unwrap();
+    fx.git(dir.path(), &["add", "b.go"]);
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "b.go");
+}
+
+#[test]
+fn resolve_last_commit() {
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    std::fs::write(dir.path().join("c.go"), "package c").unwrap();
+    fx.git(dir.path(), &["add", "."]);
+    fx.git(dir.path(), &["commit", "-m", "add c"]);
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "c.go");
+}
+
+#[test]
+fn resolve_untracked_files() {
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    // Create a new file without staging — should still be detected.
+    std::fs::write(dir.path().join("new.go"), "package new").unwrap();
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "new.go");
+}
+
+#[test]
+fn resolve_modified_unstaged() {
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    // Modify an existing tracked file without staging.
+    std::fs::write(dir.path().join("a.go"), "package a // modified").unwrap();
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "a.go");
+}
+
+#[test]
+fn resolve_single_commit_clean() {
+    // Repo with exactly one commit, clean working tree → "" (HEAD~1 missing).
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "");
+}
+
+#[test]
+fn resolve_not_git_repo() {
+    let fx = Fixture::new();
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "");
+}
+
+// Rust-only pins.
+
+#[test]
+fn resolve_merges_tracked_then_untracked() {
+    let fx = Fixture::new();
+    let dir = fx.init_repo();
+    std::fs::write(dir.path().join("a.go"), "package a // modified").unwrap();
+    std::fs::write(dir.path().join("z.go"), "package z").unwrap();
+    std::fs::write(dir.path().join("b.go"), "package b").unwrap();
+    assert_eq!(resolve(&fx.config(), &s(dir.path())), "a.go\nb.go\nz.go");
+}
+
+#[test]
+fn merge_file_lists_keeps_go_duplicate_quirks() {
+    assert_eq!(merge_file_lists("", "x\ny"), "x\ny");
+    assert_eq!(merge_file_lists("x\ny", ""), "x\ny");
+    // Items are trimmed and blank lines dropped once both lists are set.
+    assert_eq!(merge_file_lists(" a \n\nb", "c\n \nb"), "a\nb\nc");
+    // Duplicates inside a, and inside b when not in a, are kept.
+    assert_eq!(merge_file_lists("a\na", "b\nb\na"), "a\na\nb\nb");
+    // A single-list result is returned untouched (no trim, no dedup).
+    assert_eq!(merge_file_lists("", "x\n\nx "), "x\n\nx ");
+}
+
+#[test]
+fn diff_stat_follows_resolve_modes() {
+    let fx = Fixture::new();
+    let cfg = fx.config();
+
+    // Not a repo, and a clean one-commit repo: "".
+    let plain = tempfile::tempdir().unwrap();
+    assert_eq!(diff_stat(&cfg, &s(plain.path())), "");
+    let dir = fx.init_repo();
+    let wd = s(dir.path());
+    assert_eq!(diff_stat(&cfg, &wd), "");
+
+    // Untracked-only changes are dirty, but `git diff --stat HEAD` is empty.
+    std::fs::write(dir.path().join("new.go"), "package new").unwrap();
+    assert_eq!(resolve(&cfg, &wd), "new.go");
+    assert_eq!(diff_stat(&cfg, &wd), "");
+
+    // Tracked change: the stat of the working tree against HEAD.
+    std::fs::write(dir.path().join("a.go"), "package a\n// modified\n").unwrap();
+    let stat = diff_stat(&cfg, &wd);
+    assert!(stat.starts_with("a.go | "), "{stat:?}");
+    assert!(
+        stat.ends_with("1 file changed, 2 insertions(+), 1 deletion(-)"),
+        "{stat:?}"
+    );
+
+    // Clean after a second commit: the last commit's stat.
+    std::fs::remove_file(dir.path().join("new.go")).unwrap();
+    fx.git(dir.path(), &["commit", "-am", "two"]);
+    let stat = diff_stat(&cfg, &wd);
+    assert!(stat.starts_with("a.go | "), "{stat:?}");
+}
+
+/// Go's `gitCmd` leaves `Cmd.Env` nil, so a caller's `GIT_DIR` points git at
+/// another repository. Pinned as-is (known Go bug, see the Task 2.5 report).
+#[test]
+fn inherited_git_dir_overrides_the_workdir_repo() {
+    let fx = Fixture::new();
+    let a = fx.init_repo();
+    let b = tempfile::tempdir().unwrap();
+    fx.git(b.path(), &["init"]);
+    std::fs::write(b.path().join("b.go"), "package b").unwrap();
+    fx.git(b.path(), &["add", "."]);
+    fx.git(b.path(), &["commit", "-m", "b"]);
+
+    assert_eq!(resolve(&fx.config(), &s(a.path())), "");
+    let git_dir = OsString::from(format!("GIT_DIR={}", s(&b.path().join(".git"))));
+    let cfg = fx.config_with(vec![git_dir], None);
+    // B's index against A's files: b.go deleted, a.go untracked.
+    assert_eq!(resolve(&cfg, &s(a.path())), "b.go\na.go");
+}
+
+#[test]
+fn missing_git_resolves_to_empty() {
+    let mut fx = Fixture::new();
+    let empty = tempfile::tempdir().unwrap();
+    fx.vars.insert("PATH".to_string(), s(empty.path()));
+    let cfg = fx.config();
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(resolve(&cfg, &s(dir.path())), "");
+    assert_eq!(diff_stat(&cfg, &s(dir.path())), "");
+    assert_eq!(
+        git_cmd(&cfg, &s(dir.path()), &["status"]).unwrap_err(),
+        r#"exec: "git": executable file not found in $PATH"#
+    );
+}
+
+/// Go's `Cmd.environ`: with `Dir` set and `Env` nil, `PWD=<Abs(Dir)>` is
+/// appended, so it wins over an inherited PWD. The fake git sees argv0
+/// `git`, the args, and the env unfiltered.
+#[cfg(unix)]
+#[test]
+fn git_cmd_env_argv_and_pwd_follow_go() {
+    let mut fx = Fixture::new();
+    let bin = tempfile::tempdir().unwrap();
+    write_exe(
+        &bin.path().join("git"),
+        "#!/bin/sh\nprintf '%s|%s|%s|%s\\n' \"$0\" \"$*\" \"$PWD\" \"$GIT_DIR\"\n",
+    );
+    fx.vars.insert("PATH".to_string(), s(bin.path()));
+
+    // The workdir is a symlink, so sh keeps the given PWD instead of getcwd.
+    let real = tempfile::tempdir().unwrap();
+    let links = tempfile::tempdir().unwrap();
+    let link = links.path().join("wd");
+    std::os::unix::fs::symlink(real.path(), &link).unwrap();
+    let extra = vec![
+        OsString::from("PWD=/stale"),
+        OsString::from("GIT_DIR=/elsewhere"),
+    ];
+    let cfg = fx.config_with(extra, None);
+
+    let got = retry_busy(|| git_cmd(&cfg, &s(&link), &["diff", "--stat", "HEAD"]));
+    let want = format!(
+        "{}|diff --stat HEAD|{}|/elsewhere\n",
+        s(&bin.path().join("git")),
+        s(&link)
+    );
+    assert_eq!(got.unwrap(), want);
+
+    // A relative workdir is made absolute against cfg.cwd; without a cwd it
+    // fails before the spawn, as Go's filepath.Abs error does.
+    assert_eq!(
+        git_cmd(&cfg, ".", &["status"]).unwrap_err(),
+        "getwd: no such file or directory"
+    );
+    let here = std::env::current_dir().unwrap();
+    let here_link = links.path().join("here");
+    std::os::unix::fs::symlink(&here, &here_link).unwrap();
+    let cfg = fx.config_with(Vec::new(), Some(here_link.clone()));
+    let got = retry_busy(|| git_cmd(&cfg, ".", &["x"])).unwrap();
+    assert!(got.contains(&format!("|x|{}|", s(&here_link))), "{got:?}");
+
+    // A failing git is an error with Go's exit text.
+    write_exe(&bin.path().join("git"), "#!/bin/sh\necho out\nexit 3\n");
+    let got = retry_busy(|| git_cmd(&cfg, "", &["x"]));
+    assert_eq!(got.unwrap_err(), "exit status 3");
+}
+
+/// Linux ETXTBSY: another test thread may fork while a fake is open for
+/// writing (see `executor::testutil::retry_busy`).
+fn retry_busy(mut f: impl FnMut() -> Result<String, String>) -> Result<String, String> {
+    crate::executor::testutil::retry_busy(&mut f, |r| match r {
+        Err(e) => e.clone(),
+        Ok(_) => String::new(),
+    })
+}

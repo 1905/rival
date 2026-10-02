@@ -62,3 +62,11 @@
 - Selected correction, awaiting tests: retain Rust `Command` and register a narrow `pre_exec` hook that calls `execve`. Prepare all strings and pointer arrays before the fork. The hook must not allocate, lock or format. Rust documents that stdio and cwd are already set, and a hook's OS error reaches the parent. The cached 1.98.1 source also sets the process group before the hook, but applies the command environment afterward. The hook must therefore pass its own prepared environment. [Rust CommandExt documentation](https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.pre_exec)
 - Both required regression tests must run without an ignore attribute. Existing normal-execution, argument, environment, cancellation and pipe-drain tests must still pass. No file-header heuristic or separate custom process launcher is planned.
 - Local follow-up: `executor::process::set_exec` now prepares the owned strings and pointers, then calls `execve` from the hook. Both format-error tests pass without skips. Controller verification passed 360 workspace tests, formatting and Clippy. Environment order and raw bytes are preserved too. Hosted verification remains pending. Unix launches now use Rust's fork path; the effect on launch time is unmeasured.
+- Hosted follow-up: CI 37026571060 passed on macOS and Linux at `8e10ad1`, including the new executable-format, argument and environment-byte checks. The process-group and drain tests also passed through the changed launch path.
+
+### Parser and Git scope
+
+- Task2.5 preserves the Go parser's literal-space `-re` grammar, exact option errors, simple Unicode case mapping and original-byte review slicing. Source-derived tests cover the unusual `revİew` case and `-h=x` help behavior.
+- Git scope uses the shared direct execution helper. Tests confirm argv, logical PWD and inherited repository overrides with a temporary fake Git executable. Real Git tests use temporary repositories and homes.
+- Git stdout currently uses lossy UTF-8 decoding. Go retains raw bytes. Invalid-byte filenames with `core.quotepath=false` can therefore differ; default quoted output is covered. Windows PWD handling remains assigned to P5.
+- Controller verification passed 407 workspace tests, formatting and Clippy. Hosted verification remains pending for this batch.

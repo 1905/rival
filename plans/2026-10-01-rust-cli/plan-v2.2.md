@@ -144,10 +144,13 @@ Port: `internal/executor/{subprocess,quota}.go` + tests.
 Port: `internal/executor/{codex,claude,claude_docker,grok,kimi,opencode}.go` + tests.
 - [x] Exact argv per CLI and model, env, workdir handling; tests assert argv vectors (as Go tests do). All 35 named Go adapter tests are mapped in the task report, including registry tests and fake Docker preflight/build checks.
 
-**Task 2.4 verification:** controller workspace check: 360 tests passed, three ignored helper/generator entries; formatting and Clippy passed. A verified macOS shell-fallback mismatch is fixed with a prepared `execve` hook. Both executable-format regressions run without skips; byte-preserving environment, argument, process-group and drain checks pass locally. Twenty-two executor scenarios are authored and schema-checked; execution waits for P3. Hosted verification for this batch is pending. Windows preflight/temp-file/exit-status work remains P5.
+**Task 2.4 verification:** controller workspace check: 360 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37026571060](https://github.com/1905/rival/actions/runs/37026571060) passed on macOS and Linux for `8e10ad1`, including Swift session decoding. A verified macOS shell-fallback mismatch is fixed with a prepared `execve` hook. Both executable-format regressions run without skips; byte-preserving environment, argument, process-group and drain checks pass. Twenty-two executor scenarios are authored and schema-checked; execution waits for P3. Windows preflight/temp-file/exit-status work remains P5.
 
 ### Task 2.5 — parser + gitscope `light`
 Port: `internal/parser/{parser,review}.go`, `internal/gitscope/{env,gitscope}.go`, `cmd/gitscope_helper.go` + tests.
+- [x] Argument grammar, source error strings, scope detection and diff preambles ported with the named Go tests. The small `lensPrompt` wrapper follows its prompt builder in Task 2.6.
+
+**Task 2.5 verification:** controller workspace check: 407 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Git tests use temporary homes and repositories. Duplicate-file and inherited-repository-override quirks are pinned. Invalid UTF-8 Git output remains a recorded compatibility limit; Windows PWD handling remains P5. Hosted CI is pending for this batch.
 
 ### Task 2.6 — review: types, prompt, parse, format `heavy`
 Port: `internal/review/{types,prompt,parse,review_format,slots,security}.go` + tests.
