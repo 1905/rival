@@ -1,8 +1,9 @@
-# Rust CLI + TUI — Implementation Plan v2.1
+# Rust CLI + TUI — Implementation Plan v2.2
 
 **Date:** 2026-10-01
-**Status:** superseded by v2.2
+**Status:** reviewed (Codex 6/10, 7 findings applied) — awaiting approval
 **Changes from v2.0:** Go review fixes (branch `fix/go-review-findings`, 2026-10-01) wired in: port base is master *after* that merge; Tasks 2.3, 2.6/2.7, 3.1/3.2 carry the fixed behaviour and its regression tests.
+**Changes from v2.1:** Codex plan review (6/10, 7 findings, all confirmed) applied: exit_code contract, detach inherits stdio, Windows stop via the owning process + Job Object, isolated `update` scenarios, stderr expectations, Swift decode test in branch CI, unpublished 6-target build gate.
 **Changes from v1.1 (user, 2026-10-01):** no Go-vs-Rust parity harness and no Go reference binary. CLI logic is ported exactly from the Go source and proven by the ported Go unit tests + contract tests + Rust golden tests. TUI is "about the same design", free to improve; Go TUI code is read only for logic (filter, paging, kill safety, watcher). TUI frame-by-frame look-alike checks removed.
 **Spec:** ./spec.md (approved) · CLI reference: ./cli-surface.md (Go `--help` for all 21 commands)
 
@@ -22,7 +23,7 @@
 
 | Contract | Rule | Source |
 |---|---|---|
-| Session file | Same keys, same order, same `omitempty` behaviour as `session.Session` (e.g. `exit_code` 0 is omitted). RFC3339 times with Go's formatting (nanoseconds trimmed the way Go trims them). Atomic save: `<id>.json.tmp-*` then rename, mode 0600. | `rival/internal/session/session.go:152-190` |
+| Session file | Same keys, same order, same `omitempty` behaviour as `session.Session`. Pointer fields (`exit_code *int`, `end_time *time.Time`) are `Option<_>` and omitted only when `None`: a finished run writes `exit_code: 0` (`session.go:55`, set at `:189`/`:201`; `wait` prints `exit=0`, not `exit=-`). RFC3339 times with Go's formatting (nanoseconds trimmed the way Go trims them). Atomic save: `<id>.json.tmp-*` then rename, mode 0600. | `rival/internal/session/session.go:152-190` |
 | Queue ticket | Same keys/order as `queue.Ticket`; ticket files in `~/.rival/queue/`; all state changes inside one file-lock critical section. | `rival/internal/queue/{ticket,queue}.go` |
 | stderr log | One JSON object per line: `level`, `app:"rival"`, per-call fields, `time` (RFC3339, seconds), `message`. Same field names as zerolog. | `rival/main.go:20` |
 | `.env` | Loaded silently from the working directory at start (godotenv semantics). | `rival/main.go:17` |
@@ -72,7 +73,8 @@ Port: `main.go` (logger, .env), path helpers from `config`/`session`. Rust: `pat
 
 ### Task 1.3 — session model, save, summary, reaper `heavy`
 Port: `internal/session/{session,summary,reaper}.go` + tests `{session,save,summary,reaper}_test.go`.
-- [ ] `Session` struct field order = Go; serde attrs reproduce `omitempty` (skip zero/empty) exactly; custom time serialiser matching Go `time.Time` JSON.
+- [ ] `Session` struct field order = Go; serde attrs reproduce `omitempty` exactly: value fields skip zero/empty, pointer fields are `Option` and skip only `None`; custom time serialiser matching Go `time.Time` JSON.
+- [ ] Writer tests for `exit_code` unset (key absent), `0` (present, 0) and nonzero.
 - [ ] Atomic save, load, list, summary (no prompt), reaper (orphan → failed) with `procinfo`.
 - [ ] All Go cases ported → `cargo test -p rival-core session summary reaper` green.
 
@@ -93,13 +95,15 @@ Port: `internal/logfmt`, `internal/procinfo` (darwin `proc_pidinfo`, linux `/pro
 - [ ] `go test ./internal/session/ -run Contract` + `cargo test -p rival-core --test contract` green.
 
 ### Task 1.7 — scenario runner (Rust only) `heavy`
-- [ ] `parity/run.py --bin <rival> [--scenario <glob>]`: per scenario, a temp HOME, PATH = `parity/fakes` first, run the Rust binary, collect stdout, stderr JSON lines, exit code and `~/.rival/**`; normalise UUIDs/pids/times/temp paths; compare to the scenario's `expect:` block (exit code, stdout golden file, session fields, files present); exit 1 on mismatch.
-- [ ] `parity/fakes/`: Python fakes `codex`, `claude`, `grok`, `opencode`, `glab`, `docker` driven by `FAKE_<NAME>_SCRIPT=<file>` (canned output, exit code, delay, quota text).
+- [ ] `parity/run.py --bin <rival> [--scenario <glob>]`: per scenario, a temp HOME, PATH = `parity/fakes` first, run the Rust binary, collect stdout, **stderr split into plain lines and JSON log events**, exit code and `~/.rival/**`; normalise UUIDs/pids/times/temp paths; compare to the scenario's `expect:` block: exit code, stdout golden, `stderr_lines` (exact plain lines, e.g. `rival: detached pid=<PID>`, usage/validation errors from `root.go:144-149`, `Update available: …` from `update/check.go:108`), `log_events` (level + message + required fields, order-insensitive), session fields, files present; exit 1 on mismatch. Plain stderr lines are allowed alongside JSON; an unexpected plain line fails the scenario.
+- [ ] `parity/fakes/`: Python fakes `codex`, `claude`, `grok`, `opencode`, `glab`, `docker`, **`brew`** driven by `FAKE_<NAME>_SCRIPT=<file>` (canned output, exit code, delay, quota text); fake `brew --prefix rival` points into the scenario's temp dir, so `rival update` never touches the installed binary.
+- [ ] Update endpoint: the Rust update client reads `RIVAL_UPDATE_API` (base URL override, honoured only in debug builds; scenarios run the debug binary) and the runner serves canned release JSON from a local HTTP server (`http.server` on 127.0.0.1). Scenarios run with no external network; a guard in the runner fails the scenario if the fake `brew` reports a non-temp prefix.
 - [ ] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
 - [ ] Self-test: 3 scenarios (`version`, `sessions` on empty home, `queue`) pass once Task 3.4 lands; until then the runner's own unit tests.
 
 ### Task 1.8 — CI `light`
 - [ ] `.github/workflows/ci.yml`: `cargo test --workspace` + `cargo clippy -D warnings` on macos-15 and ubuntu-latest; Go tests unchanged.
+- [ ] macos-15 job also runs `cd app && swift test --filter SessionDecodingTests` plus a new Swift test that decodes every file in `testdata/written/` (the Rust writer's golden output, regenerated and checked by the Rust contract test). Required check from P1 on.
 
 ### Gate P1 `gate`
 - [ ] Orchestrator: workspace tests green, Go contract green, runner unit tests green, CI green after push of the branch. Merge to `master`.
@@ -115,7 +119,8 @@ Port: `internal/queue/{queue,ticket}.go` + `{queue,crossproc}_test.go`.
 
 ### Task 2.2 — detach + wait `heavy`
 Port: `cmd/{detach,detach_unix,detach_other,wait}.go` + `wait_test.go`. Rust: `crates/rival/src/{detach,wait}.rs`.
-- [ ] Detach: re-exec self with the same args minus `--detach`, new session (`setsid` via `pre_exec`), stdio to the `rival_out`/`rival_err` files, print `rival: detached pid=<n>`; `#[cfg(windows)]` stub returning "unsupported" until P5.
+- [ ] Detach (`cmd/detach.go:30-57`): re-exec self with the same args and env `RIVAL_DETACHED=1` (same guard name as Go), new session (`setsid` via `pre_exec`), **inherit stdin, stdout and stderr as they are** (never reopen files; the caller's redirects are the contract), print `rival: detached pid=<n>` on the inherited stderr; if that print fails, kill the child and exit 1; `#[cfg(windows)]` stub until P5.
+- [ ] Scenario: arbitrary redirect file names for stdin/stdout/stderr, input file unlinked right after the parent exits → the detached run still reads its prompt and writes to the caller's files.
 - [ ] `wait --log <file>`: parse JSON lines, poll sessions, exit codes and output identical.
 
 ### Task 2.3 — subprocess + quota `heavy`
@@ -222,7 +227,10 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 ## P5 — Windows (`feature/rust-p5-windows`)
 
 ### Task 5.1 — Windows process layer `heavy`
-- [ ] `procinfo`: `GetProcessTimes`. Detach: `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS`. Stop/kill: `GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT)` then `TerminateProcess` after the same grace period as Unix. Subprocess groups: Job Objects so children die with the run.
+- [ ] `procinfo`: `GetProcessTimes`. Detach: `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS | CREATE_NO_WINDOW`, stdio inherited as on Unix.
+- [ ] Ownership: the `rival` process that runs a review creates one Job Object per provider with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and assigns the provider at spawn (`CREATE_SUSPENDED` → assign → resume), so every descendant is in the Job. Timeout/cancel inside the owner = `TerminateJobObject`, then the same bounded pipe drain as Unix.
+- [ ] Stop from another process (TUI, `rival` stop paths): console events cannot reach a detached process, so stop = `TerminateProcess` on the **owner `rival` pid** recorded in the session (checked against its start time like Unix). The owner's Job handle closes with it → kill-on-close ends the provider tree. The session is then reaped to `failed` and the queue ticket is freed by `ReapDead`, same path as a crashed owner on Unix. Wait up to the same grace period, then report.
+- [ ] Native Windows tests (CI `windows-latest`): a fake launcher spawning a grandchild that holds stdout; (a) owner timeout → both dead, pipes closed, `RunSubprocess` returns; (b) a second process stops the detached owner → owner, launcher and grandchild dead, session `failed`, queue slot released.
 - [ ] Paths: `%USERPROFILE%\.rival`; `.cmd`/`.exe` resolution for reviewer CLIs (`codex.cmd` from npm).
 
 ### Task 5.2 — Windows CI `light`
@@ -236,7 +244,7 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 ## P6 — switch (`feature/rust-p6-switch`)
 
 ### Task 6.1 — release pipeline `heavy`
-- [ ] `release.yml`: replace the goreleaser Go build with Rust builds for darwin/linux × amd64/arm64 and windows amd64/arm64. Option order: goreleaser's Rust builder (keeps the existing `brews:` formula config) → else cargo-dist. Verify the chosen tool's current docs before writing; same archive names `rival_<os>_<arch>.tar.gz` (zip on Windows), checksums, formula update.
+- [ ] `release.yml`: replace the goreleaser Go build with Rust builds for darwin/linux × amd64/arm64 and windows amd64/arm64; add a `workflow_dispatch` snapshot mode that builds and uploads artifacts to the run but publishes nothing. Option order: goreleaser's Rust builder (keeps the existing `brews:` formula config) → else cargo-dist. Verify the chosen tool's current docs before writing; same archive names `rival_<os>_<arch>.tar.gz` (zip on Windows), checksums, formula update.
 - [ ] `Makefile`, README (Windows install: download zip, unsigned binary note), CHANGELOG.
 
 ### Task 6.2 — remove Go `light`
@@ -244,6 +252,8 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 
 ### Gate P6 `gate`
 - [ ] Full scenario set green on macOS and Linux.
+- [ ] Swift decode contract job green on the P6 branch (required before merge and before any tag).
+- [ ] Unpublished release build: run the new release workflow on the P6 branch via `workflow_dispatch` in snapshot mode (no publish, no formula push) for all six targets; download artifacts; check names `rival_<os>_<arch>.tar.gz`/`.zip`, checksums file, `rival version` output per archive (run where the host can), and the rendered formula diff against the current one.
 - [ ] `/rival-codex review` on the whole Rust tree vs `master` before P1; verify findings, fix; `/simplify`.
 - [ ] Merge; release is the user's call (version bump, SSH-alias push per project memory, `gh run watch`, brew upgrade, `rival version`).
 
