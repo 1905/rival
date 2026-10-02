@@ -237,13 +237,13 @@ Logic from `{detail_view,preview,logview,kill}.go` (follow, viewport, log tail, 
 
 ### Task 4.5 — `rival tui` wiring `light`
 Port: `cmd/tui.go`; no-op logger while the TUI runs (master fix `3989a88`); background reap.
-- [x] Terminal runtime, input, signals, watcher, bounded job workers and cleanup are wired. Update notices wait until terminal restoration. Controller: 1,091 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Seven actual PTY checks passed: q, raw Ctrl+C, OS SIGINT/SIGTERM, resize, watcher error and piped stdin. Every case restored terminal modes, cursor and alternate screen. Crossterm's `use-dev-tty` feature fixes the measured macOS pipe-input failure. Fresh opened copies survive quick exit; live cleanup still expires them after ten minutes. Hosted CI and full visual acceptance remain pending.
+- [x] Terminal runtime, input, signals, watcher, bounded job workers and cleanup are wired. Update notices wait until terminal restoration. Controller: 1,091 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Seven actual PTY checks passed: q, raw Ctrl+C, OS SIGINT/SIGTERM, resize, watcher error and piped stdin. Every case restored terminal modes, cursor and alternate screen. Crossterm's `use-dev-tty` feature fixes the measured macOS pipe-input failure. Fresh opened copies survive quick exit; live cleanup still expires them after ten minutes. CI 37069253153 passed on macOS/Linux at `667f2a0`, including all 84 CLI scenarios and Swift decoding. Full visual acceptance remains pending.
 
 ### Task 4.6 — result parser (from the app) `heavy`
 Port: `app/Sources/RivalKit/ResultParser.swift` (newest logic, incl. double-answer dedupe and the unanswered-transcript fix) + `app/Tests/RivalKitTests/ResultParserTests.swift` (41 cases). Rust: `crates/rival-core/src/result.rs`.
-- [ ] API: `parse_run_result(raw: &str) -> RunResult` with `RunResult::{Findings{summary, rating: Option<u8>, groups: Vec<SeverityGroup>}, Markdown{text}, Failed{reason}}`; `SeverityGroup{severity, findings}`; `Finding{file, line, severity, category, title, body, failure_scenario, suggestion, confidence}`.
-- [ ] Separate from `review::parse` (Go port, used by CLI output for parity). Unifying the two is a known-bugs follow-up after P6.
-- [ ] The three fake logs in `testdata/logs` → findings (6, rating 6) / markdown / failed.
+- [x] API: `parse_run_result(raw: &str) -> RunResult` with `RunResult::{Findings{summary, rating: Option<u8>, groups: Vec<SeverityGroup>}, Markdown{text}, Failed{reason}}`; `SeverityGroup{severity, findings}`; `Finding{file, line, severity, category, title, body, failure_scenario, suggestion, confidence}`.
+- [x] Separate from `review::parse` (Go port, used by CLI output for parity). Unifying the two is a known-bugs follow-up after P6.
+- [x] The three fake logs in `testdata/logs` produce findings (6, rating 6), markdown and failure. All 39 Swift parser/grouping cases are ported; the two MarkdownBlocks cases belong to 4.7. Four additional Rust tests cover decoding paths and measured Foundation integer boundaries. Controller: 1,134 workspace tests passed, eight intentional ignores; formatting, Clippy and build passed. Hosted CI remains pending.
 
 ### Task 4.7 — markdown → terminal text `heavy`
 Rust: `crates/rival/src/tui/markdown.rs`; dep `pulldown-cmark`.

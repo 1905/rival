@@ -13,6 +13,7 @@ pub mod parser;
 pub mod paths;
 pub mod procinfo;
 pub mod queue;
+pub mod result;
 pub mod review;
 pub mod session;
 pub mod sessionview;
