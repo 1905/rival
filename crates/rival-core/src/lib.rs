@@ -1,5 +1,6 @@
 //! Core library for the rival CLI.
 
+pub mod cancel;
 pub mod config;
 pub mod gojson;
 pub mod gostd;
@@ -7,6 +8,7 @@ pub mod logfmt;
 pub mod logging;
 pub mod paths;
 pub mod procinfo;
+pub mod queue;
 pub mod session;
 
 /// Build version. Mirrors Go's `var version = "dev"`; release builds override it later.

@@ -51,6 +51,27 @@ class NormaliserTest(unittest.TestCase):
         self.assertEqual(n.text("#1  waiting  review  5150  3s  /w v1.2.3"),
                          "#1  waiting  review  <PID1>  <DURATION>  /w v<V>")
 
+    PREFIX_RULE = {"regex": r"(?m)^([0-9a-f]{8}) (?:completed|failed) exit=", "kind": "uuid_prefix"}
+
+    def test_uuid_prefix_links_to_seen_uuid(self):
+        self.assertEqual(normalise.validate_rules([self.PREFIX_RULE]), [])
+        n = self.norm([self.PREFIX_RULE])
+        self.assertEqual(n.json({"session": U1}), {"session": "<UUID1>"})
+        n.text(U2)
+        self.assertEqual(n.text("%s failed exit=1 3s\n%s completed exit=0 1s\n" % (U2[:8], U1[:8])),
+                         "<UUID2:8> failed exit=1 3s\n<UUID1:8> completed exit=0 1s\n")
+        # The full UUID is replaced first, so the rule never sees it.
+        self.assertEqual(n.text("%s completed exit=0" % U1), "<UUID1> completed exit=0")
+
+    def test_uuid_prefix_rejects_unknown_and_ambiguous(self):
+        n = self.norm([self.PREFIX_RULE])
+        with self.assertRaisesRegex(normalise.NormaliseError, "'0b7c6a43' matches 0 seen UUIDs"):
+            n.text("%s completed exit=0" % U1[:8])
+        n.text("%s %s" % (U1, U1[:9] + "0000-4000-8000-000000000000"))
+        with self.assertRaisesRegex(normalise.NormaliseError, "matches 2 seen UUIDs"):
+            n.text("%s completed exit=0" % U1[:8])
+        self.assertNotIsInstance(normalise.NormaliseError("x"), ValueError)
+
     def test_rule_validation(self):
         self.assertTrue(normalise.validate_rules([{"regex": "(a)(b)", "kind": "pid"}]))
         self.assertTrue(normalise.validate_rules([{"regex": "(a)", "kind": "any"}]))

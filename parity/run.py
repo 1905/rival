@@ -927,12 +927,15 @@ class Task:
                 with SIGNALS.deferred():
                     self.cleanup()
             # Step output is read only now: no task process can still write to it.
-            for handle, expect in self.outputs:
-                self.check_output(handle, expect)
+            checks = [(handle.label, lambda h=handle, e=expect: self.check_output(h, e))
+                      for handle, expect in self.outputs]
             if self.server is not None:
-                self.check_calls()
-                self.check_files()
-                self.check_http()
+                checks += [("calls", self.check_calls), ("files", self.check_files), ("http", self.check_http)]
+            for label, check in checks:
+                try:
+                    check()
+                except normalise.NormaliseError as err:
+                    self.problem("%s: %s" % (label, err))
         except Interrupted as sig:
             # The signal may have landed before the finally block ran its cleanup.
             with SIGNALS.deferred():

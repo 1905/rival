@@ -1,0 +1,66 @@
+{
+  "name": "wait-session-ids",
+  "description": "cmd/wait.go session-ID mode: no pid, so terminal status is the only signal. loadSessionStatus decodes only status/exit_code/duration/error, so the malformed prompt (a number) and start_time of session A do not matter (wait reads A; ReapOrphans skips terminal sessions). summarize prints '%s %s exit=%s %s' with id[:8]: A has exit_code 0 and an empty duration, so the line keeps the space before the newline; B has no exit_code (nil pointer -> '-') and an error suffix ' — boom'. Positional IDs are not de-duplicated, so A twice prints twice. A missing file on the first poll fails fast (no pid to watch) even when another ID exists. All completed -> exit 0; any failed -> waitExitFailed, which cmd/root.go Execute prints as 'rival wait: exit 2'. Fixture order and names make A <UUID1> and B <UUID2>.",
+  "fixtures": [
+    {
+      "write": "home/.rival/sessions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.json",
+      "text": "{\"id\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\",\"cli\":\"claude\",\"mode\":\"native\",\"model\":\"claude-opus-5-5\",\"effort\":\"medium\",\"prompt\":5,\"status\":\"completed\",\"start_time\":\"not a time\",\"exit_code\":0,\"work_dir\":\"/w\",\"log_file\":\"\",\"output_bytes\":0,\"output_lines\":0,\"pid\":0}\n",
+      "mode": "0600"
+    },
+    {
+      "write": "home/.rival/sessions/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.json",
+      "json": {
+        "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "cli": "claude",
+        "mode": "native",
+        "model": "claude-opus-5-5",
+        "effort": "medium",
+        "status": "failed",
+        "start_time": "2026-01-02T03:04:05Z",
+        "duration": "3s",
+        "work_dir": "/w",
+        "log_file": "",
+        "output_bytes": 0,
+        "output_lines": 0,
+        "error": "boom",
+        "pid": 0
+      },
+      "mode": "0600"
+    }
+  ],
+  "steps": [
+    {
+      "run": ["wait", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "aaaaaaaa completed exit=0 \naaaaaaaa completed exit=0 \n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": ["wait", "--poll", "100ms", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+      "expect": {
+        "exit_code": 64,
+        "stdout": "no such session (file not found) — check the ID\n",
+        "stderr_lines": ["rival wait: exit 64"],
+        "log_events": []
+      }
+    },
+    {
+      "run": ["wait", "--timeout", "0s", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
+      "expect": {
+        "exit_code": 2,
+        "stdout": "aaaaaaaa completed exit=0 \nbbbbbbbb failed exit=- 3s — boom\n",
+        "stderr_lines": ["rival wait: exit 2"],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID2>.json"
+    ]
+  }
+}

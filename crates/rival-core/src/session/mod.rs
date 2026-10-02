@@ -316,7 +316,7 @@ fn duration_text(nanos: i64) -> String {
 }
 
 /// Go's `*PathError` text: `<op> <path>: <errno text>`.
-fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
+pub(crate) fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
     format!("{op} {}: {}", path.display(), gostd::os_error_text(err))
 }
 

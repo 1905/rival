@@ -149,3 +149,6 @@ Each scenario gets its own temp root:
 - RFC 3339 times become `<TIME>` with no index. Go writes them at second precision, so whether two are equal depends on timing. The JSON key `duration` becomes `<DURATION>`.
 - Other numbers stay exact: exit codes, ratings, line numbers, byte and line counts.
 - Scenario `normalise` rules add patterns for anything else, for example a PID column or a wait duration. Each rule replaces its single regex group.
+- Rule kinds: `pid` (`<PIDn>`), `duration` (`<DURATION>`), `replace` (the literal `replace` value) and `uuid_prefix`.
+- `uuid_prefix` maps a printed UUID prefix, such as the `id[:8]` of a `wait` summary, to the marker of the full UUID already seen: `<UUID1:8>`. The full UUID must appear earlier in normalisation order, for example in the detach step's `starting` log event.
+- A `uuid_prefix` match with no seen UUID, or with two, fails the scenario. Unrelated IDs are never merged.

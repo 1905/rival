@@ -148,6 +148,19 @@ class BasicTest(RunnerCase):
         self.assertProblem(r, "stdout differs")
         self.assertProblem(r, "plain stderr lines differ")
 
+    def test_uuid_prefix_links_steps_and_unknown_is_a_problem(self):
+        u = "0b7c6a43-5d1e-4c2f-9a8b-1c2d3e4f5a6b"
+        rules = [{"regex": r"(?m)^([0-9a-f]{8}) completed exit=", "kind": "uuid_prefix"}]
+        log = {"level": "info", "app": "rival", "time": TIME, "message": "starting", "session": u}
+        summary = step([{"out": u[:8] + " completed exit=0 1s\n"}], ok("<UUID1:8> completed exit=0 1s\n"))
+        sc = scenario([step([{"log": log}], ok(log_events=[
+            {"level": "info", "message": "starting", "fields": {"session": "<UUID1>"}}])), summary],
+            normalise=rules)
+        self.assertPass(self.run_sc(sc))
+        r = self.run_sc(scenario([summary], normalise=rules))
+        self.assertEqual(len(r.problems), 1, r.problems)
+        self.assertProblem(r, r"^steps\[0\] .*: UUID prefix '0b7c6a43' matches 0 seen UUIDs, want 1$")
+
     def test_log_events(self):
         log_a = {"level": "info", "app": "rival", "session": "0b7c6a43-5d1e-4c2f-9a8b-1c2d3e4f5a6b",
                  "pid": 4321, "time": TIME, "message": "reaping orphaned session"}

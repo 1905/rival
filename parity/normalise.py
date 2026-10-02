@@ -15,7 +15,10 @@ source:
 
 Every other number (exit codes, ratings, line numbers, byte and line
 counts) stays exact. Scenario ``normalise`` rules add patterns; nothing
-matches any string by default.
+matches any string by default. A ``uuid_prefix`` rule maps a printed UUID
+prefix (``id[:8]``) to the marker of the one full UUID already seen that
+starts with it, e.g. ``<UUID1:8>``; an unknown or ambiguous prefix raises
+NormaliseError.
 """
 
 from __future__ import annotations
@@ -31,8 +34,12 @@ PID_KEYS = frozenset({"pid", "owner_pid"})
 PIDSTART_KEYS = frozenset({"pid_start", "owner_pid_start"})
 DURATION_KEYS = frozenset({"duration"})
 
-RULE_KINDS = ("pid", "duration", "replace")
+RULE_KINDS = ("pid", "duration", "replace", "uuid_prefix")
 LOG_LEVELS = frozenset({"trace", "debug", "info", "warn", "error", "fatal", "panic"})
+
+
+class NormaliseError(Exception):
+    """A rule cannot map its match, for example an unknown UUID prefix."""
 
 
 def validate_rules(rules) -> list:
@@ -72,6 +79,13 @@ class Normaliser:
             table[value] = "<%s%d>" % (kind, len(table) + 1)
         return table[value]
 
+    def uuid_prefix(self, prefix: str) -> str:
+        """Marker of the one already-seen UUID starting with prefix, suffixed with its length."""
+        seen = [(u, mark) for u, mark in self.markers.get("UUID", {}).items() if prefix and u.startswith(prefix)]
+        if len(seen) != 1:
+            raise NormaliseError("UUID prefix %r matches %d seen UUIDs, want 1" % (prefix, len(seen)))
+        return "%s:%d>" % (seen[0][1][:-1], len(prefix))
+
     def text(self, s: str) -> str:
         for path, mark in self.paths:
             s = s.replace(path, mark)
@@ -87,6 +101,8 @@ class Normaliser:
             rep = self.marker("PID", int(m.group(1)))
         elif rule["kind"] == "duration":
             rep = "<DURATION>"
+        elif rule["kind"] == "uuid_prefix":
+            rep = self.uuid_prefix(m.group(1))
         else:
             rep = rule["replace"]
         whole, start = m.group(0), m.start(0)

@@ -103,14 +103,14 @@ Port: `internal/logfmt`, `internal/procinfo` (darwin `sysctl kern.proc.pid`, lin
 - [x] Expected outputs are written from the Go source and Go test expectations (messages, formats), not from running Go.
 - [ ] Self-test: 3 scenarios (`version`, `sessions` on empty home, `queue`) pass once Task 3.4 lands; until then the runner's own unit tests.
 
-Runner validation: 55 unit tests pass locally, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, inherited stdin after unlink, and bounded startup diagnostics. Hosted verification is pending. Initial CLI scenarios remain pending Task 3.4.
+Runner validation: 55 unit tests pass locally, including SIGINT/SIGTERM cleanup, unrelated-process preservation, late detached output, inherited stdin after unlink, and bounded startup diagnostics. Hosted macOS/Linux verification passed in CI 37011767761. Initial CLI scenarios remain pending Task 3.4.
 
 ### Task 1.8 — CI `light`
 - [x] `.github/workflows/ci.yml`: `cargo test --workspace` + `cargo clippy -D warnings` on macos-15 and ubuntu-latest; Go tests unchanged.
 - [x] macos-15 job also runs `cd app && swift test --filter SessionDecodingTests` plus new Swift tests that decode every file in `testdata/written/` (the Rust writer's golden output, checked by the Rust contract test without regeneration). Required check from P1 on. Local Swift filter: 14 passed.
 
 ### Gate P1 `gate`
-- [ ] Orchestrator: workspace tests green, Go contract green, runner unit tests green, CI green after push of the branch. Merge to `master`.
+- [x] Orchestrator: workspace tests, Go contract, 55 runner tests, and Swift decoding passed on the required hosts. CI 37011767761 verified `50e3eea`; merged and pushed to `master` on 2026-10-02.
 
 ---
 
@@ -118,14 +118,16 @@ Runner validation: 55 unit tests pass locally, including SIGINT/SIGTERM cleanup,
 
 ### Task 2.1 — queue + tickets `heavy`
 Port: `internal/queue/{queue,ticket}.go` + `{queue,crossproc}_test.go`.
-- [ ] fd-lock on the queue lock file; `WaitForSlot`, position callbacks, `ReapDead`, clear; ordering identical.
-- [ ] Cross-process test spawns the test binary twice (Rust equivalent of `crossproc_test.go`).
+- [x] fd-lock on the queue lock file; `WaitForSlot`, position callbacks, `ReapDead`, clear; ordering preserved. All 13 Go queue cases ported; 37 focused queue/cancellation tests pass locally.
+- [x] Cross-process test spawns three helpers, matching Go A/B/C. Deterministic enqueue readiness and bounded cleanup verify FIFO and mutual exclusion.
 
 ### Task 2.2 — detach + wait `heavy`
 Port: `cmd/{detach,detach_unix,detach_other,wait}.go` + `wait_test.go`. Rust: `crates/rival/src/{detach,wait}.rs`.
 - [ ] Detach (`cmd/detach.go:30-57`): re-exec self with the same args and env `RIVAL_DETACHED=1` (same guard name as Go), new session (`setsid` via `pre_exec`), **inherit stdin, stdout and stderr as they are** (never reopen files; the caller's redirects are the contract), print `rival: detached pid=<n>` on the inherited stderr; if that print fails, kill the child and exit 1; `#[cfg(windows)]` stub until P5.
 - [ ] Scenario: arbitrary redirect file names for stdin/stdout/stderr, input file unlinked right after the parent exits → the detached run still reads its prompt and writes to the caller's files.
-- [ ] `wait --log <file>`: parse JSON lines, poll sessions, exit codes and output identical.
+- [x] `wait --log <file>` logic: starting markers, session polling, all six named Go test cases, exit codes and exact summary lines ported. CLI wiring and signal checks remain P3.
+
+**P2a verification:** detach/wait functions implemented; 36 focused Rust tests pass. The full workspace has 257 passing tests and two ignored helper/generator entries. All 58 runner self-tests pass. Build, formatting and Clippy pass locally. The seven new detach/wait scenarios validate against source-derived sample output; actual command execution waits for P3. The scenario checks link short IDs to full UUID markers. Closed-before-startup stderr remains a P3 compatibility item (see `research.md`); the detach checkbox stays open until resolved. Redirect/unlink timing is stated explicitly in its scenario.
 
 ### Task 2.3 — subprocess + quota `heavy`
 Port: `internal/executor/{subprocess,quota}.go` + tests.
@@ -273,6 +275,7 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | ~~Plan/antislop/security parse the whole log, not the final answer~~ | `review/planrun.go`, `cmd/command_security.go` | fixed in Go before the port; ported fixed |
 | Codex double-printed answer not deduped | same | Swift dedupes |
 | CLI output parser (`review::parse`, Go port) and TUI Result parser (`result`, app port) are two implementations | `crates/rival-core/src/{review/parse,result}.rs` | unify after P6: CLI moves to `result` once parity no longer binds it |
+| Force-clearing a running ticket permits another run before its holder finishes | `queue.Clear(true)` | Running holders do not self-heal. Preserved; only waiting tickets re-create themselves. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

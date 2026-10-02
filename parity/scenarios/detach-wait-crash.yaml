@@ -1,0 +1,38 @@
+{
+  "name": "detach-wait-crash",
+  "description": "The detached child dies before it starts a session. Parent: 'rival: detached pid=N', exit 0 (cmd/detach.go). Child: parser.parseArgsWithEffort rejects '-re bogus' with 'invalid effort level %q, must be one of: %s' (config.ValidEfforts); runModelCommand prints it on the inherited stdout and returns ExitCodeError{1}, which cmd/root.go Execute prints on the inherited stderr. No session, queue dir or file is created (reap finds no dirs). `rival wait --log` (cmd/wait.go parseLogFile) gets the pid and no 'starting' ID, which is not an error. In run, havePID and the pid is dead; the re-read has no IDs, so 'allTerminal && len(w.ids) > 0' is false and it prints 'crashed: rival (pid %d) exited before finalizing sessions' and returns waitExitCrashed; Execute prints 'rival wait: exit 3'. The crash pid is the detached pid (same marker).",
+  "normalise": [
+    {"regex": "crashed: rival \\(pid (\\d+)\\)", "kind": "pid"}
+  ],
+  "steps": [
+    {
+      "run": ["command", "claude", "--detach"],
+      "stdin": "-re bogus explain the auth flow",
+      "stdout_file": "out/claude.out",
+      "stderr_file": "out/claude.err",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "invalid effort level \"bogus\", must be one of: low, medium, high, xhigh, ultra\n",
+        "stderr_lines": [
+          "rival: detached pid=<PID1>",
+          "invalid effort level \"bogus\", must be one of: low, medium, high, xhigh, ultra"
+        ],
+        "log_events": []
+      }
+    },
+    {"wait_idle": true, "timeout": 30},
+    {
+      "run": ["wait", "--log", "<ROOT>/out/claude.err"],
+      "expect": {
+        "exit_code": 3,
+        "stdout": "crashed: rival (pid <PID1>) exited before finalizing sessions\n",
+        "stderr_lines": ["rival wait: exit 3"],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {}
+  }
+}

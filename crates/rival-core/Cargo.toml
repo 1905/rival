@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = "1.0.104"
+fd-lock = "4.0.4"
 chrono = { version = "0.4.45", features = ["serde"] }
 libc = "0.2.189"
 regex = "1.13.1"

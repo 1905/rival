@@ -41,3 +41,15 @@
 - Hosted macOS signal-test startup failed before readiness. The first failure lacked child diagnostics; its cause is not established. CPython recommends an absolute executable path and `sys.executable` for restarting Python, which the test already uses. Add diagnostics before selecting a fix. [CPython subprocess guidance](https://github.com/python/cpython/blob/main/Doc/library/subprocess.rst)
 
 - The runner now avoids `HTTPServer.server_bind`'s reverse DNS lookup. It binds directly to `127.0.0.1` and assigns the local server name. Timeout diagnostics retain runner/step output and request stacks only after registration. Test cleanup matches unique task-root environment markers. These changes do not yet prove the cause of the hosted macOS timeout.
+
+- P1 follow-up: CI 37011767761 passed on macOS and Linux at `50e3eea`, including all 55 Python tests and required Swift decoding. The startup timeout did not recur. This proves the revised suite passed; it does not establish DNS as the original cause.
+
+## P2 source checks
+
+- Cached `fd-lock` 4.0.4 source (`src/sys/unix/mod.rs`) uses `rustix::fs::flock` on macOS/Linux. This matches the Go queue's lock mechanism. Three independent helper processes now pass the FIFO and mutual-exclusion check locally. Hosted verification remains pending for P2a.
+
+### Detach standard streams
+
+- Rust's Unix startup reopens closed standard descriptors on `/dev/null`. The original state is gone before `main`, so a caller that closed stderr is a compatibility gap. Normal inherited files and pipes are covered by the detach unit test. Closed-before-startup behavior remains unresolved for the P3 command gate; do not claim exact parity for it. [Rust runtime source](https://doc.rust-lang.org/src/std/sys/pal/unix/mod.rs.html)
+- Go normally exits on SIGPIPE when writing to a broken stdout/stderr pipe. Rust ignores SIGPIPE and returns a write error. The approved task explicitly requires killing the new detached child on a failed PID notice; the Rust implementation follows that requirement. Its failing-writer test passes. A real broken-pipe command check remains for P3. [Go signal behavior](https://pkg.go.dev/os/signal#hdr-SIGPIPE), [Rust runtime source](https://doc.rust-lang.org/src/std/sys/pal/unix/mod.rs.html)
+- The redirected-input scenario unlinks stdin after the parent exits. It cannot force the actual detached child's first read to occur after the unlink. File-descriptor identity and the runner's controlled detached reader cover the mechanism; actual command ordering remains a stated test limit.

@@ -1,3 +1,9 @@
+// P3 wires these into the command tree.
+#[allow(dead_code)]
+mod detach;
+#[allow(dead_code)]
+mod wait;
+
 fn main() {
     // Go main: load .env silently, then the stderr JSON logger.
     // SAFETY: first statement of main; no other thread exists yet.
