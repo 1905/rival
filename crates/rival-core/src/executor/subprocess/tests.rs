@@ -1249,3 +1249,90 @@ fn open_log_error_comes_before_start() {
         )
     );
 }
+
+/// Go's argv: argv[0] is the bare name the caller gave, not the resolved
+/// path, and empty arguments stay. A NUL in an argument is EINVAL.
+#[test]
+fn argv0_is_the_bare_name_and_empty_args_stay() {
+    let mut fx = Fixture::new();
+    let mut mirror = Recorder::default();
+    run_sh(
+        &mut fx,
+        &format!("{DRAIN}printf '<%s>' \"$0\""),
+        "",
+        Some(&mut mirror),
+    )
+    .unwrap();
+    assert_eq!(mirror.writes().concat(), b"<sh>");
+
+    let base = environ(&[PATH_ENTRY]);
+    let args = strings(&[
+        "-c",
+        &format!("{DRAIN}printf '<%s>' \"$@\""),
+        "x",
+        "",
+        "a",
+        "",
+    ]);
+    let req = Request {
+        binary: "sh",
+        args: &args,
+        env: &[],
+        prompt: "",
+        drop_env: &[],
+        environ: &base,
+    };
+    let mut mirror = Recorder::default();
+    fx.run(&Context::background(), &req, Some(&mut mirror))
+        .unwrap();
+    assert_eq!(mirror.writes().concat(), b"<><a><>");
+
+    let args = strings(&["-c", "a\0b"]);
+    let req = Request { args: &args, ..req };
+    let sh = process::look_path("sh", getenv(&base, "PATH")).unwrap();
+    assert_eq!(
+        fx.run(&Context::background(), &req, None)
+            .unwrap_err()
+            .to_string(),
+        format!("start sh: fork/exec {}: invalid argument", sh.display())
+    );
+}
+
+/// Controller finding (Task 2.4): an executable text file without a shebang
+/// is Go's `fork/exec <path>: exec format error`, never a `/bin/sh`
+/// fallback. The provider spawn sets a process group and a workdir, so it
+/// may take a different std spawn path than a plain `Command`.
+#[test]
+fn executable_without_shebang_is_exec_format_error() {
+    let mut fx = Fixture::new();
+    let bin = tempfile::tempdir().unwrap();
+    let marker = bin.path().join("marker");
+    let script = bin.path().join("noshebang");
+    fs::write(&script, format!("echo ran > '{}'\n", marker.display())).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+    let path_entry = format!("PATH={}", bin.path().display());
+    let env = environ(&[&path_entry]);
+    let args: Vec<String> = Vec::new();
+    let req = Request {
+        binary: "noshebang",
+        args: &args,
+        env: &[],
+        prompt: "",
+        drop_env: &[],
+        environ: &env,
+    };
+    let err = crate::executor::testutil::retry_busy(
+        || fx.run(&Context::background(), &req, None),
+        |r| format!("{r:?}"),
+    )
+    .unwrap_err();
+    assert_eq!(
+        format!("{err:#}"),
+        format!(
+            "start noshebang: fork/exec {}: exec format error",
+            script.display()
+        )
+    );
+    assert!(!marker.exists(), "the file ran through a shell");
+}

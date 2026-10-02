@@ -138,11 +138,13 @@ Port: `internal/executor/{subprocess,quota}.go` + tests.
 - [x] Process group per provider (Unix `CommandExt::process_group(0)`), timeout/cancel kills the **whole group**, five-second pipe drain, exact byte/line counts, and quota detection. Nonblocking pipe IO avoids cross-thread close assumptions.
 - [x] Regression test ported from the Go fix: a fake launcher spawns a child that ignores SIGTERM and holds stdout open → the run returns within the bound and the child is dead. Both deadline and manual cancellation tested; an escaped helper also proves the stdin/stdout/stderr drain bound.
 
-**Task 2.3 verification:** controller workspace check: 296 tests passed, three ignored helper/generator entries; formatting and Clippy passed. Tests use temporary session paths and injected child environments. Linux verification is pending in branch CI. `gitscope::repository_env` was pulled forward for subprocess filtering. `Config::environ()` preserves non-UTF-8 environment entries; Rust `Command` sorts the final environment keys. Windows process operations remain explicit P5 placeholders.
+**Task 2.3 verification:** controller workspace check: 296 tests passed, three ignored helper/generator entries; formatting and Clippy passed. [CI 37022801563](https://github.com/1905/rival/actions/runs/37022801563) passed on macOS and Linux for `dcd9bd9`, including the Go contract, runner tests and Swift decoding on macOS. Tests use temporary session paths and injected child environments. `gitscope::repository_env` was pulled forward for subprocess filtering. `Config::environ()` preserves non-UTF-8 environment entries. Task2.4 also preserves Unix environment order through direct `execve`. Windows process operations remain explicit P5 placeholders.
 
 ### Task 2.4 — executors `heavy`
 Port: `internal/executor/{codex,claude,claude_docker,grok,kimi,opencode}.go` + tests.
-- [ ] Exact argv per CLI and model, env, workdir handling; tests assert argv vectors (as Go tests do).
+- [x] Exact argv per CLI and model, env, workdir handling; tests assert argv vectors (as Go tests do). All 35 named Go adapter tests are mapped in the task report, including registry tests and fake Docker preflight/build checks.
+
+**Task 2.4 verification:** controller workspace check: 360 tests passed, three ignored helper/generator entries; formatting and Clippy passed. A verified macOS shell-fallback mismatch is fixed with a prepared `execve` hook. Both executable-format regressions run without skips; byte-preserving environment, argument, process-group and drain checks pass locally. Twenty-two executor scenarios are authored and schema-checked; execution waits for P3. Hosted verification for this batch is pending. Windows preflight/temp-file/exit-status work remains P5.
 
 ### Task 2.5 — parser + gitscope `light`
 Port: `internal/parser/{parser,review}.go`, `internal/gitscope/{env,gitscope}.go`, `cmd/gitscope_helper.go` + tests.
@@ -284,6 +286,8 @@ Rust: `crates/rival/src/tui/{result_view,detail_view,keys,model}.rs`.
 | Force-clearing a running ticket permits another run before its holder finishes | `queue.Clear(true)` | Running holders do not self-heal. Preserved; only waiting tickets re-create themselves. |
 | Git scope detection inherits repository overrides | `gitscope.gitCmd` | `Resolve`/`DiffStat` do not use `RepositoryEnv`; inherited `GIT_DIR` can redirect discovery. Preserve during the port. |
 | File-list merging only removes duplicates across its two inputs | `gitscope.mergeFileLists` | Duplicates inside either input remain. Preserve during the port. |
+| Claude Docker authentication is passed in process arguments | `executor.runClaudeDocker` | The existing `-e ANTHROPIC_AUTH_TOKEN=…` argument exposes the token to process inspection. Preserve during this port; fix separately. |
+| Kimi adapter restricts tools only for the exact `review` mode | `executor.kimiRunOpts` | All other modes get full-auto options. Current callers use raw/review; task-mode behavior is a latent source bug. |
 | (implementers append here) | | |
 | Oversized timeout budgets wrap signed nanoseconds | `config.MaxRunWait`, `WithRunTimeout` | Rust preserves wrapping arithmetic; negative budgets must expire immediately. |
 | Two maximum duration components can wrap the parser accumulator to zero | Go `time.ParseDuration` | Preserved with an explicit regression test. |

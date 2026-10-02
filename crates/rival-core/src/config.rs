@@ -185,7 +185,7 @@ pub fn public_runtime_error(cli: &str, model: &str, message: &str) -> String {
 
 /// Go `strings.NewReplacer(...).Replace`: one left-to-right pass without
 /// overlapping matches; at each position the earliest listed pattern wins.
-fn replace_ordered(text: &str, pairs: &[(&str, String)]) -> String {
+pub(crate) fn replace_ordered(text: &str, pairs: &[(&str, String)]) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     'scan: while !rest.is_empty() {
@@ -966,12 +966,17 @@ impl Config {
         self
     }
 
+    /// The snapshotted Go `os.Getwd()` result; `None` stands for its error.
+    pub fn cwd(&self) -> Option<&Path> {
+        self.cwd.as_deref()
+    }
+
     pub fn user_config(&self) -> Option<&UserConfig> {
         self.user.as_ref()
     }
 
     /// Go `os.Getenv` against the snapshot: unset reads as "".
-    fn getenv(&self, key: &str) -> &str {
+    pub fn getenv(&self, key: &str) -> &str {
         self.env.get(key).map_or("", String::as_str)
     }
 

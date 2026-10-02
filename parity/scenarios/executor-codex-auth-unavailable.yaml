@@ -1,0 +1,46 @@
+{
+  "name": "executor-codex-auth-unavailable",
+  "description": "CodexPreflightFor: `codex login status` exits 1, so the error is '<label> authentication is unavailable\\n' plus the combined output. Execute's Fprintln adds a newline, so stderr ends with an empty line. No session is created.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Not logged in\n",
+            "exit": 1
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "codex authentication is unavailable",
+          "Not logged in",
+          ""
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "codex": 1
+    }
+  }
+}

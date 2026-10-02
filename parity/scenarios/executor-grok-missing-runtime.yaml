@@ -1,0 +1,29 @@
+{
+  "name": "executor-grok-missing-runtime",
+  "description": "`rival command grok` with no grok on PATH: the preflight in runModelCommand fails before any session or queue work (internal/executor/grok.go RunGrokModel/grokRunArgs/GrokEffort, GrokPreflight); Execute prints the error and exits 1.",
+  "fakes": {
+    "absent": [
+      "grok"
+    ]
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "grok"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "grok runtime is not installed"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

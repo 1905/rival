@@ -1,0 +1,44 @@
+{
+  "name": "executor-k3-missing-key",
+  "description": "KimiPreflight: opencode is on PATH (looked up only, never run) but no MOONSHOT_API_KEY or KIMI_API in the env or any .env walking up from the workdir. No session is created.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv_prefix": [],
+            "stderr": "fake must not run\n",
+            "exit": 97
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": null,
+    "KIMI_API": null
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "k3"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "MOONSHOT_API_KEY is not set — add it to the project .env or export it"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "opencode": 0
+    }
+  }
+}

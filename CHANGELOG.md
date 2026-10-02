@@ -11,7 +11,9 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 - Added Rust queue tickets, FIFO locking, cancellation, and independent-process queue tests. CLI wiring remains pending.
 - Added detach and wait logic, inherited-descriptor checks, and authored success/failure/crash/timeout scenarios. The command scenarios remain unrun until P3.
 - Scenario checks now link short session IDs to full UUIDs and reject unknown or ambiguous prefixes.
-- Added provider subprocess execution, quota detection, process-group cancellation, and bounded pipe draining. macOS tests pass; Linux verification is pending.
+- Added provider subprocess execution, quota detection, process-group cancellation, and bounded pipe draining. Required macOS and Linux CI checks pass.
+- Ported Codex, Claude native/Docker, Grok, K3 and OpenCode adapters with exact argument and environment tests. Added 22 command scenarios; execution remains pending P3.
+- Fixed the Rust macOS launch path to reject invalid executable formats, matching Go. Local regression checks pass; hosted verification is pending.
 - Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
 - Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
 - Fixed existing Go test fixtures that required an installed OpenCode CLI or raced stdin writes.

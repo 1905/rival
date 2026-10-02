@@ -122,7 +122,7 @@ pub fn safe_env(environ: &[OsString]) -> Vec<OsString> {
 /// `drop_env`. An entry ending in `_` is a prefix match ("AWS_" drops every
 /// AWS_* var — exact name lists rot as providers add credential vars); any
 /// other entry matches that exact variable name.
-fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
+pub(crate) fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
     let bytes = kv.as_encoded_bytes();
     drop_env.iter().any(|name| {
         if name.ends_with('_') {
@@ -180,8 +180,30 @@ pub(crate) fn dedup_env(env: &[OsString]) -> Result<Vec<OsString>, String> {
     err.map_or(Ok(out), Err)
 }
 
+/// Replaces `cmd`'s whole environment with `env` (`KEY=VALUE` entries).
+/// Unix passes the env to `execve` itself (see [`process::set_exec`]).
+#[cfg(not(unix))]
+pub(crate) fn set_env(cmd: &mut Command, env: &[OsString]) {
+    cmd.env_clear();
+    for kv in env {
+        let bytes = kv.as_encoded_bytes();
+        // Rust's Command needs a key and a value; Go would pass an
+        // entry without "=" through unchanged.
+        if let Some(i) = env_key_end(bytes) {
+            // SAFETY: both halves split at an ASCII '='.
+            let (k, v) = unsafe {
+                (
+                    OsStr::from_encoded_bytes_unchecked(&bytes[..i]),
+                    OsStr::from_encoded_bytes_unchecked(&bytes[i + 1..]),
+                )
+            };
+            cmd.env(k, v);
+        }
+    }
+}
+
 /// Go `os.Getenv` on an `os.Environ()` list: the first entry wins.
-fn getenv<'a>(environ: &'a [OsString], key: &str) -> Option<&'a OsStr> {
+pub(crate) fn getenv<'a>(environ: &'a [OsString], key: &str) -> Option<&'a OsStr> {
     environ.iter().find_map(|kv| {
         let bytes = kv.as_encoded_bytes();
         let rest = bytes.strip_prefix(key.as_bytes())?.strip_prefix(b"=")?;
@@ -203,7 +225,7 @@ fn resolve(binary: &str, environ: &[OsString]) -> Result<PathBuf, String> {
 }
 
 /// Go's text for an `io::Error` without a file name.
-fn io_text(err: &io::Error) -> String {
+pub(crate) fn io_text(err: &io::Error) -> String {
     if err.kind() == io::ErrorKind::WriteZero {
         return "short write".to_string();
     }
@@ -219,7 +241,7 @@ fn file_error(op: &str, name: &str, err: &io::Error) -> String {
 }
 
 /// Go's `fork/exec` error text. A NUL in an argument is EINVAL in Go.
-fn spawn_error_text(err: &io::Error) -> String {
+pub(crate) fn spawn_error_text(err: &io::Error) -> String {
     if err.raw_os_error().is_none() && err.kind() == io::ErrorKind::InvalidInput {
         return "invalid argument".to_string();
     }
@@ -380,23 +402,7 @@ pub fn run_subprocess(
         let env = dedup_env(&env).map_err(|e| anyhow!("start {binary}: {e}"))?;
 
         let mut cmd = Command::new(&lp);
-        process::set_arg0(&mut cmd, binary);
-        cmd.args(req.args).env_clear();
-        for kv in &env {
-            let bytes = kv.as_encoded_bytes();
-            // Rust's Command needs a key and a value; Go would pass an
-            // entry without "=" through unchanged.
-            if let Some(i) = env_key_end(bytes) {
-                // SAFETY: both halves split at an ASCII '='.
-                let (k, v) = unsafe {
-                    (
-                        OsStr::from_encoded_bytes_unchecked(&bytes[..i]),
-                        OsStr::from_encoded_bytes_unchecked(&bytes[i + 1..]),
-                    )
-                };
-                cmd.env(k, v);
-            }
-        }
+        let image = process::set_exec(&mut cmd, &lp, binary, req.args, &env);
         if !sess.work_dir.is_empty() {
             cmd.current_dir(&sess.work_dir);
         }
@@ -404,7 +410,7 @@ pub fn run_subprocess(
         cmd.stdin(Stdio::from(stdin_r))
             .stdout(Stdio::from(stdout_w))
             .stderr(Stdio::from(stderr_w));
-        let spawned = cmd.spawn();
+        let spawned = image.and_then(|()| cmd.spawn());
         // Closes our copies of the child's pipe ends (Go closes childIOFiles
         // after Start), so EOF arrives once the provider side is done.
         drop(cmd);

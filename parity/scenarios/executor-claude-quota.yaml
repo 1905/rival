@@ -1,0 +1,126 @@
+{
+  "name": "executor-claude-quota",
+  "description": "`rival command claude` with 'review src/' (explicit scope: no git auto-detect). The fake exits 0 with only a quota signature (executor.IsQuotaExhausted 'insufficient_quota'); finishReview gets no parsed JSON, review.RunFailureReason returns the quota reason, the session fails with it, stdout keeps the public log, and Execute prints the reason. Review-mode argv/env from internal/executor/claude.go runClaudeModel/runClaudeNative/claudeArgs, ClaudePreflight -> claude_docker.go ClaudeDockerPreflight.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s).*src/.*"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "CLAUDECODE": null,
+                "ANTHROPIC_API_KEY": null
+              }
+            },
+            "stdout": "ERROR: insufficient_quota\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "ERROR: insufficient_quota\n",
+        "stderr_lines": [
+          "claude hit provider quota/rate limit (429)"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "review"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 1,
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "mode": "native",
+          "work_dir": "<ROOT>/work",
+          "account": "subscription",
+          "error": "claude hit provider quota/rate limit (429)",
+          "review_scope": "src/"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "ERROR: insufficient_quota\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  }
+}

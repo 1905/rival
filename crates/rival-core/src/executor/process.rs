@@ -133,15 +133,126 @@ pub(crate) fn configure_group(cmd: &mut Command) {
 #[cfg(not(unix))]
 pub(crate) fn configure_group(_cmd: &mut Command) {}
 
-/// Go: `cmd.Args[0]` stays the name the caller gave, not the resolved path.
+/// Makes `cmd` start `program` the way Go's `syscall.forkExec` does: a raw
+/// `execve(program, [arg0, args...], env)`. `arg0` is the name the caller
+/// gave (Go's `cmd.Args[0]`), not the resolved path. `env` is the final,
+/// deduped `KEY=VALUE` list; it is passed as-is, in order, and an entry
+/// without `=` is kept, as Go does.
+///
+/// Why not std's own exec: std ends in libc `posix_spawnp` or `execvp`, and
+/// Apple's libc retries an ENOEXEC image (an executable text file without a
+/// shebang) through `/bin/sh`. Go reports `exec format error` instead.
+///
+/// The `pre_exec` hook runs in the forked child after std has set up the
+/// stdio, the cwd, the process group and the SIGPIPE reset, and before std's
+/// own env swap and `execvp`. A hook also turns off std's `posix_spawn`
+/// path. If `execve` returns, the hook returns its errno, and std reports it
+/// to the parent through its launch-error pipe as a spawn error.
+///
+/// A NUL in `program`, `arg0` or an argument is EINVAL here, before the
+/// spawn, as in Go's `forkExec`. `env` was already checked by `dedup_env`.
 #[cfg(unix)]
-pub(crate) fn set_arg0(cmd: &mut Command, arg0: &str) {
+pub(crate) fn set_exec<S: AsRef<OsStr>>(
+    cmd: &mut Command,
+    program: &Path,
+    arg0: &str,
+    args: &[S],
+    env: &[std::ffi::OsString],
+) -> io::Result<()> {
     use std::os::unix::process::CommandExt;
-    cmd.arg0(arg0);
+
+    let image = ExecImage::new(program, arg0, args, env)?;
+    // SAFETY: the hook only calls execve on pointers built in the parent and
+    // reads errno. It allocates, locks, formats and drops nothing in the child.
+    unsafe {
+        cmd.pre_exec(move || Err(image.exec()));
+    }
+    Ok(())
 }
 
+/// Placeholder until P5: std's own spawn with `args` and `env`.
 #[cfg(not(unix))]
-pub(crate) fn set_arg0(_cmd: &mut Command, _arg0: &str) {}
+pub(crate) fn set_exec<S: AsRef<OsStr>>(
+    cmd: &mut Command,
+    _program: &Path,
+    _arg0: &str,
+    args: &[S],
+    env: &[std::ffi::OsString],
+) -> io::Result<()> {
+    cmd.args(args);
+    super::subprocess::set_env(cmd, env);
+    Ok(())
+}
+
+/// The `execve` arguments, built in the parent so the child only reads them.
+#[cfg(unix)]
+struct ExecImage {
+    path: std::ffi::CString,
+    /// Owns the argv and env strings. The pointer arrays point into their
+    /// heap buffers, which stay put when this Vec moves.
+    _strings: Vec<std::ffi::CString>,
+    /// NULL-terminated.
+    argv: Vec<*const libc::c_char>,
+    /// NULL-terminated.
+    envp: Vec<*const libc::c_char>,
+}
+
+// SAFETY: std needs the hook to be Send + Sync. The raw pointers point only
+// into `_strings`, which the image owns and nobody mutates; only the forked
+// child reads them, in `exec`.
+#[cfg(unix)]
+unsafe impl Send for ExecImage {}
+#[cfg(unix)]
+unsafe impl Sync for ExecImage {}
+
+#[cfg(unix)]
+impl ExecImage {
+    fn new<S: AsRef<OsStr>>(
+        program: &Path,
+        arg0: &str,
+        args: &[S],
+        env: &[std::ffi::OsString],
+    ) -> io::Result<ExecImage> {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let cstring = |s: &OsStr| {
+            CString::new(s.as_bytes()).map_err(|_| io::Error::from_raw_os_error(libc::EINVAL))
+        };
+        let path = cstring(program.as_os_str())?;
+        let mut strings = Vec::with_capacity(1 + args.len() + env.len());
+        strings.push(cstring(OsStr::new(arg0))?);
+        for arg in args {
+            strings.push(cstring(arg.as_ref())?);
+        }
+        for kv in env {
+            strings.push(cstring(kv)?);
+        }
+        let ptrs = |s: &[CString]| {
+            s.iter()
+                .map(|c| c.as_ptr())
+                .chain(std::iter::once(std::ptr::null()))
+                .collect::<Vec<_>>()
+        };
+        let argv = ptrs(&strings[..1 + args.len()]);
+        let envp = ptrs(&strings[1 + args.len()..]);
+        Ok(ExecImage {
+            path,
+            _strings: strings,
+            argv,
+            envp,
+        })
+    }
+
+    /// Runs in the forked child: replaces the process image, or returns the
+    /// errno. `last_os_error` only reads errno; it allocates nothing.
+    fn exec(&self) -> io::Error {
+        // SAFETY: every pointer is a NUL-terminated string owned by `self`,
+        // and both arrays end in NULL.
+        unsafe { libc::execve(self.path.as_ptr(), self.argv.as_ptr(), self.envp.as_ptr()) };
+        io::Error::last_os_error()
+    }
+}
 
 /// Result of the group kill, as Go's `cmd.Cancel` reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
