@@ -33,9 +33,12 @@ builds:
       - RIVAL_VERSION={{ .Version }}
       - '{{ if eq .Os "darwin" }}SDKROOT={{ .Env.RIVAL_APPLE_SDKROOT }}{{ end }}'
 
-  # Windows MSVC through cargo-xwin (clang-cl, lld-link, llvm-lib). Its LLVM
-  # is on PATH for this entry only. crt-static links the C runtime into
-  # rival.exe, so the zip needs no Visual C++ runtime install.
+  # Windows MSVC through cargo-xwin in its clang cross-compiler mode
+  # (XWIN_CROSS_COMPILER=clang). The default clang-cl mode passes /imsvc
+  # include options that clang rejects when ring builds its C code
+  # (cargo-xwin issue 147). The clang mode uses the windows-msvc-sysroot SDK.
+  # Its LLVM is on PATH for this entry only. crt-static links the C runtime
+  # into rival.exe, so the zip needs no Visual C++ runtime install.
   - id: rival-windows
     builder: rust
     binary: rival
@@ -51,6 +54,7 @@ builds:
     env:
       - RIVAL_VERSION={{ .Version }}
       - PATH={{ .Env.RIVAL_LLVM_BIN }}:{{ .Env.PATH }}
+      - XWIN_CROSS_COMPILER=clang
       - RUSTFLAGS=-C target-feature=+crt-static
 
 archives:

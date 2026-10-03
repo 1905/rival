@@ -1,7 +1,9 @@
-# Rust CLI + TUI — Implementation Plan v2.8
+# Rust CLI + TUI — Implementation Plan v2.10
 
 **Date:** 2026-10-03
-**Status:** superseded by v2.9
+**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Changes from v2.9:** User moved all Rust compilation/tests off this Mac to the local-network Dell on 2026-10-03. Hosted macOS/Windows checks remain. Cache cleanup recovered 88.8GB; source/tools/evidence were preserved. Task6.7 removes a host-utility assumption found on Dell. Task6.8 completes Windows filtering with the OS ordinal uppercase rules; ASCII-only matching does not cover all Windows environment names. No additional model reviews.
+**Changes from v2.8:** Final Codex review confirmed mixed-case environment filtering is unsafe on the newly supported Windows platform. Task6.5 applies Windows name semantics while preserving Unix behavior. The Docker drive-path finding is the explicitly preserved Go bug and remains deferred. The first six-target snapshot failed on ring 0.17.14 because cargo-xwin supplied clang-cl flags to clang; Task6.6 selects its supported clang mode. These are completion fixes, not new features. No additional model review.
 **Changes from v2.7:** The requested single Claude review found a new RIVAL_HOME/.env state-directory regression. The controller reproduced it with a private fixture. Task6.4 blocks only this Rust-specific variable from repository .env files, including detached execution and Windows case-insensitive names. Existing exported overrides and inherited Go behavior stay intact.
 **Changes from v2.6:** User requested one final Claude code review and README installation steps for each OS on 2026-10-03. Keep the already-approved Codex review and /simplify; add exactly one independent Claude review after implementation. Expand macOS, Linux and Windows install/update instructions, CPU selection and source fallback. Publication remains a separate decision.
 **Changes from v2.5:** Include the existing release guide and project release skill in Task 6.1. They still point at Go-only commands and would break after Task 6.2. This is documentation maintenance within the approved release switch; it does not authorize tagging, publication or installation.
@@ -24,6 +26,12 @@
 **Implementer restriction (paste verbatim in every dispatch):** "You write the code and unit tests your task names and run the focused tests for that task (`cargo test -p <crate> <filter>`, `cargo build`, `go test ./internal/<pkg>/ -run <Name>` for the Go contract tests). You NEVER run the scenario runner, real reviewer CLIs (codex, claude, grok, opencode, glab, docker), network calls, e2e / integration / live / smoke tests; never publish, deploy, push, touch infra, or run anything money-bearing. You never touch the real ~/.rival: every test uses a temp HOME/RIVAL_HOME. Do not commit; the orchestrator commits. Do not set any test-DB env var. Never delete files with rm; move them to /tmp/trash/<name>.<timestamp>. CLI tasks: port the Go logic exactly (same branches, messages, ordering); list any Go bug you notice in your report instead of fixing it. TUI tasks: reuse Go logic, but layout and look may improve."
 
 **Branches:** one per phase from `master` (`feature/rust-p1-core`, …), merged the same day its gate is green (merge hygiene). The Rust binary is built and tested in CI from P1 but not released or put on PATH until P6. Exec starts from a clean `master`.
+
+## Current execution host — user correction 2026-10-03
+
+- No Rust compilation, Cargo builds or Cargo tests on this Mac. Source edits and orchestration only. Use Dell (`ssh dell`, `192.168.8.214`) with Rust1.98.1, two Cargo jobs and task-owned checkout `/home/kass/build/rival-rust-cli-20261003`.
+- Implementers run remote checks through `.superpowers/sdd/plan-v2.2/dell-build.py`. Sync source before a remote test; never sync during another active check. Hosted macOS/Windows CI supplies native platform checks. Historical local results below remain historical evidence, not permission to build locally again.
+- Do not recreate Mac Cargo caches or download final release archives here. Download/inspect archives on Dell. The six hosted native version jobs cover macOS and Windows execution.
 
 ## Contracts every task must keep
 
@@ -347,14 +355,39 @@ Files: `crates/rival-core/src/paths.rs`; root startup tests only if needed. Cont
 - [x] Add deterministic private-fixture regressions: unset, empty and explicitly exported overrides; ordinary dotenv values still load; Windows mixed-case spelling cannot bypass the restriction. Avoid shared environment mutation. Run focused paths/dotenv and affected root tests, formatting, strict Clippy and build.
 - [ ] Controller reruns the private direct/detached CLI probe, full workspace and three-OS CI. Update README to say RIVAL_HOME is process-environment-only. Rebuild the six-target unpublished artifacts after the final code is ready. Do not run another Claude review.
 
-**Task 6.4 local verification:** The controller reproduced the original redirect with RIVAL_HOME unset, then passed all six direct/detached fake-provider cases on the corrected binary. Unset, empty and custom exported values preserve the intended state root. Both Unix and Windows name rules have deterministic regressions. Final restored-code checks passed 1,231 workspace tests with ten intentional ignores, formatting, strict Clippy and build. An earlier full run overlapped the implementer’s deliberate negative mutation and failed the two new regressions; it is not counted as final validation. Native CI and the final snapshot still follow.
+**Task 6.4 local verification:** The controller reproduced the original redirect with RIVAL_HOME unset, then passed all six direct/detached fake-provider cases on the corrected binary. Unset, empty and custom exported values preserve the intended state root. Both Unix and Windows name rules have deterministic regressions. Final restored-code checks passed 1,231 workspace tests with ten intentional ignores, formatting, strict Clippy and build. An earlier full run overlapped the implementer’s deliberate negative mutation and failed the two new regressions; it is not counted as final validation. Native CI37090115414 passed on all three OS at 03f528f, including both new tests on Windows. The final snapshot remains pending.
+
+### Task 6.5 — Windows environment filtering `heavy`
+Files: `crates/rival-core/src/executor/subprocess.rs`, its `tests.rs` / `windows_tests.rs`; shared pure unit tests may be inline in subprocess.rs. Do not change unrelated filters or adapter behavior.
+- [x] Apply ASCII case-insensitive prefix/name comparisons on Windows in safe_env and drop_matches. Preserve the exact case-sensitive Go behavior on Unix, blocked-prefix meaning, exact-name boundary, ordering, non-UTF-8 handling and trusted Request.env appending after inherited filtering.
+- [x] Add deterministic failing-first tests for mixed-case NODE_OPTIONS and proxy/provider prefixes, exact credential removal and credential-prefix removal. Prove near-name/non-matching values survive and Unix mixed-case names remain unchanged. Use injected platform behavior for both semantics on every host where practical.
+- [x] Add a bounded native Windows child-environment regression using the existing private helper executable. It must prove unsafe mixed-case inherited values cannot reach the child, allowed values survive, and trusted explicit adapter entries still win. No shared environment mutation or real providers.
+- [x] Run focused subprocess unit tests, formatting, strict Clippy and build. Controller verifies complete workspace and native Windows CI after final cleanup.
+
+### Task 6.6 — Windows ARM64 release compiler `light`
+Files: `.goreleaser.yaml`, `.github/actions/cli-release-tools/action.yml`, `scripts/test_release_config.py`. Controller owns research and final hosted build.
+- [x] Select cargo-xwin 0.23.1's supported clang cross-compiler mode for Windows builds, keeping it scoped to the Windows build entry. Keep all six targets, archive names, static CRT, publication guards and existing tool versions. No hand-built SDK/compiler flag rewriting or dependency patch.
+- [x] Add a failing-first release configuration check for Windows compiler selection and absence on Unix. Update compiler comments/version diagnostics so the selected tool is visible. Run the full release-script/config unit tests and GoReleaser configuration check. Do not run a cross-build, network command or publication from the implementer.
+- [ ] Controller reruns the unpublished six-target build, checks native version execution on six matching hosts, and inspects PE runtime imports. Passing configuration tests alone does not prove packaging.
+
+### Task 6.7 — read raw Linux environment in the contract test `light`
+Files: `crates/rival-core/src/executor/oscmd.rs` tests only. No runtime changes.
+- [ ] The first Dell workspace run passed 1,226 tests before one test failed: `run_execs_go_argv_and_env`. Dell uses uutils env0.8.0, which omits the malformed `NOEQ` entry when printing. A direct execve probe proved the kernel still passes it in `/proc/self/environ`. Update only the Linux test observation: use a direct child reader of `/proc/self/environ`, compare exact NUL-separated bytes including NOEQ, invalid UTF-8, empty values, order and deduplication. Keep the existing macOS observation and argv/NUL checks. Do not skip or weaken the contract.
+- [ ] Run the focused oscmd tests on Dell, then formatting and strict Clippy through the Dell helper. Do not compile on this Mac. Controller runs the complete workspace and scenarios after final changes.
+
+### Task 6.8 — native Windows environment-name comparisons `heavy`
+Files: new `crates/rival-core/src/envname.rs`, `crates/rival-core/src/lib.rs`, `crates/rival-core/Cargo.toml`, `crates/rival-core/src/paths.rs`, `crates/rival-core/src/executor/subprocess.rs` and its Windows tests. Do not change gitscope, Go-compatible deduplication, provider arguments or unrelated name comparisons.
+- [ ] Replace the security filters' ASCII-only Windows comparisons with the OS's ordinal case-insensitive rules. Microsoft names CompareStringOrdinal for environment-variable comparisons. Add only the required windows-sys Globalization feature and small crate-private equality/prefix helpers. Preserve exact Unix byte comparisons, raw invalid encodings, blocked-prefix semantics, exact-drop `=` boundary, ordering and trusted Request.env appending. Use explicit UTF-16 lengths for Windows, including non-ASCII names whose byte lengths differ. No custom Unicode table or broad normalization.
+- [ ] Use the same Windows equality rule when refusing RIVAL_HOME from repository .env. Preserve inherited empty/nonempty overrides and all other dotenv behavior. Unix remains exact-case. Existing injected ASCII tests must still run on Dell; Windows-specific equivalence tests run natively in CI.
+- [ ] Extend the existing private Windows child fixture to verify actual OS lookup. Probe mixed-case and Unicode candidate aliases (U+0131, U+017F): if the OS resolves an unfiltered name to a protected ASCII name, the filtered child must not receive that value. Test a near-name that stays allowed and trusted explicit adapter values. Add state-root alias regressions. No shared process environment mutation, real providers or network.
+- [ ] Run focused subprocess/paths tests, formatting and strict Clippy on Dell. The controller must inspect native Windows CI for these tests before accepting. Do not run a Mac cross-check or recreate its build caches. If the OS behavior differs from a candidate assumption, report the measured result; do not change the test to assume ASCII rules.
 
 ### Gate P6 `gate`
 - [ ] After Go removal: formatting, Clippy, full Rust workspace tests and runner tests pass on the P6 branch, plus native Windows process tests.
 - [ ] Full scenario set green on macOS and Linux.
 - [ ] Swift decode contract job green on the P6 branch (required before merge and before any tag).
 - [ ] Unpublished release build: run the new release workflow on the P6 branch via `workflow_dispatch` in snapshot mode (no publish, no formula push) for all six targets; download artifacts; check names `rival_<os>_<arch>.tar.gz`/`.zip`, checksums file, `rival version` output per archive (run where the host can), and the rendered formula diff against the current one.
-- [ ] `/rival-codex review` on the whole Rust tree vs `master` before P1; verify findings and fix.
+- [x] `/rival-codex review` on the whole Rust tree vs `master` before P1; verify findings and fix.
 - [x] Run exactly one `/rival-claude review` after implementation, as requested on 2026-10-03. Review the entire port against the same pre-P1 base. Present its full output before fixing valid findings. No automatic second review.
 - [ ] Run the actual `/simplify` after reviews, then verify any changes.
 - [ ] Merge; release is the user's call (version bump, SSH-alias push per project memory, `gh run watch`, brew upgrade, `rival version`).

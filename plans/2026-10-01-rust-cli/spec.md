@@ -151,6 +151,13 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 
 - Single Claude review completed at `b05acbb` with one medium finding: a repository .env could redirect the Rust-only RIVAL_HOME state root. A private CLI reproduction confirmed it. Task6.4 blocks that variable from .env while retaining exported overrides and Go-compatible handling of other variables. The corrected CLI passed six private direct/detached fake-provider checks; 1,231 workspace tests pass locally. Full review: `reviews/p6-claude-review.txt`. No second Claude review is planned.
 
+- Final Codex review at 03f528f reported Windows mixed-case environment filtering and the known Docker drive-path bug. Windows filtering will use ASCII case-insensitive names (a platform adaptation for new Windows support); Unix Go behavior stays exact. The Docker issue remains deferred by the approved parity scope; README directs Windows users to native Claude. Full review: `reviews/p6-codex-review.txt`.
+- Snapshot37089313489 failed on Windows ARM64 ring0.17.14 compilation: clang received cargo-xwin's clang-cl `/imsvc` flags. Task6.6 selects the documented clang compiler mode, scoped to Windows. Packaging is unverified until a final six-target snapshot and native archive checks pass.
+
+- User host correction2026-10-03: no Rust compilation/tests on this Mac. Dell now has Rust1.98.1 and a private source checkout; platform-specific tests stay in hosted CI. Mac cleanup recovered88.8GB, preserving sources and installed tools. One active Go cache was left untouched.
+- The first Dell test run exposed uutils env0.8.0 omitting malformed entries from its display. Direct execve/kernel-environment evidence confirms the runtime still passes NOEQ; Task6.7 corrects the Linux test observation without changing the command runner.
+- Task6.8 adds a small internal envname module and the windows-sys Globalization feature. Security filtering and RIVAL_HOME dotenv exclusion use Windows ordinal case-insensitive comparison, including OS-equivalent Unicode names. Unix byte behavior remains unchanged; native Windows tests must verify actual lookup.
+
 ## Rollout
 
 - **P1** core foundations + contract tests. One branch, merged the same day it is green.

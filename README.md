@@ -180,7 +180,7 @@ The binary is not code-signed. SmartScreen or antivirus software can warn on the
 
 #### Build from source
 
-Install [Rust through rustup](https://rust-lang.org/tools/install/) and Git. The repository selects Rust 1.98. Follow rustup's platform instructions for the native linker and C build tools. On Windows, use the MSVC toolchain and install its Visual Studio C++ build prerequisites.
+Install [Rust through rustup](https://rust-lang.org/tools/install/) and Git. The repository selects Rust 1.98. Follow rustup's platform instructions for the native linker and C build tools. On Windows, use the MSVC toolchain and Visual Studio's Desktop development with C++ tools. Windows ARM64 also needs the ARM64 C++ build tools and Clang.
 
 These commands work in a Unix shell or PowerShell:
 
@@ -227,7 +227,7 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 | Model | Runtime and authentication |
 |---|---|
 | Codex (`gpt-6-astra`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. |
-| Claude (`claude-opus-5-5`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. If `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](docs/claude-docker-setup.md)). |
+| Claude (`claude-opus-5-5`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](docs/claude-docker-setup.md)). |
 | Kimi K3 (`moonshotai/kimi-k3`) | [OpenCode](https://opencode.ai/docs) plus `MOONSHOT_API_KEY`, exported or in a gitignored project `.env`. |
 | Grok (`grok-4.6`) | [Grok CLI](https://docs.x.ai/) with `grok login`. `XAI_API_KEY` is not supported. |
 | Grok via OpenRouter (`x-ai/grok-4.6`) | OpenCode plus `OPENROUTER_API_KEY`. Used only by the security review. |

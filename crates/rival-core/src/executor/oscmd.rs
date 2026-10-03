@@ -565,12 +565,26 @@ mod tests {
         );
         assert_eq!((out, err), (b"<><a><><a>".to_vec(), Ok(())));
 
-        let (out, err) = run(&c, "env", &[], Output::Combined);
-        assert_eq!(err, Ok(()));
-        assert_eq!(
-            out,
-            b"PATH=/usr/bin:/bin\nNOEQ\nB=\xff\xfe\nEMPTY=\nZ=2\n".to_vec()
-        );
+        // Linux: `cat` is the direct child and prints its own kernel env
+        // block. uutils `env` hides the `NOEQ` entry when printing.
+        #[cfg(target_os = "linux")]
+        {
+            let (out, err) = run(&c, "cat", &["/proc/self/environ"], Output::Combined);
+            assert_eq!(err, Ok(()));
+            assert_eq!(
+                out,
+                b"PATH=/usr/bin:/bin\0NOEQ\0B=\xff\xfe\0EMPTY=\0Z=2\0".to_vec()
+            );
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let (out, err) = run(&c, "env", &[], Output::Combined);
+            assert_eq!(err, Ok(()));
+            assert_eq!(
+                out,
+                b"PATH=/usr/bin:/bin\nNOEQ\nB=\xff\xfe\nEMPTY=\nZ=2\n".to_vec()
+            );
+        }
 
         let sh = look_path(&c, "sh").unwrap();
         let (out, err) = run(&c, "sh", &["-c", "a\0b"], Output::Combined);
