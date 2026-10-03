@@ -1,8 +1,8 @@
 name: CI
 
-# Light CI for the Rust port (plan task 1.8). The Go release workflow
-# (release.yml) is untouched. Nothing here calls a real reviewer CLI, Docker,
-# a provider API or inference: every test isolates HOME / RIVAL_HOME itself.
+# Light CI for the Rust port (plan task 1.8). Releases are release.yml.
+# Nothing here calls a real reviewer CLI, Docker, a provider API or
+# inference: every test isolates HOME / RIVAL_HOME itself.
 on:
   push:
   pull_request:

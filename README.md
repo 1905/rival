@@ -9,10 +9,12 @@ Rival sends your code, or your plan, to a different AI model for an independent 
 **Install**
 
 ```bash
-brew install 1905/tap/rival                 # the CLI
+brew install 1905/tap/rival                 # the CLI (macOS and Linux)
 rival install                               # skills for Claude Code (and Codex, when detected)
 brew install --cask 1905/tap/rival-app      # Rival.app, the macOS menu bar and window viewer
 ```
+
+Windows zips start with the first Rust CLI release; see [Install and setup](#install-and-setup). Until then, build from source.
 
 Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`. A DMG is also attached to each release; see [Rival.app](#rivalapp).
 
@@ -76,9 +78,28 @@ rival update                    # brew upgrade 1905/tap/rival, then reinstall sk
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
 - `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable`, `rival-antislop-plan` and older names.
-- `rival update` checks the latest GitHub release. If the binary is current, it only refreshes the skills.
+- `rival update` checks the latest GitHub release. If the binary is current, it only refreshes the skills. The upgrade itself needs Homebrew.
 
-From source: `cd rival && make install && rival install`. The Go module is in the `rival/` subdirectory, so a remote `go install` does not work.
+Release archives. From the first Rust CLI release onward, each [release](https://github.com/1905/rival/releases) has one archive per system, plus `checksums.txt` with the SHA-256 of each archive. v4.1.1 and earlier are Go builds with the four macOS and Linux archives only.
+
+| System | Archive |
+|---|---|
+| macOS | `rival_darwin_arm64.tar.gz`, `rival_darwin_amd64.tar.gz` |
+| Linux | `rival_linux_amd64.tar.gz`, `rival_linux_arm64.tar.gz` |
+| Windows | `rival_windows_amd64.zip`, `rival_windows_arm64.zip` |
+
+Each archive contains the `rival` binary (`rival.exe` on Windows), `LICENSE`, `README.md` and `licenses/Go-LICENSE`. The Linux binaries link against glibc.
+
+Windows install (from the first Rust CLI release):
+
+1. Download `rival_windows_amd64.zip`, or `rival_windows_arm64.zip` on an ARM device.
+2. Compare its hash with `checksums.txt`: `Get-FileHash .\rival_windows_amd64.zip -Algorithm SHA256`.
+3. Extract `rival.exe` to a folder on your `PATH`.
+4. Run `rival install`.
+
+The Windows binary is not code-signed. SmartScreen or antivirus software can warn on the first run. If Windows blocks the file as downloaded from the internet, `Unblock-File .\rival.exe` removes that mark. `rival update` does not work without Homebrew: to update, download the new zip and run `rival install` again. Rival stores its state in `%USERPROFILE%\.rival`.
+
+From source (Rust 1.98, from a clone of this repository): `make cli-install && rival install`. Without `make`, for example on Windows, run `cargo install --locked --path crates/rival`. Both install `rival` to `~/.cargo/bin`. `make cli-install` sets the version from `git describe`; plain `cargo install` reports `dev` unless `RIVAL_VERSION` is set.
 
 Provider runtimes. Install only the ones for the models you use.
 
@@ -388,6 +409,7 @@ Environment variables:
 | `RIVAL_CLAUDE_TOKEN` | unset | OAuth token for the Docker Claude runtime. |
 | `RIVAL_NO_UPDATE_CHECK` | unset | Disable the update check (`CI` also disables it). |
 | `RIVAL_NO_TELEMETRY` | unset | Disable telemetry (`DO_NOT_TRACK` and `CI` also disable it). |
+| `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
 
 ### Queue and timeouts
 
@@ -398,7 +420,7 @@ Environment variables:
 
 ### Sessions directory
 
-Every run writes to `~/.rival/sessions/`:
+Every run writes to `~/.rival/sessions/` (`$RIVAL_HOME/sessions/` when `RIVAL_HOME` is set):
 
 - `<session-id>.json`: the session record. It is written to `<session-id>.json.tmp` first and then renamed.
 - `<session-id>.log`: the full model output.
@@ -452,7 +474,7 @@ Without Homebrew, download `Rival-X.Y.Z.dmg` from the [latest release](https://g
 - **Stop:** the Stop… toolbar button opens a confirmation sheet. A live process gets SIGTERM only while its PID start time still matches the run.
 - **Notifications:** a notification is posted when a run goes from running or queued to completed or failed. Click it to open the run. Permission is requested on the first finish.
 - **Updates:** the app watches the sessions directory and polls as a fallback, so the list updates without a reload.
-- `RIVAL_HOME`: the app reads `$RIVAL_HOME/sessions` instead of `~/.rival/sessions` when this is set. The CLI always writes to `~/.rival`, so this is for test fixtures only.
+- `RIVAL_HOME`: the app reads `$RIVAL_HOME/sessions` instead of `~/.rival/sessions` when this is set. The CLI uses the same variable (see [Configuration](#configuration)). The app sees it only when it is in the app's own environment.
 
 From a clone of this repository:
 

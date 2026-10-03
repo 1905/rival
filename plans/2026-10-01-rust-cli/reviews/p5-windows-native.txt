@@ -1,0 +1,52 @@
+Status: passed
+Head: cb182c1a2dacae0955fbafb40fc1eef0eebee039
+CI: https://github.com/1905/rival/actions/runs/37086794043
+
+test detach::windows_tests::creation_flags_follow_the_console_rule ... ok
+test detach::windows_tests::detach_win_helper ... ignored, helper process for the Windows detach tests
+test detach::windows_tests::fully_redirected_streams_get_a_detached_child_without_console ... ok
+test detach::windows_tests::console_streams_keep_working_after_the_parent_exits ... ok
+test detach::windows_tests::mixed_console_file_and_pipe_streams_each_keep_their_target ... ok
+test root::tests::windows_stdout_missing_handles_fail_like_go ... ok
+test signals::windows_tests::events_map_like_go ... ok
+test signals::windows_tests::signals_win_helper ... ignored, helper process for the Windows signal tests
+test root::tests::windows_stdin_kinds_match_go ... ok
+test tui::kill::windows_tests::kill_win_helper ... ignored, helper process for the Windows stop test
+test signals::windows_tests::ctrl_c_and_break_cancel_scopes_then_default_returns ... ok
+test tui::kill::windows_tests::second_process_stop_ends_owner_tree_and_recovers_session_and_queue ... ok
+test update_cmd::tests::windows_installer_cmd_gets_argv_and_streams ... ok
+test workdir::tests::resolve_workdir_invalid_windows_name ... ok
+test workdir::tests::resolve_workdir_nul_is_invalid_argument ... ok
+test result: ok. 543 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 4.41s
+test executor::oscmd::tests::os_temp_dir_helper ... ignored, helper process for os_temp_dir_resolves_a_relative_tmp
+test executor::oscmd::tests::os_temp_dir_is_the_api_answer ... ok
+test executor::process::windows_tests::abort_between_check_and_read_still_ends_the_read ... ok
+test executor::process::windows_tests::abort_between_check_and_write_still_ends_the_write ... ok
+test executor::process::windows_tests::close_file_reports_success ... ok
+test executor::process::windows_tests::overlapped_pipes_carry_data_and_eof ... ok
+test executor::process::windows_tests::owner_job_is_created_once_under_concurrency ... ok
+test executor::process::windows_tests::path_ext_matches_go ... ok
+test executor::process::windows_tests::program_in_dir_uses_the_os_full_path ... ok
+test executor::process::windows_tests::provider_flags_hide_a_new_console_only_without_one ... ok
+test executor::process::windows_tests::same_file_compares_identity_not_spelling ... ok
+test executor::process::windows_tests::look_path_follows_go_windows_rules ... ok
+test executor::oscmd::tests::os_temp_dir_resolves_a_relative_tmp ... ok
+test executor::subprocess::windows_tests::breakaway_outer_job_does_not_bypass_owner_containment ... ok
+test executor::subprocess::windows_tests::cmd_shim_keeps_argv_and_redirected_stdio ... ok
+test executor::subprocess::windows_tests::exe_provider_round_trip ... ok
+test executor::subprocess::windows_tests::concurrent_providers_cancel_independently ... ok
+test executor::subprocess::windows_tests::normal_owner_exit_returns_zero_and_cleans_up ... ok
+test executor::subprocess::windows_tests::windows_helper ... ignored, helper process for the Windows process-tree tests
+test executor::subprocess::windows_tests::owner_killed_before_provider_job_assignment_still_kills_provider ... ok
+test executor::process::windows_tests::abort_during_a_pending_read_ends_it_and_keeps_ownership ... ok
+test gostd::tests::os_error_text_formats_windows_errors_like_go ... ok
+test gostd::tests::windows_errno_text_does_not_grow_the_buffer ... ok
+test gostd::tests::windows_errno_text_matches_go ... ok
+test procinfo::tests::child_identity_and_running_state_are_separate ... ok
+test procinfo::tests::exit_259_helper ... ignored, helper process for child_identity_and_running_state_are_separate
+test queue::tests::pid_reuse_guard_reaps_recycled_holder ... ok
+test queue::crossproc_tests::cross_process_fifo ... ok
+test executor::subprocess::windows_tests::owner_timeout_kills_launcher_and_grandchild ... ok
+test result: ok. 595 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 10.33s
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

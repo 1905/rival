@@ -3,8 +3,13 @@
 Rival's GitHub Actions release workflow (`.github/workflows/release.yml`) is
 the only publisher. A pushed `v*` tag runs two jobs:
 
-- `release`: GoReleaser creates the GitHub release, uploads four platform
-  archives plus `checksums.txt`, and updates `rival.rb` in `1905/homebrew-tap`.
+- `release` (runs on `macos-15`): GoReleaser (`.goreleaser.yaml` at the
+  repository root) builds the Rust CLI for six targets, creates the GitHub
+  release, uploads `rival_{darwin,linux}_{amd64,arm64}.tar.gz`,
+  `rival_windows_{amd64,arm64}.zip` and `checksums.txt`, and updates `rival.rb`
+  in `1905/homebrew-tap`. cargo-zigbuild builds darwin and linux; cargo-xwin
+  builds Windows. The pinned tools are in
+  `.github/actions/cli-release-tools/action.yml`.
 - `app` (needs `release`, runs on `macos-15`): runs `swift test` in `app/`,
   builds a universal, ad-hoc signed `Rival.app` with
   `app/scripts/bundle.py --version <tag without v>`, uploads
@@ -16,6 +21,27 @@ the only publisher. A pushed `v*` tag runs two jobs:
 Do not run `goreleaser release` locally for the same tag. A second publisher
 collides with the CI-created assets and can leave an otherwise valid release
 workflow marked failed.
+
+## Unpublished snapshot
+
+A manual run of the same workflow publishes nothing. It has no inputs, only
+read permission and no tap token:
+
+```bash
+gh workflow run release.yml --ref <branch>
+```
+
+- `snapshot`: `goreleaser release --snapshot --clean --parallelism 1` builds
+  the six archives and renders `dist/homebrew/rival.rb`.
+  `scripts/check_release_archives.py` checks checksums, binary format and CPU,
+  bundled files and the formula, and runs the binary built for the build
+  host's OS and CPU. The archives, `checksums.txt`, `metadata.json`,
+  `artifacts.json` and `homebrew/rival.rb` are uploaded as the run artifact
+  `rival-snapshot`.
+- `snapshot-native`: one job per archive on a runner of that OS and CPU runs
+  the packaged `rival version` with a private home.
+
+The `release` and `app` jobs run only for a pushed `v*` tag.
 
 ## Release checklist
 
@@ -34,14 +60,27 @@ VERSION=3.23.0
 2. Run the release gate before creating a tag:
 
    ```bash
-   cd rival
-   make test
-   cd ..
+   make cli-test
+   make cli-release-check
    ```
 
-   `make test` runs lint, race-enabled Go tests, and a versioned build. The
-   release workflow itself builds artifacts but does not duplicate this test
-   gate.
+   `make cli-test` runs the Rust workspace tests and the release-script tests.
+   `make cli-release-check` validates `.goreleaser.yaml`. The release workflow
+   itself builds artifacts but does not duplicate this test gate.
+
+   The candidate commit must also pass the full `CI` workflow on macOS,
+   Linux and Windows. This includes strict Clippy, CLI scenarios and Swift
+   session decoding. Do not tag a commit whose required checks are pending.
+
+   Run the [unpublished snapshot](#unpublished-snapshot) on the release branch
+   before the first Rust release, and whenever `.goreleaser.yaml`,
+   `release.yml`, `.github/actions/cli-release-tools/`, the toolchain or the
+   dependencies changed. `snapshot` and all six `snapshot-native` jobs must
+   pass. Download the artifact and read the rendered formula:
+
+   ```bash
+   gh run download <run-id> -n rival-snapshot -D "/tmp/rival-snapshot-${VERSION}"
+   ```
 
 3. Review and commit the complete release state, then create a lightweight tag
    on that commit:
@@ -60,11 +99,15 @@ VERSION=3.23.0
    only after the status review confirms that the complete tree is intended for
    this release.
 
-4. Push the release commit and tag:
+4. Push the release commit and tag as `1905`. Commits must use the `1905`
+   GitHub noreply address (`git config user.email`). An HTTPS token without
+   the `workflow` scope cannot push `.github/workflows/` changes, so push over
+   SSH with the maintainer's key for the `1905` account selected explicitly:
 
    ```bash
-   git push origin master
-   git push origin "v${VERSION}"
+   export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i <path-to-1905-key>"
+   git push git@github.com:1905/rival.git master
+   git push git@github.com:1905/rival.git "v${VERSION}"
    ```
 
 5. Watch the `Release` workflow for that tag:
@@ -82,8 +125,8 @@ VERSION=3.23.0
    gh release view "v${VERSION}"
    ```
 
-   It must contain archives for Darwin and Linux on both amd64 and arm64,
-   `checksums.txt`, and `Rival-app.zip`. Also confirm that `1905/homebrew-tap`
+   It must contain archives for Darwin, Linux and Windows on both amd64 and
+   arm64, `checksums.txt`, and `Rival-app.zip`. Also confirm that `1905/homebrew-tap`
    has commits for the same tag that update both `rival.rb` and
    `Casks/rival-app.rb` (the app commit message is
    `Cask update for rival-app version v${VERSION}`).

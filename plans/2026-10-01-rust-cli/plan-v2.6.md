@@ -1,7 +1,8 @@
-# Rust CLI + TUI — Implementation Plan v2.5
+# Rust CLI + TUI — Implementation Plan v2.6
 
 **Date:** 2026-10-03
-**Status:** superseded by v2.6
+**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Changes from v2.5:** Include the existing release guide and project release skill in Task 6.1. They still point at Go-only commands and would break after Task 6.2. This is documentation maintenance within the approved release switch; it does not authorize tagging, publication or installation.
 **Changes from v2.4:** Split the remaining Windows error-format corrections into Task 5.3 after native CI exposed platform assumptions. The process, detach, stop and queue tests already passed natively. This preserves the approved CLI behavior and release scope.
 **Changes from v2.3:** Add Task 5.0 to preserve Go's macOS pipe/spawn synchronization. Source inspection proved the port omitted it. Its relation to the intermittent P4 cancellation failure remains unproven. The feature and release scope is unchanged.
 **Changes from v2.2:** P3 is merged. The required live plan test exposed Windows spawn/console gaps and an incomplete Go-retirement checklist. This revision keeps the approved behavior and adds a documented owner Job guard, console-aware detach flags, startup-race tests and explicit source-test retirement. No feature or release authorization changes. Full functional-test review output: `reviews/p3-live-plan-review.txt`.
@@ -51,7 +52,7 @@
 - `rival/internal/session/testdata_contract_test.go`
 - `.github/workflows/ci.yml`
 
-**Modify:** `.gitignore` (`target/`), `.github/workflows/release.yml` (P6), `Makefile` (P6), `README.md`, `CHANGELOG.md` (P6)
+**Modify:** `.gitignore` (`target/`), `.github/workflows/release.yml` (P6), `Makefile` (P6), `README.md`, `CHANGELOG.md`, `docs/releasing.md`, `.claude/skills/rival-release/SKILL.md` (P6)
 **Remove (P6):** `rival/` (moved to /tmp/trash, `git add -A`)
 **Out of scope:** `app/` (Swift), the cask, `scripts/` of the app.
 
@@ -322,8 +323,10 @@ Files: `crates/rival-core/src/gostd.rs`, `crates/rival-core/Cargo.toml` if a Win
 ## P6 — switch (`feature/rust-p6-switch`)
 
 ### Task 6.1 — release pipeline `heavy`
-- [ ] `release.yml`: replace the goreleaser Go build with Rust builds for darwin/linux × amd64/arm64 and windows amd64/arm64; add a `workflow_dispatch` snapshot mode that builds and uploads artifacts to the run but publishes nothing. Option order: goreleaser's Rust builder (keeps the existing `brews:` formula config) → else cargo-dist. Verify the chosen tool's current docs before writing; same archive names `rival_<os>_<arch>.tar.gz` (zip on Windows), checksums, formula update.
-- [ ] `Makefile`, README (Windows install: download zip, unsigned binary note), CHANGELOG.
+- [x] `release.yml`: replace the goreleaser Go build with Rust builds for darwin/linux × amd64/arm64 and windows amd64/arm64; add a `workflow_dispatch` snapshot mode that builds and uploads artifacts to the run but publishes nothing. Option order: goreleaser's Rust builder (keeps the existing `brews:` formula config) → else cargo-dist. Verify the chosen tool's current docs before writing; same archive names `rival_<os>_<arch>.tar.gz` (zip on Windows), checksums, formula update.
+- [x] `Makefile`, README (Windows install: download zip, unsigned binary note), CHANGELOG. Update `docs/releasing.md` and `.claude/skills/rival-release/SKILL.md` to the root Rust commands/configuration, six archives and unpublished snapshot check. Keep the app release steps. These documents describe a later explicitly requested release; do not execute it during this implementation.
+
+**Task 6.1 local verification:** Controller checks passed 36 release-script/config tests, thirteen unchanged app-bundle tests, the version selector test, formatting, full-workspace strict Clippy and build. Local GoReleaser2.13.3 validates the configuration; the implementer proved one macOS arm64 snapshot build and version injection. CI pins GoReleaser2.18.2. The six-target snapshot, native packaged binaries and actual linkage remain required P6 gates. LLVM/Apple SDK versions are supplied by the runner and recorded in its logs. The protected project skill update was reviewed and applied by the controller; no release skill was invoked.
 
 ### Task 6.2 — remove Go `light`
 - [ ] Move `rival/` to `/tmp/trash/rival-go.<ts>`; `git add -A`; skills tree lives only under `crates/rival-core/skills/`; `bump-skill-versions.sh` points there; `testdata` contract test now Rust-only plus a Swift decode test in `app/Tests` reading `testdata/written/`.

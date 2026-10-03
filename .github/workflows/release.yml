@@ -1,42 +1,136 @@
 name: Release
 
+# Two entry points:
+# - A pushed v* tag publishes: the GitHub release, the rival.rb formula in
+#   1905/homebrew-tap, then Rival.app and its cask. Only these jobs get write
+#   permission and the tokens.
+# - Every workflow_dispatch run is an unpublished snapshot. It has no inputs.
+#   It builds the same six archives, renders the formula, uploads them to this
+#   run only and runs each packaged binary on a matching hosted runner.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
+# The CLI build host (macos-15: M1, 7 GB) builds one target at a time
+# (--parallelism 1) with two Cargo jobs, so LTO links do not compete for
+# memory. This also limits the tool installs. A cold six-target build
+# includes compiling cargo-zigbuild and cargo-xwin.
 jobs:
   release:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rival
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      CARGO_BUILD_JOBS: "2"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-          cache-dependency-path: rival/go.sum
+      - uses: ./.github/actions/cli-release-tools
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --clean
-          workdir: rival
+      - name: GoReleaser release
+        run: goreleaser release --clean --parallelism 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  snapshot:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/cli-release-tools
+
+      # --snapshot implies --skip=announce,publish,validate: no GitHub release,
+      # no tag, no tap push. The brew pipe still renders dist/homebrew/rival.rb.
+      # The empty HOMEBREW_TAP_TOKEN only lets the formula's token template
+      # render; it is not a credential.
+      - name: GoReleaser snapshot (publishes nothing)
+        run: goreleaser release --snapshot --clean --parallelism 1
+        env:
+          HOMEBREW_TAP_TOKEN: ""
+
+      - name: Check archives, checksums and formula
+        run: python3 scripts/check_release_archives.py dist --formula --run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rival-snapshot
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/metadata.json
+            dist/artifacts.json
+            dist/homebrew/rival.rb
+          if-no-files-found: error
+          retention-days: 14
+
+  # Runs each packaged `rival version` on a runner of the archive's own OS and
+  # CPU. The check script fails when the runner does not match the archive.
+  snapshot-native:
+    if: github.event_name == 'workflow_dispatch'
+    needs: snapshot
+    name: snapshot-native (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin_arm64
+            runner: macos-15
+          - target: darwin_amd64
+            runner: macos-15-intel
+          - target: linux_amd64
+            runner: ubuntu-24.04
+          - target: linux_arm64
+            runner: ubuntu-24.04-arm
+          - target: windows_amd64
+            runner: windows-2025
+          - target: windows_arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rival-snapshot
+          path: dist
+
+      - name: Run the packaged binary
+        run: python scripts/check_release_archives.py dist --only ${{ matrix.target }} --run
 
   # Rival.app: universal, ad-hoc signed, uploaded (zip + DMG) to the release
   # goreleaser just made, then the rival-app cask in 1905/homebrew-tap is updated.
   app:
     needs: release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     # macos-15 ships Xcode 16 (Swift 6) as default; Package.swift needs tools 6.0.
     runs-on: macos-15
     permissions:

@@ -7,6 +7,7 @@ Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Switched the release pipeline to the Rust CLI. GoReleaser's Rust builder makes macOS and Linux archives with cargo-zigbuild and Windows amd64/arm64 zips with cargo-xwin, on hosted macOS. Archive names, checksums and the Homebrew formula are unchanged; archives now include `LICENSE`, `README.md` and `licenses/Go-LICENSE`. Release builds embed the version through `RIVAL_VERSION`. A manual workflow run is an unpublished snapshot: it uploads the archives and rendered formula to the run and runs each binary on a matching runner. The README documents the Windows zip install, the unsigned binary and the CLI's `RIVAL_HOME`. Local config, archive-script and darwin/arm64 GoReleaser build checks pass; the six-target hosted snapshot remains pending.
 - Matched Go's Windows error language, fallback text and invalid work-directory errors. Local checks pass 1,231 tests; final native CI remains pending. Rare stat fallback operations remain a documented compatibility limit.
 - Corrected Windows test fixtures for paths, OS errors, executable extensions, temp directories and timestamp precision. Read-only file opens now preserve Go's directory-read behavior. All 1,227 local workspace tests pass; the native rerun remains pending.
 - Added native Windows CI alongside macOS/Linux. Pinned byte-contract inputs to LF and retained all Windows process tests. Local Windows Rust lint checks pass; hosted results remain pending.
