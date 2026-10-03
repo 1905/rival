@@ -1,7 +1,8 @@
-# Rust CLI + TUI — Implementation Plan v2.7
+# Rust CLI + TUI — Implementation Plan v2.8
 
 **Date:** 2026-10-03
-**Status:** superseded by v2.8
+**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Changes from v2.7:** The requested single Claude review found a new RIVAL_HOME/.env state-directory regression. The controller reproduced it with a private fixture. Task6.4 blocks only this Rust-specific variable from repository .env files, including detached execution and Windows case-insensitive names. Existing exported overrides and inherited Go behavior stay intact.
 **Changes from v2.6:** User requested one final Claude code review and README installation steps for each OS on 2026-10-03. Keep the already-approved Codex review and /simplify; add exactly one independent Claude review after implementation. Expand macOS, Linux and Windows install/update instructions, CPU selection and source fallback. Publication remains a separate decision.
 **Changes from v2.5:** Include the existing release guide and project release skill in Task 6.1. They still point at Go-only commands and would break after Task 6.2. This is documentation maintenance within the approved release switch; it does not authorize tagging, publication or installation.
 **Changes from v2.4:** Split the remaining Windows error-format corrections into Task 5.3 after native CI exposed platform assumptions. The process, detach, stop and queue tests already passed natively. This preserves the approved CLI behavior and release scope.
@@ -339,13 +340,22 @@ Files: `crates/rival-core/src/gostd.rs`, `crates/rival-core/Cargo.toml` if a Win
 ### Task 6.3 — installation documentation `gate`
 - [ ] Controller updates README.md with separate macOS, Linux and Windows instructions, Intel/AMD versus ARM archive selection, checksum verification, PATH setup, skill installation, updates and source fallback. Mark Windows release archives as upcoming until the first Rust release is published. Verify instructions against the actual archive layout; do not install over the user’s CLI.
 
+### Task 6.4 — keep state overrides outside repository .env `heavy`
+Files: `crates/rival-core/src/paths.rs`; root startup tests only if needed. Controller owns README, plan and live CLI fixture checks.
+- [x] Prevent `.env` loading from setting `RIVAL_HOME`, the Rust-only state-root override. Preserve an inherited nonempty or empty value. Preserve all other Go dotenv parsing, expansion, precedence and HOME/USERPROFILE semantics. Match RIVAL_HOME case-insensitively on Windows and exactly on Unix.
+- [x] Do not merely freeze the parent config paths: a detached child must not inherit a repository-injected RIVAL_HOME and accept it on re-exec. Keep the variable out of the runtime environment when it came only from `.env`.
+- [x] Add deterministic private-fixture regressions: unset, empty and explicitly exported overrides; ordinary dotenv values still load; Windows mixed-case spelling cannot bypass the restriction. Avoid shared environment mutation. Run focused paths/dotenv and affected root tests, formatting, strict Clippy and build.
+- [ ] Controller reruns the private direct/detached CLI probe, full workspace and three-OS CI. Update README to say RIVAL_HOME is process-environment-only. Rebuild the six-target unpublished artifacts after the final code is ready. Do not run another Claude review.
+
+**Task 6.4 local verification:** The controller reproduced the original redirect with RIVAL_HOME unset, then passed all six direct/detached fake-provider cases on the corrected binary. Unset, empty and custom exported values preserve the intended state root. Both Unix and Windows name rules have deterministic regressions. Final restored-code checks passed 1,231 workspace tests with ten intentional ignores, formatting, strict Clippy and build. An earlier full run overlapped the implementer’s deliberate negative mutation and failed the two new regressions; it is not counted as final validation. Native CI and the final snapshot still follow.
+
 ### Gate P6 `gate`
 - [ ] After Go removal: formatting, Clippy, full Rust workspace tests and runner tests pass on the P6 branch, plus native Windows process tests.
 - [ ] Full scenario set green on macOS and Linux.
 - [ ] Swift decode contract job green on the P6 branch (required before merge and before any tag).
 - [ ] Unpublished release build: run the new release workflow on the P6 branch via `workflow_dispatch` in snapshot mode (no publish, no formula push) for all six targets; download artifacts; check names `rival_<os>_<arch>.tar.gz`/`.zip`, checksums file, `rival version` output per archive (run where the host can), and the rendered formula diff against the current one.
 - [ ] `/rival-codex review` on the whole Rust tree vs `master` before P1; verify findings and fix.
-- [ ] Run exactly one `/rival-claude review` after implementation, as requested on 2026-10-03. Review the entire port against the same pre-P1 base. Present its full output before fixing valid findings. No automatic second review.
+- [x] Run exactly one `/rival-claude review` after implementation, as requested on 2026-10-03. Review the entire port against the same pre-P1 base. Present its full output before fixing valid findings. No automatic second review.
 - [ ] Run the actual `/simplify` after reviews, then verify any changes.
 - [ ] Merge; release is the user's call (version bump, SSH-alias push per project memory, `gh run watch`, brew upgrade, `rival version`).
 

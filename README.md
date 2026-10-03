@@ -527,7 +527,7 @@ Environment variables:
 | `RIVAL_CLAUDE_TOKEN` | unset | OAuth token for the Docker Claude runtime. |
 | `RIVAL_NO_UPDATE_CHECK` | unset | Disable the update check (`CI` also disables it). |
 | `RIVAL_NO_TELEMETRY` | unset | Disable telemetry (`DO_NOT_TRACK` and `CI` also disable it). |
-| `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
+| `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Set it in the process environment; repository `.env` files cannot set it. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
 
 ### Queue and timeouts
 

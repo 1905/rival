@@ -1,0 +1,70 @@
+{
+  "finding": "Claude: repository .env can set the Rust-only RIVAL_HOME",
+  "reviewed_commit": "b05acbb3bed006ca795c8863e2dde2308ec306bd",
+  "before": [
+    {
+      "case": "unset",
+      "redirected_state_created": true,
+      "expected_state_created": false,
+      "exit_code": 0
+    },
+    {
+      "case": "empty",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "custom",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    }
+  ],
+  "after": [
+    {
+      "case": "unset",
+      "mode": "direct",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "unset",
+      "mode": "detached",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "empty",
+      "mode": "direct",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "empty",
+      "mode": "detached",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "custom",
+      "mode": "direct",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    },
+    {
+      "case": "custom",
+      "mode": "detached",
+      "redirected_state_created": false,
+      "expected_state_created": true,
+      "exit_code": 0
+    }
+  ],
+  "real_provider_calls": 0,
+  "note": "Before: queue clear in three private fixtures. After: six direct/detached fake-Codex reviews. PATH contains only the task fake."
+}
