@@ -192,6 +192,8 @@ fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
             if let Some(log) = &f.log {
                 std::fs::write(&sess.log_file, log)?;
             }
+            // Only the Unix-only save-failure test sets it.
+            #[cfg(unix)]
             if f.lock_sessions {
                 use std::os::unix::fs::PermissionsExt;
                 std::fs::set_permissions(
@@ -199,6 +201,8 @@ fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
                     std::fs::Permissions::from_mode(0o500),
                 )?;
             }
+            #[cfg(not(unix))]
+            let _ = (f.lock_sessions, cfg);
             Ok(RunResult {
                 exit_code: f.exit_code,
                 output_bytes: f.log.as_ref().map_or(0, |l| l.len() as i64),

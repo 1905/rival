@@ -66,6 +66,12 @@ impl Fixture {
         }
         let mut env: HashMap<String, String> = HashMap::new();
         env.insert("HOME".into(), home.path().to_str().unwrap().into());
+        // Go's os.UserHomeDir reads USERPROFILE on Windows: the same temp
+        // home, so no test sees the real profile. Tests that change the home
+        // use paths::HOME_VAR.
+        if cfg!(windows) {
+            env.insert("USERPROFILE".into(), home.path().to_str().unwrap().into());
+        }
         env.insert(
             "RIVAL_HOME".into(),
             home.path().join(".rival").to_str().unwrap().into(),

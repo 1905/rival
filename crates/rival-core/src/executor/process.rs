@@ -2,12 +2,16 @@
 //! the provider process group, pipe IO that a cancellation can interrupt,
 //! and reaping.
 //!
-//! Unix is the real backend. The `not(unix)` items are placeholders that
-//! keep the crate compiling; P5 replaces them with a Windows Job Object
-//! backend (group kill) and cancellable pipe IO.
+//! Unix uses a process group and nonblocking pipes with bounded polls.
+//! Windows ([`windows`]) uses an owner Job plus one nested Job per provider,
+//! and overlapped pipes whose IO an abort event cancels.
 
 #[cfg(all(test, target_os = "macos"))]
 mod spawn_tests;
+#[cfg(windows)]
+pub mod windows;
+#[cfg(all(test, windows))]
+mod windows_tests;
 
 use std::ffi::OsStr;
 use std::fmt;
@@ -16,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
 use crate::gostd;
+#[cfg(not(windows))]
 use crate::paths;
 
 /// Go `syscall.ForkLock` on macOS. std's `io::pipe` there is `pipe(2)`
@@ -62,8 +67,53 @@ pub fn spawn(cmd: &mut Command) -> io::Result<Child> {
     cmd.spawn()
 }
 
+/// The parent's ends of a provider's stdio pipes. Unix: [`pipe`] (the caller
+/// then makes its ends nonblocking). Windows: the parent end is overlapped
+/// ([`windows::overlapped_pipe`]); only [`read_some`]/[`write_some`] may do
+/// IO on it.
+pub(crate) fn provider_pipe(parent_reads: bool) -> io::Result<(PipeReader, PipeWriter)> {
+    #[cfg(windows)]
+    return windows::overlapped_pipe(parent_reads);
+    #[cfg(not(windows))]
+    {
+        let _ = parent_reads;
+        pipe()
+    }
+}
+
+/// Starts a provider: its own process group on Unix; on Windows inside the
+/// owner Job and then its own nested Job (see [`windows`]). The caller set
+/// the group attributes with [`configure_group`] first.
+pub(crate) fn start_provider(cmd: &mut Command) -> io::Result<ProcessHandle> {
+    #[cfg(windows)]
+    {
+        let (child, job) = windows::spawn_contained(cmd)?;
+        Ok(windows::ProcessHandle::new(child, job))
+    }
+    #[cfg(not(windows))]
+    spawn(cmd).map(ProcessHandle::new)
+}
+
+/// The program path to start when the child runs in `dir` (Go `cmd.Dir`).
+/// Unix `execve` resolves a relative program after the `chdir`, as Go does,
+/// so the path is kept. Windows makes it absolute against `dir` with Go's
+/// `StartProcess` rule ([`windows::program_in_dir`]); its error fails the
+/// start like Go's.
+pub fn program_in_dir(program: &Path, dir: &Path) -> io::Result<PathBuf> {
+    #[cfg(windows)]
+    return windows::program_in_dir(program, dir);
+    #[cfg(not(windows))]
+    {
+        let _ = dir;
+        Ok(program.to_path_buf())
+    }
+}
+
 /// Go `exec.ErrNotFound`.
+#[cfg(not(windows))]
 const ERR_NOT_FOUND: &str = "executable file not found in $PATH";
+#[cfg(windows)]
+use windows::ERR_NOT_FOUND;
 /// Go `exec.ErrDot`.
 const ERR_DOT: &str = "cannot run executable found relative to current directory";
 
@@ -88,6 +138,32 @@ impl std::error::Error for LookPathError {}
 /// A name containing `/` is checked as-is. Otherwise each `$PATH` element is
 /// tried in order; an empty element means `.`, and a hit that is not
 /// absolute is an `ErrDot` error.
+///
+/// Windows follows Go's Windows `LookPath` instead (`PATHEXT`, the implicit
+/// current-directory hit, `%PATH%` quoting); see [`windows::look_path_exts`].
+/// `PATHEXT` and `NoDefaultCurrentDirectoryInExePath` come from the process
+/// environment, as Go reads them.
+#[cfg(windows)]
+pub fn look_path(file: &str, path_env: Option<&OsStr>) -> Result<PathBuf, LookPathError> {
+    if matches!(file, "" | "." | "..") {
+        // Go `validateLookPath`.
+        return Err(LookPathError {
+            name: file.to_string(),
+            err: ERR_NOT_FOUND.to_string(),
+            dot_path: None,
+        });
+    }
+    let env = windows::LookEnv::process();
+    windows::look_path_exts(
+        file,
+        &windows::path_ext(env.path_ext.as_deref()),
+        path_env,
+        env.no_dot,
+        windows::same_file,
+    )
+}
+
+#[cfg(not(windows))]
 pub fn look_path(file: &str, path_env: Option<&OsStr>) -> Result<PathBuf, LookPathError> {
     let error = |err: String, dot_path: Option<PathBuf>| LookPathError {
         name: file.to_string(),
@@ -153,20 +229,6 @@ fn find_executable(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Placeholder until P5 (Go's Windows LookPath also tries `PATHEXT`).
-#[cfg(not(unix))]
-fn find_executable(path: &Path) -> Result<(), String> {
-    match std::fs::metadata(path) {
-        Ok(meta) if meta.is_dir() => Err("is a directory".to_string()),
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!(
-            "stat {}: {}",
-            path.display(),
-            gostd::os_error_text(&e)
-        )),
-    }
-}
-
 /// Starts the provider in its own process group (Go `Setpgid: true`), so a
 /// cancellation can SIGKILL the launcher and every descendant that stayed in
 /// the group. `process_group(0)` is std's `setpgid(0, 0)` in the child.
@@ -176,8 +238,9 @@ pub(crate) fn configure_group(cmd: &mut Command) {
     cmd.process_group(0);
 }
 
-/// Go is a no-op on Windows; P5 assigns a Job Object instead.
-#[cfg(not(unix))]
+/// Go's Windows `setProcessGroup` is a no-op. Rust contains the provider in
+/// Jobs instead, set up by [`start_provider`].
+#[cfg(windows)]
 pub(crate) fn configure_group(_cmd: &mut Command) {}
 
 /// Makes `cmd` start `program` the way Go's `syscall.forkExec` does: a raw
@@ -217,8 +280,15 @@ pub(crate) fn set_exec<S: AsRef<OsStr>>(
     Ok(())
 }
 
-/// Placeholder until P5: std's own spawn with `args` and `env`.
-#[cfg(not(unix))]
+/// Windows: std's own `CreateProcessW`, which keeps std's argument quoting
+/// and its safe `.bat`/`.cmd` handling (through `cmd.exe`). `env` replaces
+/// the whole environment, plus Go's `addCriticalEnv`: `SYSTEMROOT` from this
+/// process when `env` has none.
+///
+/// Differences from Go, which builds the command line itself: the child's
+/// first command-line word is the program path std was given, not `arg0`;
+/// and std drops an entry without `=` (Go would pass it through).
+#[cfg(windows)]
 pub(crate) fn set_exec<S: AsRef<OsStr>>(
     cmd: &mut Command,
     _program: &Path,
@@ -227,8 +297,32 @@ pub(crate) fn set_exec<S: AsRef<OsStr>>(
     env: &[std::ffi::OsString],
 ) -> io::Result<()> {
     cmd.args(args);
-    super::subprocess::set_env(cmd, env);
+    let env = add_critical_env(env, std::env::var_os("SYSTEMROOT"));
+    super::subprocess::set_env(cmd, &env);
     Ok(())
+}
+
+/// Go `exec.addCriticalEnv` (Windows): appends `SYSTEMROOT=<systemroot>` when
+/// no entry has that key (ASCII case ignored). Pure, for tests on every
+/// platform.
+pub fn add_critical_env(
+    env: &[std::ffi::OsString],
+    systemroot: Option<std::ffi::OsString>,
+) -> Vec<std::ffi::OsString> {
+    let mut env = env.to_vec();
+    let has = env.iter().any(|kv| {
+        let bytes = kv.as_encoded_bytes();
+        bytes
+            .iter()
+            .position(|&b| b == b'=')
+            .is_some_and(|i| bytes[..i].eq_ignore_ascii_case(b"SYSTEMROOT"))
+    });
+    if !has {
+        let mut kv = std::ffi::OsString::from("SYSTEMROOT=");
+        kv.push(systemroot.unwrap_or_default());
+        env.push(kv);
+    }
+    env
 }
 
 /// The `execve` arguments, built in the parent so the child only reads them.
@@ -323,14 +417,14 @@ pub(crate) struct ExitState {
 /// The started provider. It stays unreaped until [`ProcessHandle::try_reap`]
 /// returns its status, so its PID and process group ID cannot be reused while
 /// [`ProcessHandle::kill_group`] may still run. After a reap no signal is sent.
+#[cfg(unix)]
 pub(crate) struct ProcessHandle {
-    #[cfg(unix)]
     pid: i32,
-    #[cfg(unix)]
     reaped: bool,
-    #[cfg(not(unix))]
-    child: std::process::Child,
 }
+
+#[cfg(windows)]
+pub(crate) use windows::ProcessHandle;
 
 #[cfg(unix)]
 impl ProcessHandle {
@@ -403,7 +497,9 @@ impl ProcessHandle {
 /// Go `Process.Wait` error prefix (`NewSyscallError`).
 #[cfg(target_os = "linux")]
 pub(crate) const WAIT_SYSCALL: &str = "waitid";
-#[cfg(not(target_os = "linux"))]
+#[cfg(windows)]
+pub(crate) const WAIT_SYSCALL: &str = "WaitForSingleObject";
+#[cfg(not(any(target_os = "linux", windows)))]
 pub(crate) const WAIT_SYSCALL: &str = "wait";
 
 /// Go `os.Pipe` error prefix (`NewSyscallError`).
@@ -412,48 +508,36 @@ pub(crate) const PIPE_SYSCALL: &str = "pipe2";
 #[cfg(not(target_os = "linux"))]
 pub(crate) const PIPE_SYSCALL: &str = "pipe";
 
-#[cfg(not(unix))]
-impl ProcessHandle {
-    pub(crate) fn new(child: std::process::Child) -> ProcessHandle {
-        ProcessHandle { child }
-    }
-
-    pub(crate) fn pid(&self) -> i32 {
-        self.child.id() as i32
-    }
-
-    /// Placeholder until P5: kills the direct child only (Go's default
-    /// `Cancel` on Windows); a Job Object will kill the whole tree.
-    pub(crate) fn kill_group(&mut self) -> KillOutcome {
-        match self.child.kill() {
-            Ok(()) => KillOutcome::Sent,
-            Err(e) if e.kind() == io::ErrorKind::InvalidInput => KillOutcome::Done,
-            Err(e) => KillOutcome::Failed(gostd::os_error_text(&e)),
-        }
-    }
-
-    pub(crate) fn try_reap(&mut self) -> io::Result<Option<ExitState>> {
-        Ok(self.child.try_wait()?.map(|status| ExitState {
-            code: status.code().map_or(-1, i64::from),
-            success: status.success(),
-        }))
-    }
-}
-
 /// Ends worker pipe IO once the drain grace has passed. Go closes the pipe
 /// files; closing a descriptor from another thread does not reliably
-/// interrupt a blocked read on Linux (close(2)), so the workers use
-/// nonblocking IO and bounded poll waits that recheck this flag.
-#[derive(Default)]
-pub(crate) struct Abort(std::sync::atomic::AtomicBool);
+/// interrupt a blocked read on Linux (close(2)), so the Unix workers use
+/// nonblocking IO and bounded poll waits that recheck this flag. Windows
+/// workers wait on their overlapped IO and this manual-reset event together,
+/// so a fire at any moment ends the wait (see `windows::overlapped_io`).
+pub(crate) struct Abort {
+    fired: std::sync::atomic::AtomicBool,
+    #[cfg(windows)]
+    event: std::os::windows::io::OwnedHandle,
+}
 
 impl Abort {
+    /// Windows creates the event here; that can fail.
+    pub(crate) fn new() -> io::Result<Abort> {
+        Ok(Abort {
+            fired: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(windows)]
+            event: windows::manual_event()?,
+        })
+    }
+
     pub(crate) fn fire(&self) {
-        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.fired.store(true, std::sync::atomic::Ordering::SeqCst);
+        #[cfg(windows)]
+        windows::set_event(&self.event);
     }
 
     pub(crate) fn is_fired(&self) -> bool {
-        self.0.load(std::sync::atomic::Ordering::SeqCst)
+        self.fired.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -493,10 +577,15 @@ pub fn set_nonblocking(fd: &impl std::os::fd::AsRawFd) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(unix))]
+/// Windows needs no mode change: provider pipes are overlapped instead
+/// ([`provider_pipe`]).
+#[cfg(windows)]
 pub fn set_nonblocking<T>(_fd: &T) -> io::Result<()> {
     Ok(())
 }
+
+#[cfg(windows)]
+pub(crate) use windows::{close_file, read_some, write_some};
 
 /// Waits until `fd` is ready for `events` or the abort fires. Returns false
 /// on abort.
@@ -525,6 +614,7 @@ fn wait_ready(fd: std::os::fd::RawFd, events: libc::c_short, abort: &Abort) -> b
 }
 
 /// Reads once. Blocks (interruptibly) until data, EOF, an error, or abort.
+#[cfg(unix)]
 pub(crate) fn read_some(r: &std::io::PipeReader, buf: &mut [u8], abort: &Abort) -> Io {
     use std::io::Read;
     loop {
@@ -548,6 +638,7 @@ pub(crate) fn read_some(r: &std::io::PipeReader, buf: &mut [u8], abort: &Abort) 
 
 /// Writes once (possibly short). Blocks (interruptibly) like [`read_some`].
 /// An empty `buf` still makes one write call, as Go's `poll.FD.Write` does.
+#[cfg(unix)]
 pub(crate) fn write_some(w: &std::io::PipeWriter, buf: &[u8], abort: &Abort) -> Io {
     use std::io::Write;
     loop {
@@ -586,23 +677,19 @@ pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
     Err(err)
 }
 
-#[cfg(not(unix))]
-pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
-    drop(file);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::ffi::OsString;
 
     #[test]
     fn look_path_error_text_matches_go() {
         let err = look_path("no-such-rival-binary", Some(OsStr::new("/nonexistent"))).unwrap_err();
+        let path_var = if cfg!(windows) { "%PATH%" } else { "$PATH" };
         assert_eq!(
             err.to_string(),
-            r#"exec: "no-such-rival-binary": executable file not found in $PATH"#
+            format!(r#"exec: "no-such-rival-binary": executable file not found in {path_var}"#)
         );
         // Unset and empty PATH search nothing.
         assert!(look_path("sh", None).is_err());
@@ -666,5 +753,22 @@ mod tests {
         assert_eq!(err.err, ERR_DOT);
         assert_eq!(err.dot_path, Some(paths::clean(&rel.join("tool"))));
         assert!(!err.dot_path.unwrap().is_absolute());
+    }
+
+    #[test]
+    fn add_critical_env_matches_go() {
+        let env = |items: &[&str]| -> Vec<std::ffi::OsString> {
+            items.iter().map(std::ffi::OsString::from).collect()
+        };
+        let root = Some(std::ffi::OsString::from(r"C:\Windows"));
+        // Present in any case: unchanged.
+        let have = env(&["A=1", "SystemRoot=X"]);
+        assert_eq!(add_critical_env(&have, root.clone()), have);
+        // Missing: appended from the process value, empty when unset.
+        assert_eq!(
+            add_critical_env(&env(&["A=1", "SYSTEMROOTX=1"]), root),
+            env(&["A=1", "SYSTEMROOTX=1", r"SYSTEMROOT=C:\Windows"])
+        );
+        assert_eq!(add_critical_env(&[], None), env(&["SYSTEMROOT="]));
     }
 }

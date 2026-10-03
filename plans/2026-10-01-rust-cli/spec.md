@@ -137,7 +137,9 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - P4 is merged at `fff4ac3`. The interactive TUI and Result tab passed 1,205 workspace tests, seven real terminal cleanup cases, a real-watcher transition check and 33 screenshot checks. Hosted macOS/Linux CI passed all 84 scenarios and Swift decoding. The terminal uses the app's dim palette and an eight-entry Result cache.
 - P5 implementation correction, not yet verified: an owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. This replaces the original flag recipe and closes the documented suspended-child orphan interval; plan v2.3 carries native regression requirements.
 
-- P5 process correction: the missing macOS pipe/spawn synchronization is implemented. An isolated forced-overlap regression detects a deliberately bypassed guard. All 1,207 workspace tests and seven terminal checks pass locally. The guard covers Rival calls, not foreign libraries. The intermittent P4 cancellation failure remains unexplained; hosted verification remains pending.
+- P5 process correction: the missing macOS pipe/spawn synchronization is implemented. An isolated forced-overlap regression detects a deliberately bypassed guard. All 1,207 workspace tests and seven terminal checks pass locally. Hosted macOS/Linux CI also passed at `208842e`. The guard covers Rival calls, not foreign libraries. The intermittent P4 cancellation failure remains unexplained.
+
+- P5 Windows code and native helper tests are implemented, with native CI pending. Local checks pass 1,227 workspace tests. The implementation adds `winpath.rs`, Windows process/detach/stop helpers, cancellable overlapped pipes and OS temp-directory calls. Process identity remains separate from running state, including exit code 259. Console-less providers suppress new console windows; one-shot git/glab launches retain standard flags. Windows environment lookup folds ASCII names only. UNC lexical paths are tested; UNC network stat and native TUI restoration are not verified.
 
 ## Rollout
 

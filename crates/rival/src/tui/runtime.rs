@@ -212,7 +212,12 @@ fn check_input() -> Result<(), String> {
         })
 }
 
-/// Windows is Task 5.1.
+/// Windows needs no separate preflight. bubbletea opens `CONIN$` when stdin
+/// is not a terminal; crossterm 0.29 already reads the console input
+/// buffer, not stdin: `enable_raw_mode` and its event source open `CONIN$`
+/// through crossterm_winapi 0.9.1 `Handle::current_in_handle`. A process
+/// without a console fails there, in `ScreenGuard::enter`, with crossterm's
+/// error text rather than bubbletea's `could not open TTY` wording.
 #[cfg(not(unix))]
 fn check_input() -> Result<(), String> {
     Ok(())

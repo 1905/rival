@@ -68,8 +68,53 @@ impl Paths {
     }
 }
 
-/// Go: `filepath.Clean` (Unix rules), purely lexical.
+/// Go: `filepath.Clean` for the host, purely lexical: Unix rules, or on
+/// Windows the drive/UNC rules of [`crate::winpath`].
 pub fn clean(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    return crate::winpath::clean_path(path);
+    #[cfg(not(windows))]
+    return clean_unix(path);
+}
+
+/// Go: `filepath.Join` of two elements for the host.
+pub fn join(a: &Path, b: &Path) -> PathBuf {
+    #[cfg(windows)]
+    return crate::winpath::join_paths(a, b);
+    #[cfg(not(windows))]
+    {
+        let (a_bytes, b_bytes) = (
+            a.as_os_str().as_encoded_bytes(),
+            b.as_os_str().as_encoded_bytes(),
+        );
+        match (a_bytes.is_empty(), b_bytes.is_empty()) {
+            (true, true) => PathBuf::new(),
+            (true, false) => clean_unix(b),
+            (false, true) => clean_unix(a),
+            (false, false) => {
+                let mut joined = a_bytes.to_vec();
+                joined.push(b'/');
+                joined.extend_from_slice(b_bytes);
+                // SAFETY: two valid encodings joined at an ASCII '/'.
+                clean_unix(Path::new(unsafe {
+                    OsStr::from_encoded_bytes_unchecked(&joined)
+                }))
+            }
+        }
+    }
+}
+
+/// Go: `filepath.IsAbs` for the host.
+pub fn is_abs(path: &Path) -> bool {
+    #[cfg(windows)]
+    return crate::winpath::is_abs_path(path);
+    #[cfg(not(windows))]
+    return path.as_os_str().as_encoded_bytes().first() == Some(&b'/');
+}
+
+/// Go: `filepath.Clean` with Unix rules on every platform. A backslash is an
+/// ordinary byte here.
+pub fn clean_unix(path: &Path) -> PathBuf {
     let bytes = path.as_os_str().as_encoded_bytes();
     if bytes.is_empty() {
         return PathBuf::from(".");
@@ -104,11 +149,20 @@ pub fn clean(path: &Path) -> PathBuf {
 
 /// Go: `filepath.Abs`. `cwd` is the snapshotted `os.Getwd()` result; `None`
 /// stands for a `Getwd` error, which makes a relative path fail.
+///
+/// Windows follows [`crate::winpath::abs_with`]: drive, root-relative, UNC
+/// and drive-relative forms; another drive's own directory comes from the
+/// OS (`std::path::absolute`, `GetFullPathNameW` like Go's `syscall.FullPath`).
 pub fn abs(cwd: Option<&Path>, path: &Path) -> Option<PathBuf> {
-    if path.is_absolute() {
-        return Some(clean(path));
+    #[cfg(windows)]
+    return crate::winpath::abs_with(cwd, path, |p| std::path::absolute(p).ok());
+    #[cfg(not(windows))]
+    {
+        if is_abs(path) {
+            return Some(clean(path));
+        }
+        cwd.map(|cwd| clean(&cwd.join(path)))
     }
-    cwd.map(|cwd| clean(&cwd.join(path)))
 }
 
 /// Go: `os.Getwd` on Unix. An absolute `$PWD` naming the current directory
@@ -431,10 +485,40 @@ mod tests {
             ("abc/../../././../def", "../../def"),
         ];
         for (input, want) in cases {
-            assert_eq!(clean(Path::new(input)), PathBuf::from(want), "{input:?}");
+            assert_eq!(
+                clean_unix(Path::new(input)).into_os_string(),
+                OsString::from(want),
+                "{input:?}"
+            );
+        }
+        // A backslash is an ordinary byte under Unix rules.
+        assert_eq!(
+            clean_unix(Path::new(r"a\b/../c\.\d")).into_os_string(),
+            OsString::from(r"c\.\d")
+        );
+    }
+
+    /// The host's `clean`, `join` and `is_abs` follow its own Go rules.
+    #[test]
+    fn host_rules_dispatch_by_platform() {
+        let got = |p: &str| clean(Path::new(p)).into_os_string();
+        let joined = |a: &str, b: &str| join(Path::new(a), Path::new(b)).into_os_string();
+        if cfg!(windows) {
+            assert_eq!(got(r"C:\a\..\b/c"), OsString::from(r"C:\b\c"));
+            assert_eq!(got(r"\\host\share\x\.."), OsString::from(r"\\host\share\"));
+            assert_eq!(joined("C:", "f"), OsString::from("C:f"));
+            assert!(is_abs(Path::new(r"C:\x")) && !is_abs(Path::new(r"\x")));
+        } else {
+            // `a\b` is one element.
+            assert_eq!(got(r"a\b/../c"), OsString::from("c"));
+            assert_eq!(got(r"x/a\b/./c"), OsString::from(r"x/a\b/c"));
+            assert_eq!(joined("/a", "../b"), OsString::from("/b"));
+            assert_eq!(joined("", ""), OsString::new());
+            assert!(is_abs(Path::new("/x")) && !is_abs(Path::new(r"C:\x")));
         }
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn abs_joins_cwd_and_cleans() {
         let cwd = Path::new("/work/dir");

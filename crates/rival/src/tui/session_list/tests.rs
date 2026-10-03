@@ -262,14 +262,45 @@ fn kind_label_cases() {
 
 #[test]
 fn project_name_is_the_last_path_element() {
+    // Go filepath.Base of "/" is the host separator.
+    let root = if cfg!(windows) { r"\" } else { "/" };
     for (path, want) in [
         ("/a/b/orbit-web", "orbit-web"),
         ("/a/b/orbit-web/", "orbit-web"),
         ("", "-"),
-        ("/", "/"),
+        ("/", root),
         ("plain", "plain"),
     ] {
         assert_eq!(project_name(path), want, "{path:?}");
+    }
+}
+
+/// Both host rules on every platform: Windows splits at either separator and
+/// drops a drive or UNC volume; Unix keeps a backslash in the name.
+#[test]
+fn base_name_follows_each_platform_rule() {
+    for (path, want) in [
+        (r"C:\work\orbit-web", "orbit-web"),
+        (r"C:\work\orbit-web\", "orbit-web"),
+        ("C:/work/orbit-web", "orbit-web"),
+        (r"\\host\share\orbit-web", "orbit-web"),
+        (r"C:\", r"\"),
+        ("C:orbit-web", "orbit-web"),
+        (r"a\b/c", "c"),
+    ] {
+        assert_eq!(windows_base_name(path), want, "Windows {path:?}");
+    }
+    for (path, want) in [
+        (r"C:\work\orbit-web", r"C:\work\orbit-web"),
+        (r"a\b/c", "c"),
+        (r"/x/a\b", r"a\b"),
+    ] {
+        assert_eq!(base_name(path), want, "Unix {path:?}");
+    }
+    if cfg!(windows) {
+        assert_eq!(project_name(r"D:\src\app"), "app");
+    } else {
+        assert_eq!(project_name(r"/src/a\b"), r"a\b");
     }
 }
 

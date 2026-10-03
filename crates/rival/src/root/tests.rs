@@ -715,3 +715,181 @@ fn closed_stdin_and_stdout_fail_like_go() {
         "char_device=true\nread=ok:0\nwrite=bad file descriptor"
     );
 }
+
+// ---- Windows standard handles ----
+
+#[cfg(windows)]
+const WIN_STDIN_OUT: &str = "RIVAL_ROOT_WIN_STDIN_OUT";
+#[cfg(windows)]
+const WIN_STDIN_MODE: &str = "RIVAL_ROOT_WIN_STDIN_MODE";
+#[cfg(windows)]
+const WIN_STDIN_TEST: &str = "root::tests::win_stdin_helper_child";
+
+/// Runs only inside the helper process: reports what the process stdin and
+/// stdout adapters see. Modes `invalid`/`nullhandle` first set the standard
+/// input slot to INVALID_HANDLE_VALUE (Go's `os.Stdin` is nil) or NULL (a
+/// `File` on handle 0); `out-invalid`/`out-nullhandle` do that to stdout.
+#[cfg(windows)]
+#[test]
+#[ignore = "helper process for the Windows stdin tests"]
+fn win_stdin_helper_child() {
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::System::Console::{STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle};
+    let Some(out) = std::env::var_os(WIN_STDIN_OUT) else {
+        return;
+    };
+    let set = |which, handle| {
+        // SAFETY: changes only this helper's standard handle slot.
+        unsafe { SetStdHandle(which, handle) };
+    };
+    match std::env::var(WIN_STDIN_MODE).as_deref() {
+        Ok("invalid") => set(STD_INPUT_HANDLE, INVALID_HANDLE_VALUE),
+        Ok("nullhandle") => set(STD_INPUT_HANDLE, std::ptr::null_mut()),
+        Ok("out-invalid") => set(STD_OUTPUT_HANDLE, INVALID_HANDLE_VALUE),
+        Ok("out-nullhandle") => set(STD_OUTPUT_HANDLE, std::ptr::null_mut()),
+        _ => {}
+    }
+    let mut stdin = ProcessStdin;
+    let char_device = stdin.is_char_device();
+    let stat_failed = stdin.stat_failed();
+    let read = match stdin.read_all() {
+        Ok(data) => format!("ok:{}", String::from_utf8_lossy(&data)),
+        Err(e) => e,
+    };
+    let write = match ProcessStdout.write(b"x") {
+        Ok(n) => format!("ok:{n}"),
+        Err(e) => crate::command_plan::write_stdout_error(&e).message,
+    };
+    std::fs::write(
+        &out,
+        format!("char_device={char_device}\nstat_failed={stat_failed}\nread={read}\nwrite={write}"),
+    )
+    .unwrap();
+    std::process::exit(0);
+}
+
+#[cfg(windows)]
+fn run_win_stdin_helper(mode: &str) -> String {
+    use std::process::{Command, Stdio};
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("report");
+    let mut cmd = Command::new(std::env::current_exe().unwrap());
+    cmd.args(["--exact", WIN_STDIN_TEST, "--ignored", "--quiet"])
+        .env(WIN_STDIN_OUT, &out)
+        .env(WIN_STDIN_MODE, mode)
+        .env("HOME", dir.path())
+        .env("USERPROFILE", dir.path())
+        .env("RIVAL_HOME", dir.path().join(".rival"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut file_input = None;
+    match mode {
+        "file" => {
+            let input = dir.path().join("in.txt");
+            std::fs::write(&input, "from file").unwrap();
+            cmd.stdin(Stdio::from(std::fs::File::open(&input).unwrap()));
+        }
+        "pipe" => {
+            let (reader, writer) = rival_core::executor::process::pipe().unwrap();
+            cmd.stdin(Stdio::from(reader));
+            file_input = Some(writer);
+        }
+        _ => {
+            cmd.stdin(Stdio::null());
+        }
+    }
+    /// Owns the helper from its spawn: dropping it unexited kills it and
+    /// waits a bounded time, so no assertion leaves it running.
+    struct Guard(std::process::Child);
+    impl Guard {
+        fn wait_for(&mut self, timeout: std::time::Duration) -> Option<std::process::ExitStatus> {
+            let deadline = std::time::Instant::now() + timeout;
+            loop {
+                if let Ok(Some(status)) = self.0.try_wait() {
+                    return Some(status);
+                }
+                if std::time::Instant::now() >= deadline {
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        }
+    }
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            if matches!(self.0.try_wait(), Ok(None)) {
+                let _ = self.0.kill();
+                if self.wait_for(std::time::Duration::from_secs(10)).is_none() {
+                    eprintln!("cleanup: stdin helper {} still running", self.0.id());
+                }
+            }
+        }
+    }
+    let mut child = Guard(rival_core::executor::process::spawn(&mut cmd).unwrap());
+    drop(cmd);
+    if let Some(mut writer) = file_input {
+        writer.write_all(b"from pipe").unwrap();
+    }
+    let status = child
+        .wait_for(std::time::Duration::from_secs(30))
+        .unwrap_or_else(|| panic!("stdin helper ({mode}) did not exit in 30s"));
+    assert!(status.success(), "helper failed: {status}");
+    std::fs::read_to_string(&out).unwrap()
+}
+
+/// Go on Windows: `NUL` is a character device (so it reads as no piped
+/// input), a pipe and a file are not. An INVALID_HANDLE_VALUE stdin makes
+/// `os.Stdin` nil: `Stat` fails and the read is the bare `invalid argument`.
+/// A NULL stdin is a `File` on handle 0: `Stat` (GetFileType) fails and the
+/// read fails with ERROR_INVALID_HANDLE. std would read EOF from both.
+#[cfg(windows)]
+#[test]
+fn windows_stdin_kinds_match_go() {
+    let ok_write = "write=ok:1";
+    assert_eq!(
+        run_win_stdin_helper("null"),
+        format!("char_device=true\nstat_failed=false\nread=ok:\n{ok_write}")
+    );
+    assert_eq!(
+        run_win_stdin_helper("pipe"),
+        format!("char_device=false\nstat_failed=false\nread=ok:from pipe\n{ok_write}")
+    );
+    assert_eq!(
+        run_win_stdin_helper("file"),
+        format!("char_device=false\nstat_failed=false\nread=ok:from file\n{ok_write}")
+    );
+    assert_eq!(
+        run_win_stdin_helper("invalid"),
+        format!("char_device=false\nstat_failed=true\nread=invalid argument\n{ok_write}")
+    );
+    let invalid_handle = rival_core::gostd::os_error_text(&std::io::Error::from_raw_os_error(
+        windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32,
+    ));
+    assert_eq!(
+        run_win_stdin_helper("nullhandle"),
+        format!(
+            "char_device=false\nstat_failed=true\nread=read /dev/stdin: {invalid_handle}\n{ok_write}"
+        )
+    );
+}
+
+/// Go on Windows: an INVALID_HANDLE_VALUE stdout makes `os.Stdout` nil and a
+/// write fails with the bare `invalid argument`; a NULL stdout is a `File`
+/// whose WriteFile fails with ERROR_INVALID_HANDLE. std would report success
+/// for both.
+#[cfg(windows)]
+#[test]
+fn windows_stdout_missing_handles_fail_like_go() {
+    let head = "char_device=true\nstat_failed=false\nread=ok:";
+    assert_eq!(
+        run_win_stdin_helper("out-invalid"),
+        format!("{head}\nwrite=write stdout: invalid argument")
+    );
+    let invalid_handle = rival_core::gostd::os_error_text(&std::io::Error::from_raw_os_error(
+        windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32,
+    ));
+    assert_eq!(
+        run_win_stdin_helper("out-nullhandle"),
+        format!("{head}\nwrite=write stdout: write /dev/stdout: {invalid_handle}")
+    );
+}

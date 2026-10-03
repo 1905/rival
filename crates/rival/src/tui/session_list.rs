@@ -121,10 +121,24 @@ pub fn project_name(workdir: &str) -> String {
     if workdir.is_empty() {
         return "-".to_string();
     }
-    base_name(workdir).to_string()
+    #[cfg(windows)]
+    return windows_base_name(workdir);
+    #[cfg(not(windows))]
+    return base_name(workdir).to_string();
 }
 
-/// Go: `filepath.Base` on a slash-separated path.
+/// Go: `filepath.Base` on Windows. Both separators count and a drive or UNC
+/// volume is dropped: `C:\work\app` and `\\host\share\app` give `app`, a
+/// drive root gives `\`. Session data written on Windows may use either
+/// separator.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn windows_base_name(path: &str) -> String {
+    String::from_utf8_lossy(&rival_core::winpath::base(path.as_bytes())).into_owned()
+}
+
+/// Go: `filepath.Base` on Unix: only `/` separates, so a backslash is an
+/// ordinary name byte.
+#[cfg_attr(windows, allow(dead_code))]
 fn base_name(path: &str) -> &str {
     let trimmed = path.trim_end_matches('/');
     if trimmed.is_empty() {

@@ -10,10 +10,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
+#[cfg(unix)]
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg(unix)]
 use rival_core::executor::process;
 use rival_core::logfmt;
 use rival_core::paths::Paths;
@@ -89,16 +92,17 @@ pub type Launch = fn(&Path) -> io::Result<Option<Child>>;
 /// The opener program. Go runs `exec.Command("open", path)`, the macOS
 /// opener, on every platform. Rust uses `open` on macOS and `xdg-open` on
 /// the other unix hosts; where it is not installed the launch fails and the
-/// copy is removed again, as for any failed launch. The Windows opener
-/// (ShellExecute) is Task 5.1 and goes here too.
+/// copy is removed again, as for any failed launch. Windows has no opener
+/// program: [`launch_viewer`] asks the shell (`ShellExecuteW`) instead.
 #[cfg(target_os = "macos")]
 pub const VIEWER: &str = "open";
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 pub const VIEWER: &str = "xdg-open";
 
 /// A command whose stdin, stdout and stderr are the null device, as Go's
 /// `exec.Cmd` leaves them: it can neither read the TUI's keys nor print over
-/// the screen.
+/// the screen. Unix only: the Windows viewer starts no command.
+#[cfg(unix)]
 pub fn quiet_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
     cmd.stdin(Stdio::null())
@@ -108,6 +112,7 @@ pub fn quiet_command(program: &str) -> Command {
 }
 
 /// The viewer launch for `path`.
+#[cfg(unix)]
 pub fn viewer_command(path: &Path) -> Command {
     let mut cmd = quiet_command(VIEWER);
     cmd.arg(path);
@@ -115,8 +120,74 @@ pub fn viewer_command(path: &Path) -> Command {
 }
 
 /// Go: `exec.Command("open", path).Start()`.
+#[cfg(unix)]
 pub fn launch_viewer(path: &Path) -> io::Result<Option<Child>> {
     process::spawn(&mut viewer_command(path)).map(Some)
+}
+
+/// Windows: the shell's "open" verb on the copy, through `ShellExecuteW`.
+/// The path is passed as the file argument, never through a command line,
+/// so no shell parses it. There is no launcher process to reap (`None`),
+/// and whatever app the shell starts is never waited for or ended.
+#[cfg(windows)]
+pub fn launch_viewer(path: &Path) -> io::Result<Option<Child>> {
+    use windows_sys::Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+    };
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    shell_open(path, |verb, file| {
+        // Microsoft asks for COM on the calling thread before ShellExecute.
+        // SAFETY: plain COM setup on this job thread, undone below.
+        let com = unsafe {
+            CoInitializeEx(
+                std::ptr::null(),
+                (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+            )
+        };
+        // SAFETY: both strings are NUL-terminated and outlive the call.
+        let code = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                verb,
+                file,
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            )
+        } as isize;
+        if com >= 0 {
+            // SAFETY: balances the successful CoInitializeEx above.
+            unsafe { CoUninitialize() };
+        }
+        code
+    })
+}
+
+/// [`launch_viewer`] with the `ShellExecuteW` call injected: `exec` gets
+/// the NUL-terminated verb and file and returns its code (above 32 on
+/// success).
+#[cfg(windows)]
+pub fn shell_open(
+    path: &Path,
+    exec: impl FnOnce(*const u16, *const u16) -> isize,
+) -> io::Result<Option<Child>> {
+    use std::os::windows::ffi::OsStrExt;
+    let mut file: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if file.contains(&0) {
+        return Err(io::Error::from(io::ErrorKind::InvalidInput));
+    }
+    file.push(0);
+    let verb: Vec<u16> = "open\0".encode_utf16().collect();
+    let code = exec(verb.as_ptr(), file.as_ptr());
+    if code > 32 {
+        Ok(None)
+    } else {
+        Err(io::Error::other(format!(
+            "ShellExecute failed with code {code}"
+        )))
+    }
 }
 
 /// How long an opened log copy lives while the TUI runs (Go: 10 minutes).

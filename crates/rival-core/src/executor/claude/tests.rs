@@ -2,7 +2,9 @@
 //! env stripping, error wrapping and transport-mode checks.
 
 use super::*;
-use crate::executor::testutil::{Env, Spawned, recorder, retry_busy, strings};
+#[cfg(unix)]
+use crate::executor::testutil::retry_busy;
+use crate::executor::testutil::{Env, Spawned, recorder, strings};
 use crate::session::{MODE_ANTISLOP, MODE_PLAN, MODE_SECURITY};
 
 /// The read-only (review and task modes) argv, including the empty

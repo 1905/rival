@@ -1193,20 +1193,86 @@ fn dotenv_walk_bounds_match_go() {
 
 #[test]
 fn build_workdir_preamble_injects_absolute_path() {
+    // filepath.Abs output is host-shaped.
+    let (cwd, want) = if cfg!(windows) {
+        (r"C:\work", r"C:\work\app")
+    } else {
+        ("/work", "/work/app")
+    };
     let config = Config::new(
         Paths::from_home(Path::new("/nonexistent-rival-test-home")),
         HashMap::new(),
-        Some(PathBuf::from("/work")),
+        Some(PathBuf::from(cwd)),
     );
     assert_eq!(
         config.build_workdir_preamble(Path::new("repo/../app")),
-        "You are working in project directory: /work/app\nUse your tools to read files, run git commands, and explore the codebase as needed.\n"
+        format!(
+            "You are working in project directory: {want}\nUse your tools to read files, run git commands, and explore the codebase as needed.\n"
+        )
     );
     assert!(
         cfg(&[])
             .build_workdir_preamble(Path::new("rel"))
             .starts_with("You are working in project directory: \nUse your tools")
     );
+}
+
+// ---- Windows startup: environment names and a fresh profile ----
+
+#[test]
+fn getenv_case_rule_follows_the_platform() {
+    let env = env_map(&[
+        ("Path", r"C:\bin"),
+        ("HOME", "/h"),
+        ("zz", "1"),
+        ("ZZ", "2"),
+    ]);
+    // Windows (Go os.Getenv via GetEnvironmentVariableW): case-insensitive.
+    assert_eq!(getenv_in(true, &env, "PATH"), r"C:\bin");
+    assert_eq!(getenv_in(true, &env, "path"), r"C:\bin");
+    assert_eq!(getenv_in(true, &env, "Home"), "/h");
+    assert_eq!(getenv_in(true, &env, "zz"), "1", "an exact match wins");
+    assert_eq!(
+        getenv_in(true, &env, "Zz"),
+        "2",
+        "the smallest name, stably"
+    );
+    assert_eq!(getenv_in(true, &env, "PATHX"), "");
+    // Unix: exact names only.
+    assert_eq!(getenv_in(false, &env, "PATH"), "");
+    assert_eq!(getenv_in(false, &env, "Path"), r"C:\bin");
+    assert_eq!(getenv_in(false, &env, "Zz"), "");
+    // The Config getter uses the host rule.
+    let config = cfg(&[("Path", r"C:\bin")]);
+    let want = if cfg!(windows) { r"C:\bin" } else { "" };
+    assert_eq!(config.getenv("PATH"), want);
+}
+
+/// A fresh home has no `.rival` directory at all. Opening
+/// `<home>/.rival/config.yaml` then fails on its missing parent
+/// (Windows `ERROR_PATH_NOT_FOUND`, Unix `ENOENT`); Go's `ErrNotExist`
+/// covers both, so there is no config and no error.
+#[test]
+fn fresh_home_without_rival_dir_has_no_config_error() {
+    let home = tempfile::tempdir().unwrap();
+    assert!(!home.path().join(".rival").exists());
+    let config = home_config(home.path(), &[]);
+    assert!(
+        config.user_config_error().is_none(),
+        "{:?}",
+        config.user_config_error()
+    );
+    assert!(config.user_config().is_none());
+    assert_eq!(
+        load_user_config(&home.path().join(".rival").join("config.yaml")).unwrap(),
+        None
+    );
+    // A missing deeper parent too.
+    let deep = home.path().join("a").join("b").join("config.yaml");
+    assert_eq!(load_user_config(&deep).unwrap(), None);
+    // Any other open error still reports: a directory in place of the file.
+    fs::create_dir_all(home.path().join("dir.yaml")).unwrap();
+    assert!(load_user_config(&home.path().join("dir.yaml")).is_err());
 }
 
 // ---- security_test.go ----

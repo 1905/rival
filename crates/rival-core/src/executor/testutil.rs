@@ -43,6 +43,11 @@ impl Env {
         let work = tempfile::tempdir().unwrap();
         let mut vars = HashMap::new();
         vars.insert("HOME".to_string(), path_str(home.path()));
+        // Go's os.UserHomeDir reads USERPROFILE on Windows: the same temp
+        // home, so no test sees the real profile.
+        if cfg!(windows) {
+            vars.insert("USERPROFILE".to_string(), path_str(home.path()));
+        }
         vars.insert("PATH".to_string(), path_str(bin.path()));
         Env {
             home,

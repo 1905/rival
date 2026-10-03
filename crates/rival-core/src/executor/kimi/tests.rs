@@ -6,7 +6,9 @@ use std::ffi::{OsStr, OsString};
 use super::*;
 use crate::executor::opencode::{OPENCODE_READ_ONLY_PERMISSION, opencode_run_env_with};
 use crate::executor::subprocess::{drop_matches, safe_env};
-use crate::executor::testutil::{Env, path_str, recorder, retry_busy, strings};
+#[cfg(unix)]
+use crate::executor::testutil::retry_busy;
+use crate::executor::testutil::{Env, path_str, recorder, strings};
 
 fn k3() -> config::SecurityModel {
     config::open_code_entry_for(config::KIMI_MODEL).expect("K3 missing from the registry")

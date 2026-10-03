@@ -2,7 +2,9 @@
 //! file lifetime, error wrapping and preflight checks.
 
 use super::*;
-use crate::executor::testutil::{Env, path_str, retry_busy, strings};
+#[cfg(unix)]
+use crate::executor::testutil::retry_busy;
+use crate::executor::testutil::{Env, path_str, strings};
 
 /// grok's argv for the given parts.
 fn argv(model: &str, file: &str, effort: &str, workdir: &str, review: bool) -> Vec<String> {

@@ -502,7 +502,9 @@ pub fn to_lower(s: &str) -> String {
 }
 
 /// Go: the text of a `syscall.Errno` — the C `strerror` message with its
-/// first letter lowercased (`is a directory`, `permission denied`).
+/// first letter lowercased (`is a directory`, `permission denied`). On
+/// Windows Go prints the `FormatMessage` text as it is (`The system cannot
+/// find the file specified.`), which is std's text without its suffix.
 pub fn os_error_text(err: &std::io::Error) -> String {
     let Some(code) = err.raw_os_error() else {
         return err.to_string();
@@ -511,6 +513,9 @@ pub fn os_error_text(err: &std::io::Error) -> String {
     let text = full
         .strip_suffix(&format!(" (os error {code})"))
         .unwrap_or(&full);
+    if cfg!(windows) {
+        return text.to_string();
+    }
     let mut chars = text.chars();
     match chars.next() {
         Some(first) => first.to_lowercase().chain(chars).collect(),
@@ -518,9 +523,53 @@ pub fn os_error_text(err: &std::io::Error) -> String {
     }
 }
 
+/// Go `errors.Is(err, fs.ErrNotExist)` for an OS error: `ENOENT` on Unix;
+/// on Windows `ERROR_FILE_NOT_FOUND`, `ERROR_PATH_NOT_FOUND` (a missing
+/// parent directory) or `ERROR_BAD_NETPATH`.
+pub fn is_not_exist(err: &std::io::Error) -> bool {
+    is_not_exist_code(cfg!(windows), err.raw_os_error())
+}
+
+/// [`is_not_exist`] for a raw code, with the platform explicit so both
+/// tables test everywhere.
+pub fn is_not_exist_code(windows: bool, code: Option<i32>) -> bool {
+    match code {
+        // ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, ERROR_BAD_NETPATH.
+        Some(c) if windows => matches!(c, 2 | 3 | 53),
+        // ENOENT is 2 on every supported Unix.
+        Some(c) => c == 2,
+        None => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn is_not_exist_matches_go_err_not_exist() {
+        assert!(is_not_exist_code(false, Some(2)));
+        assert!(!is_not_exist_code(false, Some(3)), "ESRCH is not ENOENT");
+        assert!(
+            !is_not_exist_code(false, Some(20)),
+            "ENOTDIR stays an error"
+        );
+        assert!(!is_not_exist_code(false, None));
+        for code in [2, 3, 53] {
+            assert!(is_not_exist_code(true, Some(code)), "{code}");
+        }
+        assert!(
+            !is_not_exist_code(true, Some(5)),
+            "access denied stays an error"
+        );
+        #[cfg(unix)]
+        assert_eq!(libc::ENOENT, 2);
+        let missing = std::env::temp_dir()
+            .join("rival-no-such-parent-dir")
+            .join("x")
+            .join("config.yaml");
+        assert!(is_not_exist(&std::fs::File::open(missing).unwrap_err()));
+    }
 
     const S: i64 = SECOND as i64;
     const M: i64 = MINUTE as i64;

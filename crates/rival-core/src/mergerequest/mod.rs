@@ -742,7 +742,8 @@ fn output(
     }
     let fork_error =
         |e: &std::io::Error| format!("fork/exec {}: {}", path.display(), spawn_error_text(e));
-    let mut cmd = Command::new(&path);
+    let program = process::program_in_dir(&path, dir).map_err(|e| fork_error(&e))?;
+    let mut cmd = Command::new(program);
     set_exec(&mut cmd, &path, name, args, &env).map_err(|e| fork_error(&e))?;
     if dir_set {
         cmd.current_dir(dir);

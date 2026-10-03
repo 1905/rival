@@ -6,7 +6,20 @@ use crate::tui::testkit::{FAKE_PROCS, harness, set_alive, set_signal_fails, sign
 
 const STORED_PROMPT: &str = "the full prompt that a summary drops on the floor";
 
-/// A running session stored under `paths`, with fake PID `pid`.
+/// What a stop that reached its process stores. Unix: the stop's own
+/// "killed by user". Windows: the owner cannot finalize, so the reaper's
+/// crashed-owner failure.
+fn stopped_record() -> (Option<i64>, &'static str) {
+    if cfg!(windows) {
+        (Some(1), "orphaned (process dead)")
+    } else {
+        (Some(137), "killed by user")
+    }
+}
+
+/// A running session stored under `paths`, with fake PID `pid`. The owner
+/// fields name the same fake process, so the stop identity is fake on every
+/// platform (Windows stops the owner).
 fn stored_running(paths: &Paths, pid: i64) -> Session {
     let mut s = Session::new_queued(
         paths,
@@ -24,6 +37,8 @@ fn stored_running(paths: &Paths, pid: i64) -> Session {
     .unwrap();
     s.mark_running(paths).unwrap();
     s.pid = pid;
+    s.owner_pid = pid;
+    s.owner_pid_start = s.pid_start;
     s.save(paths).unwrap();
     s
 }
@@ -120,6 +135,8 @@ fn live(id: &str, status: &str, pid: i64, pid_start: i64) -> Arc<Session> {
         status: status.into(),
         pid,
         pid_start,
+        owner_pid: pid,
+        owner_pid_start: pid_start,
         ..Session::default()
     })
 }
@@ -205,10 +222,6 @@ fn stop_sessions_signals_only_verified_processes() {
     let h = harness();
     let paths = h.paths();
     let ok = stored_running(paths, 990001);
-    let gone = stored_running(paths, 990002);
-    let mut unverified = stored_running(paths, 990003);
-    unverified.pid_start = 0;
-    unverified.save(paths).unwrap();
 
     // ok is alive and signals; then alive flips for the rest.
     set_alive(true);
@@ -220,6 +233,13 @@ fn stop_sessions_signals_only_verified_processes() {
             targets: vec![Arc::new(summary_of(paths, &ok))],
         },
     );
+    // Stored after the first stop: on Windows its crashed-owner reap would
+    // also fail these fake-PID records.
+    let gone = stored_running(paths, 990002);
+    let mut unverified = stored_running(paths, 990003);
+    unverified.pid_start = 0;
+    unverified.owner_pid_start = 0;
+    unverified.save(paths).unwrap();
     set_alive(false);
     let res2 = stop_sessions(
         paths,
@@ -243,13 +263,18 @@ fn stop_sessions_signals_only_verified_processes() {
 
     let load = |s: &Session| Session::load(paths, &s.id).unwrap();
     let stored = load(&ok);
+    let (code, msg) = stopped_record();
     assert_eq!(
         (
             stored.exit_code,
             stored.error_msg.as_str(),
             stored.prompt.as_str()
         ),
-        (Some(137), "killed by user", STORED_PROMPT)
+        (code, msg, STORED_PROMPT)
+    );
+    assert_eq!(
+        res.updates[0].1.error_msg, msg,
+        "the row shows what was stored"
     );
     let stored = load(&gone);
     assert_eq!(
@@ -328,7 +353,37 @@ fn stop_job_falls_back_to_the_snapshot_when_the_record_is_unreadable() {
         },
     );
     assert_eq!(signals(), [990006]);
-    assert_eq!(res.updates[0].1.exit_code, Some(137));
+    // Windows: the reaper cannot read the record either, so the stop fails
+    // the snapshot with the reaper's text.
+    assert_eq!(res.updates[0].1.exit_code, stopped_record().0);
+    assert_eq!(res.updates[0].1.error_msg, stopped_record().1);
+}
+
+/// The stop identity: the session's PID on Unix, the owner on Windows.
+#[test]
+fn stop_identity_follows_the_platform() {
+    let s = Session {
+        pid: 11,
+        pid_start: 5,
+        owner_pid: 22,
+        owner_pid_start: 7,
+        status: "running".into(),
+        ..Session::default()
+    };
+    let want = if cfg!(windows) { (22, 7) } else { (11, 5) };
+    assert_eq!(stop_identity(&s), want);
+    // Windows refuses an owner without a recorded start even when the
+    // provider has one; Unix the other way round.
+    let no_owner_start = Session {
+        owner_pid_start: 0,
+        ..s.clone()
+    };
+    let it = item(vec![Arc::new(no_owner_start)]);
+    assert_eq!(has_unverified(Some(&it)), cfg!(windows));
+    fn always(_: i64, _: i64) -> bool {
+        true
+    }
+    assert_eq!(may_stop(&it.sessions[0], always), !cfg!(windows));
 }
 
 fn ids_of(res: &StopResult) -> Vec<&str> {
@@ -337,13 +392,29 @@ fn ids_of(res: &StopResult) -> Vec<&str> {
 
 /// The real signal refuses PIDs that would reach process groups or wrap. No
 /// signal is sent for any of these.
-#[cfg(unix)]
 #[test]
 fn terminate_refuses_group_and_out_of_range_pids() {
     for pid in [0, -1, -42, i64::from(i32::MAX) + 1, i64::MIN] {
-        let err = terminate(pid).unwrap_err();
+        let err = terminate(pid, 1).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "pid {pid}");
     }
+}
+
+/// Windows checks the identity on the handle it terminates through: a
+/// wrong or missing start time never reaches `TerminateProcess`.
+#[cfg(windows)]
+#[test]
+fn terminate_refuses_a_mismatching_identity() {
+    let me = i64::from(std::process::id());
+    let start = rival_core::procinfo::start_nanos(me as i32).unwrap();
+    assert_eq!(
+        terminate(me, 0).unwrap_err().kind(),
+        io::ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        terminate(me, start + 100).unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
 }
 
 #[test]

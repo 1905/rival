@@ -183,10 +183,7 @@ pub fn run_model_command(
         return Err(CmdError::plain(format!("read log file: {e}")));
     }
     if let Err(e) = env.stdout.write_all(out.as_bytes()) {
-        return Err(CmdError::plain(format!(
-            "write stdout: write /dev/stdout: {}",
-            gostd::os_error_text(&e)
-        )));
+        return Err(crate::command_plan::write_stdout_error(&e));
     }
 
     if exit_code != 0 {

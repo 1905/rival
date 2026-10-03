@@ -111,19 +111,36 @@ pub(crate) fn run(
 
 /// Go `exec.Command(name, args...)` up to `Start`, for callers that pick the
 /// child's stdio themselves. A bare name is looked up in `cfg`'s `$PATH`; a
-/// name with a `/` is used as-is, as Go skips `LookPath` for it. The child
-/// gets `cfg`'s env. Returns the command and the program path for
+/// name with a separator is used as-is, as Go skips `LookPath` for it (on
+/// Windows it still gets its `PATHEXT` extension, Go's `lookExtensions`).
+/// The child gets `cfg`'s env. Returns the command and the program path for
 /// [`fork_error`].
 pub fn command(cfg: &Config, name: &str, args: &[&str]) -> Result<(Command, PathBuf), String> {
-    let path = if name.contains('/') {
-        PathBuf::from(name)
-    } else {
-        look_path(cfg, name).map_err(|e| e.to_string())?
-    };
+    let path = command_path(cfg, name)?;
     let env = dedup_env(cfg.environ())?;
     let mut cmd = Command::new(&path);
     process::set_exec(&mut cmd, &path, name, args, &env).map_err(|e| fork_error(&path, &e))?;
     Ok((cmd, path))
+}
+
+/// The program path of [`command`].
+#[cfg(not(windows))]
+fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
+    if name.contains('/') {
+        return Ok(PathBuf::from(name));
+    }
+    look_path(cfg, name).map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
+    use super::process::windows::{LookEnv, look_extensions};
+    if crate::winpath::base(name.as_bytes()) == name.as_bytes() {
+        return look_path(cfg, name).map_err(|e| e.to_string());
+    }
+    // Go resolves a relative name against cmd.Dir at Start; callers here
+    // leave Dir unset, so the current directory applies.
+    look_extensions(name, "", &LookEnv::process()).map_err(|e| e.to_string())
 }
 
 /// Go's `Start` error: `fork/exec <path>: <errno text>`.
@@ -140,13 +157,24 @@ fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
     Ok((Stdio::from(fd), Stdio::from(fd2)))
 }
 
-#[cfg(not(unix))]
+/// Windows: two duplicates of this process's stderr handle
+/// (`DuplicateHandle`), one for each of the child's streams.
+#[cfg(windows)]
 fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
-    Ok((Stdio::inherit(), Stdio::inherit()))
+    use std::os::windows::io::AsHandle;
+    let handle = io::stderr().as_handle().try_clone_to_owned()?;
+    let handle2 = handle.try_clone()?;
+    Ok((Stdio::from(handle), Stdio::from(handle2)))
 }
 
 /// Go `(*exec.ExitError).Error()`: `exit status N`, or `signal: <name>`.
+/// Windows prints an exit code of `1<<16` or more in hex (`0xc0000005`).
 pub fn exit_status_text(status: ExitStatus) -> String {
+    #[cfg(windows)]
+    if let Some(code) = status.code() {
+        return windows_exit_text(code as u32);
+    }
+    #[cfg(not(windows))]
     if let Some(code) = status.code() {
         return format!("exit status {code}");
     }
@@ -162,6 +190,16 @@ pub fn exit_status_text(status: ExitStatus) -> String {
         }
     }
     format!("exit status {status}")
+}
+
+/// Go `ProcessState.String` on Windows for exit code `code` (the `uint32`
+/// from `GetExitCodeProcess`): decimal below `1<<16`, else `0x` hex.
+pub fn windows_exit_text(code: u32) -> String {
+    if code >= 1 << 16 {
+        format!("exit status {code:#x}")
+    } else {
+        format!("exit status {code}")
+    }
 }
 
 /// Go's `syscall.Signal.String()`: the per-OS `signals` table from
@@ -255,11 +293,118 @@ const GO_SIGNALS: [&str; 32] = [
 #[cfg(all(unix, not(any(target_os = "macos", target_os = "linux"))))]
 const GO_SIGNALS: [&str; 0] = [];
 
-/// Go `os.TempDir()` on Unix: `$TMPDIR`, else `/tmp`.
+/// Go `os.TempDir()`: on Unix `$TMPDIR`, else `/tmp`.
+#[cfg(not(windows))]
 pub(crate) fn temp_dir(cfg: &Config) -> String {
     match cfg.getenv("TMPDIR") {
         "" => "/tmp".to_string(),
         dir => dir.to_string(),
+    }
+}
+
+/// Go `os.TempDir()` on Windows. A [`Config::load`] config (production)
+/// asks the OS, as Go does: [`os_temp_dir`]. Its snapshot is this
+/// process's environment, which the OS call reads. A [`Config::new`] config
+/// (tests, embedders) has an injected environment that the OS cannot see,
+/// so it gets the lexical model [`windows_temp_dir`] of that environment.
+#[cfg(windows)]
+pub(crate) fn temp_dir(cfg: &Config) -> String {
+    if cfg.temp_dir_from_os() {
+        return os_temp_dir();
+    }
+    windows_temp_dir(|key| cfg.getenv(key))
+}
+
+/// Go `os.tempDir` on Windows: `GetTempPath2W` when kernel32 has it, else
+/// `GetTempPathW`, then [`trim_temp_path`]. The API reads this process's
+/// `TMP`, `TEMP`, `USERPROFILE`, makes a relative value full, and gives a
+/// SYSTEM process `C:\Windows\SystemTemp`. Go probes `GetTempPath2W` at run
+/// time; so does this, so an older Windows without it still starts.
+#[cfg(windows)]
+pub fn os_temp_dir() -> String {
+    use std::os::windows::ffi::OsStringExt;
+    use std::sync::OnceLock;
+    use windows_sys::Win32::Storage::FileSystem::GetTempPathW;
+    use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+
+    type GetTempPathFn = unsafe extern "system" fn(u32, *mut u16) -> u32;
+    static GET_TEMP_PATH: OnceLock<GetTempPathFn> = OnceLock::new();
+    let get = *GET_TEMP_PATH.get_or_init(|| {
+        let kernel32: Vec<u16> = "kernel32.dll\0".encode_utf16().collect();
+        // SAFETY: a NUL-terminated module name; kernel32 is always loaded.
+        let module = unsafe { GetModuleHandleW(kernel32.as_ptr()) };
+        if !module.is_null() {
+            // SAFETY: a valid module and a NUL-terminated ANSI name.
+            if let Some(f) = unsafe { GetProcAddress(module, c"GetTempPath2W".as_ptr().cast()) } {
+                // SAFETY: GetTempPath2W has exactly this signature.
+                return unsafe { std::mem::transmute::<_, GetTempPathFn>(f) };
+            }
+        }
+        GetTempPathW
+    });
+    let mut buf = vec![0u16; 260];
+    loop {
+        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
+        // SAFETY: buf has len writable u16s.
+        let n = unsafe { get(len, buf.as_mut_ptr()) } as usize;
+        if n > buf.len() {
+            // Too small: n is the size needed.
+            buf.resize(n, 0);
+            continue;
+        }
+        // Go ignores the error; a failure (n = 0) reads as "".
+        buf.truncate(n);
+        let dir = std::ffi::OsString::from_wide(&buf);
+        return trim_temp_path(&dir.to_string_lossy());
+    }
+}
+
+/// Go's trim of a `GetTempPath` result: one trailing `\` goes, except for
+/// a drive root like `C:\`.
+pub fn trim_temp_path(dir: &str) -> String {
+    let b = dir.as_bytes();
+    let drive_root = b.len() == 3 && b[1] == b':' && b[2] == b'\\';
+    if !drive_root && dir.ends_with('\\') {
+        return dir[..dir.len() - 1].to_string();
+    }
+    dir.to_string()
+}
+
+/// A lexical model of `GetTempPath` over an injected environment, for
+/// [`Config::new`] configs only: the first non-empty of `TMP`, `TEMP`,
+/// `USERPROFILE`, else the Windows directory (`SystemRoot`, or `C:\Windows`
+/// when unset), then [`trim_temp_path`]. Unlike the OS it neither makes a
+/// relative value full nor knows the SYSTEM temp directory; production uses
+/// [`os_temp_dir`]. Pure, for tests on every platform.
+pub fn windows_temp_dir<'a>(getenv: impl Fn(&str) -> &'a str) -> String {
+    let found = ["TMP", "TEMP", "USERPROFILE"]
+        .into_iter()
+        .map(&getenv)
+        .find(|v| !v.is_empty());
+    let dir = match found {
+        Some(v) => v,
+        None => match getenv("SystemRoot") {
+            "" => r"C:\Windows",
+            root => root,
+        },
+    };
+    trim_temp_path(dir)
+}
+
+/// Go `os.PathSeparator`.
+const SEPARATOR: char = if cfg!(windows) { '\\' } else { '/' };
+
+/// Go `os.IsPathSeparator`.
+fn is_separator(c: char) -> bool {
+    c == '/' || (cfg!(windows) && c == '\\')
+}
+
+/// Go `os.joinPath(dir, name)`: no separator is added after one.
+fn join_temp(dir: &str, name: &str) -> String {
+    if dir.ends_with(is_separator) {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}{SEPARATOR}{name}")
     }
 }
 
@@ -274,11 +419,7 @@ pub(crate) fn create_temp(cfg: &Config, pattern: &str) -> Result<(File, String),
         None => (pattern, ""),
     };
     let dir = temp_dir(cfg);
-    let prefix = if dir.ends_with('/') {
-        format!("{dir}{prefix}")
-    } else {
-        format!("{dir}/{prefix}")
-    };
+    let prefix = join_temp(&dir, prefix);
     for _ in 0..10000 {
         let name = format!("{prefix}{}{suffix}", next_random());
         let mut opts = OpenOptions::new();
@@ -301,7 +442,7 @@ pub(crate) fn create_temp(cfg: &Config, pattern: &str) -> Result<(File, String),
 /// `mkdirtemp <dir>/<dir>/<prefix>*<suffix>: file already exists` (Go
 /// repeats the dir there).
 pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> {
-    if pattern.contains('/') {
+    if pattern.contains(is_separator) {
         return Err(format!(
             "mkdirtemp {pattern}: pattern contains path separator"
         ));
@@ -311,13 +452,10 @@ pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> 
         None => (pattern, ""),
     };
     let dir = temp_dir(cfg);
-    let prefix = if dir.ends_with('/') {
-        format!("{dir}{prefix}")
-    } else {
-        format!("{dir}/{prefix}")
-    };
+    let prefix = join_temp(&dir, prefix);
     for _ in 0..10000 {
         let name = format!("{prefix}{}{suffix}", next_random());
+        #[cfg_attr(not(unix), allow(unused_mut))]
         let mut builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
         std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
@@ -329,16 +467,23 @@ pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> 
                     && let Err(stat) = std::fs::metadata(&dir)
                     && stat.kind() == io::ErrorKind::NotFound
                 {
-                    return Err(format!("stat {dir}: {}", io_text(&stat)));
+                    return Err(format!("{STAT_OP} {dir}: {}", io_text(&stat)));
                 }
                 return Err(format!("mkdir {name}: {}", io_text(&e)));
             }
         }
     }
     Err(format!(
-        "mkdirtemp {dir}/{prefix}*{suffix}: file already exists"
+        "mkdirtemp {dir}{SEPARATOR}{prefix}*{suffix}: file already exists"
     ))
 }
+
+/// Go `os.Stat`'s `*PathError` op for a missing path.
+const STAT_OP: &str = if cfg!(windows) {
+    "GetFileAttributesEx"
+} else {
+    "stat"
+};
 
 /// Go `nextRandom`: a random `uint32` in decimal.
 fn next_random() -> String {
@@ -350,6 +495,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    #[cfg(unix)]
     use crate::executor::testutil::retry_busy;
     use crate::paths::Paths;
 
@@ -515,6 +661,11 @@ mod tests {
         }
     }
 
+    /// The host's temp-dir variable: Go reads `TMPDIR` on Unix and `TMP`
+    /// first on Windows.
+    const TMP_VAR: &str = if cfg!(windows) { "TMP" } else { "TMPDIR" };
+
+    #[cfg(not(windows))]
     #[test]
     fn temp_dir_follows_go_unix() {
         assert_eq!(temp_dir(&cfg(&[])), "/tmp");
@@ -522,12 +673,165 @@ mod tests {
     }
 
     #[test]
+    fn windows_temp_dir_follows_get_temp_path() {
+        let env = |vars: &'static [(&'static str, &'static str)]| {
+            move |key: &str| vars.iter().find(|(k, _)| *k == key).map_or("", |(_, v)| *v)
+        };
+        assert_eq!(
+            windows_temp_dir(env(&[("TMP", r"D:\t\"), ("TEMP", r"E:\x")])),
+            r"D:\t"
+        );
+        assert_eq!(windows_temp_dir(env(&[("TEMP", r"E:\x")])), r"E:\x");
+        assert_eq!(
+            windows_temp_dir(env(&[("TMP", ""), ("USERPROFILE", r"C:\Users\me")])),
+            r"C:\Users\me"
+        );
+        assert_eq!(
+            windows_temp_dir(env(&[("TMP", r"C:\")])),
+            r"C:\",
+            "drive root"
+        );
+        assert_eq!(
+            windows_temp_dir(env(&[("SystemRoot", r"C:\WINDOWS")])),
+            r"C:\WINDOWS"
+        );
+        assert_eq!(windows_temp_dir(env(&[])), r"C:\Windows");
+        #[cfg(windows)]
+        assert_eq!(temp_dir(&cfg(&[("TMP", r"D:\t\")])), r"D:\t");
+        // Go's trim of the API result.
+        assert_eq!(
+            trim_temp_path(r"C:\Users\me\AppData\Local\Temp\"),
+            r"C:\Users\me\AppData\Local\Temp"
+        );
+        assert_eq!(trim_temp_path(r"C:\"), r"C:\");
+        assert_eq!(trim_temp_path(r"\\srv\share\t\"), r"\\srv\share\t");
+        assert_eq!(trim_temp_path(""), "");
+    }
+
+    /// A config whose env is this process's own asks the OS (Windows) or
+    /// reads its `TMPDIR` snapshot (Unix). Nothing mutates the environment.
+    #[test]
+    fn loaded_config_temp_dir_is_the_process_answer() {
+        let home = tempfile::tempdir().unwrap();
+        let loaded = Config::load(&Paths::from_home(home.path()));
+        assert!(loaded.temp_dir_from_os());
+        assert!(
+            !cfg(&[]).temp_dir_from_os(),
+            "an injected env is not the process's"
+        );
+        #[cfg(windows)]
+        assert_eq!(temp_dir(&loaded), os_temp_dir());
+        #[cfg(not(windows))]
+        {
+            let want = std::env::var("TMPDIR")
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| "/tmp".to_string());
+            assert_eq!(temp_dir(&loaded), want);
+        }
+    }
+
+    /// The real `GetTempPath2W`/`GetTempPathW` answer, trimmed like Go; std
+    /// asks the same API and keeps the trailing `\`.
+    #[cfg(windows)]
+    #[test]
+    fn os_temp_dir_is_the_api_answer() {
+        let got = os_temp_dir();
+        assert!(crate::winpath::is_abs(got.as_bytes()), "{got}");
+        assert_eq!(got, trim_temp_path(&std::env::temp_dir().to_string_lossy()));
+    }
+
+    #[cfg(windows)]
+    const TEMP_HELPER_ENV: &str = "RIVAL_OSCMD_TEMP_HELPER";
+
+    /// Helper process for [`os_temp_dir_resolves_a_relative_tmp`]: writes its
+    /// [`os_temp_dir`] to the file named by the env var. A no-op otherwise.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "helper process for os_temp_dir_resolves_a_relative_tmp"]
+    fn os_temp_dir_helper() {
+        if let Some(out) = std::env::var_os(TEMP_HELPER_ENV) {
+            std::fs::write(out, os_temp_dir()).unwrap();
+        }
+    }
+
+    /// The API makes a relative `TMP` full against the current directory.
+    /// The helper gets its own environment; this process's stays untouched.
+    #[cfg(windows)]
+    #[test]
+    fn os_temp_dir_resolves_a_relative_tmp() {
+        use std::time::{Duration, Instant};
+        let home = tempfile::tempdir().unwrap();
+        let out = home.path().join("temp-answer");
+        let mut cmd = Command::new(std::env::current_exe().unwrap());
+        cmd.args([
+            "--exact",
+            "executor::oscmd::tests::os_temp_dir_helper",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .current_dir(home.path())
+        .env(TEMP_HELPER_ENV, &out)
+        .env("TMP", r"rel\tmp\")
+        .env("TEMP", r"Z:\not-used")
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
+        .env("RIVAL_HOME", home.path().join(".rival"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        let mut child = process::spawn(&mut cmd).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if Instant::now() > deadline {
+                let _ = child.kill();
+                let _ = child.try_wait();
+                panic!("temp helper did not exit in 30s");
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert!(status.success(), "{status:?}");
+        let got = std::fs::read_to_string(&out).unwrap();
+        let want = home.path().join("rel").join("tmp");
+        assert_eq!(got, want.to_str().unwrap());
+    }
+
+    #[test]
+    fn windows_exit_text_uses_hex_above_16_bits() {
+        assert_eq!(windows_exit_text(0), "exit status 0");
+        assert_eq!(windows_exit_text(3), "exit status 3");
+        assert_eq!(windows_exit_text(0xffff), "exit status 65535");
+        assert_eq!(windows_exit_text(1 << 16), "exit status 0x10000");
+        assert_eq!(windows_exit_text(0xC000_0005), "exit status 0xc0000005");
+        assert_eq!(windows_exit_text(u32::MAX), "exit status 0xffffffff");
+    }
+
+    /// Raw Windows statuses through the real `ExitStatus`: Go's unsigned
+    /// reading, never a negative code.
+    #[cfg(windows)]
+    #[test]
+    fn exit_status_text_matches_go_windows() {
+        use std::os::windows::process::ExitStatusExt;
+        assert_eq!(exit_status_text(ExitStatus::from_raw(1)), "exit status 1");
+        assert_eq!(
+            exit_status_text(ExitStatus::from_raw(0xC000_013A)),
+            "exit status 0xc000013a"
+        );
+    }
+
+    #[test]
     fn create_temp_names_and_errors_match_go() {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        let (file, name) = create_temp(&cfg(&[("TMPDIR", d)]), "rival-grok-*.md").unwrap();
+        let (file, name) = create_temp(&cfg(&[(TMP_VAR, d)]), "rival-grok-*.md").unwrap();
         drop(file);
-        let base = name.strip_prefix(&format!("{d}/rival-grok-")).unwrap();
+        let base = name
+            .strip_prefix(&format!("{d}{SEPARATOR}rival-grok-"))
+            .unwrap();
         let digits = base.strip_suffix(".md").unwrap();
         assert!(
             !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()),
@@ -540,26 +844,36 @@ mod tests {
             assert_eq!(mode & 0o777, 0o600);
         }
 
-        // A trailing slash is not doubled, and no '*' appends the random part.
-        let slash = format!("{d}/");
-        let (_f, name) = create_temp(&cfg(&[("TMPDIR", &slash)]), "plain").unwrap();
-        assert!(name.starts_with(&format!("{d}/plain")), "{name}");
+        // A trailing separator is not doubled (on Unix TMPDIR keeps it; on
+        // Windows GetTempPath's trim already removed it), and no '*'
+        // appends the random part.
+        let slash = format!("{d}{SEPARATOR}");
+        let (_f, name) = create_temp(&cfg(&[(TMP_VAR, &slash)]), "plain").unwrap();
+        assert!(name.starts_with(&format!("{d}{SEPARATOR}plain")), "{name}");
+        assert!(!name.contains(&format!("{SEPARATOR}{SEPARATOR}")), "{name}");
 
-        let missing = format!("{d}/missing");
-        let err = create_temp(&cfg(&[("TMPDIR", &missing)]), "rival-grok-*.md").unwrap_err();
+        let missing = format!("{d}{SEPARATOR}missing");
+        let err = create_temp(&cfg(&[(TMP_VAR, &missing)]), "rival-grok-*.md").unwrap_err();
         assert!(
-            err.starts_with(&format!("open {missing}/rival-grok-")),
+            err.starts_with(&format!("open {missing}{SEPARATOR}rival-grok-")),
             "{err}"
         );
-        assert!(err.ends_with(".md: no such file or directory"), "{err}");
+        let not_found = if cfg!(windows) {
+            "The system cannot find the path specified."
+        } else {
+            "no such file or directory"
+        };
+        assert!(err.ends_with(&format!(".md: {not_found}")), "{err}");
     }
 
     #[test]
     fn mkdir_temp_names_and_errors_match_go() {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
-        let name = mkdir_temp(&cfg(&[("TMPDIR", d)]), "rival-mr-*").unwrap();
-        let digits = name.strip_prefix(&format!("{d}/rival-mr-")).unwrap();
+        let name = mkdir_temp(&cfg(&[(TMP_VAR, d)]), "rival-mr-*").unwrap();
+        let digits = name
+            .strip_prefix(&format!("{d}{SEPARATOR}rival-mr-"))
+            .unwrap();
         assert!(
             !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()),
             "{name}"
@@ -572,28 +886,45 @@ mod tests {
             assert_eq!(meta.permissions().mode() & 0o777, 0o700);
         }
 
-        let slash = format!("{d}/");
-        let name = mkdir_temp(&cfg(&[("TMPDIR", &slash)]), "plain").unwrap();
-        assert!(name.starts_with(&format!("{d}/plain")), "{name}");
+        let slash = format!("{d}{SEPARATOR}");
+        let name = mkdir_temp(&cfg(&[(TMP_VAR, &slash)]), "plain").unwrap();
+        assert!(name.starts_with(&format!("{d}{SEPARATOR}plain")), "{name}");
 
-        let missing = format!("{d}/missing");
+        let missing = format!("{d}{SEPARATOR}missing");
+        let gone = if cfg!(windows) {
+            "The system cannot find the file specified."
+        } else {
+            "no such file or directory"
+        };
         assert_eq!(
-            mkdir_temp(&cfg(&[("TMPDIR", &missing)]), "rival-mr-*").unwrap_err(),
-            format!("stat {missing}: no such file or directory")
+            mkdir_temp(&cfg(&[(TMP_VAR, &missing)]), "rival-mr-*").unwrap_err(),
+            format!("{STAT_OP} {missing}: {gone}")
         );
         assert_eq!(
-            mkdir_temp(&cfg(&[("TMPDIR", d)]), "a/b*").unwrap_err(),
+            mkdir_temp(&cfg(&[(TMP_VAR, d)]), "a/b*").unwrap_err(),
             "mkdirtemp a/b*: pattern contains path separator"
         );
-        // A file in the way of the parent is ENOTDIR from mkdir itself.
-        let file = format!("{d}/file");
+        // A backslash is a separator only on Windows.
+        let backslash = mkdir_temp(&cfg(&[(TMP_VAR, d)]), r"a\b*");
+        if cfg!(windows) {
+            assert_eq!(
+                backslash.unwrap_err(),
+                r"mkdirtemp a\b*: pattern contains path separator"
+            );
+        } else {
+            assert!(backslash.is_ok(), "{backslash:?}");
+        }
+        // A file in the way of the parent fails in mkdir itself (ENOTDIR on
+        // Unix), not in the temp-dir stat.
+        let file = format!("{d}{SEPARATOR}file");
         std::fs::write(&file, "x").unwrap();
-        let err = mkdir_temp(&cfg(&[("TMPDIR", &file)]), "rival-mr-*").unwrap_err();
+        let err = mkdir_temp(&cfg(&[(TMP_VAR, &file)]), "rival-mr-*").unwrap_err();
         assert!(
-            err.starts_with(&format!("mkdir {file}/rival-mr-"))
-                && err.ends_with(": not a directory"),
+            err.starts_with(&format!("mkdir {file}{SEPARATOR}rival-mr-")),
             "{err}"
         );
+        #[cfg(unix)]
+        assert!(err.ends_with(": not a directory"), "{err}");
     }
 
     #[cfg(unix)]

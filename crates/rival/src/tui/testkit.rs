@@ -32,6 +32,7 @@ thread_local! {
     static ALIVE: StdCell<bool> = const { StdCell::new(false) };
     static SIGNAL_FAILS: StdCell<bool> = const { StdCell::new(false) };
     static SIGNALS: RefCell<Vec<i64>> = const { RefCell::new(Vec::new()) };
+    static TERMINATED: RefCell<Vec<i64>> = const { RefCell::new(Vec::new()) };
     static READS: StdCell<usize> = const { StdCell::new(0) };
     static LAUNCHED: RefCell<Vec<PathBuf>> = const { RefCell::new(Vec::new()) };
     static LAUNCH_FAILS: StdCell<bool> = const { StdCell::new(false) };
@@ -82,12 +83,26 @@ pub fn fake_alive(_pid: i64, _start: i64) -> bool {
     ALIVE.get()
 }
 
-/// The fake signal: records the PID and never sends anything.
-fn fake_terminate(pid: i64) -> io::Result<()> {
+/// The fake running state (the Windows stop's death wait). Only the
+/// Windows stop reads it. A successful fake terminate ends the stopped owner
+/// and, as its kill-on-close Job does, every fake process: the fixtures'
+/// providers all run under the owner that was stopped. Identity
+/// ([`fake_alive`]) stays readable afterwards, as a Windows process's does
+/// while any handle holds it.
+pub fn fake_running(pid: i64, start: i64) -> bool {
+    fake_alive(pid, start) && TERMINATED.with_borrow(Vec::is_empty)
+}
+
+/// The fake signal: records the PID and never sends anything. A successful
+/// one ends the fake processes for [`fake_running`] only; `alive`
+/// (identity) keeps answering what [`set_alive`] said, so every other
+/// target of the same stop still verifies.
+fn fake_terminate(pid: i64, _start: i64) -> io::Result<()> {
     SIGNALS.with_borrow_mut(|s| s.push(pid));
     if SIGNAL_FAILS.get() {
-        return Err(io::Error::from_raw_os_error(libc::ESRCH));
+        return Err(io::Error::from(io::ErrorKind::NotFound));
     }
+    TERMINATED.with_borrow_mut(|t| t.push(pid));
     Ok(())
 }
 
@@ -198,6 +213,7 @@ fn counting_read_tail(path: &Path, max_bytes: i64) -> io::Result<(Vec<u8>, bool)
 
 pub const FAKE_PROCS: ProcessOps = ProcessOps {
     alive: fake_alive,
+    running: fake_running,
     terminate: fake_terminate,
 };
 
@@ -227,6 +243,7 @@ pub fn harness() -> Harness {
     ALIVE.set(false);
     SIGNAL_FAILS.set(false);
     SIGNALS.with_borrow_mut(Vec::clear);
+    TERMINATED.with_borrow_mut(Vec::clear);
     READS.set(0);
     LAUNCHED.with_borrow_mut(Vec::clear);
     LAUNCH_FAILS.set(false);

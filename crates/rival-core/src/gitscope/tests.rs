@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::*;
-use crate::executor::testutil::{path_str, write_exe};
+use crate::executor::testutil::path_str;
+#[cfg(unix)]
+use crate::executor::testutil::write_exe;
 use crate::paths::Paths;
 
 struct Fixture {
@@ -26,6 +28,13 @@ impl Fixture {
         let path = std::env::var("PATH").unwrap_or_default();
         vars.insert("PATH".to_string(), path);
         vars.insert("HOME".to_string(), path_str(home.path()));
+        // Windows reads the profile from USERPROFILE; keep it private too.
+        vars.insert("USERPROFILE".to_string(), path_str(home.path()));
+        // Git for Windows needs the system root; read only.
+        #[cfg(windows)]
+        if let Ok(root) = std::env::var("SYSTEMROOT") {
+            vars.insert("SYSTEMROOT".to_string(), root);
+        }
         vars.insert("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string());
         Fixture { home, vars }
     }
@@ -221,10 +230,36 @@ fn missing_git_resolves_to_empty() {
     let dir = tempfile::tempdir().unwrap();
     assert_eq!(resolve(&cfg, &s(dir.path())), "");
     assert_eq!(diff_stat(&cfg, &s(dir.path())), "");
+    let path_var = if cfg!(windows) { "%PATH%" } else { "$PATH" };
     assert_eq!(
         git_cmd(&cfg, &s(dir.path()), &["status"]).unwrap_err(),
-        r#"exec: "git": executable file not found in $PATH"#
+        format!(r#"exec: "git": executable file not found in {path_var}"#)
     );
+}
+
+/// Go's `Cmd.environ` adds no `PWD` on Windows: an inherited one passes
+/// through unchanged, and none appears otherwise. The fake git is a `.cmd`
+/// found through `PATHEXT`; in a batch file an unset `%PWD%` is empty.
+#[cfg(windows)]
+#[test]
+fn git_cmd_adds_no_pwd_on_windows() {
+    let mut fx = Fixture::new();
+    let bin = tempfile::tempdir().unwrap();
+    std::fs::write(
+        bin.path().join("git.cmd"),
+        "@echo off\r\necho [%PWD%]^|%*\r\n",
+    )
+    .unwrap();
+    fx.vars.insert("PATH".to_string(), s(bin.path()));
+    let work = tempfile::tempdir().unwrap();
+
+    let cfg = fx.config_with(Vec::new(), Some(work.path().to_path_buf()));
+    let got = git_cmd(&cfg, &s(work.path()), &["diff", "--stat"]).unwrap();
+    assert_eq!(got.trim_end(), "[]|diff --stat");
+
+    let cfg = fx.config_with(vec![OsString::from(r"PWD=C:\stale")], None);
+    let got = git_cmd(&cfg, &s(work.path()), &["x"]).unwrap();
+    assert_eq!(got.trim_end(), r"[C:\stale]|x");
 }
 
 /// Go's `Cmd.environ`: with `Dir` set and `Env` nil, `PWD=<Abs(Dir)>` is
@@ -281,6 +316,7 @@ fn git_cmd_env_argv_and_pwd_follow_go() {
 
 /// Linux ETXTBSY: another test thread may fork while a fake is open for
 /// writing (see `executor::testutil::retry_busy`).
+#[cfg(unix)]
 fn retry_busy(mut f: impl FnMut() -> Result<String, String>) -> Result<String, String> {
     crate::executor::testutil::retry_busy(&mut f, |r| match r {
         Err(e) => e.clone(),

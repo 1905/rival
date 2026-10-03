@@ -109,7 +109,8 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
 ///
 /// - `git` is looked up in `cfg`'s `$PATH`.
 /// - The env is `cfg.environ()`, unfiltered, plus `PWD=<abs workdir>` when
-///   `workdir` is set (Go's `Cmd.environ`), then Go `dedupEnv`.
+///   `workdir` is set (Go's `Cmd.environ`; not on Windows, which has no
+///   `PWD`), then Go `dedupEnv`.
 /// - stdin is the null device; stderr is captured and dropped (Go keeps it in
 ///   the `ExitError`, which nobody reads).
 ///
@@ -118,7 +119,7 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
 fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String> {
     let path = look_path(cfg, "git").map_err(|e| e.to_string())?;
     let mut env: Vec<OsString> = cfg.environ().to_vec();
-    if !workdir.is_empty() {
+    if !workdir.is_empty() && !cfg!(windows) {
         // Go: filepath.Abs(c.Dir); its error fails Start.
         let pwd = paths::abs(cfg.cwd(), Path::new(workdir))
             .ok_or_else(|| "getwd: no such file or directory".to_string())?;
@@ -130,7 +131,8 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
     let fork_error =
         |e: &std::io::Error| format!("fork/exec {}: {}", path.display(), spawn_error_text(e));
 
-    let mut cmd = Command::new(&path);
+    let program = process::program_in_dir(&path, Path::new(workdir)).map_err(|e| fork_error(&e))?;
+    let mut cmd = Command::new(program);
     set_exec(&mut cmd, &path, "git", args, &env).map_err(|e| fork_error(&e))?;
     if !workdir.is_empty() {
         cmd.current_dir(workdir);

@@ -12,6 +12,10 @@ use std::sync::atomic::{AtomicU8, Ordering};
 /// Bit `fd` is set when standard descriptor `fd` was closed at startup.
 static CLOSED_AT_START: AtomicU8 = AtomicU8::new(0);
 /// Set once the constructor ran, so a missing constructor is detectable.
+#[cfg_attr(
+    not(all(test, any(target_os = "linux", target_os = "macos"))),
+    allow(dead_code, reason = "diagnostic for the constructor tests")
+)]
 static RECORDED: AtomicU8 = AtomicU8::new(0);
 
 /// The constructor body. `fcntl(F_GETFD)` fails with `EBADF` only for a
@@ -57,7 +61,10 @@ pub fn any_closed_at_start() -> bool {
 }
 
 /// Whether the constructor ran in this process.
-#[cfg_attr(not(test), allow(dead_code, reason = "diagnostic for tests"))]
+#[cfg_attr(
+    not(all(test, any(target_os = "linux", target_os = "macos"))),
+    allow(dead_code, reason = "diagnostic for the constructor tests")
+)]
 pub fn recorded() -> bool {
     RECORDED.load(Ordering::Acquire) == 1
 }

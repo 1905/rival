@@ -10,6 +10,8 @@
 //! Stdin, stdout and stderr are inherited as they are, so redirects like
 //! `< prompt > out 2> err` keep working in the child. A TTY-attached child
 //! would lose its controlling terminal; this is for non-interactive use.
+//! Windows has no setsid: see `set_detach_attr` for its process group and
+//! console rules.
 
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Write};
@@ -156,19 +158,64 @@ fn set_detach_attr(child: &mut Command) {
     }
 }
 
-/// Go `detach_other.go`: no setsid on Windows. Real semantics land in P5.
-#[cfg(not(unix))]
-fn set_detach_attr(_child: &mut Command) {}
+/// Windows has no session to leave. The child gets its own process group,
+/// so the launcher's group cannot reach it with a console control event
+/// (Ctrl+C is off in a new group), and it never joins the parent's owner
+/// Job: this short-lived parent creates none (only a provider spawn does).
+///
+/// The console is chosen from the actual standard handles. If any of them
+/// is a console (`GetConsoleMode` succeeds), the child shares that console,
+/// so its console input and output keep working after the parent exits.
+/// Otherwise every stream is a file, pipe or device, and `DETACHED_PROCESS`
+/// gives the child no console at all. `CREATE_NO_WINDOW` is never used: it
+/// would drop the inherited console, and beside `DETACHED_PROCESS` it does
+/// nothing. Redirected handles are inherited as they are, never reopened.
+///
+/// Limit: closing the shared console window ends that console; a child
+/// still using it then loses its console I/O and gets the close event.
+#[cfg(windows)]
+fn set_detach_attr(child: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    child.creation_flags(detach_creation_flags(any_std_handle_is_console()));
+}
 
-#[cfg(all(test, unix))]
+/// The creation flags of the detached child: `CREATE_NEW_PROCESS_GROUP`,
+/// plus `DETACHED_PROCESS` when no standard handle is a console.
+#[cfg(windows)]
+pub fn detach_creation_flags(any_console: bool) -> u32 {
+    use windows_sys::Win32::System::Threading::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS};
+    if any_console {
+        CREATE_NEW_PROCESS_GROUP
+    } else {
+        CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
+    }
+}
+
+/// Whether stdin, stdout or stderr of this process is a console handle.
+#[cfg(windows)]
+pub fn any_std_handle_is_console() -> bool {
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::System::Console::{
+        GetConsoleMode, GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+    };
+    [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]
+        .into_iter()
+        .any(|which| {
+            // SAFETY: plain queries; a NULL or invalid handle just fails.
+            unsafe {
+                let handle = GetStdHandle(which);
+                let mut mode = 0;
+                !handle.is_null()
+                    && handle != INVALID_HANDLE_VALUE
+                    && GetConsoleMode(handle, &mut mode) != 0
+            }
+        })
+}
+
+/// Platform-neutral checks of the guard and the command shape.
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
-
-    /// Set on the helper child only (on its `Command`, never the test
-    /// process env). Names the file the helper writes its report to.
-    const HELPER_OUT: &str = "RIVAL_DETACH_TEST_HELPER_OUT";
-    const HELPER_TEST: &str = "detach::tests::detach_helper_child";
 
     #[test]
     fn requested_follows_the_go_guard() {
@@ -204,14 +251,33 @@ mod tests {
         let mut err = Vec::new();
         let out = spawn_detached(&exe, &[], &mut err);
         assert_eq!(out, DetachOutcome::Exit(1));
+        let text = if cfg!(windows) {
+            "The system cannot find the file specified."
+        } else {
+            "no such file or directory"
+        };
         assert_eq!(
             String::from_utf8(err).unwrap(),
             format!(
-                "rival: detach failed: fork/exec {}: no such file or directory\n",
+                "rival: detach failed: fork/exec {}: {text}\n",
                 exe.display()
             )
         );
     }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests;
+
+#[cfg(all(test, unix))]
+mod unix_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    /// Set on the helper child only (on its `Command`, never the test
+    /// process env). Names the file the helper writes its report to.
+    const HELPER_OUT: &str = "RIVAL_DETACH_TEST_HELPER_OUT";
+    const HELPER_TEST: &str = "detach::unix_tests::detach_helper_child";
 
     #[test]
     fn closed_std_fd_at_startup_fails_like_go_start_without_a_child() {

@@ -127,7 +127,9 @@ pub(crate) fn run_claude_docker_with(
     }
 
     // The workdir must be absolute for the Docker volume mount. Go joins
-    // with a bare "/" and does not clean the result.
+    // with a bare "/" and does not clean the result. Go tests for a leading
+    // "/" on every OS, so on Windows `C:\repo` becomes `<cwd>/C:\repo`: a
+    // known Go quirk, kept as the source does it.
     let mut abs_workdir = workdir.to_string();
     if !abs_workdir.starts_with('/') {
         let Some(wd) = cfg.cwd() else {

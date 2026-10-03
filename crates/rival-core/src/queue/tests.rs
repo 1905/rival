@@ -282,10 +282,12 @@ fn queue_timeout() {
 // slot.
 #[test]
 fn pid_reuse_guard_reaps_recycled_holder() {
-    if !proc_start_ok() {
-        eprintln!("skip: process start time unsupported on this platform");
-        return;
-    }
+    // Go skips where the start time is unsupported. macOS, Linux and Windows
+    // (GetProcessTimes) all support it, so here the case always runs.
+    assert!(
+        proc_start_ok(),
+        "process start time must be readable on this platform"
+    );
     let dir = tempfile::tempdir().unwrap();
     // Plant a running ticket with OUR live pid but a bogus start time.
     let id = "recycled";

@@ -109,7 +109,7 @@ pub fn run_command_plan(
         return Ok(());
     }
 
-    let abs_path = resolve_plan_path(&raw_path, &workdir, cfg.getenv("HOME"), cfg.cwd())
+    let abs_path = resolve_plan_path(&raw_path, &workdir, cfg.getenv(paths::HOME_VAR), cfg.cwd())
         .map_err(|e| fail_on_stdout(env.stdout, e))?;
 
     // Cancel the queue wait / child processes on SIGINT/SIGTERM.
@@ -140,7 +140,12 @@ pub(crate) fn fail_on_stdout(stdout: &mut dyn Write, msg: String) -> CmdError {
 }
 
 /// Go `fmt.Errorf("write stdout: %w", err)` for a failed `os.Stdout` write.
+/// A nil Windows `os.Stdout` fails with the bare `os.ErrInvalid`, without
+/// the `*PathError` op and path.
 pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
+    if crate::root::is_nil_file(e) {
+        return CmdError::plain(format!("write stdout: {e}"));
+    }
     CmdError::plain(format!(
         "write stdout: write /dev/stdout: {}",
         gostd::os_error_text(e)
@@ -279,24 +284,29 @@ fn split_plan_option(token: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Go `filepath.Join(a, b)` on Unix: empty elements are dropped, the rest
-/// joined with `/` and cleaned. Unlike [`Path::join`], an absolute `b` does
-/// not replace `a`.
+/// Go `filepath.Join(a, b)` for the host ([`paths::join`]): empty elements
+/// are dropped, the rest joined and cleaned; Windows keeps drive and UNC
+/// volumes. Unlike [`Path::join`], an absolute `b` does not replace `a`.
 fn go_join(a: &str, b: &str) -> String {
-    let parts: Vec<&str> = [a, b].into_iter().filter(|e| !e.is_empty()).collect();
-    if parts.is_empty() {
-        return String::new();
-    }
-    paths::clean(Path::new(&parts.join("/")))
+    paths::join(Path::new(a), Path::new(b))
         .to_string_lossy()
         .into_owned()
 }
 
+/// Go `os.Stat`'s `*PathError` op: `GetFileAttributesEx` is Windows' first
+/// stat call.
+const STAT_OP: &str = if cfg!(windows) {
+    "GetFileAttributesEx"
+} else {
+    "stat"
+};
+
 /// Go `resolvePlanPath`: turns the raw user-supplied path into a validated
 /// absolute path to an existing regular file. Relative paths are resolved
 /// against `workdir`. Any file name is accepted; `.md` is not required.
-/// `home` is Go's `os.UserHomeDir()` (`$HOME`; empty = unavailable) and
-/// `cwd` the `os.Getwd()` snapshot `filepath.Abs` would use.
+/// `home` is Go's `os.UserHomeDir()` (`$HOME`, `%USERPROFILE%` on Windows;
+/// empty = unavailable) and `cwd` the `os.Getwd()` snapshot `filepath.Abs`
+/// would use. `filepath.IsAbs`, `Join` and `Abs` follow the host's rules.
 pub(crate) fn resolve_plan_path(
     raw_path: &str,
     workdir: &str,
@@ -308,7 +318,7 @@ pub(crate) fn resolve_plan_path(
     if (p == "~" || p.starts_with("~/")) && !home.is_empty() {
         p = go_join(home, &p[1..]);
     }
-    if !Path::new(&p).is_absolute() {
+    if !paths::is_abs(Path::new(&p)) {
         p = go_join(workdir, &p);
     }
     // Reject control characters (e.g. a newline in the file name): the path
@@ -339,7 +349,7 @@ pub(crate) fn resolve_plan_path(
         }
         Err(e) => {
             return Err(format!(
-                "cannot read plan file {abs}: stat {abs}: {}",
+                "cannot read plan file {abs}: {STAT_OP} {abs}: {}",
                 gostd::os_error_text(&e)
             ));
         }

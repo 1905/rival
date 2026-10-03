@@ -20,6 +20,7 @@ pub mod sessionview;
 pub mod skills;
 pub mod telemetry;
 pub mod update;
+pub mod winpath;
 
 /// Build version. Mirrors Go's `var version = "dev"`; release builds override it later.
 pub const VERSION: &str = "dev";

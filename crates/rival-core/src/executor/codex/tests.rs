@@ -2,7 +2,9 @@
 //! wrapping and preflight checks against task-owned fakes.
 
 use super::*;
-use crate::executor::testutil::{Env, Spawned, recorder, retry_busy, strings};
+#[cfg(unix)]
+use crate::executor::testutil::retry_busy;
+use crate::executor::testutil::{Env, Spawned, recorder, strings};
 
 fn argv(effort: &str, workdir: &str) -> Vec<String> {
     let effort_arg = format!("model_reasoning_effort={effort}");

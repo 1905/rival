@@ -559,7 +559,7 @@ fn parse_version_reads_the_frontmatter_only() {
 fn install_command_writes_under_home_not_rival_home() {
     let rival_home = tempfile::tempdir().unwrap();
     let fix = Fixture::with(&[("RIVAL_HOME", rival_home.path().to_str().unwrap())], None);
-    let home = PathBuf::from(fix.cfg.getenv("HOME"));
+    let home = PathBuf::from(fix.cfg.getenv(rival_core::paths::HOME_VAR));
     let (code, stdout, stderr) = execute(
         &fix,
         &mut FakeStdin::new(""),
@@ -616,7 +616,7 @@ fn run(
 fn auto_without_codex_installs_claude_and_says_so_on_stderr() {
     let bin = tempfile::tempdir().unwrap();
     let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
-    let home = PathBuf::from(fix.cfg.getenv("HOME"));
+    let home = PathBuf::from(fix.cfg.getenv(rival_core::paths::HOME_VAR));
     let (result, stdout, stderr) = run(&fix, false, "auto", "");
     result.unwrap();
     assert_eq!(
@@ -639,7 +639,7 @@ fn auto_with_codex_installs_both_hosts() {
         ],
         None,
     );
-    let home = PathBuf::from(fix.cfg.getenv("HOME"));
+    let home = PathBuf::from(fix.cfg.getenv(rival_core::paths::HOME_VAR));
     let (result, stdout, stderr) = run(&fix, false, "auto", "");
     result.unwrap();
     assert_eq!(stderr, "");
@@ -667,7 +667,7 @@ fn explicit_targets_skip_the_note() {
 
 #[test]
 fn empty_home_fails_before_any_target() {
-    let fix = Fixture::with(&[("HOME", "")], None);
+    let fix = Fixture::with(&[(rival_core::paths::HOME_VAR, "")], None);
     let (result, stdout, stderr) = run(&fix, false, "typo", "");
     let want = if cfg!(windows) {
         "get home dir: %userprofile% is not defined"

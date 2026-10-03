@@ -805,7 +805,9 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
     let shown = path.display();
     let mut file = match std::fs::File::open(path) {
         Ok(file) => file,
-        Err(e) if e.raw_os_error() == Some(libc::ENOENT) => return Ok(None),
+        // Go errors.Is(err, os.ErrNotExist); on Windows also a missing
+        // parent directory (ERROR_PATH_NOT_FOUND), as in a fresh profile.
+        Err(e) if gostd::is_not_exist(&e) => return Ok(None),
         Err(e) => {
             return Err(ConfigError::new(format!(
                 "read {shown}: open {shown}: {}",
@@ -877,6 +879,10 @@ pub struct Config {
     cwd: Option<PathBuf>,
     user: Option<UserConfig>,
     user_err: Option<ConfigError>,
+    /// The snapshot is this process's environment ([`Config::load`]), so
+    /// OS calls that read the environment themselves (Windows
+    /// `GetTempPath2W`) see the same values.
+    process_env: bool,
 }
 
 /// The env snapshot holds API keys, so `Debug` shows only its size.
@@ -898,7 +904,9 @@ impl Config {
     /// working directory (Go `os.Getwd`), then reads the user config.
     pub fn load(paths: &Paths) -> Self {
         let (env, environ, cwd) = process_snapshot();
-        Self::new(paths.clone(), env, cwd).with_environ(environ)
+        let mut cfg = Self::new(paths.clone(), env, cwd).with_environ(environ);
+        cfg.process_env = true;
+        cfg
     }
 
     /// Go reads `config.yaml` once at package init, before `main` loads
@@ -908,7 +916,9 @@ impl Config {
     /// while keeping the user config and its load error from [`Config::load`].
     pub fn reload_env(self, paths: Paths) -> Self {
         let (env, environ, cwd) = process_snapshot();
-        self.with_runtime_env(paths, env, environ, cwd)
+        let mut cfg = self.with_runtime_env(paths, env, environ, cwd);
+        cfg.process_env = true;
+        cfg
     }
 
     /// Pure form of [`Config::reload_env`]: replaces the paths, the `env`
@@ -925,6 +935,7 @@ impl Config {
         self.env = env;
         self.environ = environ;
         self.cwd = cwd;
+        self.process_env = false;
         self
     }
 
@@ -943,6 +954,7 @@ impl Config {
             cwd,
             user: None,
             user_err: None,
+            process_env: false,
         };
         if !cfg.getenv("RIVAL_HOME").is_empty() || !cfg.getenv(paths::HOME_VAR).is_empty() {
             match load_user_config(&cfg.paths.config_file()) {
@@ -979,6 +991,13 @@ impl Config {
         self
     }
 
+    /// Whether `os.TempDir()` may ask the OS: true when the env snapshot is
+    /// this process's own ([`Config::load`], [`Config::reload_env`]); an
+    /// injected env ([`Config::new`], [`Config::with_runtime_env`]) is not.
+    pub fn temp_dir_from_os(&self) -> bool {
+        self.process_env
+    }
+
     /// The snapshotted Go `os.Getwd()` result; `None` stands for its error.
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()
@@ -988,9 +1007,11 @@ impl Config {
         self.user.as_ref()
     }
 
-    /// Go `os.Getenv` against the snapshot: unset reads as "".
+    /// Go `os.Getenv` against the snapshot: unset reads as "". Windows
+    /// names are case-insensitive (`Path` answers `PATH`), as Go's
+    /// `GetEnvironmentVariableW` lookup is; see [`getenv_in`].
     pub fn getenv(&self, key: &str) -> &str {
-        self.env.get(key).map_or("", String::as_str)
+        getenv_in(cfg!(windows), &self.env, key)
     }
 
     /// An invalid `~/.rival/config.yaml`. Commands fail before doing any
@@ -1294,6 +1315,28 @@ impl Config {
         let abs = paths::abs(self.cwd.as_deref(), workdir).unwrap_or_default();
         WORKDIR_PREAMBLE.replace("{WORKDIR}", &abs.to_string_lossy())
     }
+}
+
+/// [`Config::getenv`] with the platform rule explicit, so both test
+/// everywhere. An exact match wins. Case-insensitive (Windows) names compare
+/// ASCII case-folded; a real Windows environment cannot hold two such names,
+/// and in a test map the smallest matching name wins, so the answer is
+/// stable.
+pub fn getenv_in<'a>(
+    case_insensitive: bool,
+    env: &'a HashMap<String, String>,
+    key: &str,
+) -> &'a str {
+    if let Some(v) = env.get(key) {
+        return v;
+    }
+    if !case_insensitive {
+        return "";
+    }
+    env.iter()
+        .filter(|(k, _)| k.eq_ignore_ascii_case(key))
+        .min_by(|a, b| a.0.cmp(b.0))
+        .map_or("", |(_, v)| v.as_str())
 }
 
 /// The process environment as `(UTF-8 getters, ordered environ, getwd)`.

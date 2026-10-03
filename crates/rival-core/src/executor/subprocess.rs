@@ -9,6 +9,8 @@
 
 #[cfg(all(test, unix))]
 mod tests;
+#[cfg(all(test, windows))]
+mod windows_tests;
 
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -153,10 +155,19 @@ fn env_key_end(kv: &[u8]) -> Option<usize> {
     }
 }
 
-/// Go `exec.dedupEnv` on Unix: the last value of each key wins, in the
-/// order of each key's last occurrence. An entry without `=` is kept as-is.
-/// An entry with a NUL byte is skipped and reported.
+/// Go `exec.dedupEnv`: the last value of each key wins, in the order of
+/// each key's last occurrence. An entry without `=` is kept as-is. An entry
+/// with a NUL byte is skipped and reported. Windows compares keys case
+/// insensitively (Go `strings.ToLower`).
 pub(crate) fn dedup_env(env: &[OsString]) -> Result<Vec<OsString>, String> {
+    dedup_env_case(cfg!(windows), env)
+}
+
+/// Go `exec.dedupEnvCase` (`nulOK` false).
+pub(crate) fn dedup_env_case(
+    case_insensitive: bool,
+    env: &[OsString],
+) -> Result<Vec<OsString>, String> {
     let mut err = None;
     let mut out = Vec::with_capacity(env.len());
     let mut saw = std::collections::HashSet::new();
@@ -172,7 +183,16 @@ pub(crate) fn dedup_env(env: &[OsString]) -> Result<Vec<OsString>, String> {
             }
             continue;
         };
-        if saw.insert(&bytes[..i]) {
+        let key = &bytes[..i];
+        let key = if case_insensitive {
+            match std::str::from_utf8(key) {
+                Ok(k) => gostd::to_lower(k).into_bytes(),
+                Err(_) => key.to_ascii_lowercase(),
+            }
+        } else {
+            key.to_vec()
+        };
+        if saw.insert(key) {
             out.push(kv.clone());
         }
     }
@@ -182,7 +202,7 @@ pub(crate) fn dedup_env(env: &[OsString]) -> Result<Vec<OsString>, String> {
 
 /// Replaces `cmd`'s whole environment with `env` (`KEY=VALUE` entries).
 /// Unix passes the env to `execve` itself (see [`process::set_exec`]).
-#[cfg(not(unix))]
+#[cfg(windows)]
 pub(crate) fn set_env(cmd: &mut Command, env: &[OsString]) {
     cmd.env_clear();
     for kv in env {
@@ -202,11 +222,30 @@ pub(crate) fn set_env(cmd: &mut Command, env: &[OsString]) {
     }
 }
 
-/// Go `os.Getenv` on an `os.Environ()` list: the first entry wins.
+/// Go `os.Getenv` on an `os.Environ()` list: the first entry wins. Windows
+/// names are case-insensitive (ASCII), as `GetEnvironmentVariableW` treats
+/// them.
 pub(crate) fn getenv<'a>(environ: &'a [OsString], key: &str) -> Option<&'a OsStr> {
+    getenv_case(cfg!(windows), environ, key)
+}
+
+pub(crate) fn getenv_case<'a>(
+    case_insensitive: bool,
+    environ: &'a [OsString],
+    key: &str,
+) -> Option<&'a OsStr> {
     environ.iter().find_map(|kv| {
         let bytes = kv.as_encoded_bytes();
-        let rest = bytes.strip_prefix(key.as_bytes())?.strip_prefix(b"=")?;
+        let head = bytes.get(..key.len())?;
+        let same = if case_insensitive {
+            head.eq_ignore_ascii_case(key.as_bytes())
+        } else {
+            head == key.as_bytes()
+        };
+        if !same {
+            return None;
+        }
+        let rest = bytes[key.len()..].strip_prefix(b"=")?;
         // SAFETY: a suffix after an ASCII '=' of a valid encoded OsStr.
         Some(unsafe { OsStr::from_encoded_bytes_unchecked(rest) })
     })
@@ -214,7 +253,8 @@ pub(crate) fn getenv<'a>(environ: &'a [OsString], key: &str) -> Option<&'a OsStr
 
 /// Go `exec.Command`: a name without a separator is looked up in `$PATH`
 /// now; the error is reported by `Start`.
-fn resolve(binary: &str, environ: &[OsString]) -> Result<PathBuf, String> {
+#[cfg(not(windows))]
+fn resolve(binary: &str, environ: &[OsString], _dir: &str) -> Result<PathBuf, String> {
     if binary.is_empty() {
         return Err("exec: no command".to_string());
     }
@@ -222,6 +262,29 @@ fn resolve(binary: &str, environ: &[OsString]) -> Result<PathBuf, String> {
         return Ok(PathBuf::from(binary));
     }
     process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string())
+}
+
+/// Go `exec.Command` plus `Start` on Windows: a bare name (`filepath.Base`
+/// of itself) is looked up in `%PATH%` with `PATHEXT`; any other name gets
+/// its `PATHEXT` extension from `lookExtensions`, a relative one against
+/// `dir` (the `cmd.Dir`).
+#[cfg(windows)]
+fn resolve(binary: &str, environ: &[OsString], dir: &str) -> Result<PathBuf, String> {
+    use super::process::windows::{LookEnv, look_extensions};
+    use crate::winpath;
+
+    if binary.is_empty() {
+        return Err("exec: no command".to_string());
+    }
+    if winpath::base(binary.as_bytes()) == binary.as_bytes() {
+        return process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string());
+    }
+    let dir = if winpath::is_abs(binary.as_bytes()) {
+        ""
+    } else {
+        dir
+    };
+    look_extensions(binary, dir, &LookEnv::process()).map_err(|e| e.to_string())
 }
 
 /// Go's text for an `io::Error` without a file name.
@@ -364,24 +427,26 @@ pub fn run_subprocess(
     mirror: Option<&mut (dyn Write + Send)>,
 ) -> anyhow::Result<RunResult> {
     let binary = req.binary;
-    let resolved = resolve(binary, req.environ);
+    let resolved = resolve(binary, req.environ, &sess.work_dir);
     let env = child_env(req);
 
-    let pipe = |what: &str| {
-        let (r, w) = process::pipe()
+    let pipe = |what: &str, parent_reads: bool| {
+        let (r, w) = process::provider_pipe(parent_reads)
             .map_err(|e| anyhow!("{what} pipe: {}: {}", process::PIPE_SYSCALL, io_text(&e)))?;
         anyhow::Ok((r, w))
     };
-    // Our ends must be nonblocking: the drain bound relies on it (see
-    // process::Abort). A setup failure stops before the child starts.
+    // Our ends must be nonblocking (Unix) or overlapped (Windows): the drain
+    // bound relies on it (see process::Abort). A setup failure stops before
+    // the child starts.
     let nonblocking =
         |what: &str, e: io::Error| anyhow!("{what} pipe: set nonblocking: {}", io_text(&e));
-    let (stdin_r, stdin_w) = pipe("stdin")?;
+    let (stdin_r, stdin_w) = pipe("stdin", false)?;
     process::set_nonblocking(&stdin_w).map_err(|e| nonblocking("stdin", e))?;
-    let (stdout_r, stdout_w) = pipe("stdout")?;
+    let (stdout_r, stdout_w) = pipe("stdout", true)?;
     process::set_nonblocking(&stdout_r).map_err(|e| nonblocking("stdout", e))?;
-    let (stderr_r, stderr_w) = pipe("stderr")?;
+    let (stderr_r, stderr_w) = pipe("stderr", true)?;
     process::set_nonblocking(&stderr_r).map_err(|e| nonblocking("stderr", e))?;
+    let abort = Abort::new().map_err(|e| anyhow!("abort event: {}", io_text(&e)))?;
 
     let log_file = sess.open_log().map_err(|e| {
         anyhow!(
@@ -401,7 +466,16 @@ pub fn run_subprocess(
         }
         let env = dedup_env(&env).map_err(|e| anyhow!("start {binary}: {e}"))?;
 
-        let mut cmd = Command::new(&lp);
+        let fork_error = |e: &io::Error| {
+            anyhow!(
+                "start {binary}: fork/exec {}: {}",
+                lp.display(),
+                spawn_error_text(e)
+            )
+        };
+        let program =
+            process::program_in_dir(&lp, Path::new(&sess.work_dir)).map_err(|e| fork_error(&e))?;
+        let mut cmd = Command::new(program);
         let image = process::set_exec(&mut cmd, &lp, binary, req.args, &env);
         if !sess.work_dir.is_empty() {
             cmd.current_dir(&sess.work_dir);
@@ -410,18 +484,11 @@ pub fn run_subprocess(
         cmd.stdin(Stdio::from(stdin_r))
             .stdout(Stdio::from(stdout_w))
             .stderr(Stdio::from(stderr_w));
-        let spawned = image.and_then(|()| process::spawn(&mut cmd));
+        let spawned = image.and_then(|()| process::start_provider(&mut cmd));
         // Closes our copies of the child's pipe ends (Go closes childIOFiles
         // after Start), so EOF arrives once the provider side is done.
         drop(cmd);
-        let child = spawned.map_err(|e| {
-            anyhow!(
-                "start {binary}: fork/exec {}: {}",
-                lp.display(),
-                spawn_error_text(&e)
-            )
-        })?;
-        let proc = ProcessHandle::new(child);
+        let proc: ProcessHandle = spawned.map_err(|e| fork_error(&e))?;
 
         // Record the child PID + its start time (the latter guards the PID
         // against reuse: the queue's liveness check holds a slot while a
@@ -440,6 +507,7 @@ pub fn run_subprocess(
             stdin: stdin_w,
             stdout: stdout_r,
             stderr: stderr_r,
+            abort,
         };
         supervise(ctx, &sess.id, binary, proc, io, req.prompt, &log, mirror)
     })();
@@ -455,11 +523,12 @@ pub fn run_subprocess(
     result
 }
 
-/// The parent ends of the three pipes.
+/// The parent ends of the three pipes, and the abort that ends their IO.
 struct Pipes {
     stdin: PipeWriter,
     stdout: PipeReader,
     stderr: PipeReader,
+    abort: Abort,
 }
 
 /// Go's `cmd.Cancel` plus `watchCtx`: kills the group and returns the error
@@ -493,6 +562,7 @@ fn supervise(
         stdin,
         stdout,
         stderr,
+        abort,
     } = io;
     let (wake_ctx, wake) = ctx.with_cancel();
     let drain = Drain {
@@ -500,7 +570,6 @@ fn supervise(
         cond: Condvar::new(),
         wake: wake.clone(),
     };
-    let abort = Abort::default();
     // `Some(err)` once the group kill ran; Go calls Cancel at most once.
     let mut watch: Option<Option<String>> = None;
     let mut aborted = false;

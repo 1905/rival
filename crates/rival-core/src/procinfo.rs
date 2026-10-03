@@ -15,6 +15,11 @@ pub fn start_nanos(pid: i32) -> Option<i64> {
 /// `want_start`. Unlike [`alive`] it never degrades: an unrecorded start (0) or
 /// an unreadable start time is false. Use it to authorize a signal; [`alive`]
 /// is for existence checks that must not false-reap.
+///
+/// It checks identity only. On Windows an exited process whose object some
+/// handle still keeps open opens with its creation time, so this stays true
+/// after the exit; wait for death with [`alive`], which reads the running
+/// state.
 pub fn same_process(pid: i32, want_start: i64) -> bool {
     if pid <= 0 || want_start == 0 {
         return false;
@@ -46,10 +51,67 @@ fn exists(pid: i32) -> bool {
     unsafe { libc::kill(pid, 0) == 0 }
 }
 
-// Windows liveness lands in P5.
-#[cfg(not(unix))]
-fn exists(_pid: i32) -> bool {
-    false
+/// Windows: the PID opens and its process has not exited. Like Unix
+/// `kill(pid, 0)` failing with EPERM, a process this user may not open
+/// (access denied) counts as not existing.
+#[cfg(windows)]
+fn exists(pid: i32) -> bool {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::WAIT_TIMEOUT;
+    use windows_sys::Win32::System::Threading::{PROCESS_SYNCHRONIZE, WaitForSingleObject};
+
+    let Some(process) = windows::open(pid, PROCESS_SYNCHRONIZE) else {
+        return false;
+    };
+    // SAFETY: a valid handle with SYNCHRONIZE access; zero timeout.
+    unsafe { WaitForSingleObject(process.as_raw_handle(), 0) == WAIT_TIMEOUT }
+}
+
+#[cfg(windows)]
+pub mod windows {
+    //! Windows process identity: `OpenProcess` plus `GetProcessTimes`.
+
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::Threading::{
+        GetProcessTimes, OpenProcess, PROCESS_ACCESS_RIGHTS, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    /// 100 ns intervals from 1601-01-01 to 1970-01-01.
+    const UNIX_EPOCH_AS_FILETIME: i64 = 116_444_736_000_000_000;
+
+    /// Opens `pid` with query access plus `extra`, or `None`.
+    pub fn open(pid: i32, extra: PROCESS_ACCESS_RIGHTS) -> Option<OwnedHandle> {
+        let pid = u32::try_from(pid).ok().filter(|&p| p > 0)?;
+        // SAFETY: a plain open by PID; the handle is not inheritable.
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | extra, 0, pid) };
+        if handle.is_null() {
+            return None;
+        }
+        // SAFETY: a fresh handle we own.
+        Some(unsafe { OwnedHandle::from_raw_handle(handle) })
+    }
+
+    /// The creation time of an open process in Unix nanoseconds, from
+    /// `GetProcessTimes` (100 ns resolution). Fixed for the process's life,
+    /// so it pins the identity of the PID like the Unix start times.
+    pub fn creation_nanos(process: &OwnedHandle) -> Option<i64> {
+        // SAFETY: all-zero FILETIMEs are valid out values.
+        let mut times: [FILETIME; 4] = unsafe { std::mem::zeroed() };
+        let [created, exited, kernel, user] = &mut times;
+        // SAFETY: a valid handle with query access and four writable FILETIMEs.
+        let ok = unsafe { GetProcessTimes(process.as_raw_handle(), created, exited, kernel, user) };
+        if ok == 0 {
+            return None;
+        }
+        let ticks = (i64::from(created.dwHighDateTime) << 32) | i64::from(created.dwLowDateTime);
+        let nanos = ticks
+            .checked_sub(UNIX_EPOCH_AS_FILETIME)?
+            .checked_mul(100)?;
+        // 0 is the "unrecorded" sentinel; no live process started at it.
+        (nanos != 0).then_some(nanos)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -104,7 +166,15 @@ fn start_nanos_impl(pid: i32) -> Option<i64> {
     parse_stat_start(&data)
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+/// Windows: the creation time from `GetProcessTimes`, in Unix nanoseconds.
+/// Go's `start_other.go` reports none here; the Rust port needs it so the
+/// queue, the reaper and the TUI stop can tell a reused PID apart.
+#[cfg(windows)]
+fn start_nanos_impl(pid: i32) -> Option<i64> {
+    windows::creation_nanos(&windows::open(pid, 0)?)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 fn start_nanos_impl(_pid: i32) -> Option<i64> {
     None
 }
@@ -155,23 +225,25 @@ mod tests {
         std::process::id() as i32
     }
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    /// Every supported platform (macOS, Linux, Windows) reads a start time;
+    /// the Go tests' skip for an unsupported platform never applies here.
+    fn self_start() -> i64 {
+        let n = start_nanos(self_pid());
+        match n {
+            Some(v) if v > 0 => v,
+            _ => panic!("start_nanos(self) = {n:?}, want positive"),
+        }
+    }
+
     #[test]
     fn start_nanos_self() {
-        let n = start_nanos(self_pid());
-        assert!(
-            matches!(n, Some(v) if v > 0),
-            "start_nanos(self) = {n:?}, want positive"
-        );
+        self_start();
     }
 
     #[test]
     fn alive_cases() {
         let pid = self_pid();
-        let Some(start) = start_nanos(pid) else {
-            eprintln!("start time unsupported on this platform");
-            return;
-        };
+        let start = self_start();
         assert!(alive(pid, start), "alive(self, correct start) = false");
         // A non-matching start time means the PID was recycled → treat as dead.
         assert!(!alive(pid, start + 1), "PID-reuse guard failed");
@@ -192,10 +264,7 @@ mod tests {
     #[test]
     fn same_process_cases() {
         let pid = self_pid();
-        let Some(start) = start_nanos(pid) else {
-            eprintln!("start time unsupported on this platform");
-            return;
-        };
+        let start = self_start();
         assert!(
             same_process(pid, start),
             "same_process(self, correct start) = false"
@@ -243,6 +312,119 @@ mod tests {
         // Go uses sysctl, which can inspect another user's process. proc_pidinfo
         // cannot, so switching to it would silently change stop authorization.
         assert!(start_nanos(1).is_some_and(|n| n > 0));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn start_nanos_self_is_unix_wall_clock_on_windows() {
+        // GetProcessTimes creation time: Unix nanoseconds at 100 ns steps.
+        let start = self_start();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as i64;
+        assert!(start <= now, "start {start} after now {now}");
+        assert!(
+            now - start < 86_400 * 1_000_000_000,
+            "start {start} too old"
+        );
+        assert_eq!(start % 100, 0, "100 ns precision expected");
+    }
+
+    #[cfg(windows)]
+    const EXIT_HELPER_ENV: &str = "RIVAL_PROCINFO_EXIT_HELPER";
+
+    /// Helper process for [`child_identity_and_running_state_are_separate`]:
+    /// reads one line from stdin, then exits with 259 (`STILL_ACTIVE`).
+    /// A no-op in a normal test run.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "helper process for child_identity_and_running_state_are_separate"]
+    fn exit_259_helper() {
+        if std::env::var_os(EXIT_HELPER_ENV).is_none() {
+            return;
+        }
+        let mut line = String::new();
+        let _ = std::io::stdin().read_line(&mut line);
+        std::process::exit(259);
+    }
+
+    /// Identity (creation time) and running state are separate Windows
+    /// facts. While any handle keeps an exited process object, its PID still
+    /// opens with the same creation time, so `same_process` stays true; only
+    /// the signaled state says it ended. An exit code of 259 equals
+    /// `STILL_ACTIVE`, so `GetExitCodeProcess` alone would call it running.
+    #[cfg(windows)]
+    #[test]
+    fn child_identity_and_running_state_are_separate() {
+        use std::io::Write;
+        use std::time::{Duration, Instant};
+
+        let home = tempfile::tempdir().unwrap();
+        let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+        cmd.args([
+            "--exact",
+            "procinfo::tests::exit_259_helper",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(EXIT_HELPER_ENV, "1")
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
+        .env("RIVAL_HOME", home.path().join(".rival"))
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+        // Our Child handle keeps the process object (and its PID) until it
+        // drops; the guard kills and reaps it on every exit path.
+        struct Guard(std::process::Child);
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                if matches!(self.0.try_wait(), Ok(None)) {
+                    let _ = self.0.kill();
+                    let deadline = Instant::now() + Duration::from_secs(10);
+                    while matches!(self.0.try_wait(), Ok(None)) && Instant::now() < deadline {
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
+                }
+            }
+        }
+        let mut child = Guard(crate::executor::process::spawn(&mut cmd).unwrap());
+        let pid = child.0.id() as i32;
+        let start = start_nanos(pid).expect("child start time");
+        assert_eq!(start_nanos(pid), Some(start), "stable while it runs");
+        assert!(alive(pid, start), "a running child is alive");
+        assert!(same_process(pid, start));
+        assert!(
+            !same_process(pid, start + 100),
+            "another start is another process"
+        );
+
+        // Let it exit with 259, waiting a bounded time.
+        let mut stdin = child.0.stdin.take().unwrap();
+        stdin.write_all(b"go\n").unwrap();
+        drop(stdin);
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break status;
+            }
+            assert!(Instant::now() < deadline, "helper {pid} did not exit");
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(status.code(), Some(259), "{status:?}");
+
+        // Our handle is still open: identity remains, running state is gone.
+        assert!(!alive(pid, start), "an exited process is not alive");
+        assert!(!alive(pid, 0), "an exited process does not exist");
+        assert_eq!(
+            start_nanos(pid),
+            Some(start),
+            "the retained object keeps its identity"
+        );
+        assert!(same_process(pid, start));
+        assert!(!same_process(pid, start + 100));
     }
 
     #[cfg(target_os = "linux")]

@@ -21,6 +21,39 @@ fn opened(out: JobOutput) -> OpenedLog {
     }
 }
 
+/// Windows opens through the shell with the path as data: metacharacters,
+/// spaces and percent signs arrive unchanged, nothing is interpolated, and
+/// no launcher process is kept.
+#[cfg(windows)]
+#[test]
+fn windows_opener_passes_the_path_as_data() {
+    use std::cell::RefCell;
+    fn decode(p: *const u16) -> String {
+        let mut n = 0;
+        // SAFETY: the opener passes NUL-terminated strings.
+        while unsafe { *p.add(n) } != 0 {
+            n += 1;
+        }
+        // SAFETY: n units were just read.
+        String::from_utf16(unsafe { std::slice::from_raw_parts(p, n) }).unwrap()
+    }
+    let path = Path::new(r"C:\Temp\rival log & (x) ^ %PATH% !.txt");
+    let seen = RefCell::new(None);
+    let got = shell_open(path, |verb, file| {
+        *seen.borrow_mut() = Some((decode(verb), decode(file)));
+        42
+    });
+    assert!(matches!(got, Ok(None)), "{got:?}");
+    assert_eq!(
+        seen.into_inner(),
+        Some(("open".to_string(), path.to_str().unwrap().to_string()))
+    );
+    // A shell error code (2 = file not found) is a failed launch.
+    let err = shell_open(path, |_, _| 2).unwrap_err();
+    assert_eq!(err.to_string(), "ShellExecute failed with code 2");
+}
+
+#[cfg(unix)]
 #[test]
 fn viewer_command_is_the_go_opener() {
     let cmd = viewer_command(Path::new("/tmp/rival-log-x.txt"));
@@ -148,6 +181,7 @@ fn log_views_expire_copies_and_keep_fresh_ones_on_close() {
     assert!(p3.exists(), "exit removed a fresh copy");
 }
 
+#[cfg(unix)]
 fn copy(h: &crate::tui::testkit::Harness, name: &str) -> PathBuf {
     let path = h.env.temp_dir.join(name);
     fs::write(&path, "copy\n").unwrap();

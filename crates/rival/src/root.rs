@@ -115,6 +115,16 @@ impl StdinSource for ProcessStdin {
         if startup_fds::closed_at_start(0) {
             return Err(text(&io::Error::from_raw_os_error(libc::EBADF)));
         }
+        // Windows: std reads EOF from a missing handle (`handle_ebadf`); Go
+        // does not. An INVALID_HANDLE_VALUE makes Go's `os.Stdin` nil, whose
+        // Read is the bare `os.ErrInvalid`. A NULL handle is still a File,
+        // and its ReadFile fails with ERROR_INVALID_HANDLE.
+        #[cfg(windows)]
+        match std_handle(windows_sys::Win32::System::Console::STD_INPUT_HANDLE) {
+            StdHandle::Invalid => return Err(NilFile.to_string()),
+            StdHandle::Null => return Err(text(&invalid_handle_error())),
+            StdHandle::Valid(_) => {}
+        }
         let mut data = Vec::new();
         io::stdin()
             .lock()
@@ -147,28 +157,116 @@ fn stdin_stat_ok() -> bool {
     unsafe { libc::fstat(0, &mut st) == 0 }
 }
 
-#[cfg(not(unix))]
+/// Go `os.Stdin.Stat()` on Windows reports `ModeCharDevice` for a
+/// `FILE_TYPE_CHAR` handle: a console, and also the `NUL` device.
+#[cfg(windows)]
 fn stdin_is_char_device() -> bool {
-    use std::io::IsTerminal;
-    io::stdin().is_terminal()
+    use windows_sys::Win32::Storage::FileSystem::FILE_TYPE_CHAR;
+    stdin_file_type() == Some(FILE_TYPE_CHAR)
 }
 
-/// Windows is Task 5.
-#[cfg(not(unix))]
+/// Go `os.Stdin.Stat()` succeeding on Windows: a usable standard input
+/// handle whose file type can be read. An INVALID_HANDLE_VALUE (Go's
+/// `os.Stdin` is nil: `ErrInvalid`) or a NULL handle (`GetFileType` fails)
+/// fails, as does an unknown type with an error.
+#[cfg(windows)]
 fn stdin_stat_ok() -> bool {
-    true
+    stdin_file_type().is_some()
+}
+
+/// A Windows standard handle as Go's `syscall.getStdHandle` keeps it. Go's
+/// `os.NewFile` rejects only INVALID_HANDLE_VALUE (a nil `*File`); a NULL
+/// handle becomes a `File` whose calls fail with ERROR_INVALID_HANDLE.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum StdHandle {
+    Valid(windows_sys::Win32::Foundation::HANDLE),
+    Null,
+    Invalid,
+}
+
+#[cfg(windows)]
+pub(crate) fn std_handle(which: windows_sys::Win32::System::Console::STD_HANDLE) -> StdHandle {
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::System::Console::GetStdHandle;
+    // SAFETY: a plain query.
+    let handle = unsafe { GetStdHandle(which) };
+    if handle == INVALID_HANDLE_VALUE {
+        StdHandle::Invalid
+    } else if handle.is_null() {
+        StdHandle::Null
+    } else {
+        StdHandle::Valid(handle)
+    }
+}
+
+/// ERROR_INVALID_HANDLE: what Go's ReadFile/WriteFile/GetFileType on a NULL
+/// standard handle fail with.
+#[cfg(windows)]
+fn invalid_handle_error() -> io::Error {
+    io::Error::from_raw_os_error(windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32)
+}
+
+/// `GetFileType` of the standard input handle, or `None` when the handle is
+/// missing or the call fails.
+#[cfg(windows)]
+pub(crate) fn stdin_file_type() -> Option<u32> {
+    use windows_sys::Win32::Foundation::{GetLastError, NO_ERROR};
+    use windows_sys::Win32::Storage::FileSystem::{FILE_TYPE_UNKNOWN, GetFileType};
+    use windows_sys::Win32::System::Console::STD_INPUT_HANDLE;
+    let StdHandle::Valid(handle) = std_handle(STD_INPUT_HANDLE) else {
+        return None;
+    };
+    // SAFETY: plain queries on a standard input handle.
+    unsafe {
+        let kind = GetFileType(handle);
+        if kind == FILE_TYPE_UNKNOWN && GetLastError() != NO_ERROR {
+            return None;
+        }
+        Some(kind)
+    }
+}
+
+/// Go's `os.ErrInvalid` from a nil `*os.File` (`checkValid`): its text has
+/// no op or path. Windows `os.Stdin`/`os.Stdout` are nil when the standard
+/// handle is INVALID_HANDLE_VALUE.
+#[derive(Debug)]
+pub struct NilFile;
+
+impl std::fmt::Display for NilFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("invalid argument")
+    }
+}
+
+impl std::error::Error for NilFile {}
+
+/// Whether `e` is [`NilFile`]: Go prints it bare, without `write <path>:`.
+pub fn is_nil_file(e: &io::Error) -> bool {
+    e.get_ref().is_some_and(|inner| inner.is::<NilFile>())
 }
 
 /// Unbuffered stdout, like Go's `os.Stdout`: every write reaches fd 1 at
 /// once, so it interleaves with stderr in call order. When fd 1 was closed
 /// at startup, writes fail with EBADF as Go's do (Rust reopened it on
 /// /dev/null, where they would succeed).
+///
+/// Windows: std turns a write to a missing handle into a silent success
+/// (`handle_ebadf`). Go fails it: INVALID_HANDLE_VALUE with [`NilFile`], a
+/// NULL handle with ERROR_INVALID_HANDLE. The handle is checked before each
+/// write. A valid handle that fails later still goes through std.
 pub struct ProcessStdout;
 
 impl Write for ProcessStdout {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if startup_fds::closed_at_start(1) {
             return Err(io::Error::from_raw_os_error(libc::EBADF));
+        }
+        #[cfg(windows)]
+        match std_handle(windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE) {
+            StdHandle::Invalid => return Err(io::Error::new(io::ErrorKind::InvalidInput, NilFile)),
+            StdHandle::Null => return Err(invalid_handle_error()),
+            StdHandle::Valid(_) => {}
         }
         let mut out = io::stdout().lock();
         let n = out.write(buf)?;

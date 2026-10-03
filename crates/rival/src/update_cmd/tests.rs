@@ -1,6 +1,11 @@
 //! Go `cmd/update_test.go`, plus the error branches of `updateToVersion`.
 //! Every brew and rival here is a shell script in a temp dir; `PATH` holds
 //! only that dir. No real Homebrew, network or install target is touched.
+//!
+//! The shell-script fakes need a shebang, which Windows `CreateProcess`
+//! cannot run, so those tests are Unix-only. Windows covers the same
+//! `oscmd::command` launch with a `.cmd` fake
+//! ([`windows_installer_cmd_gets_argv_and_streams`]).
 
 use super::*;
 
@@ -68,6 +73,7 @@ fn update(fix: &Fixture, apps: &Path, current: &str, latest: &str) -> Out {
 }
 
 /// Go `TestUpdateInstallsFromSelectedBinary`.
+#[cfg(unix)]
 #[test]
 fn update_installs_from_selected_binary() {
     let fix = Fixture::new();
@@ -94,8 +100,41 @@ fn update_installs_from_selected_binary() {
     assert_eq!(o.stderr, "oops\n");
 }
 
+/// The `.cmd` twin of [`update_installs_from_selected_binary`]: the new
+/// binary is a batch file in a directory with a space, run through
+/// `oscmd::command` (std quotes it for `cmd.exe`). It gets the installer
+/// argv, its stdout and stderr reach the captured streams, and a non-zero
+/// exit is Go's `exit status N`.
+#[cfg(windows)]
+#[test]
+fn windows_installer_cmd_gets_argv_and_streams() {
+    let fix = Fixture::new();
+    let dir = tempfile::tempdir().unwrap();
+    let binary = script(
+        &dir.path().join("new rival").join("rival.cmd"),
+        "@echo off\r\nfor %%a in (%*) do echo %%~a\r\necho new embedded skills\r\n",
+    );
+    let bin = binary.to_str().unwrap().to_string();
+    let o = run_busy(&fix, |env| {
+        install_updated_skills(env, ChildIo::Capture, &bin)
+    });
+    assert_eq!(o.result, Ok(()));
+    assert_eq!(
+        o.stdout.replace("\r\n", "\n"),
+        "install\n--force\n--target\nauto\nnew embedded skills\n"
+    );
+
+    script(&binary, "@echo off\r\necho oops 1>&2\r\nexit /b 7\r\n");
+    let o = run_busy(&fix, |env| {
+        install_updated_skills(env, ChildIo::Capture, &bin)
+    });
+    assert_eq!(o.result, Err("exit status 7".to_string()));
+    assert_eq!(o.stderr.replace("\r\n", "\n"), "oops \n");
+}
+
 /// A fixture whose `PATH` is only `bin`, with a brew script there and a
 /// prefix holding `bin/rival`.
+#[cfg_attr(not(unix), allow(dead_code))]
 struct Brew {
     fix: Fixture,
     _dir: tempfile::TempDir,
@@ -104,6 +143,7 @@ struct Brew {
     apps: PathBuf,
 }
 
+#[cfg_attr(not(unix), allow(dead_code))]
 fn brew(brew_body: &str, rival_body: &str) -> Brew {
     let dir = tempfile::tempdir().unwrap();
     let bin = dir.path().join("bin");
@@ -128,11 +168,14 @@ fn brew(brew_body: &str, rival_body: &str) -> Brew {
     }
 }
 
+#[cfg_attr(not(unix), allow(dead_code))]
 const BREW_OK: &str = "#!/bin/sh\ncase \"$1\" in\nupgrade) exit 0;;\n--prefix) printf '%s\\n' \"$RIVAL_TEST_BREW_PREFIX\";;\n*) exit 9;;\nesac\n";
+#[cfg_attr(not(unix), allow(dead_code))]
 const NEW_RIVAL: &str = "#!/bin/sh\nprintf 'new release skills\\n'\n";
 
 /// Go `TestUpdateUsesHomebrewBinaryNotOldEmbeddedSkills`, with the whole
 /// transcript.
+#[cfg(unix)]
 #[test]
 fn update_uses_homebrew_binary_not_old_embedded_skills() {
     let b = brew(BREW_OK, NEW_RIVAL);
@@ -147,6 +190,7 @@ fn update_uses_homebrew_binary_not_old_embedded_skills() {
 
 /// Go leaves brew's Stdin nil (the null device) and gives the upgraded
 /// installer `cmd.InOrStdin()`: brew must not eat the installer's input.
+#[cfg(unix)]
 #[test]
 fn brew_gets_no_stdin_and_the_installer_gets_the_commands() {
     let dir = tempfile::tempdir().unwrap();
@@ -175,6 +219,7 @@ fn brew_gets_no_stdin_and_the_installer_gets_the_commands() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn failed_upgrade_falls_back_to_reinstall() {
     let body = "#!/bin/sh\ncase \"$1\" in\nupgrade) echo 'upgrade said no' >&2; exit 1;;\nreinstall) echo reinstalled;;\n--prefix) echo 'prefix noise' >&2; printf '  %s \\n' \"$RIVAL_TEST_BREW_PREFIX\";;\n*) exit 9;;\nesac\n";
@@ -189,6 +234,7 @@ fn failed_upgrade_falls_back_to_reinstall() {
     assert_eq!(o.stderr, "upgrade said no\n");
 }
 
+#[cfg(unix)]
 #[test]
 fn update_error_branches() {
     let both_fail = "#!/bin/sh\nexit 9\n";
@@ -238,7 +284,7 @@ fn update_error_branches() {
 #[test]
 fn current_version_refreshes_skills_for_new_codex_install() {
     let fix = Fixture::new();
-    let home = PathBuf::from(fix.cfg.getenv("HOME"));
+    let home = PathBuf::from(fix.cfg.getenv(rival_core::paths::HOME_VAR));
     std::fs::create_dir(home.join(".codex")).unwrap();
     let apps = tempfile::tempdir().unwrap();
     let o = update(&fix, apps.path(), "current", "current");
@@ -262,7 +308,7 @@ fn current_version_refreshes_skills_for_new_codex_install() {
 #[test]
 fn current_version_without_codex_installs_claude_only() {
     let fix = Fixture::new();
-    let home = PathBuf::from(fix.cfg.getenv("HOME"));
+    let home = PathBuf::from(fix.cfg.getenv(rival_core::paths::HOME_VAR));
     let apps = tempfile::tempdir().unwrap();
     let o = update(&fix, apps.path(), "dev", "dev");
     assert_eq!(o.result, Ok(()));
@@ -273,9 +319,14 @@ fn current_version_without_codex_installs_claude_only() {
 
 #[test]
 fn current_version_needs_a_home() {
-    let fix = Fixture::with(&[("HOME", "")], None);
+    let fix = Fixture::with(&[(rival_core::paths::HOME_VAR, "")], None);
     let apps = tempfile::tempdir().unwrap();
     let o = update(&fix, apps.path(), "dev", "dev");
-    assert_eq!(o.result, Err("$HOME is not defined".to_string()));
+    let want = if cfg!(windows) {
+        "%userprofile% is not defined"
+    } else {
+        "$HOME is not defined"
+    };
+    assert_eq!(o.result, Err(want.to_string()));
     assert_eq!(o.stdout, "already on latest (vdev)\n");
 }

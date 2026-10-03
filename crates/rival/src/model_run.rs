@@ -1,9 +1,9 @@
 //! `rival run <model>`: the terminal-facing workflow. Go:
 //! `cmd/model_run.go`.
 
+use rival_core::logging;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::NewSession;
-use rival_core::{gostd, logging};
 
 use crate::merge_request::{ReviewTarget, reject_unresolved_mr};
 use crate::model_command::{
@@ -187,10 +187,7 @@ pub fn run_model_run(
     // The live mirror already showed the transcript; the formatted review
     // follows it.
     if let Err(e) = env.stdout.write_all(format!("\n{out}").as_bytes()) {
-        return Err(CmdError::plain(format!(
-            "write stdout: write /dev/stdout: {}",
-            gostd::os_error_text(&e)
-        )));
+        return Err(crate::command_plan::write_stdout_error(&e));
     }
     Ok(())
 }

@@ -14,7 +14,9 @@ use ratatui::backend::TestBackend;
 use rival_core::session::Session;
 use rival_core::sessionview::SessionEvent;
 
-use crate::tui::jobs::{LOG_VIEW_TTL, OpenedLog, PromptsRequest};
+use crate::tui::jobs::PromptsRequest;
+#[cfg(unix)]
+use crate::tui::jobs::{LOG_VIEW_TTL, OpenedLog};
 use crate::tui::kill::StopRequest;
 use crate::tui::logview::{LogKey, LogPane, LogRequest};
 use crate::tui::result_view::{ResultRequest, ResultTarget};
@@ -581,6 +583,43 @@ fn open_then_quit_follows_the_launcher_policy() {
             );
         }
     }
+}
+
+static SHELL_OPENED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// The Windows opener's shape (`ShellExecuteW`): the shell took the path and
+/// there is no launcher process to reap.
+fn shell_launch(path: &Path) -> io::Result<Option<Child>> {
+    SHELL_OPENED.lock().unwrap().push(path.to_path_buf());
+    Ok(None)
+}
+
+/// "o" then "q" with a launcher-less opener: the copy is adopted and stays
+/// for the viewer the shell started, which nothing waits for or ends.
+#[test]
+fn open_then_quit_keeps_the_copy_without_a_launcher() {
+    let h = harness();
+    let env = JobEnv {
+        launch: shell_launch,
+        ..h.env.clone()
+    };
+    let (tx, rx) = mpsc::channel();
+    let mut jobs = JobPool::start(env, JOB_WORKERS, tx.clone()).unwrap();
+    let mut m = testkit::open_detail(&h.env, preview_fixture_logs(&h), 100, 30);
+    tx.send(term_key("o")).unwrap();
+    tx.send(term_key("q")).unwrap();
+    let mut views = LogViews::default();
+    run_loop(&mut m, &rx, &jobs, &mut views, &opts()).unwrap();
+    finish_jobs(&mut jobs, &rx, &mut views);
+    assert!(views.is_empty());
+    let opened = std::mem::take(&mut *SHELL_OPENED.lock().unwrap());
+    assert_eq!(opened.len(), 1, "one launch");
+    assert_eq!(
+        fs::read_to_string(&opened[0]).unwrap(),
+        "LIVE-RUN-OUTPUT\n",
+        "quit removed a fresh copy the viewer may not have read"
+    );
+    let _ = fs::remove_file(&opened[0]);
 }
 
 /// Watch: the first snapshot reaches the loop's channel; stop joins every

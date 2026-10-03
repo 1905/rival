@@ -980,10 +980,25 @@ fn running_group(h: &Harness) -> Vec<Arc<Session>> {
             s.mark_running(h.paths()).unwrap();
             s.pid = 990001 + i as i64;
             s.pid_start = 77;
+            // One rival process owns the whole group, as in a real
+            // megareview. Windows stops that owner (`kill::stop_identity`).
+            s.owner_pid = 990001;
+            s.owner_pid_start = 77;
             s.save(h.paths()).unwrap();
             Arc::new(s)
         })
         .collect()
+}
+
+/// What a stop that reached its process stores. Unix: the stop's own
+/// "killed by user". Windows: the owner cannot finalize, so the reaper's
+/// crashed-owner failure.
+fn stopped_record() -> (Option<i64>, &'static str) {
+    if cfg!(windows) {
+        (Some(1), "orphaned (process dead)")
+    } else {
+        (Some(137), "killed by user")
+    }
 }
 
 fn open_kill_model(h: &Harness, list: Vec<Arc<Session>>) -> Model {
@@ -1042,7 +1057,15 @@ fn stop_yes_signals_and_fails() {
     };
     let res = h.env.run(job.clone()).into_msg().unwrap();
     drive(&mut m, &h.env, [res]);
-    assert_eq!(signals(), [990001, 990002]);
+    // Unix signals each member's provider. Windows terminates the group's
+    // one owner once; the crashed-owner reap then fails both members.
+    let want: &[i64] = if cfg!(windows) {
+        &[990001]
+    } else {
+        &[990001, 990002]
+    };
+    assert_eq!(signals(), want);
+    let (code, msg) = stopped_record();
     for s in &list {
         let st = stored(&h.env, s);
         assert_eq!(
@@ -1052,7 +1075,7 @@ fn stop_yes_signals_and_fails() {
                 st.error_msg.as_str(),
                 st.prompt.as_str()
             ),
-            ("failed", Some(137), "killed by user", "prompt"),
+            ("failed", code, msg, "prompt"),
             "{}",
             s.model
         );
@@ -1131,12 +1154,20 @@ fn stop_yes_skips_a_run_that_finished_meanwhile() {
     });
     drive(&mut m, &h.env, [sessions(vec![done, list[1].clone()])]);
     drive(&mut m, &h.env, [key("y")]);
-    assert_eq!(signals(), [990002], "only the still-running run");
-    assert_eq!(
-        stored(&h.env, &list[0]).status,
-        "running",
-        "the finished one is not rewritten"
-    );
+    if cfg!(windows) {
+        // The still-running member's stop identity is the shared owner.
+        // Ending it ends the group, so the crashed-owner reap also fails
+        // the other member, whose stored record still says running here.
+        assert_eq!(signals(), [990001], "the owner of the still-running run");
+        assert_eq!(stored(&h.env, &list[0]).status, "failed");
+    } else {
+        assert_eq!(signals(), [990002], "only the still-running run");
+        assert_eq!(
+            stored(&h.env, &list[0]).status,
+            "running",
+            "the finished one is not rewritten"
+        );
+    }
 }
 
 // Go: TestStopNeverSignalsAReusedPID. The process dies and its PID is reused
@@ -1174,6 +1205,7 @@ fn stop_refuses_a_run_without_recorded_start() {
     let list = running_group(&h)[..1].to_vec();
     let mut s = (*list[0]).clone();
     s.pid_start = 0;
+    s.owner_pid_start = 0;
     s.save(h.paths()).unwrap();
     let mut m = open_kill_model(&h, vec![Arc::new(s)]);
     drive(&mut m, &h.env, [key("x")]);
@@ -1303,6 +1335,8 @@ fn golden_cases() -> Vec<(&'static str, String)> {
                 queued_at: Some(now - TimeDelta::minutes(3)),
                 pid: 990001 + i as i64,
                 pid_start: 77,
+                owner_pid: 990001,
+                owner_pid_start: 77,
                 log_file: h.log(&format!("stop{i}.log"), &format!("{model} reviewing\n")),
                 ..run(
                     &format!("stop000{i}-0000"),

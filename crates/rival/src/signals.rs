@@ -16,6 +16,12 @@
 //! A scope either cancels a context ([`notify_context`], every command) or
 //! calls a function with the signal ([`notify`], the TUI, which must tell
 //! SIGINT from SIGTERM as bubbletea does).
+//!
+//! Windows has console control events instead, mapped as Go's runtime maps
+//! them: Ctrl+C and Ctrl+Break are SIGINT; close, logoff and shutdown are
+//! SIGTERM. One `SetConsoleCtrlHandler` routine is added while a scope is
+//! open and removed with the last one. The system calls it on a thread of
+//! its own, so it notifies the scopes directly.
 
 use std::sync::Arc;
 
@@ -39,7 +45,6 @@ type Sink = Arc<dyn Fn(Signal) + Send + Sync>;
 /// scope, the previous signal dispositions come back.
 #[must_use = "dropping the guard ends signal handling for the scope"]
 pub struct NotifyGuard {
-    #[cfg(unix)]
     id: u64,
     cancel: Option<CancelFunc>,
 }
@@ -67,7 +72,7 @@ pub fn notify_context(parent: &Context) -> Result<(Context, NotifyGuard), String
 
 /// Opens a scope that calls `on_signal` for every SIGINT and SIGTERM while
 /// the guard lives. The same install, restore and error rules as
-/// [`notify_context`] apply. Not unix: no signal is delivered (Task 5).
+/// [`notify_context`] apply.
 pub fn notify(on_signal: impl Fn(Signal) + Send + Sync + 'static) -> Result<NotifyGuard, String> {
     open(Arc::new(on_signal))
 }
@@ -75,22 +80,115 @@ pub fn notify(on_signal: impl Fn(Signal) + Send + Sync + 'static) -> Result<Noti
 fn open(sink: Sink) -> Result<NotifyGuard, String> {
     #[cfg(unix)]
     let id = unix::register(sink)?;
-    #[cfg(not(unix))]
-    drop(sink);
-    Ok(NotifyGuard {
-        #[cfg(unix)]
-        id,
-        cancel: None,
-    })
+    #[cfg(windows)]
+    let id = windows::register(sink)?;
+    Ok(NotifyGuard { id, cancel: None })
 }
 
 impl Drop for NotifyGuard {
     fn drop(&mut self) {
         #[cfg(unix)]
         unix::unregister(self.id);
+        #[cfg(windows)]
+        windows::unregister(self.id);
         if let Some(cancel) = &self.cancel {
             cancel.cancel();
         }
+    }
+}
+
+#[cfg(windows)]
+mod windows {
+    use std::sync::Mutex;
+
+    use windows_sys::Win32::System::Console::{
+        CTRL_BREAK_EVENT, CTRL_C_EVENT, CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT,
+        SetConsoleCtrlHandler,
+    };
+
+    use super::{Signal, Sink};
+
+    struct State {
+        next_id: u64,
+        scopes: Vec<(u64, Sink)>,
+        installed: bool,
+    }
+
+    static STATE: Mutex<State> = Mutex::new(State {
+        next_id: 0,
+        scopes: Vec::new(),
+        installed: false,
+    });
+
+    fn lock() -> std::sync::MutexGuard<'static, State> {
+        STATE.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Go runtime `ctrlHandler`'s mapping.
+    pub(super) fn signal_of(ctrl: u32) -> Option<Signal> {
+        match ctrl {
+            CTRL_C_EVENT | CTRL_BREAK_EVENT => Some(Signal::Interrupt),
+            CTRL_CLOSE_EVENT | CTRL_LOGOFF_EVENT | CTRL_SHUTDOWN_EVENT => Some(Signal::Terminate),
+            _ => None,
+        }
+    }
+
+    /// Notifies every open scope. With none open the event is not handled
+    /// and the next routine (the default one) runs. Like Go, a SIGTERM-type
+    /// event blocks this thread afterwards: Windows ends the process once
+    /// the routine returns, and blocking leaves the scopes time to clean up.
+    unsafe extern "system" fn handler(ctrl: u32) -> i32 {
+        let Some(sig) = signal_of(ctrl) else {
+            return 0;
+        };
+        let scopes: Vec<Sink> = lock().scopes.iter().map(|(_, s)| s.clone()).collect();
+        if scopes.is_empty() {
+            return 0;
+        }
+        for sink in &scopes {
+            sink(sig);
+        }
+        if sig == Signal::Terminate {
+            loop {
+                std::thread::park();
+            }
+        }
+        1
+    }
+
+    pub(super) fn register(sink: Sink) -> Result<u64, String> {
+        let mut st = lock();
+        if !st.installed {
+            // SAFETY: adds a valid handler routine.
+            if unsafe { SetConsoleCtrlHandler(Some(handler), 1) } == 0 {
+                return Err(format!(
+                    "SetConsoleCtrlHandler: {}",
+                    rival_core::gostd::os_error_text(&std::io::Error::last_os_error())
+                ));
+            }
+            st.installed = true;
+        }
+        let id = st.next_id;
+        st.next_id += 1;
+        st.scopes.push((id, sink));
+        Ok(id)
+    }
+
+    pub(super) fn unregister(id: u64) {
+        let mut st = lock();
+        st.scopes.retain(|(i, _)| *i != id);
+        if st.scopes.is_empty() && st.installed {
+            // SAFETY: removes the routine added above. A failure cannot be
+            // reported from a drop; with no scope the routine declines.
+            unsafe { SetConsoleCtrlHandler(Some(handler), 0) };
+            st.installed = false;
+        }
+    }
+
+    /// Whether the routine is installed (tests).
+    #[cfg(test)]
+    pub(super) fn installed() -> bool {
+        lock().installed
     }
 }
 
@@ -535,5 +633,149 @@ mod tests {
         assert!(!ctx.is_done());
         drop(guard);
         assert!(ctx.is_done());
+    }
+}
+
+/// Windows console control events. The events are raised inside a helper
+/// process that has a console of its own (`CREATE_NEW_CONSOLE`), so no other
+/// test process receives them.
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use std::os::windows::process::CommandExt;
+    use std::path::Path;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    use windows_sys::Win32::System::Console::{
+        CTRL_BREAK_EVENT, CTRL_C_EVENT, CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT,
+        GenerateConsoleCtrlEvent, SetConsoleCtrlHandler,
+    };
+    use windows_sys::Win32::System::Threading::CREATE_NEW_CONSOLE;
+
+    const HELPER_OUT: &str = "RIVAL_SIGNALS_WIN_OUT";
+    const HELPER_TEST: &str = "signals::windows_tests::signals_win_helper";
+    /// `STATUS_CONTROL_C_EXIT`: the default Ctrl+C routine's exit code.
+    const CONTROL_C_EXIT: u32 = 0xC000_013A;
+
+    #[test]
+    fn events_map_like_go() {
+        assert_eq!(windows::signal_of(CTRL_C_EVENT), Some(Signal::Interrupt));
+        assert_eq!(
+            windows::signal_of(CTRL_BREAK_EVENT),
+            Some(Signal::Interrupt)
+        );
+        for ev in [CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT] {
+            assert_eq!(windows::signal_of(ev), Some(Signal::Terminate));
+        }
+        assert_eq!(windows::signal_of(99), None);
+    }
+
+    /// Runs inside the helper process only.
+    #[test]
+    #[ignore = "helper process for the Windows signal tests"]
+    fn signals_win_helper() {
+        let Some(out) = std::env::var_os(HELPER_OUT) else {
+            return;
+        };
+        // A parent may have turned Ctrl+C off for its children.
+        // SAFETY: restores normal Ctrl+C processing for this helper.
+        unsafe { SetConsoleCtrlHandler(None, 0) };
+        let wait = Duration::from_secs(10);
+        let mut report = Vec::new();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let guard = notify(move |sig| {
+            let _ = tx.send(sig);
+        })
+        .unwrap();
+        let (ctx, ctx_guard) = notify_context(&Context::background()).unwrap();
+        report.push(format!("installed={}", windows::installed()));
+        // SAFETY: raises the event in this helper's own console.
+        unsafe { GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) };
+        let first = rx.recv_timeout(wait);
+        // SAFETY: as above.
+        unsafe { GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0) };
+        let second = rx.recv_timeout(wait);
+        report.push(format!(
+            "first={first:?} second={second:?} ctx_cancelled={}",
+            ctx.wait_timeout(wait).is_some()
+        ));
+        drop(ctx_guard);
+        report.push(format!("still_installed={}", windows::installed()));
+        drop(guard);
+        report.push(format!("removed={}", !windows::installed()));
+        std::fs::write(Path::new(&out), report.join("\n")).unwrap();
+        // Outside every scope the default routine ends the helper.
+        // SAFETY: as above.
+        unsafe { GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) };
+        std::thread::sleep(Duration::from_secs(10));
+        std::fs::write(Path::new(&out), "survived").unwrap();
+    }
+
+    #[test]
+    fn ctrl_c_and_break_cancel_scopes_then_default_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("report");
+        let mut cmd = Command::new(std::env::current_exe().unwrap());
+        cmd.args([
+            "--exact",
+            HELPER_TEST,
+            "--ignored",
+            "--quiet",
+            "--test-threads=1",
+        ])
+        .env(HELPER_OUT, &out)
+        .env("HOME", dir.path())
+        .env("USERPROFILE", dir.path())
+        .env("RIVAL_HOME", dir.path().join(".rival"))
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        /// Owns the helper from its spawn: dropping it unexited kills it
+        /// and waits a bounded time, so no failed assertion or `try_wait`
+        /// error leaves it running.
+        struct Guard(std::process::Child);
+        impl Guard {
+            fn wait_for(&mut self, timeout: Duration) -> Option<std::process::ExitStatus> {
+                let deadline = Instant::now() + timeout;
+                loop {
+                    if let Ok(Some(status)) = self.0.try_wait() {
+                        return Some(status);
+                    }
+                    if Instant::now() >= deadline {
+                        return None;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                if matches!(self.0.try_wait(), Ok(None)) {
+                    let _ = self.0.kill();
+                    if self.wait_for(Duration::from_secs(10)).is_none() {
+                        eprintln!("cleanup: signal helper {} still running", self.0.id());
+                    }
+                }
+            }
+        }
+        let mut child = Guard(rival_core::executor::process::spawn(&mut cmd).unwrap());
+        let status = child
+            .wait_for(Duration::from_secs(30))
+            .expect("signal helper timed out");
+        let report = std::fs::read_to_string(&out).unwrap_or_default();
+        assert_eq!(
+            report,
+            "installed=true\n\
+             first=Ok(Interrupt) second=Ok(Interrupt) ctx_cancelled=true\n\
+             still_installed=true\n\
+             removed=true"
+        );
+        assert_eq!(
+            status.code().map(|c| c as u32),
+            Some(CONTROL_C_EXIT),
+            "{status:?}"
+        );
     }
 }
