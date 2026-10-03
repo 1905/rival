@@ -13,7 +13,8 @@ Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 
 - Added Windows process management, console-aware detach and stop recovery. Native Windows lifecycle tests passed before the release switch. macOS pipe creation and spawning now share Go's descriptor-inheritance guard.
 - Configured six release archives: macOS, Linux and Windows on amd64/arm64. Manual workflow runs build unpublished archives, render the Homebrew formula and execute each packaged version on a matching host.
 - Documented installation, checksums, PATH setup, updates and source builds for every OS. Skill version updates now target only the Rust assets.
-- Local checks after Go removal: 1,229 Rust tests, 69 runner tests, 36 release checks, formatting, strict Clippy and build passed. Retained byte contracts are unchanged. The final three-OS CI, six-target snapshot and whole-port reviews remain pending.
+- Blocked repository `.env` files from setting the Rust-only `RIVAL_HOME` state override. Explicit process-environment values still work. Six direct/detached fake-provider checks passed.
+- Local checks: 1,231 Rust tests, 69 runner tests, 36 release checks, formatting, strict Clippy and build passed. Retained byte contracts are unchanged. Three-OS CI passed before the state-override fix. The requested single Claude review is complete; final CI, packaging, Codex review and cleanup remain pending.
 - The published CLI remains Go v4.1.1. Rust releases are not published yet. YAML parser details differ; documented inherited Go bugs remain unchanged. Windows UNC network access and native TUI restoration are not verified.
 
 ### Changed

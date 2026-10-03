@@ -21,6 +21,9 @@ const ROOT_DIR: &str = ".rival";
 /// The variable Go's `os.UserHomeDir` reads.
 pub const HOME_VAR: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
 
+/// The Rust-port override for the rival root. Process environment only.
+pub const STATE_ROOT_VAR: &str = "RIVAL_HOME";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Paths {
     pub root: PathBuf,
@@ -36,7 +39,7 @@ impl Paths {
 
     /// Reads `RIVAL_HOME`, then `HOME` (`USERPROFILE` on Windows).
     pub fn from_env() -> Self {
-        Self::from_vars(std::env::var_os("RIVAL_HOME"), std::env::var_os(HOME_VAR))
+        Self::from_vars(std::env::var_os(STATE_ROOT_VAR), std::env::var_os(HOME_VAR))
     }
 
     /// Pure form of [`Paths::from_env`]. Empty values count as unset, like
@@ -222,6 +225,10 @@ pub fn parse_dotenv(src: &str) -> Result<HashMap<String, String>, DotenvError> {
 /// missing or unparseable file is silently ignored, and existing process
 /// variables win, even when empty.
 ///
+/// Port addition: `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to
+/// the reviewed repository, and Go had no such variable for it to move
+/// rival's state with. Only the process environment can set it.
+///
 /// # Safety
 ///
 /// Calls `std::env::set_var`. The caller must guarantee that no other thread
@@ -240,8 +247,15 @@ pub unsafe fn load_dotenv() {
 /// `is_set` answers for the environment as it was before loading. Entries Go's
 /// `os.Setenv` would reject (empty key, `=` or NUL in the key, NUL in the
 /// value) are skipped, as Go ignores that error.
-pub fn load_dotenv_with(
+pub fn load_dotenv_with(path: &Path, is_set: impl Fn(&str) -> bool, set: impl FnMut(&str, &str)) {
+    load_dotenv_for(path, cfg!(windows), is_set, set);
+}
+
+/// [`load_dotenv_with`] with the host's environment-name rules as a
+/// parameter, so both are testable everywhere.
+fn load_dotenv_for(
     path: &Path,
+    windows: bool,
     is_set: impl Fn(&str) -> bool,
     mut set: impl FnMut(&str, &str),
 ) {
@@ -252,9 +266,22 @@ pub fn load_dotenv_with(
         if key.is_empty() || key.contains(['=', '\0']) || value.contains('\0') {
             continue;
         }
+        if is_state_root_var(key, windows) {
+            continue;
+        }
         if !is_set(key) {
             set(key, value);
         }
+    }
+}
+
+/// Whether `key` names [`STATE_ROOT_VAR`]. Windows environment names are
+/// case-insensitive, so any spelling matches there.
+fn is_state_root_var(key: &str, windows: bool) -> bool {
+    if windows {
+        key.eq_ignore_ascii_case(STATE_ROOT_VAR)
+    } else {
+        key == STATE_ROOT_VAR
     }
 }
 
@@ -781,6 +808,83 @@ mod tests {
             },
         );
         env
+    }
+
+    /// [`load`] under the given platform's name rules. On Windows, names
+    /// compare case-insensitively, like the real environment there.
+    fn load_on(
+        windows: bool,
+        contents: &str,
+        existing: &[(&str, &str)],
+    ) -> HashMap<String, String> {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".env");
+        std::fs::write(&path, contents).unwrap();
+        let before = map(existing);
+        let mut env = before.clone();
+        load_dotenv_for(
+            &path,
+            windows,
+            |k| {
+                before.keys().any(|b| {
+                    if windows {
+                        b.eq_ignore_ascii_case(k)
+                    } else {
+                        b == k
+                    }
+                })
+            },
+            |k, v| {
+                env.insert(k.to_string(), v.to_string());
+            },
+        );
+        env
+    }
+
+    fn root_of(env: &HashMap<String, String>) -> PathBuf {
+        let get = |k: &str| env.get(k).map(OsString::from);
+        Paths::from_vars(get(STATE_ROOT_VAR), get("HOME")).root
+    }
+
+    #[test]
+    fn dotenv_never_sets_state_root() {
+        let file = "RIVAL_HOME=./.rival-dev\nA=1\nHOME=/repo-home\n";
+        for windows in [false, true] {
+            // Unset: the file's value is dropped; other keys, HOME included,
+            // still load like Go.
+            let env = load_on(windows, file, &[]);
+            assert_eq!(
+                env,
+                map(&[("A", "1"), ("HOME", "/repo-home")]),
+                "windows={windows}"
+            );
+            assert_eq!(root_of(&env), PathBuf::from("/repo-home/.rival"));
+
+            // Exported, even empty: the process value stays.
+            let env = load_on(windows, file, &[("RIVAL_HOME", ""), ("HOME", "/h")]);
+            assert_eq!(env["RIVAL_HOME"], "", "windows={windows}");
+            assert_eq!(root_of(&env), PathBuf::from("/h/.rival"));
+            let env = load_on(windows, file, &[("RIVAL_HOME", "/custom"), ("HOME", "/h")]);
+            assert_eq!(env["RIVAL_HOME"], "/custom", "windows={windows}");
+            assert_eq!(env["A"], "1", "windows={windows}");
+            assert_eq!(root_of(&env), PathBuf::from("/custom"));
+        }
+    }
+
+    #[test]
+    fn dotenv_state_root_spelling_follows_platform() {
+        let file = "rival_home=a\nRival_Home=b\nRIVAL_HOME=c\nOK=1\n";
+        // Windows names are case-insensitive: no spelling gets through.
+        assert_eq!(load_on(true, file, &[]), map(&[("OK", "1")]));
+        // Unix names are exact: other spellings are ordinary variables.
+        assert_eq!(
+            load_on(false, file, &[]),
+            map(&[("rival_home", "a"), ("Rival_Home", "b"), ("OK", "1")])
+        );
+        // The host loader applies the host's rule.
+        let env = load(Some(file), &[]);
+        assert!(!env.contains_key(STATE_ROOT_VAR));
+        assert_eq!(env.contains_key("rival_home"), !cfg!(windows));
     }
 
     #[test]

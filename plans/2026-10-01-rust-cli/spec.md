@@ -149,6 +149,8 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - P6 Go retirement removes `rival/`, Go CI and direct Go-source reads. Rust tests retain prompt hashes, literal configuration/skill expectations and session contracts; Swift keeps decoding the same files. The version-bump script targets only the Rust skill tree. Release-script tests run in Linux CI with explicit PyYAML6.0.3. Local validation passed 1,229 Rust tests, 69 runner tests, 36 release tests and the unchanged 66-file baseline.
 - The README has separate macOS, Linux and Windows install steps, CPU selection, hash checks, PATH setup, updates and source fallback. Seven shell examples pass syntax checks. Windows installation commands are reviewed but not executed against a published ZIP; no Rust release exists yet.
 
+- Single Claude review completed at `b05acbb` with one medium finding: a repository .env could redirect the Rust-only RIVAL_HOME state root. A private CLI reproduction confirmed it. Task6.4 blocks that variable from .env while retaining exported overrides and Go-compatible handling of other variables. The corrected CLI passed six private direct/detached fake-provider checks; 1,231 workspace tests pass locally. Full review: `reviews/p6-claude-review.txt`. No second Claude review is planned.
+
 ## Rollout
 
 - **P1** core foundations + contract tests. One branch, merged the same day it is green.
