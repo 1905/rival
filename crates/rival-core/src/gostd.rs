@@ -523,6 +523,21 @@ pub fn os_error_text(err: &std::io::Error) -> String {
     }
 }
 
+/// Go `os.Open`: read-only. Go's Windows `syscall.Open` adds
+/// `FILE_FLAG_BACKUP_SEMANTICS` to every read-only open, so a directory
+/// opens and its first read fails (`read <path>: Incorrect function.`);
+/// std's plain open would fail instead (`open <path>: Access is denied.`).
+pub fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<std::fs::File> {
+    let mut opts = std::fs::OpenOptions::new();
+    opts.read(true);
+    #[cfg(windows)]
+    std::os::windows::fs::OpenOptionsExt::custom_flags(
+        &mut opts,
+        windows_sys::Win32::Storage::FileSystem::FILE_FLAG_BACKUP_SEMANTICS,
+    );
+    opts.open(path)
+}
+
 /// Go `errors.Is(err, fs.ErrNotExist)` for an OS error: `ENOENT` on Unix;
 /// on Windows `ERROR_FILE_NOT_FOUND`, `ERROR_PATH_NOT_FOUND` (a missing
 /// parent directory) or `ERROR_BAD_NETPATH`.
@@ -540,6 +555,33 @@ pub fn is_not_exist_code(windows: bool, code: Option<i32>) -> bool {
         Some(c) => c == 2,
         None => false,
     }
+}
+
+/// Go's `Errno` text for the OS errors that tests provoke. Windows prints
+/// the English `FormatMessage` text.
+#[cfg(test)]
+pub(crate) mod errtext {
+    /// A missing file in an existing directory.
+    pub const NO_SUCH_FILE: &str = if cfg!(windows) {
+        "The system cannot find the file specified."
+    } else {
+        "no such file or directory"
+    };
+
+    /// A missing parent directory (`ERROR_PATH_NOT_FOUND` on Windows).
+    pub const NO_SUCH_PATH: &str = if cfg!(windows) {
+        "The system cannot find the path specified."
+    } else {
+        "no such file or directory"
+    };
+
+    /// The read of a directory that [`super::open_file`] opened
+    /// (`ERROR_INVALID_FUNCTION` on Windows).
+    pub const IS_A_DIRECTORY: &str = if cfg!(windows) {
+        "Incorrect function."
+    } else {
+        "is a directory"
+    };
 }
 
 #[cfg(test)]
@@ -715,6 +757,10 @@ mod tests {
         assert_eq!(to_lower("ΟΔΟΣ"), "οδοσ");
     }
 
+    /// A raw OS error is an errno on Unix but a Win32 code on Windows, where
+    /// libc's CRT errno values name unrelated errors (21 is
+    /// `ERROR_NOT_READY`).
+    #[cfg(unix)]
     #[test]
     fn os_error_text_matches_syscall_errno() {
         let eisdir = std::io::Error::from_raw_os_error(libc::EISDIR);
@@ -723,5 +769,22 @@ mod tests {
         assert_eq!(os_error_text(&eacces), "permission denied");
         let enoent = std::io::Error::from_raw_os_error(libc::ENOENT);
         assert_eq!(os_error_text(&enoent), "no such file or directory");
+    }
+
+    /// Go's Windows `Errno.Error`: the English `FormatMessage` text, kept
+    /// as it is.
+    #[cfg(windows)]
+    #[test]
+    fn os_error_text_matches_syscall_errno() {
+        for (code, want) in [
+            (1, "Incorrect function."),
+            (2, "The system cannot find the file specified."),
+            (3, "The system cannot find the path specified."),
+            (5, "Access is denied."),
+            (6, "The handle is invalid."),
+        ] {
+            let err = std::io::Error::from_raw_os_error(code);
+            assert_eq!(os_error_text(&err), want, "{code}");
+        }
     }
 }

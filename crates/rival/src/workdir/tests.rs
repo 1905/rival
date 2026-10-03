@@ -53,14 +53,22 @@ fn resolve_workdir_cases() {
                 cwd.join("plain.txt").display()
             ),
         ),
-        // ENOTDIR is not "not exist" in Go: the stat error is kept.
+        // ENOTDIR is not "not exist" in Go: the stat error is kept. Windows
+        // reports ERROR_PATH_NOT_FOUND, which is.
         (
             "through a file",
             "plain.txt/x",
-            format!(
-                "cannot read workdir {p}: stat {p}: not a directory",
-                p = cwd.join("plain.txt/x").display()
-            ),
+            if cfg!(windows) {
+                format!(
+                    "workdir not found: {}",
+                    cwd.join("plain.txt").join("x").display()
+                )
+            } else {
+                format!(
+                    "cannot read workdir {p}: stat {p}: not a directory",
+                    p = cwd.join("plain.txt/x").display()
+                )
+            },
         ),
     ];
     for (name, raw, want) in errs {

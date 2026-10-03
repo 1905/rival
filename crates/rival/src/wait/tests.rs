@@ -94,6 +94,12 @@ fn parse_log_file_cases() {
     }
 }
 
+/// Go `%q` of a printable path: only `\` and `"` are escaped, so a Windows
+/// path doubles its separators.
+fn quoted(path: &str) -> String {
+    format!("\"{}\"", path.replace('\\', r"\\").replace('"', "\\\""))
+}
+
 #[test]
 fn parse_log_file_missing_file_errors() {
     let dir = tempfile::tempdir().unwrap();
@@ -102,17 +108,29 @@ fn parse_log_file_missing_file_errors() {
     let path = p.to_string_lossy();
     assert_eq!(
         err,
-        format!("read log file \"{path}\": open {path}: no such file or directory")
+        format!(
+            "read log file {}: open {path}: {}",
+            quoted(&path),
+            crate::testutil::NO_SUCH_FILE
+        )
     );
 }
 
+/// Go's Windows `syscall.Open` opens a directory for reading
+/// (`FILE_FLAG_BACKUP_SEMANTICS`); the read then fails with
+/// `ERROR_INVALID_FUNCTION`.
 #[test]
 fn parse_log_file_directory_is_a_read_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().to_string_lossy().into_owned();
+    let text = if cfg!(windows) {
+        "Incorrect function."
+    } else {
+        "is a directory"
+    };
     assert_eq!(
         parse_log_file(dir.path()).unwrap_err(),
-        format!("read log file \"{path}\": read {path}: is a directory")
+        format!("read log file {}: read {path}: {text}", quoted(&path))
     );
 }
 
@@ -122,8 +140,8 @@ fn parse_log_file_no_pid_no_session_message() {
     assert_eq!(
         parse_log_file(&p).unwrap_err(),
         format!(
-            "no detached pid or run session found in \"{}\" (run may have failed before launch)",
-            p.to_string_lossy()
+            "no detached pid or run session found in {} (run may have failed before launch)",
+            quoted(&p.to_string_lossy())
         )
     );
 }
@@ -785,7 +803,9 @@ fn wait_action_usage_errors() {
         action(&opts(&m, SECOND, MS), &[], &paths),
         (
             usage(&format!(
-                "read log file \"{m}\": open {m}: no such file or directory"
+                "read log file {}: open {m}: {}",
+                quoted(&m),
+                crate::testutil::NO_SUCH_FILE
             )),
             String::new()
         )

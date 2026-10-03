@@ -104,7 +104,10 @@ fn detect_codex_signals() {
         let mut codex_home = String::new();
         let dir = match signal {
             "cli" => {
-                let path = bin.path().join("codex");
+                // Go's Windows LookPath needs a PATHEXT extension: npm
+                // installs codex as codex.cmd. The fake never runs.
+                let name = if cfg!(windows) { "codex.cmd" } else { "codex" };
+                let path = bin.path().join(name);
                 fs::write(&path, "#!/bin/sh\nexit 0\n").unwrap();
                 #[cfg(unix)]
                 {
@@ -643,12 +646,14 @@ fn auto_with_codex_installs_both_hosts() {
     let (result, stdout, stderr) = run(&fix, false, "auto", "");
     result.unwrap();
     assert_eq!(stderr, "");
-    assert!(stdout.contains(&format!(
-        "Installing codex skills to {}\n",
-        home.join(".agents/skills").display()
-    )));
+    // filepath.Join writes host separators.
+    let base = home.join(".agents").join("skills");
+    assert!(
+        stdout.contains(&format!("Installing codex skills to {}\n", base.display())),
+        "{stdout}"
+    );
     for name in skills::NAMES {
-        let codex = fs::read(home.join(".agents/skills").join(name).join("SKILL.md")).unwrap();
+        let codex = fs::read(base.join(name).join("SKILL.md")).unwrap();
         assert_eq!(codex, skills::codex_skill(name, &version(name)).unwrap());
     }
 }

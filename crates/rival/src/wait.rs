@@ -13,7 +13,6 @@
 //! Durations are signed nanoseconds, like Go's `time.Duration`.
 
 use std::fmt;
-use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -486,7 +485,7 @@ fn read_file(path: &Path) -> Result<Vec<u8>, String> {
             gostd::os_error_text(&err)
         )
     };
-    let mut file = File::open(path).map_err(|e| op_err("open", e))?;
+    let mut file = gostd::open_file(path).map_err(|e| op_err("open", e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data).map_err(|e| op_err("read", e))?;
     Ok(data)

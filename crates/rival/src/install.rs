@@ -5,7 +5,7 @@
 //! which only moves Rival's own state.
 
 use std::ffi::OsStr;
-use std::fs::{self, DirBuilder, File, OpenOptions};
+use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::{self, BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -317,7 +317,7 @@ fn read_embedded_skill(name: &str) -> Result<(Vec<u8>, String), String> {
 
 /// Go `os.ReadFile`, with its `*PathError` text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let mut file = File::open(path).map_err(|e| path_error("open", path, &e))?;
+    let mut file = gostd::open_file(path).map_err(|e| path_error("open", path, &e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| path_error("read", path, &e))?;

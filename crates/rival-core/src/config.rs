@@ -803,7 +803,7 @@ impl From<RawUserConfig> for UserConfig {
 /// random, so any invalid entry may be the one reported there).
 pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> {
     let shown = path.display();
-    let mut file = match std::fs::File::open(path) {
+    let mut file = match gostd::open_file(path) {
         Ok(file) => file,
         // Go errors.Is(err, os.ErrNotExist); on Windows also a missing
         // parent directory (ERROR_PATH_NOT_FOUND), as in a fresh profile.

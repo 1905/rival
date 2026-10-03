@@ -330,7 +330,7 @@ pub(crate) fn io_error(op: &str, path: &Path, err: io::Error) -> anyhow::Error {
 
 /// Go: `os.ReadFile`.
 pub(crate) fn read_file(path: &Path) -> anyhow::Result<Vec<u8>> {
-    let mut f = File::open(path).map_err(|e| io_error("open", path, e))?;
+    let mut f = crate::gostd::open_file(path).map_err(|e| io_error("open", path, e))?;
     let mut data = Vec::new();
     f.read_to_end(&mut data)
         .map_err(|e| io_error("read", path, e))?;

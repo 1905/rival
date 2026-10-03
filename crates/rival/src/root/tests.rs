@@ -593,16 +593,18 @@ fn model_command_errors_reach_stderr_with_their_code() {
     assert_eq!(r.stdout, r.stderr);
 
     let mut stdin = FakeStdin::new("hi");
+    let missing = fix.missing_dir("nonexistent-rival");
     let r = run_with(
         &fix,
         &mut stdin,
         &hooks,
         &events,
-        &["command", "codex", "--workdir", "/nonexistent-rival"],
+        &["command", "codex", "--workdir", &missing],
     );
+    let want = format!("workdir not found: {missing}\n");
     assert_eq!(r.code, 1);
-    assert_eq!(r.stdout, "workdir not found: /nonexistent-rival\n");
-    assert_eq!(r.stderr, "workdir not found: /nonexistent-rival\n");
+    assert_eq!(r.stdout, want);
+    assert_eq!(r.stderr, want);
 
     let mut stdin = FakeStdin::new("hi");
     let r = run_with(

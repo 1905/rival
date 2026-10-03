@@ -219,7 +219,7 @@ fn native_request_strips_subscription_credentials_only() {
         let mut env = Env::new();
         env.set("RIVAL_CLAUDE_AUTH", Some(auth))
             .set("ANTHROPIC_API_KEY", Some(key));
-        env.fake("claude", "#!/bin/sh\nexit 0\n");
+        env.fake_on_path("claude");
         let cfg = env.config();
         let work = env.work_str();
         let mut sess = env.session("claude", "raw", config::CLAUDE_MODEL, &work);
@@ -255,7 +255,7 @@ fn native_request_strips_subscription_credentials_only() {
 #[test]
 fn claude_errors_are_wrapped_with_the_public_label() {
     let mut env = Env::new();
-    env.fake("claude", "#!/bin/sh\nexit 0\n");
+    env.fake_on_path("claude");
     let work = env.work_str();
 
     // An auth config error stops before any spawn.

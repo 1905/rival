@@ -334,12 +334,11 @@ fn workdir_then_preflight_order() {
     let fix = Fixture::new();
     let f = fake_run("");
     // A bad workdir is printed on stdout, exits 1, and skips preflight.
-    let out = run_command_with(&fix, &f, "-re ultra hi", "/nonexistent-dir", &*no_mr());
-    assert_eq!(
-        out.result,
-        Err(CmdError::exit(1, "workdir not found: /nonexistent-dir"))
-    );
-    assert_eq!(out.stdout, "workdir not found: /nonexistent-dir\n");
+    let missing = fix.missing_dir("nonexistent-dir");
+    let out = run_command_with(&fix, &f, "-re ultra hi", &missing, &*no_mr());
+    let want = format!("workdir not found: {missing}");
+    assert_eq!(out.result, Err(CmdError::exit(1, want.clone())));
+    assert_eq!(out.stdout, format!("{want}\n"));
     assert_eq!(f.borrow().preflight_calls, 0);
 
     // A failing preflight is a plain error and creates no session.
@@ -527,14 +526,15 @@ fn claude_records_the_configured_subscription() {
     assert_eq!(fix.sessions()[0].account, "");
 }
 
-/// Go's final stdout write error is reported (a closed fd 1 gives EBADF);
-/// the session is already complete.
+/// Go's final stdout write error is reported (a closed fd 1 gives EBADF,
+/// a closed Windows handle `ERROR_INVALID_HANDLE`); the session is already
+/// complete.
 #[test]
 fn stdout_write_error_is_reported() {
     struct Closed;
     impl std::io::Write for Closed {
         fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
-            Err(std::io::Error::from_raw_os_error(libc::EBADF))
+            Err(crate::testutil::closed_handle_error())
         }
         fn flush(&mut self) -> std::io::Result<()> {
             Ok(())
@@ -559,9 +559,10 @@ fn stdout_write_error_is_reported() {
     let result = run_model_command(&mut env, &spec, s(wd.path()), true);
     assert_eq!(
         result,
-        Err(CmdError::plain(
-            "write stdout: write /dev/stdout: bad file descriptor"
-        ))
+        Err(CmdError::plain(format!(
+            "write stdout: write /dev/stdout: {}",
+            crate::testutil::CLOSED_HANDLE
+        )))
     );
     assert_eq!(fix.sessions()[0].status, "completed");
 }

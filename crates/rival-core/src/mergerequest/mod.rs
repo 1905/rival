@@ -580,7 +580,7 @@ fn diff_too_large(size: u64) -> bool {
 
 /// Go `os.ReadFile` with its `open`/`read` error text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let mut file = std::fs::File::open(path)
+    let mut file = crate::gostd::open_file(path)
         .map_err(|e| format!("open {}: {}", path.display(), io_text(&e)))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)

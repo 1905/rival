@@ -9,6 +9,7 @@ use std::time::{Duration as StdDuration, Instant};
 use super::summary::{load_all_summaries, load_summary_file};
 use super::*;
 use crate::gojson::zero_time;
+use crate::gostd::errtext::{IS_A_DIRECTORY, NO_SUCH_FILE, NO_SUCH_PATH};
 
 fn temp_paths() -> (tempfile::TempDir, Paths) {
     let home = tempfile::tempdir().unwrap();
@@ -310,12 +311,15 @@ fn save_without_sessions_dir_reports_go_style_error() {
         ..Session::default()
     };
     let err = format!("{:#}", s.save(&paths).unwrap_err());
+    // Go os.CreateTemp joins with the host separator; the sessions dir is
+    // a missing parent (ERROR_PATH_NOT_FOUND on Windows).
     let prefix = format!(
-        "create session tmp: open {}/a.json.tmp-",
-        paths.sessions_dir().display()
+        "create session tmp: open {}{}a.json.tmp-",
+        paths.sessions_dir().display(),
+        std::path::MAIN_SEPARATOR
     );
     assert!(err.starts_with(&prefix), "{err}");
-    assert!(err.ends_with(": no such file or directory"), "{err}");
+    assert!(err.ends_with(&format!(": {NO_SUCH_PATH}")), "{err}");
 }
 
 // ---- writer: Go MarshalIndent bytes ----
@@ -979,29 +983,27 @@ fn from_json_reports_go_type_errors() {
 fn load_errors_read_like_go_and_downcast_to_io() {
     let (_home, paths) = temp_paths();
     let dir = paths.sessions_dir();
-    let open_missing = |name: &str| {
-        format!(
-            "open {}: no such file or directory",
-            dir.join(name).display()
-        )
-    };
+    // The sessions dir does not exist yet: a missing parent.
+    let open_missing =
+        |name: &str, text: &str| format!("open {}: {text}", dir.join(name).display());
 
     let err = Session::load(&paths, "missing").unwrap_err();
-    assert_eq!(err.to_string(), open_missing("missing.json"));
+    assert_eq!(err.to_string(), open_missing("missing.json", NO_SUCH_PATH));
     assert_eq!(
         err.downcast_ref::<io::Error>().unwrap().kind(),
         io::ErrorKind::NotFound
     );
     // filepath.Join cleans the path.
     let err = Session::load(&paths, "a/../b").unwrap_err();
-    assert_eq!(err.to_string(), open_missing("b.json"));
+    assert_eq!(err.to_string(), open_missing("b.json", NO_SUCH_PATH));
 
-    // A directory opens but cannot be read.
+    // A directory opens but cannot be read; Go's Windows open of a
+    // directory for reading succeeds too (FILE_FLAG_BACKUP_SEMANTICS).
     fs::create_dir_all(dir.join("d.json")).unwrap();
     let err = Session::load(&paths, "d").unwrap_err();
     assert_eq!(
         err.to_string(),
-        format!("read {}: is a directory", dir.join("d.json").display())
+        format!("read {}: {IS_A_DIRECTORY}", dir.join("d.json").display())
     );
     assert!(err.downcast_ref::<io::Error>().is_some());
 
@@ -1015,7 +1017,13 @@ fn load_errors_read_like_go_and_downcast_to_io() {
     // The summary reader keeps Go's path errors too.
     let missing = dir.join("gone.json");
     let err = load_summary_file(&missing, 10).unwrap_err();
-    assert_eq!(err.to_string(), open_missing("gone.json"));
+    assert_eq!(err.to_string(), open_missing("gone.json", NO_SUCH_FILE));
     let err = load_summary_file(&missing, 1 << 20).unwrap_err();
-    assert_eq!(err.to_string(), open_missing("gone.json"));
+    assert_eq!(err.to_string(), open_missing("gone.json", NO_SUCH_FILE));
+    // The large-file path opens with os.Open, like os.ReadFile.
+    let err = load_summary_file(&dir.join("d.json"), 1 << 20).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!("read {}: {IS_A_DIRECTORY}", dir.join("d.json").display())
+    );
 }

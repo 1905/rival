@@ -30,16 +30,51 @@ pub fn json_answer_log() -> String {
     )
 }
 
+/// Go's `syscall.Errno` text for the OS errors the fixtures provoke. Windows
+/// prints the English `FormatMessage` text.
+pub const NO_SUCH_FILE: &str = if cfg!(windows) {
+    "The system cannot find the file specified."
+} else {
+    "no such file or directory"
+};
+
+/// A missing parent directory: ENOENT on Unix, `ERROR_PATH_NOT_FOUND` on
+/// Windows.
+pub const NO_SUCH_PATH: &str = if cfg!(windows) {
+    "The system cannot find the path specified."
+} else {
+    "no such file or directory"
+};
+
+/// A write to a closed standard handle: EBADF on Unix,
+/// `ERROR_INVALID_HANDLE` on Windows.
+pub const CLOSED_HANDLE: &str = if cfg!(windows) {
+    "The handle is invalid."
+} else {
+    "bad file descriptor"
+};
+
+/// The OS error behind [`CLOSED_HANDLE`].
+pub fn closed_handle_error() -> std::io::Error {
+    std::io::Error::from_raw_os_error(if cfg!(windows) { 6 } else { libc::EBADF })
+}
+
 /// A temp HOME with its own `.rival`.
 pub struct Fixture {
     /// Keeps the temp HOME alive.
-    _home: tempfile::TempDir,
+    home: tempfile::TempDir,
     pub cfg: Config,
 }
 
 impl Fixture {
     pub fn new() -> Fixture {
         Self::with(&[], None)
+    }
+
+    /// An absolute path under the temp HOME that does not exist. A literal
+    /// `/nonexistent` is drive-relative on Windows, so it needs a cwd.
+    pub fn missing_dir(&self, name: &str) -> String {
+        self.home.path().join(name).to_str().unwrap().to_string()
     }
 
     /// Extra env entries and an explicit working directory for relative
@@ -85,7 +120,7 @@ impl Fixture {
             Some(home.path().as_os_str().to_owned()),
         );
         let cfg = Config::new(paths, env, cwd);
-        Fixture { _home: home, cfg }
+        Fixture { home, cfg }
     }
 
     /// Go `session.LoadAll()`.

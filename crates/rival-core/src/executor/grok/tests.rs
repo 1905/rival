@@ -147,11 +147,15 @@ fn grok_full_prompt_matches_shared_composition() {
     assert_eq!(grok_full_prompt(&cfg, "review this diff", "/repo"), want);
 }
 
-/// An env whose TMPDIR is a fresh dir, so the prompt file can be watched.
+/// The variable Go's `os.TempDir` reads first: `TMPDIR` on Unix, `TMP` on
+/// Windows. Tests set it in the injected config only.
+const TMP_VAR: &str = if cfg!(windows) { "TMP" } else { "TMPDIR" };
+
+/// An env whose temp dir is a fresh dir, so the prompt file can be watched.
 fn tmp_env() -> (Env, tempfile::TempDir) {
     let mut env = Env::new();
     let tmp = tempfile::tempdir().unwrap();
-    env.set("TMPDIR", Some(&path_str(tmp.path())));
+    env.set(TMP_VAR, Some(&path_str(tmp.path())));
     (env, tmp)
 }
 
@@ -200,8 +204,13 @@ fn run_grok_model_threads_model_to_argv() {
         assert_eq!(arg_value(&args, "-m"), want, "{name}");
         assert_eq!(args, argv(want, &file, "high", &work, true), "{name}");
         assert_eq!(stdin, "", "{name}: stdin must carry nothing");
+        // Go os.CreateTemp joins with the host separator.
         assert!(
-            file.starts_with(&format!("{}/rival-grok-", path_str(tmp.path()))),
+            file.starts_with(&format!(
+                "{}{}rival-grok-",
+                path_str(tmp.path()),
+                std::path::MAIN_SEPARATOR
+            )),
             "{file}"
         );
         assert!(file.ends_with(".md"), "{file}");
@@ -286,7 +295,8 @@ fn run_grok_model_errors_remove_the_prompt_file() {
 
     // No temp dir: the create error is wrapped.
     let mut env = Env::new();
-    env.set("TMPDIR", Some("/nonexistent-rival-tmp"));
+    let missing = path_str(&tmp.path().join("nonexistent-rival-tmp"));
+    env.set(TMP_VAR, Some(&missing));
     let err = run_grok_model_with(
         &env.config(),
         &mut sess,
@@ -300,12 +310,16 @@ fn run_grok_model_errors_remove_the_prompt_file() {
     .unwrap_err()
     .to_string();
     assert!(
-        err.starts_with(
-            "grok runtime: create prompt file: open /nonexistent-rival-tmp/rival-grok-"
-        ),
+        err.starts_with(&format!(
+            "grok runtime: create prompt file: open {missing}{}rival-grok-",
+            std::path::MAIN_SEPARATOR
+        )),
         "{err}"
     );
-    assert!(err.ends_with(".md: no such file or directory"), "{err}");
+    assert!(
+        err.ends_with(&format!(".md: {}", crate::gostd::errtext::NO_SUCH_PATH)),
+        "{err}"
+    );
 }
 
 #[cfg(unix)]

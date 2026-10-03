@@ -398,9 +398,20 @@ mod tests {
         assert_eq!(rev, 0);
     }
 
+    /// Windows `SystemTime` counts 100 ns ticks, so the portable case uses
+    /// a whole tick; Unix keeps single nanoseconds.
     #[test]
     fn unix_nanos_matches_go() {
-        assert_eq!(unix_nanos(UNIX_EPOCH + Duration::new(2, 5)), 2_000_000_005);
+        assert_eq!(
+            unix_nanos(UNIX_EPOCH + Duration::new(2, 500)),
+            2_000_000_500
+        );
         assert_eq!(unix_nanos(UNIX_EPOCH - Duration::new(1, 0)), -1_000_000_000);
+        assert_eq!(
+            unix_nanos(UNIX_EPOCH - Duration::new(1, 300)),
+            -1_000_000_300
+        );
+        #[cfg(unix)]
+        assert_eq!(unix_nanos(UNIX_EPOCH + Duration::new(2, 5)), 2_000_000_005);
     }
 }

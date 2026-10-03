@@ -55,7 +55,7 @@ pub fn load_summary_file(path: &Path, size: i64) -> anyhow::Result<Session> {
         return Ok(s);
     }
 
-    let mut f = File::open(path).map_err(|e| io_error("open", path, e))?;
+    let mut f = crate::gostd::open_file(path).map_err(|e| io_error("open", path, e))?;
     let mut prefix = vec![0u8; SUMMARY_EDGE_BYTES as usize];
     let n = read_full(&mut f, path, &mut prefix)?;
     prefix.truncate(n);

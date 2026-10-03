@@ -148,6 +148,7 @@ fn prompt_stdin_runs_raw_and_completes_without_reading_the_log() {
 fn input_validation_order_and_messages() {
     let fix = Fixture::new();
     let f = fake_run("");
+    let missing = fix.missing_dir("nonexistent");
     // Neither --review nor --prompt-stdin.
     let mut stdin = FakeStdin::new("x");
     stdin.forbid_read = true;
@@ -157,7 +158,7 @@ fn input_validation_order_and_messages() {
         &mut stdin,
         &*no_mr(),
         RunOptions {
-            workdir: "/nonexistent".into(),
+            workdir: missing.clone(),
             ..RunOptions::default()
         },
     );
@@ -169,7 +170,7 @@ fn input_validation_order_and_messages() {
     // Empty stdin prompt, before the workdir is checked.
     let mut stdin = FakeStdin::new("");
     let opts = RunOptions {
-        workdir: "/nonexistent".into(),
+        workdir: missing.clone(),
         prompt_stdin: true,
         ..RunOptions::default()
     };
@@ -202,7 +203,7 @@ fn input_validation_order_and_messages() {
     let out = run(&fix, &f, &mut stdin, &*no_mr(), opts);
     assert_eq!(
         out.result,
-        Err(CmdError::plain("workdir not found: /nonexistent"))
+        Err(CmdError::plain(format!("workdir not found: {missing}")))
     );
     assert_eq!(out.stdout, "");
     assert_eq!(f.borrow().preflight_calls, 0);

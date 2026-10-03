@@ -285,7 +285,11 @@ fn a_missing_log_fails_and_is_read_again() {
     let entry = slot.entry_of(&ResultTarget::of(&s)).unwrap();
     assert_eq!(
         entry.result,
-        Err(format!("open {}: no such file or directory", s.log_file))
+        Err(format!(
+            "open {}: {}",
+            s.log_file,
+            crate::testutil::NO_SUCH_FILE
+        ))
     );
     let req = slot.request(ResultTarget::of(&s)).unwrap();
     assert_eq!(req.known, None);

@@ -29,10 +29,9 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
     };
     let shown = abs.to_string_lossy().into_owned();
     match std::fs::metadata(&abs) {
-        // Go os.IsNotExist: ENOENT only (ENOTDIR is "cannot read").
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Err(format!("workdir not found: {shown}"))
-        }
+        // Go os.IsNotExist: ENOENT on Unix (ENOTDIR is "cannot read"); on
+        // Windows its own three codes, narrower than std's NotFound.
+        Err(e) if gostd::is_not_exist(&e) => Err(format!("workdir not found: {shown}")),
         Err(e) => Err(format!(
             "cannot read workdir {shown}: stat {shown}: {}",
             gostd::os_error_text(&e)

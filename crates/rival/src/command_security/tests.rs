@@ -10,7 +10,10 @@ use std::time::{Duration, Instant};
 
 use rival_core::config::{K3_LABEL, KIMI_MODEL, WHOLE_PROJECT};
 
-use crate::testutil::{FakeStdin, Fixture, TEST_MR_URL, execute, no_mr, with_env};
+use crate::testutil::{
+    CLOSED_HANDLE, FakeStdin, Fixture, NO_SUCH_FILE, TEST_MR_URL, closed_handle_error, execute,
+    no_mr, with_env,
+};
 
 fn s(p: &Path) -> String {
     p.to_str().unwrap().to_string()
@@ -505,7 +508,7 @@ fn missing_log_fails_the_session_and_the_command() {
     let f = RefCell::new(Fake::default());
     let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
     let sess = &fix.sessions()[0];
-    let err = format!("open {}: no such file or directory", sess.log_file);
+    let err = format!("open {}: {NO_SUCH_FILE}", sess.log_file);
     assert_eq!(
         r.result,
         Err(CmdError::plain(format!("read log file: {err}")))
@@ -552,7 +555,7 @@ struct ClosedStdout;
 
 impl io::Write for ClosedStdout {
     fn write(&mut self, _: &[u8]) -> io::Result<usize> {
-        Err(io::Error::from_raw_os_error(libc::EBADF))
+        Err(closed_handle_error())
     }
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
@@ -582,9 +585,9 @@ fn stdout_write_error_leaves_the_session_interrupted() {
     };
     assert_eq!(
         result,
-        Err(CmdError::plain(
-            "write stdout: write /dev/stdout: bad file descriptor"
-        ))
+        Err(CmdError::plain(format!(
+            "write stdout: write /dev/stdout: {CLOSED_HANDLE}"
+        )))
     );
     let sess = &fix.sessions()[0];
     assert_eq!(sess.status, "failed");

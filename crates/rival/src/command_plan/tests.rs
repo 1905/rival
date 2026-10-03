@@ -617,7 +617,11 @@ fn stdin_effort_and_paths_with_spaces_reach_the_runner() {
         || Ok(sample_result()),
     );
     assert_eq!(r.result, Ok(()));
-    assert_eq!(r.seen.abs_path, s(&dir.path().join("docs/my plan.md")));
+    // filepath.Join cleans to the host separator.
+    assert_eq!(
+        r.seen.abs_path,
+        s(&dir.path().join("docs").join("my plan.md"))
+    );
     assert_eq!(r.seen.effort, "ultra");
     assert_eq!(r.seen.clis, ["codex"], "default model");
 
@@ -689,7 +693,14 @@ fn validation_errors_print_on_stdout_and_fail() {
             "reasoning effort conflicts: command uses \"\" but plan arguments request \"xhigh\""
                 .into(),
         ),
-        (&[], "missing.md", format!("plan file not found: {w}/missing.md")),
+        (
+            &[],
+            "missing.md",
+            format!(
+                "plan file not found: {}",
+                s(&Path::new(&w).join("missing.md"))
+            ),
+        ),
         (
             &[],
             ".",
@@ -713,17 +724,16 @@ fn checks_run_in_source_order() {
     let fix = Fixture::new();
     let (_dir, w, _) = workdir_with_plan();
     // A bad workdir wins over a bad effort.
+    let missing = fix.missing_dir("definitely-not-here");
     let r = run_plan(
         &fix,
         &mut FakeStdin::new("plan.md"),
-        &["--workdir", "/definitely/not/here", "--effort", "bogus"],
+        &["--workdir", &missing, "--effort", "bogus"],
         || panic!("runner must not start"),
     );
-    assert_eq!(
-        r.result,
-        Err(fail("workdir not found: /definitely/not/here"))
-    );
-    assert_eq!(r.stdout, "workdir not found: /definitely/not/here\n");
+    let want = format!("workdir not found: {missing}");
+    assert_eq!(r.result, Err(fail(want.clone())));
+    assert_eq!(r.stdout, format!("{want}\n"));
 
     // A bad effort wins over a bad model.
     let r = run_plan(
@@ -828,7 +838,10 @@ fn relative_workdir_resolves_before_the_plan_path() {
     );
     assert_eq!(r.result, Ok(()));
     assert_eq!(r.seen.workdir, s(&parent.path().join("proj")));
-    assert_eq!(r.seen.abs_path, s(&parent.path().join("proj/plan.md")));
+    assert_eq!(
+        r.seen.abs_path,
+        s(&parent.path().join("proj").join("plan.md"))
+    );
 }
 
 // ---- Through the root: both streams ----

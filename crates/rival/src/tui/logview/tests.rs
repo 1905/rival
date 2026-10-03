@@ -79,7 +79,7 @@ fn wrap_log_lines_empty_and_missing() {
     let missing = missing.to_str().unwrap();
     assert_eq!(
         lines(missing, 80, 0),
-        Err(format!("open {missing}: no such file or directory")),
+        Err(format!("open {missing}: {}", crate::testutil::NO_SUCH_FILE)),
         "Go's *PathError text"
     );
 }
@@ -203,6 +203,11 @@ fn create_group_log_view_uses_raw_ids_and_errors() {
     ];
     let view = create_group_log_view(&h.env.temp_dir, &sessions).unwrap();
     let got = fs::read_to_string(view).unwrap();
+    // The parent directory is missing too.
+    let unavailable = format!(
+        "(log unavailable: open /nonexistent/x.log: {})",
+        crate::testutil::NO_SUCH_PATH
+    );
     for want in [
         "=== gpt-5.5 REVIEW · EFFORT high (FAILED) ===",
         "Error: codex gpt-5.5 exploded",
@@ -210,7 +215,7 @@ fn create_group_log_view_uses_raw_ids_and_errors() {
         "=== gpt-6-astra JUDGE ===",
         // A log without a trailing newline gets one before the gap.
         "judge body\n\n=== claude REVIEW ===",
-        "(log unavailable: open /nonexistent/x.log: no such file or directory)",
+        unavailable.as_str(),
     ] {
         assert!(got.contains(want), "group log lacks {want:?}:\n{got}");
     }

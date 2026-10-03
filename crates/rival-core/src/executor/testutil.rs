@@ -88,6 +88,17 @@ impl Env {
         write_exe(&self.bin.path().join(name), script)
     }
 
+    /// A fake that `LookPath` finds but no test runs. Go's Windows
+    /// `LookPath` needs a `PATHEXT` extension, so there it is `<name>.exe`.
+    pub fn fake_on_path(&self, name: &str) -> PathBuf {
+        let file = if cfg!(windows) {
+            format!("{name}.exe")
+        } else {
+            name.to_string()
+        };
+        self.fake(&file, "#!/bin/sh\nexit 0\n")
+    }
+
     /// A queued session in a temp home, as Go's `session.NewQueued`.
     pub fn session(&self, cli: &str, mode: &str, model: &str, workdir: &str) -> Session {
         Session::new_queued(

@@ -390,17 +390,16 @@ fn read_and_runner_errors_fail_plainly() {
 #[test]
 fn bad_workdir_is_reported_first() {
     let fix = Fixture::new();
+    let missing = fix.missing_dir("definitely-not-here");
     let r = run_antislop(
         &fix,
         &mut FakeStdin::new("src/"),
-        &["--workdir", "/definitely/not/here", "--effort", "bogus"],
+        &["--workdir", &missing, "--effort", "bogus"],
         never,
     );
-    assert_eq!(
-        r.result,
-        Err(fail("workdir not found: /definitely/not/here"))
-    );
-    assert_eq!(r.stdout, "workdir not found: /definitely/not/here\n");
+    let want = format!("workdir not found: {missing}");
+    assert_eq!(r.result, Err(fail(want.clone())));
+    assert_eq!(r.stdout, format!("{want}\n"));
 }
 
 // ---- Through the root: both streams ----

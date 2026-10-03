@@ -52,6 +52,12 @@ fn loaded(body: &str) -> (tempfile::TempDir, Config) {
     (home, config)
 }
 
+/// `<home>/.rival/config.yaml` with host separators, as Go's
+/// `filepath.Join` writes it.
+fn config_path(home: &Path) -> PathBuf {
+    home.join(".rival").join("config.yaml")
+}
+
 fn home_config(home: &Path, extra: &[(&str, &str)]) -> Config {
     let mut env = env_map(extra);
     env.insert(
@@ -642,7 +648,7 @@ fn grok_is_enumerated_in_effort_model_errors() {
         .user_config_error()
         .expect("unknown effort model was accepted");
     assert!(err.to_string().contains(GROK_LABEL), "{err}");
-    let path = home.path().join(".rival/config.yaml");
+    let path = config_path(home.path());
     assert_eq!(
         err.to_string(),
         format!(
@@ -729,7 +735,7 @@ fn load_user_config_validates_effort_map() {
 #[test]
 fn load_user_config_reports_go_messages() {
     let (home, config) = loaded("efforts:\n  claude: Huge\n");
-    let path = home.path().join(".rival/config.yaml");
+    let path = config_path(home.path());
     assert_eq!(
         config.user_config_error().unwrap().to_string(),
         format!(
@@ -738,7 +744,7 @@ fn load_user_config_reports_go_messages() {
         )
     );
     let (home, config) = loaded("efforts:\n  kimi-k3: high\n");
-    let path = home.path().join(".rival/config.yaml");
+    let path = config_path(home.path());
     assert_eq!(
         config.user_config_error().unwrap().to_string(),
         format!(
@@ -747,7 +753,7 @@ fn load_user_config_reports_go_messages() {
         )
     );
     let (home, config) = loaded("security:\n  reviewer: ' GPT5 '\n");
-    let path = home.path().join(".rival/config.yaml");
+    let path = config_path(home.path());
     assert_eq!(
         config.user_config_error().unwrap().to_string(),
         format!(
@@ -756,7 +762,7 @@ fn load_user_config_reports_go_messages() {
         )
     );
     let (home, config) = loaded("efforts: [");
-    let path = home.path().join(".rival/config.yaml");
+    let path = config_path(home.path());
     let message = config.user_config_error().unwrap().to_string();
     assert!(
         message.starts_with(&format!("parse {}: ", path.display())),
@@ -869,10 +875,14 @@ fn load_user_config_reports_unreadable_config_path() {
         .expect("directory at config path was silently ignored");
     let shown = path.display().to_string();
     assert!(err.to_string().contains(&format!("read {shown}")), "{err}");
-    // Go: os.ReadFile wraps the read(2) failure in a *PathError.
+    // Go: os.ReadFile wraps the read(2) failure in a *PathError. On Windows
+    // Go's syscall.Open opens the directory too; ReadFile then fails.
     assert_eq!(
         err.to_string(),
-        format!("read {shown}: read {shown}: is a directory")
+        format!(
+            "read {shown}: read {shown}: {}",
+            crate::gostd::errtext::IS_A_DIRECTORY
+        )
     );
 }
 
