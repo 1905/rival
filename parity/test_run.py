@@ -1006,8 +1006,8 @@ class ScenarioFilesTest(unittest.TestCase):
             with self.subTest(n):
                 run.load_scenario(os.path.join(run.SCENARIOS_DIR, n))
 
-    # Committed expectations: they must keep holding after the Go tree is removed.
-    # Source: rival/cmd/root.go `const banner` and `var Version = "dev"`, printed by
+    # Committed expectations, independent of the removed Go tree.
+    # Source (Go, before removal): rival/cmd/root.go `const banner` and `var Version = "dev"`, printed by
     # rival/cmd/version.go as fmt.Print(banner) then fmt.Printf("  %s\\n", Version).
     GO_BANNER = ("\n"
                  "         _             __\n"

@@ -22,6 +22,7 @@ to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`
 1. **Bump skill versions** — run `./scripts/bump-skill-versions.sh <version>` to
    update the embedded SKILL.md files (`crates/rival-core/skills/`).
 2. **Build + test** — from the repository root:
+   create/activate a local Python venv and install `scripts/requirements-test.txt`.
    `make cli-test && make cli-release-check` (Rust workspace tests, release
    script tests, `goreleaser check`). Must be green before tagging.
    Require the candidate commit's full three-OS `CI` workflow to pass too,

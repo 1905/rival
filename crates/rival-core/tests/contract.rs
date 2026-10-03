@@ -1,5 +1,5 @@
-//! Session record contract shared with Go (`rival/internal/session/
-//! testdata_contract_test.go`) and later Swift. `testdata/expected.json`
+//! Session record contract shared with Swift (`app/Tests`), first set by Go
+//! `internal/session/testdata_contract_test.go`. `testdata/expected.json`
 //! holds the typed values; `testdata/written/` holds the writer's golden
 //! bytes. The tests here never rewrite the golden files; regenerate them
 //! on purpose with

@@ -1,7 +1,6 @@
 //! Go: `internal/review/prompt_test.go` (prompt cases) and the prompt cases
 //! of `cmd/command_security_test.go`, plus byte pins of every prompt text.
 
-use std::collections::HashMap;
 use std::fs;
 
 use super::*;
@@ -300,75 +299,4 @@ fn built_prompts_sha256_golden() {
     ]
     .map(|(len, hash)| (len, hash.to_string()));
     assert_eq!(got, want);
-}
-
-// ---- golden checks against the Go source (removed with the Go tree in P6;
-// the SHA-256 pins above keep the goldens) ----
-
-const GO_PROMPT: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../rival/internal/review/prompt.go"
-);
-
-/// Evaluates a Go string expression `lit + lit + Ident ...` of raw
-/// (backtick) and plain (escape-free) string literals, starting at `rest`.
-fn eval_go_expr(mut rest: &str, known: &HashMap<String, String>) -> String {
-    let mut out = String::new();
-    loop {
-        rest = rest.trim_start();
-        if let Some(r) = rest.strip_prefix('`') {
-            let end = r.find('`').unwrap();
-            out.push_str(&r[..end]);
-            rest = &r[end + 1..];
-        } else if let Some(r) = rest.strip_prefix('"') {
-            let end = r.find('"').unwrap();
-            assert!(!r[..end].contains('\\'), "escapes unsupported");
-            out.push_str(&r[..end]);
-            rest = &r[end + 1..];
-        } else {
-            let end = rest
-                .find(|c: char| !(c.is_alphanumeric() || c == '_'))
-                .unwrap();
-            out.push_str(&known[&rest[..end]]);
-            rest = &rest[end..];
-        }
-        match rest.trim_start_matches([' ', '\t']).strip_prefix('+') {
-            Some(r) => rest = r,
-            None => return out,
-        }
-    }
-}
-
-fn go_prompts() -> HashMap<String, String> {
-    let src = fs::read_to_string(GO_PROMPT).unwrap_or_else(|e| panic!("read {GO_PROMPT}: {e}"));
-    let mut known = HashMap::new();
-    for name in [
-        "severityRubric",
-        "failureScenarioRule",
-        "cleanReviewExampleLine",
-    ] {
-        let head = format!("\nconst {name} = ");
-        let start = src.find(&head).unwrap_or_else(|| panic!("no const {name}")) + head.len();
-        let value = eval_go_expr(&src[start..], &known);
-        known.insert(name.to_string(), value);
-    }
-    for name in [
-        "bugHunterInstructions",
-        "securityInstructions",
-        "reviewerJSONContract",
-    ] {
-        let head = format!("\nfunc {name}() string {{\n\treturn ");
-        let start = src.find(&head).unwrap_or_else(|| panic!("no func {name}")) + head.len();
-        let value = eval_go_expr(&src[start..], &known);
-        known.insert(name.to_string(), value);
-    }
-    known
-}
-
-#[test]
-fn prompts_match_go_source_bytes() {
-    let go = go_prompts();
-    for (name, rust) in rust_prompts() {
-        assert_eq!(rust, go[name], "{name} differs from {GO_PROMPT}");
-    }
 }

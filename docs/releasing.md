@@ -60,6 +60,9 @@ VERSION=3.23.0
 2. Run the release gate before creating a tag:
 
    ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python3 -m pip install -r scripts/requirements-test.txt
    make cli-test
    make cli-release-check
    ```

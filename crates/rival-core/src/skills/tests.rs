@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
 use super::*;
 
@@ -289,107 +288,79 @@ fn codex_skill_commands() {
     ));
 }
 
-// ---- Go tree parity. These read the Go sources and go away with them in P6.
-
-fn go_skills_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rival/internal/skills")
-}
-
-fn go_source(file: &str) -> String {
-    let path = go_skills_dir().join(file);
-    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
-}
-
-/// The quoted strings of the Go `var <name> = []string{...}` block.
-fn go_string_list(src: &str, var: &str) -> Vec<String> {
-    let start = src
-        .find(&format!("var {var} = []string{{"))
-        .unwrap_or_else(|| panic!("var {var} not found"));
-    let block = &src[start..];
-    let end = block.find('}').unwrap();
-    block[..end]
-        .lines()
-        .map(|line| line.split("//").next().unwrap())
-        .flat_map(|line| line.split('"').skip(1).step_by(2))
-        .map(str::to_string)
-        .collect()
-}
-
+/// The embedded tree is `codex.md` plus one `SKILL.md` per name, nothing
+/// else (the file set Go's `internal/skills` held).
 #[test]
-fn names_and_deprecated_match_go() {
-    let src = go_source("embed.go");
-    assert_eq!(go_string_list(&src, "Names"), NAMES);
-    assert_eq!(go_string_list(&src, "Deprecated"), DEPRECATED);
-    for name in NAMES {
-        assert!(
-            src.contains(&format!("//go:embed all:{name}\n")),
-            "{name} is not in Go's embed list"
-        );
-    }
-}
-
-/// Every embedded Markdown file equals the Go tree's byte for byte, and
-/// the Go tree holds no extra Markdown.
-#[test]
-fn embedded_markdown_matches_go_tree() {
-    let mut rust_files: Vec<String> = vec!["codex.md".into()];
+fn embedded_files_are_codex_md_and_skill_md() {
+    let mut got: Vec<String> = TREE
+        .files()
+        .map(|f| f.path().to_str().unwrap().to_string())
+        .collect();
     for dir in TREE.dirs() {
+        assert!(dir.dirs().next().is_none(), "{}", dir.path().display());
         for file in dir.files() {
-            rust_files.push(file.path().to_str().unwrap().replace('\\', "/"));
+            got.push(file.path().to_str().unwrap().replace('\\', "/"));
         }
     }
-    rust_files.sort();
-    let mut go_files: Vec<String> = Vec::new();
-    for entry in std::fs::read_dir(go_skills_dir()).unwrap() {
-        let entry = entry.unwrap();
-        let name = entry.file_name().into_string().unwrap();
-        if entry.file_type().unwrap().is_dir() {
-            for sub in std::fs::read_dir(entry.path()).unwrap() {
-                let sub = sub.unwrap().file_name().into_string().unwrap();
-                go_files.push(format!("{name}/{sub}"));
-            }
-        } else if name.ends_with(".md") {
-            go_files.push(name);
-        }
-    }
-    go_files.sort();
-    assert_eq!(rust_files, go_files);
-    for file in &rust_files {
-        let want = std::fs::read(go_skills_dir().join(file)).unwrap();
-        let got = TREE.get_file(file).unwrap().contents();
-        assert!(got == want.as_slice(), "{file} differs from the Go tree");
-    }
+    got.sort();
+    let mut want: Vec<String> = NAMES.iter().map(|n| format!("{n}/SKILL.md")).collect();
+    want.push("codex.md".into());
+    want.sort();
+    assert_eq!(got, want);
 }
 
-/// The description and input of every Codex skill are Go `codex.go` string
-/// literals, and the frontmatter format string is Go's.
+/// The description and input of every Codex skill, as Go `codex.go` held
+/// them before the Go tree was removed.
 #[test]
-fn codex_skill_text_matches_go_literals() {
-    let src = go_source("codex.go");
-    assert!(src.contains(
-        r#""---\nname: %s\ndescription: %s\nmetadata:\n  version: %s\n---\n\n# %s\n\n## Review input\n\n%s\n\n""#
-    ));
-    for name in NAMES {
+fn codex_skill_text_golden() {
+    let review = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.";
+    let plan_description = "Review a plan or specification document through Rival from Codex, returning ratings and findings.";
+    let plan = "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.";
+    let cases = [
+        (
+            "rival-claude",
+            "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). For a plan document use $rival-plan-claude. Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
+        ),
+        (
+            "rival-codex",
+            "Run a requested codex prompt or code review through Rival from Codex.",
+            review,
+        ),
+        (
+            "rival-k3",
+            "Run a requested k3 prompt or code review through Rival from Codex.",
+            review,
+        ),
+        (
+            "rival-grok",
+            "Run a requested grok prompt or code review through Rival from Codex.",
+            review,
+        ),
+        ("rival-plan", plan_description, plan),
+        ("rival-plan-codex", plan_description, plan),
+        ("rival-plan-claude", plan_description, plan),
+        (
+            "rival-antislop",
+            "Review code for over-engineering and unnecessary complexity through Rival, returning a leanness rating and cut list. Use for requested antislop reviews.",
+            "Pass the scope and options verbatim. Empty input reviews git-detected changes. Default Codex, high fallback; `-m claude` selects Claude. This reports quality and simplification findings, not ordinary bug findings.",
+        ),
+        (
+            "rival-security",
+            "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.",
+            "First run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Pass the user's scope verbatim; empty input reviews git-detected changes. The model is selected by security.reviewer in Rival's configuration.",
+        ),
+    ];
+    let mut names: Vec<&str> = cases.iter().map(|(name, _, _)| *name).collect();
+    names.sort_unstable();
+    let mut active = NAMES.to_vec();
+    active.sort_unstable();
+    assert_eq!(names, active);
+    for (name, description, input) in cases {
         let data = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
-        let description = data
-            .lines()
-            .find_map(|l| l.strip_prefix("description: "))
-            .unwrap();
-        let input = data
-            .split("## Review input\n\n")
-            .nth(1)
-            .and_then(|rest| rest.split("\n\n").next())
-            .unwrap();
-        let description = if ["rival-codex", "rival-k3", "rival-grok"].contains(&name) {
-            "Run a requested %s prompt or code review through Rival from Codex.".to_string()
-        } else {
-            description.to_string()
-        };
-        for text in [description.as_str(), input] {
-            assert!(
-                src.contains(&format!("\"{text}\"")),
-                "{name}: {text:?} is not a codex.go literal"
-            );
-        }
+        let head = format!(
+            "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: 1\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"
+        );
+        assert!(data.starts_with(&head), "{name}:\n{data}");
     }
 }

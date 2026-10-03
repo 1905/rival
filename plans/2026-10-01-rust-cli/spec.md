@@ -96,7 +96,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 | `testdata/**` (new) | Shared fake fixtures; Go contract test in `rival/internal/session` + Rust contract test; a Swift decoding test reads Rust-written sessions. |
 | `.github/workflows/ci.yml` (new or extended) | `cargo test` on macOS, Linux, Windows; scenario runner on macOS + Linux; Swift decode test of Rust-written sessions on macOS (required from P1). |
 | `.github/workflows/release.yml` | P6: goreleaser Go builds → Rust builds for 6 targets (goreleaser rust builder or cargo-dist, chosen in the plan), same formula update. |
-| `Makefile`, `README.md`, `CHANGELOG.md` | P6: build/test commands, Windows install note. |
+| `Makefile`, `README.md`, `CHANGELOG.md` | P6: build/test commands and separate install/update instructions for macOS, Linux and Windows, including both CPU architectures and source fallback. |
 | `docs/releasing.md`, `.claude/skills/rival-release/SKILL.md` | Keep release instructions usable after Go retirement: root Rust checks, six artifacts, snapshot gate and unchanged app release flow. Release execution still requires a separate request. |
 | `rival/**` | P6: moved out (mv to /tmp/trash, `git add -A`). |
 
@@ -144,7 +144,10 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - P5 CI adds `windows-latest` and `.gitattributes` for LF byte contracts. An isolated autocrlf clone changed 380 contract inputs without the rules and zero with them. All Rust tests and strict Clippy run on Windows. Unix scenarios and Go checks remain macOS/Linux; Swift decoding remains macOS. Each job has a 40-minute outer timeout.
 - P5 native process acceptance passed at `30dec1f`; shared Windows fixtures still needed correction. Go-compatible directory opening is now shared by CLI file readers. Plan v2.5 isolates the remaining Windows error-language and operation-name corrections in Task 5.3. CI37085956811 passed Windows, macOS and Linux at 1096e31. Task 5.3 adds English-first Windows errors and source-correct NUL/invalid-name workdir branches. Final native acceptance passed in CI37086794043, including both workdir branches and real Windows error formatting. Rare stat fallback operations and malformed UTF-16 remain documented limits.
 
-- P6 release setup is implemented. Root `.goreleaser.yaml` uses cargo-zigbuild for four Unix targets and cargo-xwin for two MSVC targets. A shared composite action installs build tools. Every manual workflow run is an unpublished snapshot with six native archive checks. Tag pushes retain CLI/formula and app/cask publication. Windows builds request a static C runtime; actual PE imports remain unverified. Thirty-six archive/config tests pass locally. Go retirement, all six hosted archives and final review remain pending.
+- P6 release setup is implemented. Root `.goreleaser.yaml` uses cargo-zigbuild for four Unix targets and cargo-xwin for two MSVC targets. A shared composite action installs build tools. Every manual workflow run is an unpublished snapshot with six native archive checks. Tag pushes retain CLI/formula and app/cask publication. Windows builds request a static C runtime; actual PE imports remain unverified. Thirty-six archive/config tests pass locally. Go retirement is complete. All six hosted archives and final review remain pending.
+
+- P6 Go retirement removes `rival/`, Go CI and direct Go-source reads. Rust tests retain prompt hashes, literal configuration/skill expectations and session contracts; Swift keeps decoding the same files. The version-bump script targets only the Rust skill tree. Release-script tests run in Linux CI with explicit PyYAML6.0.3. Local validation passed 1,229 Rust tests, 69 runner tests, 36 release tests and the unchanged 66-file baseline.
+- The README has separate macOS, Linux and Windows install steps, CPU selection, hash checks, PATH setup, updates and source fallback. Seven shell examples pass syntax checks. Windows installation commands are reviewed but not executed against a published ZIP; no Rust release exists yet.
 
 ## Rollout
 
@@ -153,5 +156,5 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - **P3** commands + scenario runner green.
 - **P4** ratatui TUI.
 - **P5** Windows.
-- **P6** release switch, Go removed; Codex review + /simplify on the final diff; release is your call.
+- **P6** release switch, Go removed; one Codex review, one Claude review requested on 2026-10-03, then /simplify on the final diff; release is your call.
 - Rust binary is built and tested in CI from P1 but not released until P6.
