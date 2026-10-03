@@ -140,6 +140,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - P5 process correction: the missing macOS pipe/spawn synchronization is implemented. An isolated forced-overlap regression detects a deliberately bypassed guard. All 1,207 workspace tests and seven terminal checks pass locally. Hosted macOS/Linux CI also passed at `208842e`. The guard covers Rival calls, not foreign libraries. The intermittent P4 cancellation failure remains unexplained.
 
 - P5 Windows code and native helper tests are implemented, with native CI pending. Local checks pass 1,227 workspace tests. The implementation adds `winpath.rs`, Windows process/detach/stop helpers, cancellable overlapped pipes and OS temp-directory calls. Process identity remains separate from running state, including exit code 259. Console-less providers suppress new console windows; one-shot git/glab launches retain standard flags. Windows environment lookup folds ASCII names only. UNC lexical paths are tested; UNC network stat and native TUI restoration are not verified.
+- P5 CI adds `windows-latest` and `.gitattributes` for LF byte contracts. An isolated autocrlf clone changed 380 contract inputs without the rules and zero with them. All Rust tests and strict Clippy run on Windows. Unix scenarios and Go checks remain macOS/Linux; Swift decoding remains macOS. Each job has a 40-minute outer timeout.
 
 ## Rollout
 

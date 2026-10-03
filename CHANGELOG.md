@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Added native Windows CI alongside macOS/Linux. Pinned byte-contract inputs to LF and retained all Windows process tests. Local Windows Rust lint checks pass; hosted results remain pending.
 - Added the Windows process layer: owner/provider Jobs, cancellable pipes, console-aware detach, PID-safe stop recovery, executable lookup and path handling. Local validation: 1,227 workspace tests, build and strict Clippy passed. Native Windows checks remain pending.
 - Guarded macOS pipe setup against concurrent process launches, including the signal pipe. An isolated regression detects the missing lock. Local validation: 1,207 workspace tests and seven terminal checks passed. The guard covers Rival calls; foreign libraries remain outside it.
 - Added the Result tab with parsed findings, expandable details, Markdown and live/failure notes. Background parsing is cached and rejects stale responses. Local validation: 1,205 workspace tests, terminal cleanup checks and 33 Go/Rust screenshots passed. Native Windows and release-switch gates remain pending.

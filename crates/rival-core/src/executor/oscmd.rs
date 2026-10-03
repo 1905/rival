@@ -337,7 +337,9 @@ pub fn os_temp_dir() -> String {
             // SAFETY: a valid module and a NUL-terminated ANSI name.
             if let Some(f) = unsafe { GetProcAddress(module, c"GetTempPath2W".as_ptr().cast()) } {
                 // SAFETY: GetTempPath2W has exactly this signature.
-                return unsafe { std::mem::transmute::<_, GetTempPathFn>(f) };
+                return unsafe {
+                    std::mem::transmute::<unsafe extern "system" fn() -> isize, GetTempPathFn>(f)
+                };
             }
         }
         GetTempPathW

@@ -298,7 +298,9 @@ Files: `crates/rival-core/src/executor/{process,subprocess,oscmd}.rs`, `crates/r
 **Task 5.1 implementation checkpoint:** Source changes and native helper tests are complete. Controller checks passed: 1,227 workspace tests, ten intentional ignores, formatting, strict Clippy and build. Windows Rust code type-checks with stub C objects, which proves neither linking nor runtime behavior. Native requirements above stay unchecked until Task 5.2 CI passes. Providers started by console-less owners use `CREATE_NO_WINDOW` with `CREATE_SUSPENDED`; console-backed owners keep console inheritance. This is separate from detach flags. One-shot git/glab launches keep standard creation behavior.
 
 ### Task 5.2 — Windows CI `light`
-- [ ] `ci.yml` adds `windows-latest`: `cargo test --workspace` (cross-process queue test included); the scenario runner stays macOS/Linux (fake CLIs are Python scripts with Unix shebangs).
+- [x] `ci.yml` adds `windows-latest`: `cargo test --workspace` (cross-process queue test included); the scenario runner stays macOS/Linux (fake CLIs are Python scripts with Unix shebangs).
+
+**Task 5.2 verification:** CI configuration and an isolated autocrlf clone check pass locally. LF attributes prevent 380 contract inputs from changing at checkout. Strict Windows Rust lint checks pass with stub C objects; native CI remains the P5 gate. Cargo uses `--no-fail-fast` so a failed test target does not hide other target results, without changing the failed exit status.
 
 ### Gate P5 `gate`
 - [ ] CI green on all three; orchestrator reviews the Windows-only code paths. Merge.

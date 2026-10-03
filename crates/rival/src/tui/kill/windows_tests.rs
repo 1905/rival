@@ -115,6 +115,9 @@ fn kill_win_helper() {
         "launcher" => {
             let mut cmd = Command::new(exe());
             cmd.args(helper_args()).env(MODE, "grandchild");
+            // Not waited on: the stop under test kills this launcher, and
+            // the provider Job kills the grandchild with it.
+            #[allow(clippy::zombie_processes)]
             let grandchild = rival_core::executor::process::spawn(&mut cmd).unwrap();
             // SAFETY: a plain query; NULL means no console window.
             let window = !unsafe { GetConsoleWindow() }.is_null();

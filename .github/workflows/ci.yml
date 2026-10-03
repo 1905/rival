@@ -27,8 +27,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-latest]
+        # Windows runs the whole Rust workspace, including the native
+        # process-tree and cross-process queue tests. The Go baseline, the
+        # Unix fd check and the parity scenarios (fake CLIs are Python
+        # scripts with Unix shebangs) stay macOS/Linux only.
+        os: [macos-15, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # Final bound so a hung native process test cannot use the 6 h default.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +46,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - uses: actions/setup-go@v5
+        if: runner.os != 'Windows'
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: rival/go.sum
@@ -54,35 +61,44 @@ jobs:
       # writer bytes with the committed testdata/written golden files. The
       # golden generator is #[ignore]d and never runs here.
       - name: cargo test
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --locked --no-fail-fast
 
       # The fd-state loader constructor must survive the final link in both
       # the debug and the LTO release binary (Rust only promises object-file
       # retention for #[used]). Runs rival with fd 0 or 2 closed; both cases
       # stop before any provider, queue or network work.
+      # Unix-only (preexec_fn); Windows handles are covered by the native
+      # Rust tests above.
       - name: Startup fd constructor (debug + LTO release)
+        if: runner.os != 'Windows'
         run: python3 scripts/check-startup-fds.py
 
       - name: go test (includes the session contract)
+        if: runner.os != 'Windows'
         working-directory: rival
         run: |
           go version
           go test ./...
 
       - name: Session contract (Go, verbose)
+        if: runner.os != 'Windows'
         working-directory: rival
         run: go test ./internal/session/ -run '^TestContract' -count=1 -v
 
-      # No step may rewrite or add golden files.
+      # No step may rewrite or add golden files. Git Bash on Windows; a
+      # CRLF checkout of a pinned-LF fixture also shows up here.
       - name: Fixtures unchanged
+        shell: bash
         run: |
           git status --porcelain -- testdata/
           test -z "$(git status --porcelain -- testdata/)"
 
       - name: Parity runner self-tests
+        if: runner.os != 'Windows'
         run: python3 -m unittest discover -s parity -p 'test_*.py'
 
       - name: Parity scenarios
+        if: runner.os != 'Windows'
         run: |
           if [ "$PARITY_SCENARIOS" != "true" ]; then
             echo "::warning::Parity scenarios skipped: PARITY_SCENARIOS=$PARITY_SCENARIOS (enabled from P3)."

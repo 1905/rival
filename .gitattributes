@@ -1,0 +1,10 @@
+# Byte contracts: Rust tests compare these files byte for byte, embed them
+# (include_str!, include_dir!) or parse Go sources. Windows clones with
+# core.autocrlf=true would check them out with CRLF, so pin LF everywhere.
+*.rs text eol=lf
+*.go text eol=lf
+/testdata/** text eol=lf
+/crates/**/testdata/** text eol=lf
+/crates/rival-core/skills/** text eol=lf
+/rival/internal/skills/** text eol=lf
+/rival/internal/review/testdata/** text eol=lf

@@ -330,6 +330,9 @@ fn windows_helper() {
             cmd.args(helper_args()).env(MODE, "grandchild");
             // stdout and stderr are inherited: the grandchild holds the
             // provider pipes too.
+            // Not waited on: the test kills this launcher and checks that
+            // the provider Job kills the grandchild too.
+            #[allow(clippy::zombie_processes)]
             let grandchild = crate::executor::process::spawn(&mut cmd).unwrap();
             write_report(
                 &report.unwrap(),
@@ -429,6 +432,9 @@ fn owner_exit(report: &Path) {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    // Not waited on: the test checks that closing the owner Job on a normal
+    // owner exit kills this stray.
+    #[allow(clippy::zombie_processes)]
     let stray = crate::executor::process::spawn(&mut cmd).unwrap();
     write_report(
         report,
