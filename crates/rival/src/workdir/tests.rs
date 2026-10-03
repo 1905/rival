@@ -76,6 +76,43 @@ fn resolve_workdir_cases() {
     }
 }
 
+/// A NUL is EINVAL: Unix os.Stat reports it as a stat error; Windows
+/// filepath.Abs (syscall.FullPath) fails first.
+#[test]
+fn resolve_workdir_nul_is_invalid_argument() {
+    let (_root, cwd) = layout();
+    let fix = Fixture::with(&[], Some(cwd.clone()));
+    let want = if cfg!(windows) {
+        r#"resolve workdir "v3\x00x": invalid argument"#.to_string()
+    } else {
+        format!(
+            "cannot read workdir {p}: stat {p}: invalid argument",
+            p = cwd.join("v3\0x").display()
+        )
+    };
+    assert_eq!(resolve_workdir(&fix.cfg, "v3\0x"), Err(want));
+}
+
+/// `|` is a legal Unix name, so the path is just missing. On Windows both
+/// GetFileAttributesEx and the CreateFile fallback fail with
+/// ERROR_INVALID_NAME, which is not "not exist": Go reports CreateFile.
+#[test]
+fn resolve_workdir_invalid_windows_name() {
+    let (_root, cwd) = layout();
+    let fix = Fixture::with(&[], Some(cwd.clone()));
+    let p = cwd.join("a|b");
+    let want = if cfg!(windows) {
+        format!(
+            "cannot read workdir {p}: CreateFile {p}: \
+             The filename, directory name, or volume label syntax is incorrect.",
+            p = p.display()
+        )
+    } else {
+        format!("workdir not found: {}", p.display())
+    };
+    assert_eq!(resolve_workdir(&fix.cfg, "a|b"), Err(want));
+}
+
 #[test]
 fn relative_workdir_without_a_cwd_fails_but_absolute_works() {
     let (root, _) = layout();

@@ -20,6 +20,14 @@ mod tests;
 /// ("v3/" -> v3/v3/), and sessions would record "." instead of the project
 /// path. Relative paths resolve against `cfg`'s working directory.
 pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
+    // Go filepath.Abs on Windows always calls syscall.FullPath, whose
+    // UTF16PtrFromString rejects a NUL with EINVAL.
+    if cfg!(windows) && raw.contains('\0') {
+        return Err(format!(
+            "resolve workdir {}: invalid argument",
+            gostd::quote(raw)
+        ));
+    }
     let Some(abs) = paths::abs(cfg.cwd(), Path::new(raw)) else {
         return Err(format!(
             "resolve workdir {}: {}",
@@ -28,18 +36,33 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
         ));
     };
     let shown = abs.to_string_lossy().into_owned();
+    // Go os.Stat on Unix: BytePtrFromString rejects a NUL with EINVAL
+    // before the syscall (std's own error has no errno).
+    if shown.contains('\0') {
+        return Err(format!(
+            "cannot read workdir {shown}: {STAT_OP} {shown}: invalid argument"
+        ));
+    }
     match std::fs::metadata(&abs) {
         // Go os.IsNotExist: ENOENT on Unix (ENOTDIR is "cannot read"); on
         // Windows its own three codes, narrower than std's NotFound.
         Err(e) if gostd::is_not_exist(&e) => Err(format!("workdir not found: {shown}")),
         Err(e) => Err(format!(
-            "cannot read workdir {shown}: stat {shown}: {}",
+            "cannot read workdir {shown}: {STAT_OP} {shown}: {}",
             gostd::os_error_text(&e)
         )),
         Ok(meta) if !meta.is_dir() => Err(format!("workdir is not a directory: {shown}")),
         Ok(_) => Ok(shown),
     }
 }
+
+/// The `PathError` op of a failed Go `os.Stat` that is not "not exist".
+/// On Windows (`os/stat_windows.go`) such a `GetFileAttributesEx` error
+/// falls through to `CreateFile`, whose error is returned; std's
+/// `metadata` returns the error of its own `CreateFileW`. Go's rarer
+/// `FindFirstFile`, `GetFileType` and `GetFileInformationByHandle` ops
+/// are not distinguished.
+const STAT_OP: &str = if cfg!(windows) { "CreateFile" } else { "stat" };
 
 /// Go `os.Getwd`'s error, re-read: the config snapshot keeps only the
 /// failure.

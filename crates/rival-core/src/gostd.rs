@@ -504,22 +504,82 @@ pub fn to_lower(s: &str) -> String {
 /// Go: the text of a `syscall.Errno` — the C `strerror` message with its
 /// first letter lowercased (`is a directory`, `permission denied`). On
 /// Windows Go prints the `FormatMessage` text as it is (`The system cannot
-/// find the file specified.`), which is std's text without its suffix.
+/// find the file specified.`), asking for US English first.
 pub fn os_error_text(err: &std::io::Error) -> String {
     let Some(code) = err.raw_os_error() else {
         return err.to_string();
     };
-    let full = std::io::Error::from_raw_os_error(code).to_string();
-    let text = full
-        .strip_suffix(&format!(" (os error {code})"))
-        .unwrap_or(&full);
-    if cfg!(windows) {
-        return text.to_string();
+    #[cfg(windows)]
+    return windows_errno_text(code as u32, |lang, buf| {
+        system_message(code as u32, lang, buf)
+    });
+    #[cfg(not(windows))]
+    {
+        let full = std::io::Error::from_raw_os_error(code).to_string();
+        let text = full
+            .strip_suffix(&format!(" (os error {code})"))
+            .unwrap_or(&full);
+        let mut chars = text.chars();
+        match chars.next() {
+            Some(first) => first.to_lowercase().chain(chars).collect(),
+            None => String::new(),
+        }
     }
-    let mut chars = text.chars();
-    match chars.next() {
-        Some(first) => first.to_lowercase().chain(chars).collect(),
-        None => String::new(),
+}
+
+/// Go `langid(LANG_ENGLISH, SUBLANG_ENGLISH_US)`.
+#[cfg(any(windows, test))]
+const LANG_ENGLISH_US: u32 = 0x01 << 10 | 0x09;
+
+/// Go `syscall.Errno.error` on Windows (`syscall_windows.go`): the system
+/// message in US English, else in the default language, else
+/// `winapi error #<code>`, with trailing CR/LF trimmed. `format(lang, buf)`
+/// is `FormatMessageW` for `code` into `buf`; it returns the UTF-16 units
+/// written, 0 on failure. Go's buffer is a fixed 300 units, so a longer
+/// message fails both attempts. Go keeps an unpaired surrogate as WTF-8;
+/// a Rust `String` cannot, so it becomes U+FFFD. Go's invented errnos at
+/// `APPLICATION_ERROR` (`EINVAL` and friends) use Go's own table first; a
+/// raw OS code in that range is not mapped here.
+#[cfg(any(windows, test))]
+fn windows_errno_text(code: u32, mut format: impl FnMut(u32, &mut [u16]) -> u32) -> String {
+    let mut b = [0u16; 300];
+    let mut n = format(LANG_ENGLISH_US, &mut b);
+    if n == 0 {
+        n = format(0, &mut b);
+        if n == 0 {
+            return format!("winapi error #{code}");
+        }
+    }
+    let mut n = (n as usize).min(b.len());
+    while n > 0 && (b[n - 1] == u16::from(b'\n') || b[n - 1] == u16::from(b'\r')) {
+        n -= 1;
+    }
+    // Go `UTF16ToString`: stop at the first NUL.
+    let end = b[..n].iter().position(|&u| u == 0).unwrap_or(n);
+    String::from_utf16_lossy(&b[..end])
+}
+
+/// `FormatMessageW` with Go's flags, for [`windows_errno_text`].
+#[cfg(windows)]
+fn system_message(code: u32, lang: u32, buf: &mut [u16]) -> u32 {
+    use windows_sys::Win32::System::Diagnostics::Debug::{
+        FORMAT_MESSAGE_ARGUMENT_ARRAY, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
+        FormatMessageW,
+    };
+    let flags =
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY | FORMAT_MESSAGE_IGNORE_INSERTS;
+    // SAFETY: `buf` is writable for `buf.len()` units; IGNORE_INSERTS
+    // means the null argument array is never read.
+    unsafe {
+        FormatMessageW(
+            flags,
+            std::ptr::null(),
+            code,
+            lang,
+            buf.as_mut_ptr(),
+            buf.len() as u32,
+            std::ptr::null(),
+        )
     }
 }
 
@@ -611,6 +671,133 @@ mod tests {
             .join("x")
             .join("config.yaml");
         assert!(is_not_exist(&std::fs::File::open(missing).unwrap_err()));
+    }
+
+    /// Fake system messages per language id.
+    type Msgs<'a> = &'a [(u32, &'a str)];
+
+    /// A fake `FormatMessageW`: a language missing from `msgs`, or a
+    /// message that does not fit with its NUL, fails; every call is logged
+    /// with its buffer size.
+    fn fake_format<'a>(
+        msgs: Msgs<'a>,
+        calls: &'a mut Vec<(u32, usize)>,
+    ) -> impl FnMut(u32, &mut [u16]) -> u32 + 'a {
+        move |lang, buf| {
+            calls.push((lang, buf.len()));
+            let Some((_, msg)) = msgs.iter().find(|(l, _)| *l == lang) else {
+                return 0;
+            };
+            let units: Vec<u16> = msg.encode_utf16().collect();
+            if units.len() >= buf.len() {
+                return 0;
+            }
+            buf[..units.len()].copy_from_slice(&units);
+            units.len() as u32
+        }
+    }
+
+    // Go syscall_windows.go Errno.error.
+    #[test]
+    fn windows_errno_text_matches_go() {
+        assert_eq!(LANG_ENGLISH_US, 0x409);
+        let cases: &[(&str, u32, Msgs, &str, &[u32])] = &[
+            (
+                "english first",
+                2,
+                &[
+                    (0x409, "The system cannot find the file specified.\r\n"),
+                    (0, "Le fichier spécifié est introuvable.\r\n"),
+                ],
+                "The system cannot find the file specified.",
+                &[0x409],
+            ),
+            (
+                "default language when english is missing",
+                2,
+                &[(0, "Le fichier spécifié est introuvable.\r\n")],
+                "Le fichier spécifié est introuvable.",
+                &[0x409, 0],
+            ),
+            (
+                "unknown code",
+                0x2000_ffff,
+                &[],
+                "winapi error #536936447",
+                &[0x409, 0],
+            ),
+            (
+                "code above i32::MAX prints unsigned",
+                0x8007_0005,
+                &[],
+                "winapi error #2147942405",
+                &[0x409, 0],
+            ),
+            (
+                "only trailing CR and LF are trimmed",
+                1,
+                &[(0x409, "line one\r\nline two. \n\r\r\n")],
+                "line one\r\nline two. ",
+                &[0x409],
+            ),
+            (
+                "stops at a NUL",
+                1,
+                &[(0x409, "ab\0cd\r\n")],
+                "ab",
+                &[0x409],
+            ),
+            (
+                "surrogate pair decodes",
+                1,
+                &[(0x409, "x \u{1f600}\r\n")],
+                "x \u{1f600}",
+                &[0x409],
+            ),
+        ];
+        for &(name, code, msgs, want, want_langs) in cases {
+            let mut calls = Vec::new();
+            let got = windows_errno_text(code, fake_format(msgs, &mut calls));
+            assert_eq!(got, want, "{name}");
+            let langs: Vec<u32> = calls.iter().map(|c| c.0).collect();
+            assert_eq!(langs, want_langs, "{name}");
+            assert!(calls.iter().all(|c| c.1 == 300), "{name}: {calls:?}");
+        }
+    }
+
+    /// Go's fixed 300-unit buffer: a message that does not fit fails both
+    /// attempts (FormatMessageW reports ERROR_INSUFFICIENT_BUFFER).
+    #[test]
+    fn windows_errno_text_does_not_grow_the_buffer() {
+        let long = "x".repeat(300);
+        let msgs = [(0x409, long.as_str()), (0, long.as_str())];
+        let mut calls = Vec::new();
+        let got = windows_errno_text(87, fake_format(&msgs, &mut calls));
+        assert_eq!(got, "winapi error #87");
+        assert_eq!(calls, [(0x409, 300), (0, 300)]);
+        let fits = "y".repeat(299);
+        let msgs = [(0x409, fits.as_str())];
+        assert_eq!(
+            windows_errno_text(87, fake_format(&msgs, &mut Vec::new())),
+            fits
+        );
+    }
+
+    /// The real `FormatMessageW` on the runner (en-US system messages).
+    #[cfg(windows)]
+    #[test]
+    fn os_error_text_formats_windows_errors_like_go() {
+        let text = |code: i32| os_error_text(&std::io::Error::from_raw_os_error(code));
+        assert_eq!(text(1), errtext::IS_A_DIRECTORY);
+        assert_eq!(text(2), errtext::NO_SUCH_FILE);
+        assert_eq!(text(3), errtext::NO_SUCH_PATH);
+        assert_eq!(text(5), "Access is denied.");
+        assert_eq!(
+            text(123),
+            "The filename, directory name, or volume label syntax is incorrect."
+        );
+        // The customer bit: no system message exists.
+        assert_eq!(text(0x2000_ffff), "winapi error #536936447");
     }
 
     const S: i64 = SECOND as i64;

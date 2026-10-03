@@ -315,3 +315,13 @@ The same audit found two remaining error-format gaps. Workdir errors still name 
 ## Final cleanup command — 2026-10-03
 
 Installed Claude Code is2.1.287. `/simplify` is a bundled command, so no local SKILL.md exists. Current [official code-review docs](https://code.claude.com/docs/en/code-review#escalate-to-ultrareview) explicitly retain it as a cleanup-only pass that applies fixes. The older2.1.147 rename does not establish its removal now. Use the plan's `/simplify` after the Rival Codex review; do not substitute an additional correctness review or a cloud ultrareview. Neither final gate has run yet.
+
+## Windows error compatibility — 2026-10-03
+
+Task 5.3 ports Go 1.25.14 `syscall.Errno.error`: FormatMessageW requests US English (0x0409), then language 0, using the same fixed 300-unit buffer. Both failures produce `winapi error #N`. Only terminal CR/LF are trimmed; decoding stops at NUL. The generated Go wrapper does not grow the buffer. Injected formatter tests prove order, fallback, buffer size and unsigned codes. Native assertions cover OS codes 1/2/3/5/123 and an unknown code.
+
+The work-directory NUL branch fails earlier on Windows: filepath.Abs calls syscall.FullPath, whose UTF16 conversion returns EINVAL. The controller's initial os.Stat/`Stat` hypothesis did not apply at this call site. Unix NUL reaches stat and reports invalid argument. Ordinary Windows non-not-found metadata errors use `CreateFile`, matching Go's fallback after GetFileAttributesEx. An invalid-name fixture exercises that branch natively.
+
+Rare stat fallbacks are not distinguished: FindFirstFile after a sharing violation, handle-information errors and special reparse/console paths can differ from Go in operation name or errno. Rust also cannot preserve malformed UTF-16 as Go WTF-8 bytes. Go-invented APPLICATION_ERROR errno values are not mapped; standard OS APIs do not produce those invented values. Other Windows FullPath failures remain a lexical-path compatibility limit.
+
+Controller checks pass 1,231 workspace tests, formatting, strict Clippy, build and Windows-target lint. The latter uses stub C objects and proves types/lints only. Native CI37085956811 passed all three platforms at 1096e31 before Task 5.3: Windows passed 1,140 tests, including process containment, detach streams, stop/owner races, exit code259, FIFO, `.cmd` execution and directory read errors. Final Task5.3 native acceptance remains pending.

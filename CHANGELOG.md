@@ -7,6 +7,7 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 ## [Unreleased]
 
 ### In progress — Rust CLI port
+- Matched Go's Windows error language, fallback text and invalid work-directory errors. Local checks pass 1,231 tests; final native CI remains pending. Rare stat fallback operations remain a documented compatibility limit.
 - Corrected Windows test fixtures for paths, OS errors, executable extensions, temp directories and timestamp precision. Read-only file opens now preserve Go's directory-read behavior. All 1,227 local workspace tests pass; the native rerun remains pending.
 - Added native Windows CI alongside macOS/Linux. Pinned byte-contract inputs to LF and retained all Windows process tests. Local Windows Rust lint checks pass; hosted results remain pending.
 - Added the Windows process layer: owner/provider Jobs, cancellable pipes, console-aware detach, PID-safe stop recovery, executable lookup and path handling. Local validation: 1,227 workspace tests, build and strict Clippy passed. Native Windows checks remain pending.
