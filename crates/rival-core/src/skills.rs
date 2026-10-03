@@ -1,9 +1,8 @@
 //! The skills `rival install` writes for Claude Code and Codex. Go:
 //! `internal/skills/{embed,codex}.go`.
 //!
-//! The Markdown under `crates/rival-core/skills/` is a byte-for-byte copy of
-//! `rival/internal/skills/`. `scripts/bump-skill-versions.sh` bumps both
-//! trees until the Go tree is removed.
+//! The Markdown under `crates/rival-core/skills/` is the only skill tree.
+//! `scripts/bump-skill-versions.sh` bumps its versions.
 
 use include_dir::{Dir, include_dir};
 

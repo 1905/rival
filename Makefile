@@ -23,7 +23,7 @@ soak:
 	python3 app/scripts/soak_test.py
 
 # CLI (Rust). `rival version` prints RIVAL_VERSION; the default is the git
-# description, like the Go Makefile's VERSION.
+# description, like the removed Go Makefile's VERSION.
 RIVAL_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 # Release build of the CLI for this host: target/release/rival.
@@ -34,8 +34,9 @@ cli-build:
 cli-install:
 	RIVAL_VERSION=$(RIVAL_VERSION) cargo install --locked --path crates/rival
 
-# Workspace tests plus the release-script and release-config tests (the
-# config tests need PyYAML).
+# Workspace tests plus the release-script and release-config tests. The
+# config tests need PyYAML: install scripts/requirements-test.txt into the
+# python3 on PATH (a venv), as CI does.
 cli-test:
 	cargo test --workspace --locked
 	python3 -m unittest discover -s scripts -p 'test_*.py'

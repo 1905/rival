@@ -6,17 +6,16 @@
 
 Rival sends your code, or your plan, to a different AI model for an independent review, and it runs in the background while you keep working.
 
-**Install**
+**Install on macOS or Linux**
 
 ```bash
 brew install 1905/tap/rival                 # the CLI (macOS and Linux)
-rival install                               # skills for Claude Code (and Codex, when detected)
-brew install --cask 1905/tap/rival-app      # Rival.app, the macOS menu bar and window viewer
+rival install                             # skills for Claude Code (and Codex, when detected)
 ```
 
-Windows zips start with the first Rust CLI release; see [Install and setup](#install-and-setup). Until then, build from source.
+See [macOS](#macos), [Linux](#linux), or [Windows](#windows) for full installation steps. Windows ZIP downloads start with the first Rust CLI release. Until then, use the [source build](#build-from-source).
 
-Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`. A DMG is also attached to each release; see [Rival.app](#rivalapp).
+The optional macOS viewer installs separately: `brew install --cask 1905/tap/rival-app`. Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`. See [Rival.app](#rivalapp) for the DMG option.
 
 **The five most used skills**
 
@@ -60,48 +59,170 @@ Everything below is checked against the `rival` binary and its source. Commands,
 
 ### Install and setup
 
+Choose your system below. The CLI runs on macOS, Linux and Windows. Rival.app is available only on macOS.
+
+**Release availability:** v4.1.1 and earlier contain the Go CLI for macOS and Linux. The Rust CLI and Windows archives are not published yet. Build this checkout from source to use them now.
+
+#### macOS
+
+With [Homebrew](https://docs.brew.sh/Installation), on Apple Silicon or Intel:
+
 ```bash
 brew install 1905/tap/rival
-rival install                   # --target auto (default)
-rival install --target codex    # explicit Codex install
-rival install --force           # overwrite without prompting
-rival update                    # brew upgrade 1905/tap/rival, then reinstall skills
+rival version
+rival install
 ```
 
-`rival install` flags:
+To install without Homebrew:
+
+1. Download the matching archive and `checksums.txt` from the same [release](https://github.com/1905/rival/releases).
+2. Open Terminal in the download folder. Select your archive:
+
+| Mac | Archive |
+|---|---|
+| Apple Silicon (M1 or later) | `rival_darwin_arm64.tar.gz` |
+| Intel | `rival_darwin_amd64.tar.gz` |
+
+```bash
+archive=rival_darwin_arm64.tar.gz    # use rival_darwin_amd64.tar.gz on Intel
+shasum -a 256 "$archive"
+```
+
+Compare the hash with the matching line in `checksums.txt`. If it matches, install:
+
+```bash
+rival_extract=$(mktemp -d)
+tar -xzf "$archive" -C "$rival_extract"
+mkdir -p "$HOME/.local/bin"
+install -m 755 "$rival_extract/rival" "$HOME/.local/bin/rival"
+export PATH="$HOME/.local/bin:$PATH"
+rival version
+rival install
+```
+
+Add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zprofile` to keep the command available in new terminals. If you use Bash, add it to `~/.bash_profile` instead.
+
+#### Linux
+
+With [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux):
+
+```bash
+brew install 1905/tap/rival
+rival version
+rival install
+```
+
+To install without Homebrew, download your archive and `checksums.txt` from the same [release](https://github.com/1905/rival/releases). Run `uname -m` to identify your CPU:
+
+| `uname -m` | Archive |
+|---|---|
+| `x86_64` (Intel or AMD) | `rival_linux_amd64.tar.gz` |
+| `aarch64` or `arm64` | `rival_linux_arm64.tar.gz` |
+
+The Rust Linux archives require glibc. They do not target Alpine or other musl-based systems.
+
+In the download folder:
+
+```bash
+archive=rival_linux_amd64.tar.gz    # use rival_linux_arm64.tar.gz on ARM64
+sha256sum "$archive"
+```
+
+Compare the hash with the matching line in `checksums.txt`. If it matches, install:
+
+```bash
+rival_extract=$(mktemp -d)
+tar -xzf "$archive" -C "$rival_extract"
+mkdir -p "$HOME/.local/bin"
+install -m 755 "$rival_extract/rival" "$HOME/.local/bin/rival"
+export PATH="$HOME/.local/bin:$PATH"
+rival version
+rival install
+```
+
+Add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file (`~/.bashrc` for Bash, `~/.zshrc` for Zsh).
+
+#### Windows
+
+Windows ZIP archives will be available with the first Rust CLI release. Until then, use [Build from source](#build-from-source).
+
+Once published, download your ZIP and `checksums.txt` from the same [release](https://github.com/1905/rival/releases). In Settings → System → About, check **System type**:
+
+| System type | Archive |
+|---|---|
+| x64-based processor (Intel or AMD) | `rival_windows_amd64.zip` |
+| ARM-based processor | `rival_windows_arm64.zip` |
+
+Open PowerShell in the download folder:
+
+```powershell
+$archive = '.\rival_windows_amd64.zip'   # use rival_windows_arm64.zip on ARM64
+Get-FileHash $archive -Algorithm SHA256
+```
+
+Compare the hash with the matching line in `checksums.txt`. If it matches, extract the files and add the folder to your user PATH:
+
+```powershell
+$rivalBin = Join-Path $env:LOCALAPPDATA 'Programs\Rival'
+Expand-Archive -LiteralPath $archive -DestinationPath $rivalBin -Force
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $rivalBin) {
+    [Environment]::SetEnvironmentVariable('Path', "$rivalBin;$userPath", 'User')
+}
+$env:Path = "$rivalBin;$env:Path"
+rival version
+rival install
+```
+
+No administrator account is needed. New terminals inherit the saved PATH. Rival stores its state in `%USERPROFILE%\.rival`.
+
+The binary is not code-signed. SmartScreen or antivirus software can warn on the first run. If Windows blocks the verified download, run `Unblock-File (Join-Path $rivalBin 'rival.exe')` and try again.
+
+#### Build from source
+
+Install [Rust through rustup](https://rust-lang.org/tools/install/) and Git. The repository selects Rust 1.98. Follow rustup's platform instructions for the native linker and C build tools. On Windows, use the MSVC toolchain and install its Visual Studio C++ build prerequisites.
+
+These commands work in a Unix shell or PowerShell:
+
+```text
+git clone https://github.com/1905/rival.git
+cd rival
+cargo install --locked --path crates/rival
+rival version
+rival install
+```
+
+Cargo installs to `~/.cargo/bin` on macOS/Linux or `%USERPROFILE%\.cargo\bin` on Windows. If `rival` is not found, open a new terminal or add that directory to PATH.
+
+A plain Cargo build reports version `dev`. On macOS/Linux, `make cli-install` sets the version from `git describe`. `make install` installs the separate Mac app.
+
+#### Updates and skills
+
+For a Homebrew installation, run `rival update`. It checks the latest release, upgrades through Homebrew when needed, and refreshes the skills.
+
+For a manual archive installation, repeat your OS's download, checksum and extraction steps with the new release. Then run `rival install` again. For a source installation, update the checkout and repeat `cargo install --locked --path crates/rival`. Binary upgrades through `rival update` require Homebrew.
+
+Each Rust release archive contains `rival` (`rival.exe` on Windows), `LICENSE`, `README.md` and `licenses/Go-LICENSE`. Keep the license files with redistributed copies.
+
+```bash
+rival install                   # Claude Code, plus Codex when detected
+rival install --target codex    # explicit Codex install
+rival install --target all      # both sets of skills
+rival install --force           # overwrite without prompting
+```
 
 | Flag | Default | Effect |
 |---|---|---|
 | `--target` | `auto` | `auto`, `claude`, `codex` or `all`. |
 | `--force` | off | Overwrite installed skills without prompting. |
 
-- Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`.
+- Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
 - `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable`, `rival-antislop-plan` and older names.
-- `rival update` checks the latest GitHub release. If the binary is current, it only refreshes the skills. The upgrade itself needs Homebrew.
 
-Release archives. From the first Rust CLI release onward, each [release](https://github.com/1905/rival/releases) has one archive per system, plus `checksums.txt` with the SHA-256 of each archive. v4.1.1 and earlier are Go builds with the four macOS and Linux archives only.
+#### Provider runtimes
 
-| System | Archive |
-|---|---|
-| macOS | `rival_darwin_arm64.tar.gz`, `rival_darwin_amd64.tar.gz` |
-| Linux | `rival_linux_amd64.tar.gz`, `rival_linux_arm64.tar.gz` |
-| Windows | `rival_windows_amd64.zip`, `rival_windows_arm64.zip` |
-
-Each archive contains the `rival` binary (`rival.exe` on Windows), `LICENSE`, `README.md` and `licenses/Go-LICENSE`. The Linux binaries link against glibc.
-
-Windows install (from the first Rust CLI release):
-
-1. Download `rival_windows_amd64.zip`, or `rival_windows_arm64.zip` on an ARM device.
-2. Compare its hash with `checksums.txt`: `Get-FileHash .\rival_windows_amd64.zip -Algorithm SHA256`.
-3. Extract `rival.exe` to a folder on your `PATH`.
-4. Run `rival install`.
-
-The Windows binary is not code-signed. SmartScreen or antivirus software can warn on the first run. If Windows blocks the file as downloaded from the internet, `Unblock-File .\rival.exe` removes that mark. `rival update` does not work without Homebrew: to update, download the new zip and run `rival install` again. Rival stores its state in `%USERPROFILE%\.rival`.
-
-From source (Rust 1.98, from a clone of this repository): `make cli-install && rival install`. Without `make`, for example on Windows, run `cargo install --locked --path crates/rival`. Both install `rival` to `~/.cargo/bin`. `make cli-install` sets the version from `git describe`; plain `cargo install` reports `dev` unless `RIVAL_VERSION` is set.
-
-Provider runtimes. Install only the ones for the models you use.
+Install and authenticate the runtime for each model you use. Rival does not include these programs.
 
 | Model | Runtime and authentication |
 |---|---|
@@ -447,13 +568,16 @@ Detail keys:
 
 | Key | Action |
 |---|---|
-| `1`, `2`, `3` | Output, Prompt, Info tabs. |
+| `1`, `2`, `3`, `4` | Result, Raw, Prompt, Info tabs. |
+| `j`/`k`, `Enter`/`Space` on Result | Select a finding, then expand or collapse it. |
 | `[`, `]` | Previous and next member of a group. |
 | `f` | Follow the live output. |
 | `/`, `n`, `N` | Search the output, next match, previous match. |
 | `o` | Open the log file. |
-| `x` | Stop the run. It opens a confirm bar. Only `y` sends SIGTERM; `n` or `Esc` cancels. |
+| `x` | Open the stop confirmation. `y` stops the run; `n` or `Esc` cancels. Unix sends SIGTERM. Windows terminates the owner and its provider tree. |
 | `Esc` | Back to the list. |
+
+Finished runs open on Result. Live runs open on Raw. Result shows findings by severity or formatted Markdown. If parsing fails, it offers the raw log.
 
 ### Rival.app
 
