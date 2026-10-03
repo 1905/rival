@@ -97,6 +97,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 | `.github/workflows/ci.yml` (new or extended) | `cargo test` on macOS, Linux, Windows; scenario runner on macOS + Linux; Swift decode test of Rust-written sessions on macOS (required from P1). |
 | `.github/workflows/release.yml` | P6: goreleaser Go builds → Rust builds for 6 targets (goreleaser rust builder or cargo-dist, chosen in the plan), same formula update. |
 | `Makefile`, `README.md`, `CHANGELOG.md` | P6: build/test commands, Windows install note. |
+| `docs/releasing.md`, `.claude/skills/rival-release/SKILL.md` | Keep release instructions usable after Go retirement: root Rust checks, six artifacts, snapshot gate and unchanged app release flow. Release execution still requires a separate request. |
 | `rival/**` | P6: moved out (mv to /tmp/trash, `git add -A`). |
 
 ## Tests
@@ -127,7 +128,7 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - Notarization or Windows code signing (unsigned binaries; note in README).
 - New commands or flag changes.
 
-## As-built notes — implementation in progress, 2026-10-02
+## As-built notes — implementation in progress, 2026-10-03
 
 - `.env` uses a direct godotenv v1.5.1 parser port. dotenvy changed duplicate-key and expansion behavior.
 - `gostd.rs` shares Go duration, quoting, case-folding and error-text semantics. Its Unicode 15.0.0 tables come from the release toolchain, Go 1.25.14, with the BSD license retained in `licenses/Go-LICENSE`.
@@ -135,13 +136,15 @@ Expectations are written from the Go source and Go tests (messages, formats, cod
 - YAML uses serde-saphyr 1.3.0. Compatibility limit: Rival validation messages and the `parse <path>:` prefix match Go; malformed-YAML parser details use Rust's wording.
 - P3 is merged at `bb95462`. All 84 scenarios pass on macOS/Linux; two real Rust-driven reviews rendered in the unchanged Swift app.
 - P4 is merged at `fff4ac3`. The interactive TUI and Result tab passed 1,205 workspace tests, seven real terminal cleanup cases, a real-watcher transition check and 33 screenshot checks. Hosted macOS/Linux CI passed all 84 scenarios and Swift decoding. The terminal uses the app's dim palette and an eight-entry Result cache.
-- P5 implementation correction, not yet verified: an owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. This replaces the original flag recipe and closes the documented suspended-child orphan interval; plan v2.3 carries native regression requirements.
+- P5 owner cleanup Job protects provider creation before nested per-provider Job assignment. Console-aware detach flags preserve the approved stream behavior. Native startup-race, owner-exit, timeout, stop and mixed-console-stream tests passed in CI37086794043.
 
 - P5 process correction: the missing macOS pipe/spawn synchronization is implemented. An isolated forced-overlap regression detects a deliberately bypassed guard. All 1,207 workspace tests and seven terminal checks pass locally. Hosted macOS/Linux CI also passed at `208842e`. The guard covers Rival calls, not foreign libraries. The intermittent P4 cancellation failure remains unexplained.
 
-- P5 Windows code and native helper tests are implemented, with native CI pending. Local checks pass 1,227 workspace tests. The implementation adds `winpath.rs`, Windows process/detach/stop helpers, cancellable overlapped pipes and OS temp-directory calls. Process identity remains separate from running state, including exit code 259. Console-less providers suppress new console windows; one-shot git/glab launches retain standard flags. Windows environment lookup folds ASCII names only. UNC lexical paths are tested; UNC network stat and native TUI restoration are not verified.
+- P5 is merged at `cb182c1`. All three native CI jobs passed; Windows passed 1,145 tests. Local checks passed 1,231 workspace tests. The implementation adds `winpath.rs`, Windows process/detach/stop helpers, cancellable overlapped pipes and OS temp-directory calls. Process identity remains separate from running state, including exit code 259. Console-less providers suppress new console windows; one-shot git/glab launches retain standard flags. Windows environment lookup folds ASCII names only. UNC lexical paths are tested; UNC network stat and native TUI restoration are not verified.
 - P5 CI adds `windows-latest` and `.gitattributes` for LF byte contracts. An isolated autocrlf clone changed 380 contract inputs without the rules and zero with them. All Rust tests and strict Clippy run on Windows. Unix scenarios and Go checks remain macOS/Linux; Swift decoding remains macOS. Each job has a 40-minute outer timeout.
-- P5 native process acceptance passed at `30dec1f`; shared Windows fixtures still needed correction. Go-compatible directory opening is now shared by CLI file readers. Plan v2.5 isolates the remaining Windows error-language and operation-name corrections in Task 5.3. CI37085956811 passed Windows, macOS and Linux at 1096e31. Task 5.3 adds English-first Windows errors and source-correct NUL/invalid-name workdir branches. Local checks pass 1,231 tests; its final native acceptance remains pending. Rare stat fallback operations and malformed UTF-16 remain documented limits.
+- P5 native process acceptance passed at `30dec1f`; shared Windows fixtures still needed correction. Go-compatible directory opening is now shared by CLI file readers. Plan v2.5 isolates the remaining Windows error-language and operation-name corrections in Task 5.3. CI37085956811 passed Windows, macOS and Linux at 1096e31. Task 5.3 adds English-first Windows errors and source-correct NUL/invalid-name workdir branches. Final native acceptance passed in CI37086794043, including both workdir branches and real Windows error formatting. Rare stat fallback operations and malformed UTF-16 remain documented limits.
+
+- P6 release setup is implemented. Root `.goreleaser.yaml` uses cargo-zigbuild for four Unix targets and cargo-xwin for two MSVC targets. A shared composite action installs build tools. Every manual workflow run is an unpublished snapshot with six native archive checks. Tag pushes retain CLI/formula and app/cask publication. Windows builds request a static C runtime; actual PE imports remain unverified. Thirty-six archive/config tests pass locally. Go retirement, all six hosted archives and final review remain pending.
 
 ## Rollout
 
