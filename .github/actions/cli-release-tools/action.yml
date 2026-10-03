@@ -31,8 +31,9 @@ runs:
       shell: bash
       run: cargo install --locked cargo-zigbuild@0.23.4 cargo-xwin@0.23.1
 
-    # cargo-xwin needs clang-cl, llvm-lib and lld-link. Homebrew ships lld
-    # separately from llvm. The path goes to the Windows build entry only.
+    # cargo-xwin runs in clang mode (.goreleaser.yaml XWIN_CROSS_COMPILER=clang)
+    # and needs clang, llvm-lib and lld-link. Homebrew ships lld separately
+    # from llvm. The path goes to the Windows build entry only.
     - name: LLVM for cargo-xwin
       shell: bash
       run: |
@@ -57,11 +58,14 @@ runs:
         zig version
         cargo-zigbuild --version
         cargo-xwin --version
-        # GoReleaser runs `cargo-xwin build --target=<triple> ...` directly.
+        # GoReleaser runs `cargo-xwin build --target=<triple> ...` directly,
+        # with XWIN_CROSS_COMPILER=clang for the Windows entry.
         cargo-xwin build --help > /dev/null
         (
           PATH="$RIVAL_LLVM_BIN:$PATH"
-          clang-cl --version
+          echo "cargo-xwin cross compiler: clang"
+          command -v clang
+          clang --version
           command -v llvm-lib
           lld-link --version
         )

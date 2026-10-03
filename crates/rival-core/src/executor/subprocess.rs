@@ -24,6 +24,7 @@ use anyhow::{anyhow, bail};
 
 use super::process::{self, Abort, ExitState, Io, KillOutcome, ProcessHandle};
 use crate::cancel::{CancelFunc, Context};
+use crate::envname;
 use crate::gitscope;
 use crate::gostd;
 use crate::logging::{self, Event};
@@ -107,30 +108,43 @@ pub struct Request<'a> {
 }
 
 /// Go `safeEnv`: `environ` without Git repository overrides and without the
-/// blocked prefixes that a repo-local .env could inject.
+/// blocked prefixes that a repo-local .env could inject. Windows compares
+/// the prefixes case-insensitively (see [`safe_env_case`]).
 pub fn safe_env(environ: &[OsString]) -> Vec<OsString> {
+    safe_env_case(cfg!(windows), environ)
+}
+
+/// [`safe_env`] with an explicit name rule (see [`crate::envname`]). Go's
+/// `strings.HasPrefix` is case-sensitive; Windows env names are not, so
+/// there `Node_Options` must go as `NODE_OPTIONS` does.
+pub(crate) fn safe_env_case(case_insensitive: bool, environ: &[OsString]) -> Vec<OsString> {
     gitscope::repository_env(environ)
         .into_iter()
         .filter(|kv| {
-            let bytes = kv.as_encoded_bytes();
             !BLOCKED_ENV_PREFIXES
                 .iter()
-                .any(|prefix| bytes.starts_with(prefix.as_bytes()))
+                .any(|prefix| envname::has_prefix(case_insensitive, kv, prefix))
         })
         .collect()
+}
+
+/// [`drop_matches_case`] with the host's name rule.
+#[cfg(test)]
+pub(crate) fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
+    drop_matches_case(cfg!(windows), kv, drop_env)
 }
 
 /// Go `dropMatches`: whether `kv` (a `KEY=VALUE` entry) is named by
 /// `drop_env`. An entry ending in `_` is a prefix match ("AWS_" drops every
 /// AWS_* var — exact name lists rot as providers add credential vars); any
-/// other entry matches that exact variable name.
-pub(crate) fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
-    let bytes = kv.as_encoded_bytes();
+/// other entry matches that exact variable name. `case_insensitive` (the
+/// Windows rule) compares names case-insensitively (see [`crate::envname`]).
+pub(crate) fn drop_matches_case(case_insensitive: bool, kv: &OsStr, drop_env: &[&str]) -> bool {
     drop_env.iter().any(|name| {
         if name.ends_with('_') {
-            bytes.starts_with(name.as_bytes())
+            envname::has_prefix(case_insensitive, kv, name)
         } else {
-            bytes.starts_with(name.as_bytes()) && bytes.get(name.len()) == Some(&b'=')
+            envname::has_prefix(case_insensitive, kv, &format!("{name}="))
         }
     })
 }
@@ -138,9 +152,15 @@ pub(crate) fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
 /// The env the child gets: Go's `append(base, env...)` after `safeEnv` and
 /// `dropEnv`.
 pub fn child_env(req: &Request<'_>) -> Vec<OsString> {
-    let mut base = safe_env(req.environ);
+    child_env_case(cfg!(windows), req)
+}
+
+/// [`child_env`] with an explicit name rule. Only the inherited env is
+/// filtered; the trusted `req.env` entries are appended unchanged.
+pub(crate) fn child_env_case(case_insensitive: bool, req: &Request<'_>) -> Vec<OsString> {
+    let mut base = safe_env_case(case_insensitive, req.environ);
     if !req.drop_env.is_empty() {
-        base.retain(|kv| !drop_matches(kv, req.drop_env));
+        base.retain(|kv| !drop_matches_case(case_insensitive, kv, req.drop_env));
     }
     base.extend(req.env.iter().map(OsString::from));
     base
@@ -894,4 +914,192 @@ fn copy_stderr(
             .msg("failed to copy stderr to log");
     }
     err
+}
+
+/// Both name rules, on every host: `true` is the case-insensitive rule (the
+/// OS's on Windows, the ASCII model elsewhere), `false` Go's (and Unix's)
+/// case-sensitive one. Every name here is ASCII, so both agree.
+#[cfg(test)]
+mod env_case_tests {
+    use super::*;
+
+    fn environ(items: &[&str]) -> Vec<OsString> {
+        items.iter().map(OsString::from).collect()
+    }
+
+    /// `head`, one unpaired surrogate (Windows) or invalid byte (Unix), then
+    /// `tail`.
+    fn non_utf8(head: &str, tail: &str) -> OsString {
+        #[cfg(unix)]
+        let s = {
+            use std::os::unix::ffi::OsStringExt;
+            let mut b = head.as_bytes().to_vec();
+            b.push(0xff);
+            b.extend_from_slice(tail.as_bytes());
+            OsString::from_vec(b)
+        };
+        #[cfg(windows)]
+        let s = {
+            use std::os::windows::ffi::OsStringExt;
+            let mut w: Vec<u16> = head.encode_utf16().collect();
+            w.push(0xD800);
+            w.extend(tail.encode_utf16());
+            OsString::from_wide(&w)
+        };
+        assert!(s.to_str().is_none(), "{s:?} is valid UTF-8");
+        s
+    }
+
+    /// (entry, kept on Windows, kept on Unix).
+    fn safe_env_cases() -> Vec<(OsString, bool, bool)> {
+        let mut cases: Vec<(OsString, bool, bool)> = [
+            ("PATH=/usr/bin", true, true),
+            ("Node_Options=--require=./payload.cjs", false, true),
+            ("node_options=--inspect", false, true),
+            ("NODE_OPTIONS_X=1", false, false),
+            ("Https_Proxy=http://evil:8080", false, true),
+            ("hTTP_pROXY=http://evil", false, true),
+            ("http_proxy=http://evil", false, false),
+            ("No_Proxy=*", false, true),
+            ("All_Proxy=socks5://evil", false, true),
+            ("Ld_Preload=evil.so", false, true),
+            ("Dyld_Insert_Libraries=evil", false, true),
+            (r#"Opencode_Permission={"bash":"allow"}"#, false, true),
+            ("Kimi_Api=sk", false, true),
+            ("Moonshot_Api_Key=sk", false, true),
+            ("Grok_Home=evil", false, true),
+            ("Xai_Api_Key=sk", false, true),
+            // Near names: no blocked prefix in any case.
+            ("Node_Option=near", true, true),
+            ("Https_Proxi=near", true, true),
+            ("Ld_Preloa=near", true, true),
+            ("Opencode=near", true, true),
+            ("Grokx_Home=near", true, true),
+            ("Xai=near", true, true),
+            ("NODE=short", true, true),
+            ("Rival_Keep=yes", true, true),
+        ]
+        .into_iter()
+        .map(|(kv, win, unix)| (OsString::from(kv), win, unix))
+        .collect();
+        cases.push((non_utf8("Node_Options=", "x"), false, true));
+        cases.push((non_utf8("RIVAL_", "=1"), true, true));
+        cases
+    }
+
+    fn kept(cases: &[(OsString, bool, bool)], windows: bool) -> Vec<OsString> {
+        cases
+            .iter()
+            .filter(|(_, win, unix)| if windows { *win } else { *unix })
+            .map(|(kv, _, _)| kv.clone())
+            .collect()
+    }
+
+    #[test]
+    fn safe_env_windows_rule_blocks_mixed_case_prefixes() {
+        let cases = safe_env_cases();
+        let input: Vec<OsString> = cases.iter().map(|(kv, _, _)| kv.clone()).collect();
+        assert_eq!(safe_env_case(true, &input), kept(&cases, true));
+    }
+
+    #[test]
+    fn safe_env_unix_rule_keeps_mixed_case_names() {
+        let cases = safe_env_cases();
+        let input: Vec<OsString> = cases.iter().map(|(kv, _, _)| kv.clone()).collect();
+        assert_eq!(safe_env_case(false, &input), kept(&cases, false));
+    }
+
+    #[test]
+    fn drop_matches_follows_the_name_rule() {
+        let drop = ["ANTHROPIC_API_KEY", "AWS_", "CLAUDECODE", ""];
+        // (entry, dropped on Windows, dropped on Unix).
+        let cases = [
+            ("ANTHROPIC_API_KEY=k", true, true),
+            ("Anthropic_Api_Key=k", true, false),
+            ("anthropic_api_key=k", true, false),
+            ("ANTHROPIC_API_KEY_2=k", false, false),
+            ("Anthropic_Api_Key_2=k", false, false),
+            ("Anthropic_Api_Ke=k", false, false),
+            ("Anthropic_Api_Key", false, false),
+            ("AWS_REGION=x", true, true),
+            ("aws_session_token=x", true, false),
+            ("Aws_Region=x", true, false),
+            ("AwsX=x", false, false),
+            ("ClaudeCode=1", true, false),
+            ("ClaudeCodeX=1", false, false),
+            ("=C:=C:\\", true, true),
+            ("PATH=/usr/bin", false, false),
+        ];
+        for (kv, win, unix) in cases {
+            let kv = OsStr::new(kv);
+            assert_eq!(drop_matches_case(true, kv, &drop), win, "windows {kv:?}");
+            assert_eq!(drop_matches_case(false, kv, &drop), unix, "unix {kv:?}");
+        }
+        let bad = non_utf8("Aws_", "=x");
+        assert!(drop_matches_case(true, &bad, &drop));
+        assert!(!drop_matches_case(false, &bad, &drop));
+    }
+
+    #[test]
+    fn child_env_filters_inherited_names_and_keeps_trusted_entries() {
+        let inherited = environ(&[
+            "PATH=/usr/bin",
+            "Node_Options=--require=./payload.cjs",
+            "Opencode_Config_Content=evil",
+            "Anthropic_Api_Key=secret",
+            "aws_session_token=secret",
+            "Anthropic_Api_Key_2=keep",
+            "Rival_Mode=inherited",
+            "Rival_Keep=yes",
+        ]);
+        let trusted = [
+            "OPENCODE_CONFIG_CONTENT=trusted".to_string(),
+            "RIVAL_MODE=trusted".to_string(),
+        ];
+        let req = Request {
+            binary: "provider",
+            args: &[],
+            env: &trusted,
+            prompt: "",
+            drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
+            environ: &inherited,
+        };
+
+        let windows = child_env_case(true, &req);
+        assert_eq!(
+            windows,
+            environ(&[
+                "PATH=/usr/bin",
+                "Anthropic_Api_Key_2=keep",
+                "Rival_Mode=inherited",
+                "Rival_Keep=yes",
+                "OPENCODE_CONFIG_CONTENT=trusted",
+                "RIVAL_MODE=trusted",
+            ])
+        );
+        // The trusted entry wins over the inherited one with the same name.
+        assert_eq!(
+            dedup_env_case(true, &windows).unwrap(),
+            environ(&[
+                "PATH=/usr/bin",
+                "Anthropic_Api_Key_2=keep",
+                "Rival_Keep=yes",
+                "OPENCODE_CONFIG_CONTENT=trusted",
+                "RIVAL_MODE=trusted",
+            ])
+        );
+
+        let mut unix = inherited.clone();
+        unix.extend(trusted.iter().map(OsString::from));
+        assert_eq!(child_env_case(false, &req), unix);
+    }
+
+    #[test]
+    fn platform_wrappers_use_the_host_rule() {
+        let cases = safe_env_cases();
+        let input: Vec<OsString> = cases.iter().map(|(kv, _, _)| kv.clone()).collect();
+        assert_eq!(safe_env(&input), kept(&cases, cfg!(windows)));
+        let kv = OsStr::new("Anthropic_Api_Key=k");
+        assert_eq!(drop_matches(kv, &["ANTHROPIC_API_KEY"]), cfg!(windows));
+    }
 }

@@ -14,7 +14,9 @@ Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 
 - Configured six release archives: macOS, Linux and Windows on amd64/arm64. Manual workflow runs build unpublished archives, render the Homebrew formula and execute each packaged version on a matching host.
 - Documented installation, checksums, PATH setup, updates and source builds for every OS. Skill version updates now target only the Rust assets.
 - Blocked repository `.env` files from setting the Rust-only `RIVAL_HOME` state override. Explicit process-environment values still work. Six direct/detached fake-provider checks passed.
-- Local checks: 1,231 Rust tests, 69 runner tests, 36 release checks, formatting, strict Clippy and build passed. Retained byte contracts are unchanged. Three-OS CI passed before the state-override fix. The requested single Claude review is complete; final CI, packaging, Codex review and cleanup remain pending.
+- Windows inherited-environment filters now use the operating system's case-insensitive comparison. Unix comparisons stay exact. Native Windows alias tests are pending CI.
+- Selected cargo-xwin's clang mode after the first snapshot failed on Windows ARM64. The six-target package rebuild is pending.
+- Prior checks: 1,231 Rust tests, 69 runner tests, 36 release checks and three-OS CI passed. Both final model reviews are complete. The latest focused checks and strict Clippy passed on Dell; 37 release checks passed. Final CI, packaging and code cleanup remain pending.
 - The published CLI remains Go v4.1.1. Rust releases are not published yet. YAML parser details differ; documented inherited Go bugs remain unchanged. Windows UNC network access and native TUI restoration are not verified.
 
 ### Changed

@@ -565,18 +565,8 @@ mod tests {
         );
         assert_eq!((out, err), (b"<><a><><a>".to_vec(), Ok(())));
 
-        let (out, err) = run(&c, "env", &[], Output::Combined);
-        assert_eq!(err, Ok(()));
-        // GNU env prints the entry without `=`. uutils env drops it from
-        // its listing, so both listings are valid here. The Linux check
-        // below proves the entry reaches the child either way.
-        let with_noeq = b"PATH=/usr/bin:/bin\nNOEQ\nB=\xff\xfe\nEMPTY=\nZ=2\n".to_vec();
-        let without_noeq = b"PATH=/usr/bin:/bin\nB=\xff\xfe\nEMPTY=\nZ=2\n".to_vec();
-        assert!(
-            out == with_noeq || out == without_noeq,
-            "env listing: {out:?}"
-        );
-
+        // Linux: `cat` is the direct child and prints its own kernel env
+        // block. uutils `env` hides the `NOEQ` entry when printing.
         #[cfg(target_os = "linux")]
         {
             let (out, err) = run(&c, "cat", &["/proc/self/environ"], Output::Combined);
@@ -584,6 +574,15 @@ mod tests {
             assert_eq!(
                 out,
                 b"PATH=/usr/bin:/bin\0NOEQ\0B=\xff\xfe\0EMPTY=\0Z=2\0".to_vec()
+            );
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let (out, err) = run(&c, "env", &[], Output::Combined);
+            assert_eq!(err, Ok(()));
+            assert_eq!(
+                out,
+                b"PATH=/usr/bin:/bin\nNOEQ\nB=\xff\xfe\nEMPTY=\nZ=2\n".to_vec()
             );
         }
 

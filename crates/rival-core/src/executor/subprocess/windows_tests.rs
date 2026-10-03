@@ -39,6 +39,10 @@ const MODE: &str = "RIVAL_WIN_HELPER";
 const REPORT: &str = "RIVAL_WIN_REPORT";
 const HOME: &str = "RIVAL_WIN_HOME";
 const ARGS_MARK: &str = "RIVAL-ARGS";
+/// `;`-separated names the `env` helper looks up through the OS.
+const LOOKUP: &str = "RIVAL_WIN_LOOKUP";
+/// Report key prefix of those lookups.
+const LOOKUP_KEY: &str = "lookup:";
 /// Every wait for a helper is bounded by this.
 const BOUND: Duration = Duration::from_secs(30);
 /// How long a helper that waits to be killed lives at most.
@@ -356,6 +360,21 @@ fn windows_helper() {
             if let Some(report) = report {
                 write_report(&report, &[format!("args={}", args.join("\u{1f}"))]);
             }
+        }
+        "env" => {
+            let mut lines: Vec<String> = std::env::vars_os()
+                .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
+                .collect();
+            // The OS's own lookup (GetEnvironmentVariableW) of each name.
+            if let Some(names) = std::env::var(LOOKUP).ok().filter(|n| !n.is_empty()) {
+                for name in names.split(';') {
+                    lines.push(match std::env::var_os(name) {
+                        Some(v) => format!("{LOOKUP_KEY}{name}=set:{}", v.to_string_lossy()),
+                        None => format!("{LOOKUP_KEY}{name}=unset"),
+                    });
+                }
+            }
+            write_report(&report.unwrap(), &lines);
         }
         "owner-race" => owner_race(&report.unwrap()),
         "owner-exit" => owner_exit(&report.unwrap()),
@@ -712,6 +731,272 @@ fn cmd_shim_keeps_argv_and_redirected_stdio() {
     let log = fx.log();
     assert!(log.contains("out:the prompt"), "{log}");
     assert!(log.contains("err:the prompt"), "{log}");
+}
+
+/// Windows env names are case-insensitive: mixed-case inherited variants of
+/// the blocked prefixes and dropped credentials never reach the provider,
+/// near names survive, and the trusted adapter entries win.
+#[test]
+fn child_env_drops_mixed_case_inherited_names() {
+    let mut fx = Fixture::new();
+    let report = fx.path("env");
+    let env = environ(
+        fx.dir.path(),
+        &[
+            ("Node_Options", "--require=./payload.cjs"),
+            ("Https_Proxy", "http://evil:8080"),
+            ("Opencode_Permission", r#"{"bash":"allow"}"#),
+            ("Opencode_Config_Content", "evil"),
+            ("Xai_Api_Key", "evil"),
+            ("Anthropic_Api_Key", "evil"),
+            ("aws_session_token", "evil"),
+            ("Anthropic_Api_Key_2", "keep"),
+            ("Node_Option", "near"),
+            ("Rival_Keep", "yes"),
+            ("Rival_Mode", "inherited"),
+        ],
+    );
+    let provider_env = [
+        format!("{MODE}=env"),
+        format!("{REPORT}={}", report.display()),
+        "OPENCODE_CONFIG_CONTENT=trusted".to_string(),
+        "RIVAL_MODE=trusted".to_string(),
+    ];
+    let args = helper_args();
+    let binary = exe();
+    let req = Request {
+        binary: &binary,
+        args: &args,
+        env: &provider_env,
+        prompt: "",
+        drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
+        environ: &env,
+    };
+    let (ctx, _cancel) = Context::background().with_timeout(BOUND);
+    let res = run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).unwrap();
+    assert_eq!(res.exit_code, 0, "{}", fx.log());
+
+    let r = read_report(&report, "env");
+    let values = |name: &str| -> Vec<&str> {
+        r.iter()
+            .filter(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+            .collect()
+    };
+    for name in [
+        "NODE_OPTIONS",
+        "HTTPS_PROXY",
+        "OPENCODE_PERMISSION",
+        "XAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "AWS_SESSION_TOKEN",
+    ] {
+        assert_eq!(values(name), Vec::<&str>::new(), "{name} leaked: {r:?}");
+    }
+    assert!(
+        !r.iter().any(|(_, v)| v == "evil" || v.contains("payload")),
+        "an unsafe inherited value reached the provider: {r:?}"
+    );
+    assert_eq!(values("OPENCODE_CONFIG_CONTENT"), ["trusted"]);
+    assert_eq!(values("RIVAL_MODE"), ["trusted"]);
+    assert_eq!(values("ANTHROPIC_API_KEY_2"), ["keep"]);
+    assert_eq!(values("NODE_OPTION"), ["near"]);
+    assert_eq!(values("RIVAL_KEEP"), ["yes"]);
+}
+
+/// Runs the `env` helper as a provider. `inherited` entries go through the
+/// filters; `trusted` ones are appended as adapter values. The child also
+/// reports the OS lookup of each of `lookups`, which the base env does not
+/// set.
+fn env_child(
+    inherited: &[(&str, &str)],
+    trusted: &[(&str, &str)],
+    lookups: &[&str],
+    drop_env: &[&str],
+) -> Vec<(String, String)> {
+    let mut fx = Fixture::new();
+    let report = fx.path("env");
+    let mut env = environ(fx.dir.path(), &[]);
+    env.retain(|kv| {
+        !lookups.iter().any(|name| {
+            kv.as_encoded_bytes()
+                .starts_with(format!("{name}=").as_bytes())
+        })
+    });
+    env.extend(
+        inherited
+            .iter()
+            .map(|(k, v)| OsString::from(format!("{k}={v}"))),
+    );
+    let mut provider_env = vec![
+        format!("{MODE}=env"),
+        format!("{REPORT}={}", report.display()),
+        format!("{LOOKUP}={}", lookups.join(";")),
+    ];
+    provider_env.extend(trusted.iter().map(|(k, v)| format!("{k}={v}")));
+    let args = helper_args();
+    let binary = exe();
+    let req = Request {
+        binary: &binary,
+        args: &args,
+        env: &provider_env,
+        prompt: "",
+        drop_env,
+        environ: &env,
+    };
+    let (ctx, _cancel) = Context::background().with_timeout(BOUND);
+    let res = run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).unwrap();
+    assert_eq!(res.exit_code, 0, "{}", fx.log());
+    read_report(&report, "env")
+}
+
+/// The values of the variable spelled exactly `name` in an `env` report.
+fn exact<'a>(report: &'a [(String, String)], name: &str) -> Vec<&'a str> {
+    report
+        .iter()
+        .filter(|(k, _)| k == name)
+        .map(|(_, v)| v.as_str())
+        .collect()
+}
+
+/// The child's OS lookup of `name`: its value, or `None` when unset.
+fn lookup<'a>(report: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    let got = field(report, &format!("{LOOKUP_KEY}{name}"));
+    if got == "unset" {
+        return None;
+    }
+    Some(got.strip_prefix("set:").expect("set:<value>"))
+}
+
+/// Measures whether the OS resolves `protected` to a variable spelled
+/// `candidate`. The child gets `candidate` as a trusted adapter value, which
+/// no filter touches, and looks `protected` up.
+fn os_resolves(candidate: &str, protected: &str) -> bool {
+    let r = env_child(&[], &[(candidate, "probe")], &[protected], &[]);
+    assert_eq!(
+        exact(&r, candidate),
+        ["probe"],
+        "trusted {candidate:?}: {r:?}"
+    );
+    let alias = lookup(&r, protected) == Some("probe");
+    eprintln!("measured: {candidate:?} resolves as {protected}: {alias}");
+    alias
+}
+
+/// Candidate spellings of protected names, with the name the child looks
+/// up. Mixed ASCII case is always the same name. U+0131 (dotless i) and
+/// U+017F (long s) may fold to I and S in the OS uppercase table; the test
+/// measures that instead of assuming it.
+const ALIASES: [(&str, &str); 9] = [
+    ("Node_Options", "NODE_OPTIONS"),
+    ("NODE_OPT\u{131}ONS", "NODE_OPTIONS"),
+    ("NODE_OPTION\u{17f}", "NODE_OPTIONS"),
+    ("HTTP\u{17f}_PROXY", "HTTPS_PROXY"),
+    ("K\u{131}MI_API_KEY", "KIMI_API_KEY"),
+    ("MOON\u{17f}HOT_API_KEY", "MOONSHOT_API_KEY"),
+    ("XA\u{131}_API_KEY", "XAI_API_KEY"),
+    ("ANTHROP\u{131}C_API_KEY", "ANTHROPIC_API_KEY"),
+    ("AW\u{17f}_SESSION_TOKEN", "AWS_SESSION_TOKEN"),
+];
+
+/// The filters' name comparison is the OS's: every inherited spelling the
+/// child's OS lookup would resolve as a protected name is removed, every
+/// other spelling passes, and trusted adapter values still arrive.
+#[test]
+fn child_env_blocks_every_os_alias_of_a_protected_name() {
+    let measured: Vec<bool> = ALIASES
+        .iter()
+        .map(|(candidate, protected)| os_resolves(candidate, protected))
+        .collect();
+    assert!(
+        measured[0],
+        "mixed ASCII case must resolve as the same name"
+    );
+    for ((candidate, protected), alias) in ALIASES.iter().zip(&measured) {
+        assert_eq!(
+            envname::eq(true, OsStr::new(candidate), protected),
+            *alias,
+            "comparison of {candidate:?} with {protected} disagrees with the OS lookup"
+        );
+    }
+
+    let values: Vec<String> = (0..ALIASES.len()).map(|i| format!("evil-{i}")).collect();
+    let mut inherited: Vec<(&str, &str)> = ALIASES
+        .iter()
+        .zip(&values)
+        .map(|((candidate, _), value)| (*candidate, value.as_str()))
+        .collect();
+    inherited.extend([("Node_Option", "near"), ("NODE_OPT\u{cd}ONS", "near-u")]);
+    let mut names: Vec<&str> = ALIASES.iter().map(|(_, protected)| *protected).collect();
+    names.dedup();
+    names.push("OPENCODE_CONFIG_CONTENT");
+    let r = env_child(
+        &inherited,
+        &[("OPENCODE_CONFIG_CONTENT", "trusted")],
+        &names,
+        &["ANTHROPIC_API_KEY", "AWS_"],
+    );
+    for (candidate, protected) in ALIASES {
+        assert_eq!(
+            lookup(&r, protected),
+            None,
+            "{protected} via {candidate:?}: {r:?}"
+        );
+    }
+    for (((candidate, _), alias), value) in ALIASES.iter().zip(&measured).zip(&values) {
+        let want = if *alias { vec![] } else { vec![value.as_str()] };
+        assert_eq!(exact(&r, candidate), want, "{candidate:?}: {r:?}");
+    }
+    assert_eq!(exact(&r, "Node_Option"), ["near"]);
+    assert_eq!(exact(&r, "NODE_OPT\u{cd}ONS"), ["near-u"]);
+    assert_eq!(lookup(&r, "OPENCODE_CONFIG_CONTENT"), Some("trusted"));
+}
+
+/// The state-root check refuses exactly the spellings the OS resolves as
+/// `RIVAL_HOME`. A repository `.env` with a parseable spelling loads only
+/// when it is no alias; near names and ordinary keys still load. godotenv
+/// rejects the U+0131 key, so that file sets nothing: it never loads from
+/// `.env`, whatever the OS says about it.
+#[test]
+fn state_root_check_refuses_every_os_alias() {
+    use crate::paths::{STATE_ROOT_VAR, is_state_root_var, load_dotenv_with, parse_dotenv};
+
+    let dir = tempfile::tempdir().unwrap();
+    let dotenv = dir.path().join(".env");
+    // (spelling, known OS answer, godotenv parses it).
+    for (candidate, known, parses) in [
+        ("Rival_Home", Some(true), true),
+        ("rival_home", Some(true), true),
+        ("R\u{131}VAL_HOME", None, false),
+        ("RIVAL_HOM\u{f3}", Some(false), true),
+        ("RIVAL_HOMEX", Some(false), true),
+    ] {
+        let alias = os_resolves(candidate, STATE_ROOT_VAR);
+        if let Some(known) = known {
+            assert_eq!(alias, known, "{candidate:?}");
+        }
+        assert_eq!(
+            is_state_root_var(candidate, true),
+            alias,
+            "state-root check of {candidate:?} disagrees with the OS lookup"
+        );
+
+        let text = format!("{candidate}=repo\nOK=1\n");
+        assert_eq!(parse_dotenv(&text).is_ok(), parses, "{candidate:?}");
+        fs::write(&dotenv, &text).unwrap();
+        let mut set = Vec::new();
+        load_dotenv_with(&dotenv, |_| false, |k, v| set.push(format!("{k}={v}")));
+        set.sort();
+        let mut want = Vec::new();
+        if parses {
+            want.push("OK=1".to_string());
+            if !alias {
+                want.push(format!("{candidate}=repo"));
+            }
+        }
+        want.sort();
+        assert_eq!(set, want, "{candidate:?}");
+    }
 }
 
 /// The prompt-write and output paths on a plain `.exe` provider.

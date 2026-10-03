@@ -1370,6 +1370,51 @@ fn child_gets_exactly_the_filtered_env() {
     );
 }
 
+/// Unix env names are case-sensitive, as in Go: mixed-case variants of the
+/// blocked prefixes and dropped names reach the child unchanged.
+#[test]
+fn unix_child_keeps_mixed_case_names() {
+    let mut fx = Fixture::new();
+    let base = environ(&[
+        PATH_ENTRY,
+        "Node_Options=--inspect",
+        "Https_Proxy=http://proxy:8080",
+        "Anthropic_Api_Key=k",
+        "aws_a=1",
+        "NODE_OPTIONS=x",
+        "ANTHROPIC_API_KEY=k",
+    ]);
+    let args = sh_args(&format!("{DRAIN}exec /usr/bin/env"));
+    let req = Request {
+        binary: "sh",
+        args: &args,
+        env: &[],
+        prompt: "some prompt",
+        drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
+        environ: &base,
+    };
+    let mut mirror = Recorder::default();
+    fx.run(&Context::background(), &req, Some(&mut mirror))
+        .unwrap();
+    let out = String::from_utf8(mirror.writes().concat()).unwrap();
+    let shell_vars = ["PWD=", "OLDPWD=", "SHLVL=", "_="];
+    let mut got: Vec<&str> = out
+        .lines()
+        .filter(|l| !shell_vars.iter().any(|v| l.starts_with(v)))
+        .collect();
+    got.sort();
+    assert_eq!(
+        got,
+        [
+            "Anthropic_Api_Key=k",
+            "Https_Proxy=http://proxy:8080",
+            "Node_Options=--inspect",
+            PATH_ENTRY,
+            "aws_a=1",
+        ]
+    );
+}
+
 #[test]
 fn workdir_pid_and_owner_are_recorded() {
     let mut fx = Fixture::new();

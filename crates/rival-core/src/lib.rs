@@ -2,6 +2,7 @@
 
 pub mod cancel;
 pub mod config;
+mod envname;
 pub mod executor;
 pub mod gitscope;
 pub mod gojson;

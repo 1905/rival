@@ -276,13 +276,10 @@ fn load_dotenv_for(
 }
 
 /// Whether `key` names [`STATE_ROOT_VAR`]. Windows environment names are
-/// case-insensitive, so any spelling matches there.
-fn is_state_root_var(key: &str, windows: bool) -> bool {
-    if windows {
-        key.eq_ignore_ascii_case(STATE_ROOT_VAR)
-    } else {
-        key == STATE_ROOT_VAR
-    }
+/// case-insensitive, so every spelling the OS treats as that name matches
+/// there (see [`crate::envname`]).
+pub(crate) fn is_state_root_var(key: &str, windows: bool) -> bool {
+    crate::envname::eq(windows, OsStr::new(key), STATE_ROOT_VAR)
 }
 
 fn parse_into(src: &str, out: &mut HashMap<String, String>) -> Result<(), String> {
@@ -873,18 +870,55 @@ mod tests {
 
     #[test]
     fn dotenv_state_root_spelling_follows_platform() {
-        let file = "rival_home=a\nRival_Home=b\nRIVAL_HOME=c\nOK=1\n";
+        let file =
+            "rival_home=a\nRival_Home=b\nRIVAL_HOME=c\nOK=1\nRIVAL_HOM\u{f3}=d\nRIVAL_HOMEX=e\n";
+        // Near names (another letter, a longer name) are ordinary keys.
+        let near = [("OK", "1"), ("RIVAL_HOM\u{f3}", "d"), ("RIVAL_HOMEX", "e")];
         // Windows names are case-insensitive: no spelling gets through.
-        assert_eq!(load_on(true, file, &[]), map(&[("OK", "1")]));
+        assert_eq!(load_on(true, file, &[]), map(&near));
         // Unix names are exact: other spellings are ordinary variables.
-        assert_eq!(
-            load_on(false, file, &[]),
-            map(&[("rival_home", "a"), ("Rival_Home", "b"), ("OK", "1")])
-        );
+        let mut unix = vec![("rival_home", "a"), ("Rival_Home", "b")];
+        unix.extend(near);
+        assert_eq!(load_on(false, file, &[]), map(&unix));
         // The host loader applies the host's rule.
         let env = load(Some(file), &[]);
         assert!(!env.contains_key(STATE_ROOT_VAR));
         assert_eq!(env.contains_key("rival_home"), !cfg!(windows));
+    }
+
+    /// godotenv widens each UTF-8 byte of a key to a rune. The second byte
+    /// of U+0131 (dotless i) widens to `±`, which is no letter, so a file
+    /// spelling `RIVAL_HOME` with it sets nothing on any platform.
+    #[test]
+    fn dotenv_rejects_unicode_state_root_spelling() {
+        let file = "R\u{131}VAL_HOME=repo\nOK=1\n";
+        assert!(parse_dotenv(file).is_err());
+        for windows in [false, true] {
+            assert!(load_on(windows, file, &[]).is_empty(), "windows={windows}");
+        }
+    }
+
+    /// The Windows host loader, with the OS name comparison: no spelling of
+    /// `RIVAL_HOME` loads, exported values (empty ones included) stay, and
+    /// near names and ordinary keys load like Go. The native child test in
+    /// `subprocess::windows_tests` checks the rule against the OS lookup.
+    #[cfg(windows)]
+    #[test]
+    fn dotenv_state_root_windows_rule_is_the_os_rule() {
+        let file = "rival_home=a\nRival_Home=b\nRIVAL_HOM\u{f3}=d\nRIVAL_HOMEX=e\nOK=1\n";
+        for existing in [
+            &[][..],
+            &[("RIVAL_HOME", "")][..],
+            &[("RIVAL_HOME", "/custom")][..],
+        ] {
+            let mut want = map(existing);
+            want.extend(map(&[
+                ("RIVAL_HOM\u{f3}", "d"),
+                ("RIVAL_HOMEX", "e"),
+                ("OK", "1"),
+            ]));
+            assert_eq!(load(Some(file), existing), want, "existing {existing:?}");
+        }
     }
 
     #[test]

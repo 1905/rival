@@ -58,6 +58,14 @@ class GoreleaserTest(unittest.TestCase):
             self.assertFalse(any(name in e for e in unix), name)
         self.assertIn("RUSTFLAGS=-C target-feature=+crt-static", win)
 
+    def test_windows_selects_clang_cross_compiler(self):
+        # cargo-xwin's default clang-cl mode passes /imsvc to clang when ring
+        # builds its C code; the clang mode uses its own sysroot instead.
+        unix, win = self.builds["rival-unix"]["env"], self.builds["rival-windows"]["env"]
+        self.assertEqual([e for e in win if e.startswith("XWIN_")], ["XWIN_CROSS_COMPILER=clang"])
+        self.assertFalse(any("XWIN_" in e for e in unix))
+        self.assertFalse(any("XWIN_" in e for e in self.cfg.get("env", [])))
+
     def test_archive_names_and_files(self):
         (archive,) = self.cfg["archives"]
         names = {archive["name_template"].replace("{{ .ProjectName }}", "rival")
