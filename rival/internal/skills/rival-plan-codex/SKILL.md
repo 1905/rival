@@ -58,6 +58,7 @@ use those literal values below.
 ```bash
 rival wait --log <rival_err>
 echo "RIVAL_DONE rc=$? out=<rival_out> err=<rival_err>"
+echo "NEXT: follow the skill's Present output steps: read out, verify EVERY finding, apply the auto-fix policy above, then reply once."
 ```
 
 Substitute the literal `<rival_err>` / `<rival_out>` paths. `rival wait` blocks
@@ -75,9 +76,10 @@ wants. The watcher will wake you.
 ### Present output (on the watcher's completion notification)
 
 When the background `rival wait` exits you receive a task notification (this may
-be several turns later). Handle it in ONE turn: read, verify, plan, then write
-ONE final message. **Everything the user must see goes in that final message,
-with NO tool calls after it.** Text emitted between tool calls can be dropped by
+be several turns later). Handle it in ONE turn: read, verify, fix per the auto-fix policy, then
+write ONE final message. Never just echo the findings: verifying them is the
+job. **Everything the user must see goes in that final message, with NO tool
+calls after it.** Text emitted between tool calls can be dropped by
 the harness; a review the user never sees is a failed run. So do not print
 partial results while you work — they belong in the final message.
 
@@ -93,19 +95,27 @@ partial results while you work — they belong in the final message.
 3. **Plan a plan edit for each CONFIRMED finding only**, highest severity first:
    one line each — what changes, and where. FALSE POSITIVE and UNCLEAR findings
    get no plan edit.
-4. **Apply plan edits only if the user asked for them.** Asked means: the
-   request that started this run said so ("review and fix"), a standing
-   full-auto instruction is active, or the user replies asking for it later. If
-   asked: edit the plan document for CONFIRMED findings only (a new version file if the project versions its plans). If not asked: do not edit anything.
+4. **Act by severity.** The `rival wait` output ends with an `auto-fix:` line
+   (`off` if it is missing). It sets the default; the user can ask for more.
+   - CRITICAL and HIGH, CONFIRMED: with `auto-fix: critical+high`, edit the plan
+     document for them without asking (a new version file if the project
+     versions its plans). With `auto-fix: off`, do not edit; propose the plan
+     edit.
+   - MEDIUM and LOW, CONFIRMED: never auto-fixed. Verify, present and propose
+     the plan edit only.
+   - The user asked for plan edits (the request that started this run said "review
+     and fix", a standing full-auto instruction is active, or they reply asking
+     for it later): apply the plan edits for every CONFIRMED finding they asked for.
+   FALSE POSITIVE and UNCLEAR findings are never edited.
 5. The final message — its final text, no tool calls after it:
    - a 2-4 line **stats summary first**: finding counts by severity (e.g.
      "1 HIGH, 3 MEDIUM, 0 LOW"), plus one line per HIGH/CRITICAL finding title,
      and the session id/runtime if visible;
    - `Verified: N confirmed, N false positive, N unclear`;
    - a verdict table: `# | severity | title | verdict | evidence`;
-   - the plan edit plan — or, if step 4 applied them, what changed and the
-     build/test result. If not applied, end the plan with one line: say "fix"
-     to apply the CONFIRMED ones;
+   - what step 4 applied, with the build/test result, then the proposed
+     plan edit for every CONFIRMED finding still open. If any are open, end with
+     one line: say "fix" to apply them;
    - then the **full contents verbatim** in a fenced code block.
 6. If the output has no findings (a plain prompt answer or a clean review),
    skip steps 2-4 and present the stats summary plus the verbatim output.

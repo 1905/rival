@@ -47,7 +47,7 @@
       "run": ["wait", "--log", "<ROOT>/elsewhere/err log (detached).txt"],
       "expect": {
         "exit_code": 0,
-        "stdout": "<UUID1:8> completed exit=0 <DURATION>\n",
+        "stdout": "<UUID1:8> completed exit=0 <DURATION>\nauto-fix: off\n",
         "stderr_lines": [],
         "log_events": []
       }

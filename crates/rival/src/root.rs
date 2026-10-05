@@ -618,6 +618,7 @@ fn dispatch(
                 log: inv.string("log").into(),
                 timeout: inv.duration("timeout"),
                 poll: inv.duration("poll"),
+                auto_fix_policy: env.cfg.auto_fix_policy(),
             };
             let (ctx, _scope) = env.signal_context()?;
             wait::wait_action(&opts, &inv.args, env.cfg.paths(), &ctx, env.stdout)

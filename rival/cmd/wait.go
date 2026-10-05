@@ -53,6 +53,8 @@ Two modes:
       Parse the detached rival PID and session IDs from a run's stderr file,
       poll the rival process for liveness, then summarize the sessions when it
       exits. Detects a crashed rival (process dead, sessions not finalized).
+      After the summary it prints "auto-fix: off" or "auto-fix: critical+high"
+      (auto_fix_critical_high in ~/.rival/config.yaml).
 
   rival wait <session-id>...       (terminal-status only)
       Poll the named sessions' JSON until all reach a terminal state.
@@ -116,6 +118,11 @@ func waitAction(cmd *cobra.Command, args []string) error {
 	}
 
 	code := w.run(ctx)
+	// Skills read this line to decide whether to fix CONFIRMED critical/high
+	// findings without asking. Only a summarized run has output to act on.
+	if logFile != "" && (code == waitExitCompleted || code == waitExitFailed) {
+		w.printf("auto-fix: %s\n", config.AutoFixPolicy())
+	}
 	if code == waitExitCompleted {
 		return nil
 	}

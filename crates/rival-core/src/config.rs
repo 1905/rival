@@ -736,6 +736,9 @@ pub struct UserConfig {
     pub security: SecurityConfig,
     pub efforts: BTreeMap<String, String>,
     pub roles: BTreeMap<String, String>,
+    /// Lets the skills apply fixes for CONFIRMED critical and high findings
+    /// without asking. Medium and low are never auto-fixed.
+    pub auto_fix_critical_high: bool,
 }
 
 /// yaml.v3 decodes YAML null into a Go string as "", and any other scalar as
@@ -775,6 +778,8 @@ struct RawUserConfig {
     efforts: Option<BTreeMap<String, GoString>>,
     #[serde(default)]
     roles: Option<BTreeMap<String, GoString>>,
+    #[serde(default)]
+    auto_fix_critical_high: Option<bool>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -794,6 +799,7 @@ impl From<RawUserConfig> for UserConfig {
             },
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
+            auto_fix_critical_high: raw.auto_fix_critical_high.unwrap_or_default(),
         }
     }
 }
@@ -1031,6 +1037,16 @@ impl Config {
         self.user
             .as_ref()
             .map_or("", |u| u.claude.subscription.as_str())
+    }
+
+    /// The fix policy `rival wait --log` prints for the skills:
+    /// `auto_fix_critical_high` on gives "critical+high", else "off".
+    pub fn auto_fix_policy(&self) -> &'static str {
+        if self.user.as_ref().is_some_and(|u| u.auto_fix_critical_high) {
+            "critical+high"
+        } else {
+            "off"
+        }
     }
 
     /// The raw `security.reviewer` value, or "" when unset.

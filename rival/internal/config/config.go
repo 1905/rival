@@ -850,6 +850,9 @@ type UserConfig struct {
 	Security SecurityConfig    `yaml:"security"`
 	Efforts  map[string]string `yaml:"efforts"`
 	Roles    map[string]string `yaml:"roles"`
+	// AutoFixCriticalHigh lets the skills apply fixes for CONFIRMED critical
+	// and high findings without asking. Medium and low are never auto-fixed.
+	AutoFixCriticalHigh bool `yaml:"auto_fix_critical_high"`
 }
 
 var userConfig *UserConfig
@@ -1062,6 +1065,19 @@ func ClaudeSubscription() string {
 		return ""
 	}
 	return userConfig.Claude.Subscription
+}
+
+// AutoFixCriticalHigh reports whether auto_fix_critical_high is on (default off).
+func AutoFixCriticalHigh() bool {
+	return userConfig != nil && userConfig.AutoFixCriticalHigh
+}
+
+// AutoFixPolicy is the fix policy `rival wait --log` prints for the skills.
+func AutoFixPolicy() string {
+	if AutoFixCriticalHigh() {
+		return "critical+high"
+	}
+	return "off"
 }
 
 func init() {

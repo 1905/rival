@@ -522,3 +522,35 @@ func TestLoadUserConfigIgnoresObsoleteMegareviewKeys(t *testing.T) {
 		t.Fatalf("bug_hunter override = %q, %v; want the configured prompt", got, ok)
 	}
 }
+
+func TestAutoFixCriticalHighDefaultsOff(t *testing.T) {
+	oldConfig, oldErr := userConfig, userConfigErr
+	t.Cleanup(func() {
+		userConfig, userConfigErr = oldConfig, oldErr
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".rival")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ body, want string }{
+		{"", "off"},
+		{"efforts:\n  codex: high\n", "off"},
+		{"auto_fix_critical_high: false\n", "off"},
+		{"auto_fix_critical_high:\n", "off"},
+		{"auto_fix_critical_high: true\n", "critical+high"},
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		LoadUserConfig()
+		if err := UserConfigError(); err != nil {
+			t.Fatalf("%q: %v", tc.body, err)
+		}
+		if got := AutoFixPolicy(); got != tc.want {
+			t.Fatalf("%q: AutoFixPolicy() = %q, want %q", tc.body, got, tc.want)
+		}
+	}
+}

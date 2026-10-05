@@ -1764,3 +1764,19 @@ fn environ_comes_from_env_sorted_and_can_be_replaced() {
     assert!(format!("{c:?}").contains("environ: <2 entries>"));
     assert!(!format!("{c:?}").contains("Z=1"));
 }
+
+#[test]
+fn auto_fix_critical_high_defaults_off() {
+    for (body, want) in [
+        ("efforts:\n  codex: high\n", "off"),
+        ("auto_fix_critical_high: false\n", "off"),
+        ("auto_fix_critical_high:\n", "off"),
+        ("auto_fix_critical_high: true\n", "critical+high"),
+    ] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.auto_fix_policy(), want, "{body:?}");
+    }
+    let (_home, missing) = loaded("");
+    assert_eq!(missing.auto_fix_policy(), "off");
+}
