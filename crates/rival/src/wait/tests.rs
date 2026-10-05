@@ -741,6 +741,7 @@ fn opts(log: &str, timeout: i64, poll: i64) -> WaitOptions {
         log: PathBuf::from(log),
         timeout,
         poll,
+        auto_fix_policy: "off",
     }
 }
 
@@ -892,9 +893,21 @@ fn wait_action_log_mode_without_pid() {
         ),
     )
     .unwrap();
+    let mut o = opts(&log.to_string_lossy(), SECOND, MS);
     assert_eq!(
-        action(&opts(&log.to_string_lossy(), SECOND, MS), &[], &paths),
-        (Ok(()), "11111111 completed exit=0 4s\n".to_string())
+        action(&o, &[], &paths),
+        (
+            Ok(()),
+            "11111111 completed exit=0 4s\nauto-fix: off\n".to_string()
+        )
+    );
+    o.auto_fix_policy = "critical+high";
+    assert_eq!(
+        action(&o, &[], &paths),
+        (
+            Ok(()),
+            "11111111 completed exit=0 4s\nauto-fix: critical+high\n".to_string()
+        )
     );
 }
 

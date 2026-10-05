@@ -43,7 +43,7 @@
       "run": ["wait", "--log", "<ROOT>/out/claude.err"],
       "expect": {
         "exit_code": 2,
-        "stdout": "<UUID1:8> failed exit=1 <DURATION> — claude exited with code 1\n",
+        "stdout": "<UUID1:8> failed exit=1 <DURATION> — claude exited with code 1\nauto-fix: off\n",
         "stderr_lines": ["rival wait: exit 2"],
         "log_events": []
       }

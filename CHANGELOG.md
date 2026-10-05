@@ -6,6 +6,9 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 
 ## [Unreleased]
 
+### Added
+- `auto_fix_critical_high` in `~/.rival/config.yaml` (off by default). Skills now verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking. Medium and low findings are verified and proposed, never auto-fixed. `rival wait --log` prints the policy as `auto-fix: off|critical+high`, and the watcher reminds the agent to verify.
+
 ### In progress — Rust CLI port
 - Matched Go's Windows error language, fallback text and invalid work-directory errors. Local checks pass 1,231 tests; final native CI remains pending. Rare stat fallback operations remain a documented compatibility limit.
 - Corrected Windows test fixtures for paths, OS errors, executable extensions, temp directories and timestamp precision. Read-only file opens now preserve Go's directory-read behavior. All 1,227 local workspace tests pass; the native rerun remains pending.

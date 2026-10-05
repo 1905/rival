@@ -184,7 +184,7 @@ cat out.txt                       # the review
 
 `rival wait` has two modes:
 
-- `rival wait --log <stderr-file>`: reads the PID and session IDs from the stderr file and watches the process. It detects a crash.
+- `rival wait --log <stderr-file>`: reads the PID and session IDs from the stderr file and watches the process. It detects a crash. After the summary it prints the `auto-fix:` policy for the skills.
 - `rival wait <session-id>...`: polls session JSON only. The session can turn terminal a moment before stdout is flushed, so prefer `--log`.
 
 | Flag | Default |
@@ -363,6 +363,8 @@ security:
 claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
 
+auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
+
 roles:                # optional prompt overrides
   bug_hunter: "..."   # replaces the code-review instructions
   security: "..."     # replaces the security-review instructions
@@ -371,6 +373,7 @@ roles:                # optional prompt overrides
 - The values shown for `efforts` are the built-in defaults.
 - An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
 - An old `efforts.sol` key is ignored.
+- `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
 Environment variables:

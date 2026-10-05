@@ -359,6 +359,8 @@ Two modes:
       Parse the detached rival PID and session IDs from a run's stderr file,
       poll the rival process for liveness, then summarize the sessions when it
       exits. Detects a crashed rival (process dead, sessions not finalized).
+      After the summary it prints \"auto-fix: off\" or \"auto-fix: critical+high\"
+      (auto_fix_critical_high in ~/.rival/config.yaml).
 
   rival wait <session-id>...       (terminal-status only)
       Poll the named sessions' JSON until all reach a terminal state.

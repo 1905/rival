@@ -93,6 +93,10 @@ pub struct WaitOptions {
     pub timeout: i64,
     /// `--poll`, nanoseconds.
     pub poll: i64,
+    /// What `--log` mode prints after the summary: [`Config::auto_fix_policy`].
+    ///
+    /// [`Config::auto_fix_policy`]: rival_core::config::Config::auto_fix_policy
+    pub auto_fix_policy: &'static str,
 }
 
 /// Go: `waitAction`. `paths` locates the session files; `ctx` is the signal
@@ -153,7 +157,13 @@ pub fn wait_action(
         w.ids = args.to_vec();
     }
 
+    let log_mode = w.log_file.is_some();
     let code = w.run(ctx);
+    // Skills read this line to decide whether to fix CONFIRMED critical/high
+    // findings without asking. Only a summarized run has output to act on.
+    if log_mode && (code == WAIT_EXIT_COMPLETED || code == WAIT_EXIT_FAILED) {
+        w.print(format!("auto-fix: {}\n", opts.auto_fix_policy).as_bytes());
+    }
     if code == WAIT_EXIT_COMPLETED {
         return Ok(());
     }
