@@ -2,12 +2,9 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 2026-09-29.
+Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 2026-10-07.
 
 ## [Unreleased]
-
-### Added
-- `auto_fix_critical_high` in `~/.rival/config.yaml` (off by default). Skills now verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking. Medium and low findings are verified and proposed, never auto-fixed. `rival wait --log` prints the policy as `auto-fix: off|critical+high`, and the watcher reminds the agent to verify.
 
 ### In progress — Rust CLI port
 - Matched Go's Windows error language, fallback text and invalid work-directory errors. Local checks pass 1,231 tests; final native CI remains pending. Rare stat fallback operations remain a documented compatibility limit.
@@ -60,6 +57,12 @@ Latest release: [v4.1.1](https://github.com/1905/rival/releases/tag/v4.1.1) — 
 
 ### Fixed
 - `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+
+## [v4.2.0] — 2026-10-07
+
+### Added
+- `auto_fix_critical_high` in `~/.rival/config.yaml` (off by default). Skills now verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking. Medium and low findings are verified and proposed, never auto-fixed. `rival wait --log` prints the policy as `auto-fix: off|critical+high`, and the watcher reminds the agent to verify.
+- Review findings follow plain-English writing rules based on ASD-STE100 structure: one fact per sentence, active voice, no stacked hedges, no filler. The reviewer prompt carries the rules for `summary`, `title`, `body`, `failure_scenario` and `suggestion`. Skills apply them to the lines the host agent adds, and never edit the verbatim reviewer output. Reviewer prompts set through `roles.bug_hunter` and `roles.security` keep the rules, because they sit in the output contract.
 
 ## [v4.1.1] — 2026-09-29
 

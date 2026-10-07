@@ -204,6 +204,18 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
 }
 ```
 
+## Writing rules
+
+Write summary, title, body, failure_scenario and suggestion in plain, literal English.
+- One fact per sentence. Use 20 words or fewer per instruction and 25 or fewer per explanation.
+- Use the active voice and simple tenses. Name who or what acts.
+- Use the verb, not a noun built from it: "check the log", not "perform a check of the log".
+- Use one word for one thing. Do not rotate synonyms.
+- Do not stack hedges. Keep real doubt as one "may" or "might" and say what you did not check. Never turn "may fail" into "fails".
+- Do not use semicolons, phrasal verbs ("spin up", "kick off"), or words that claim quality ("robust", "seamless", "powerful").
+- Do not state a cause, a frequency or a fix you did not verify in the code.
+- Keep identifiers, paths and quoted errors exactly as written.
+
 "#,
     clean_review_example_line!(),
     "\n"
