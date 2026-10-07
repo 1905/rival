@@ -19,6 +19,8 @@ struct Setup {
     fx: Fixture,
     sess: Session,
     calls: Rc<RefCell<Vec<String>>>,
+    /// The session mode each provider call saw.
+    modes: Rc<RefCell<Vec<String>>>,
     spec: ModelSpec,
 }
 
@@ -41,11 +43,14 @@ fn setup(yaml: &str, second: Option<&str>) -> Setup {
     )
     .unwrap();
     let calls = Rc::new(RefCell::new(Vec::new()));
+    let modes = Rc::new(RefCell::new(Vec::new()));
     let mut spec = fake_spec(&fake_run(""));
     let seen = Rc::clone(&calls);
+    let seen_modes = Rc::clone(&modes);
     let second = second.map(str::to_string);
     spec.run = Box::new(move |c| {
         seen.borrow_mut().push(c.prompt.to_string());
+        seen_modes.borrow_mut().push(c.sess.mode.clone());
         assert!(c.review, "the rewrite runs read-only");
         assert!(c.out.is_none(), "the rewrite is not mirrored");
         let Some(text) = &second else {
@@ -63,6 +68,7 @@ fn setup(yaml: &str, second: Option<&str>) -> Setup {
         fx,
         sess,
         calls,
+        modes,
         spec,
     }
 }
@@ -193,4 +199,30 @@ fn provider_failure_keeps_the_original() {
     assert_eq!(run(&mut s, &raw), raw);
     assert_eq!(s.calls.borrow().len(), 1);
     assert_eq!(std::fs::read_to_string(&s.sess.log_file).unwrap(), raw);
+}
+
+/// Claude's first run records its transport ("native") as the session mode,
+/// and Claude derives read-only permissions from the mode. The rewrite call
+/// must still run as a review.
+#[test]
+fn rewrite_runs_as_a_review_after_the_transport_replaced_the_mode() {
+    let mut s = setup("ste_rewrite: true\n", Some(CLEAN));
+    s.sess.mode = "native".into();
+    std::fs::write(&s.sess.log_file, format!("{DIRTY}\n")).unwrap();
+    run(&mut s, &format!("{DIRTY}\n"));
+    assert_eq!(*s.modes.borrow(), ["review"]);
+}
+
+/// A sidecar that cannot be written still leaves the log without the
+/// rewrite, so every reader shows the original.
+#[test]
+fn unwritable_sidecar_still_cuts_the_rewrite_from_the_log() {
+    let mut s = setup("ste_rewrite: true\n", Some(MOVED));
+    let raw = format!("{DIRTY}\n");
+    std::fs::write(&s.sess.log_file, &raw).unwrap();
+    // A directory where the sidecar file would go makes its write fail.
+    std::fs::create_dir(sidecar_path(&s.sess.log_file)).unwrap();
+    assert_eq!(run(&mut s, &raw), raw);
+    assert_eq!(std::fs::read_to_string(&s.sess.log_file).unwrap(), raw);
+    assert_eq!(shown(&s).0, 3);
 }

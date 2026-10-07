@@ -11,7 +11,7 @@ use rival_core::review;
 use rival_core::session::Session;
 
 use crate::model_command::CancelOnDrop;
-use crate::model_specs::{ModelSpec, RunCall};
+use crate::model_specs::{ModelSpec, RunCall, session_mode};
 
 #[cfg(test)]
 mod tests;
@@ -57,6 +57,10 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
 
     let (run_ctx, cancel) = review::with_run_timeout(r.ctx, r.cfg, 1);
     let _cancel = CancelOnDrop(cancel);
+    // The first run may have replaced the mode with its transport (Claude
+    // records "native" or "docker"). Adapters derive read-only permissions
+    // from the mode, so the rewrite must run as a review too.
+    sess.mode = session_mode(true).to_string();
     logging::info()
         .str("session", sess.id.as_str())
         .int("hits", before as i64)
@@ -133,8 +137,10 @@ pub(crate) fn sidecar_path(log_file: &str) -> String {
     format!("{log_file}.ste-rewrite")
 }
 
-/// Moves everything after byte `start` of the session log to the sidecar,
-/// cuts the log back to `start`, and returns the moved text.
+/// Cuts the session log back to byte `start` and returns what followed it.
+/// The cut comes first, so the log never keeps an unchecked rewrite. The
+/// cut text then goes to the sidecar; failing that write only loses the
+/// transcript.
 fn split_off_rewrite(log_file: &str, start: u64) -> std::io::Result<String> {
     use std::io::{Read, Seek, SeekFrom};
 
@@ -145,11 +151,18 @@ fn split_off_rewrite(log_file: &str, start: u64) -> std::io::Result<String> {
     log.seek(SeekFrom::Start(start))?;
     let mut tail = Vec::new();
     log.read_to_end(&mut tail)?;
+    log.set_len(start)?;
     let mut opts = std::fs::OpenOptions::new();
     opts.create(true).write(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-    opts.open(sidecar_path(log_file))?.write_all(&tail)?;
-    log.set_len(start)?;
+    if let Err(e) = opts
+        .open(sidecar_path(log_file))
+        .and_then(|mut f| f.write_all(&tail))
+    {
+        logging::warn()
+            .err(e)
+            .msg("could not save the rewrite transcript");
+    }
     Ok(String::from_utf8_lossy(&tail).into_owned())
 }
