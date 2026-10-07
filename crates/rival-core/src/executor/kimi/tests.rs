@@ -5,7 +5,7 @@ use std::ffi::{OsStr, OsString};
 
 use super::*;
 use crate::executor::opencode::{OPENCODE_READ_ONLY_PERMISSION, opencode_run_env_with};
-use crate::executor::subprocess::{drop_matches, safe_env};
+use crate::executor::subprocess::{drop_matches_case, safe_env};
 #[cfg(unix)]
 use crate::executor::testutil::retry_busy;
 use crate::executor::testutil::{Env, path_str, recorder, strings};
@@ -28,7 +28,11 @@ fn drop_matches_prefix_and_exact() {
         ("AWSOME_VAR=x", false),               // prefix requires the underscore
         ("PATH=/usr/bin", false),
     ] {
-        assert_eq!(drop_matches(OsStr::new(kv), &KIMI_DROP_ENV), want, "{kv}");
+        assert_eq!(
+            drop_matches_case(cfg!(windows), OsStr::new(kv), &KIMI_DROP_ENV),
+            want,
+            "{kv}"
+        );
     }
 }
 

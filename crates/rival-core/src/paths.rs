@@ -255,7 +255,7 @@ pub fn load_dotenv_with(path: &Path, is_set: impl Fn(&str) -> bool, set: impl Fn
 /// parameter, so both are testable everywhere.
 fn load_dotenv_for(
     path: &Path,
-    windows: bool,
+    case_insensitive: bool,
     is_set: impl Fn(&str) -> bool,
     mut set: impl FnMut(&str, &str),
 ) {
@@ -263,10 +263,11 @@ fn load_dotenv_for(
         return;
     };
     for (key, value) in &vars {
-        if key.is_empty() || key.contains(['=', '\0']) || value.contains('\0') {
-            continue;
-        }
-        if is_state_root_var(key, windows) {
+        if key.is_empty()
+            || key.contains(['=', '\0'])
+            || value.contains('\0')
+            || is_state_root_var(key, case_insensitive)
+        {
             continue;
         }
         if !is_set(key) {
@@ -278,8 +279,8 @@ fn load_dotenv_for(
 /// Whether `key` names [`STATE_ROOT_VAR`]. Windows environment names are
 /// case-insensitive, so every spelling the OS treats as that name matches
 /// there (see [`crate::envname`]).
-pub(crate) fn is_state_root_var(key: &str, windows: bool) -> bool {
-    crate::envname::eq(windows, OsStr::new(key), STATE_ROOT_VAR)
+pub(crate) fn is_state_root_var(key: &str, case_insensitive: bool) -> bool {
+    crate::envname::eq(case_insensitive, OsStr::new(key), STATE_ROOT_VAR)
 }
 
 fn parse_into(src: &str, out: &mut HashMap<String, String>) -> Result<(), String> {

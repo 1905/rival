@@ -80,7 +80,7 @@ def read_members(path):
     members = {}
     if path.name.endswith(".zip"):
         with zipfile.ZipFile(path) as archive:
-            require(archive.testzip() is None, f"{path.name}: corrupt member")
+            # read() checks each member's CRC and raises BadZipFile.
             for info in archive.infolist():
                 check_member_name(info.filename)
                 if info.is_dir():
@@ -133,7 +133,7 @@ def lf(data):
     return data.replace(b"\r\n", b"\n")
 
 
-def check_archive(dist, sums, system, arch, root=ROOT):
+def check_archive(dist, sums, system, arch):
     """Checks one archive; returns (binary bytes, binary file name)."""
     name = archive_name(system, arch)
     paths = list(dist.rglob(name))
@@ -153,7 +153,7 @@ def check_archive(dist, sums, system, arch, root=ROOT):
         require(mode & 0o111, f"{name}: {binary_path} is not executable ({oct(mode)})")
     for bundled in BUNDLED:
         member = one_member(members, bundled, name)
-        require(lf(members[member][0]) == lf((root / bundled).read_bytes()),
+        require(lf(members[member][0]) == lf((ROOT / bundled).read_bytes()),
                 f"{name}: {member} differs from {bundled}")
     return binary, exe
 

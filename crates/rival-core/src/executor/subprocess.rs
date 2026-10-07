@@ -128,25 +128,35 @@ pub(crate) fn safe_env_case(case_insensitive: bool, environ: &[OsString]) -> Vec
         .collect()
 }
 
-/// [`drop_matches_case`] with the host's name rule.
-#[cfg(test)]
-pub(crate) fn drop_matches(kv: &OsStr, drop_env: &[&str]) -> bool {
-    drop_matches_case(cfg!(windows), kv, drop_env)
-}
-
 /// Go `dropMatches`: whether `kv` (a `KEY=VALUE` entry) is named by
 /// `drop_env`. An entry ending in `_` is a prefix match ("AWS_" drops every
 /// AWS_* var — exact name lists rot as providers add credential vars); any
 /// other entry matches that exact variable name. `case_insensitive` (the
 /// Windows rule) compares names case-insensitively (see [`crate::envname`]).
+#[cfg(test)]
 pub(crate) fn drop_matches_case(case_insensitive: bool, kv: &OsStr, drop_env: &[&str]) -> bool {
-    drop_env.iter().any(|name| {
-        if name.ends_with('_') {
-            envname::has_prefix(case_insensitive, kv, name)
-        } else {
-            envname::has_prefix(case_insensitive, kv, &format!("{name}="))
-        }
-    })
+    drop_hit(case_insensitive, kv, &drop_prefixes(drop_env))
+}
+
+/// The prefix each `drop_env` entry matches: the entry itself when it ends
+/// in `_`, else `NAME=` for the exact variable.
+fn drop_prefixes(drop_env: &[&str]) -> Vec<String> {
+    drop_env
+        .iter()
+        .map(|name| {
+            if name.ends_with('_') {
+                (*name).to_string()
+            } else {
+                format!("{name}=")
+            }
+        })
+        .collect()
+}
+
+fn drop_hit(case_insensitive: bool, kv: &OsStr, prefixes: &[String]) -> bool {
+    prefixes
+        .iter()
+        .any(|p| envname::has_prefix(case_insensitive, kv, p))
 }
 
 /// The env the child gets: Go's `append(base, env...)` after `safeEnv` and
@@ -160,7 +170,8 @@ pub fn child_env(req: &Request<'_>) -> Vec<OsString> {
 pub(crate) fn child_env_case(case_insensitive: bool, req: &Request<'_>) -> Vec<OsString> {
     let mut base = safe_env_case(case_insensitive, req.environ);
     if !req.drop_env.is_empty() {
-        base.retain(|kv| !drop_matches_case(case_insensitive, kv, req.drop_env));
+        let prefixes = drop_prefixes(req.drop_env);
+        base.retain(|kv| !drop_hit(case_insensitive, kv, &prefixes));
     }
     base.extend(req.env.iter().map(OsString::from));
     base
@@ -1100,6 +1111,9 @@ mod env_case_tests {
         let input: Vec<OsString> = cases.iter().map(|(kv, _, _)| kv.clone()).collect();
         assert_eq!(safe_env(&input), kept(&cases, cfg!(windows)));
         let kv = OsStr::new("Anthropic_Api_Key=k");
-        assert_eq!(drop_matches(kv, &["ANTHROPIC_API_KEY"]), cfg!(windows));
+        assert_eq!(
+            drop_matches_case(cfg!(windows), kv, &["ANTHROPIC_API_KEY"]),
+            cfg!(windows)
+        );
     }
 }

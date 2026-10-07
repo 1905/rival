@@ -493,7 +493,11 @@ fn drop_matches_prefix_and_exact_rules() {
         ("=C:=C:\\", true),
     ];
     for (kv, want) in cases {
-        assert_eq!(drop_matches(OsStr::new(kv), &drop), want, "{kv}");
+        assert_eq!(
+            drop_matches_case(cfg!(windows), OsStr::new(kv), &drop),
+            want,
+            "{kv}"
+        );
     }
 }
 

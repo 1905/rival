@@ -962,7 +962,8 @@ impl Config {
             user_err: None,
             process_env: false,
         };
-        if !cfg.getenv("RIVAL_HOME").is_empty() || !cfg.getenv(paths::HOME_VAR).is_empty() {
+        if !cfg.getenv(paths::STATE_ROOT_VAR).is_empty() || !cfg.getenv(paths::HOME_VAR).is_empty()
+        {
             match load_user_config(&cfg.paths.config_file()) {
                 Ok(user) => cfg.user = user,
                 Err(e) => cfg.user_err = Some(e),
