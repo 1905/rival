@@ -1,11 +1,14 @@
 //! `rival run <model>`: the terminal-facing workflow. Go:
 //! `cmd/model_run.go`.
 
+use std::io::Write;
+
 use rival_core::logging;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::NewSession;
 
 use crate::merge_request::{ReviewTarget, reject_unresolved_mr};
+use crate::mirror::LiveMirror;
 use crate::model_command::{
     CancelOnDrop, OwnedSession, complete_session, fail_session, finish_review, prepare_review,
     read_log,
@@ -109,7 +112,7 @@ pub fn run_model_run(
         .msg(&format!("starting {}", spec.command_name));
 
     let group_id = sess.group_id.clone();
-    let _release = review::wait_for_group_slot(
+    let release = review::wait_for_group_slot(
         &ctx,
         cfg,
         &GroupSlot {
@@ -127,6 +130,20 @@ pub fn run_model_run(
     let _cancel_run = CancelOnDrop(cancel_run);
 
     // The run surface is terminal-facing, so output mirrors to stdout live.
+    // In production the copy goes through a queue (see crate::mirror), so a
+    // stdout nobody reads cannot hold the run past its context.
+    let live = match env.live_stdout {
+        Some(open) => Some(
+            LiveMirror::spawn(open())
+                .map_err(|e| CmdError::plain(format!("start stdout mirror: {e}")))?,
+        ),
+        None => None,
+    };
+    let mut sink = live.as_ref().map(|m| m.sink(&run_ctx));
+    let out: &mut (dyn Write + Send) = match sink.as_mut() {
+        Some(sink) => sink,
+        None => &mut *env.stdout,
+    };
     let result = (spec.run)(RunCall {
         ctx: &run_ctx,
         cfg,
@@ -136,8 +153,11 @@ pub fn run_model_run(
         workdir: &run_workdir,
         cred_workdir: &workdir,
         review: opts.is_review,
-        out: Some(&mut *env.stdout),
+        out: Some(out),
     });
+    if let Some(live) = live {
+        live.finish(&run_ctx);
+    }
     let result = match result {
         Ok(result) => result,
         Err(e) => {
@@ -196,6 +216,9 @@ pub fn run_model_run(
         }
     };
     complete_session(cfg.paths(), &mut sess, &result);
+    // The provider is done: free the slot before a write that a stalled
+    // stdout could block.
+    drop(release);
     // The live mirror already showed the transcript; the formatted review
     // follows it.
     if let Err(e) = env.stdout.write_all(format!("\n{out}").as_bytes()) {

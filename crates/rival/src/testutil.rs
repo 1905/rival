@@ -309,6 +309,7 @@ pub fn with_env(
             stdin,
             stdout: &mut stdout,
             stderr: &mut stderr,
+            live_stdout: None,
             prepare_mr: prepare,
             signals: false,
         };
@@ -372,6 +373,7 @@ pub fn execute(fix: &Fixture, stdin: &mut FakeStdin, args: &[&str]) -> (i32, Str
             stdin,
             stdout: &mut stdout,
             stderr: &mut stderr,
+            live_stdout: None,
             prepare_mr: &*prepare,
             signals: false,
         };

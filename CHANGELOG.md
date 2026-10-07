@@ -22,6 +22,9 @@ The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session fil
 
 ### Fixed
 - `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+- Claude in Docker: a cancelled or timed-out run now removes its container. Before, the container kept running against the mounted project after Rival freed the queue slot.
+- `rival run`: a stdout reader that keeps the pipe open but stops reading no longer holds the run past a cancel or `RIVAL_RUN_TIMEOUT`. The live copy is dropped after the timeout; the session log keeps all output.
+- Codex reviews: a transcript with no final answer no longer counts as a review when a tool printed review-shaped JSON.
 
 ### Known limits
 - The config parser is `serde-saphyr`, not Go's `yaml.v3`. Rare YAML edge cases can parse differently.

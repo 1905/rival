@@ -6,6 +6,7 @@ mod gitscope_helper;
 mod gocsv;
 mod install;
 mod merge_request;
+mod mirror;
 mod model_command;
 mod model_run;
 mod model_specs;
