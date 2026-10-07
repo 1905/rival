@@ -1722,3 +1722,19 @@ fn auto_fix_critical_high_defaults_off() {
     let (_home, missing) = loaded("");
     assert_eq!(missing.auto_fix_policy(), "off");
 }
+
+#[test]
+fn ste_rewrite_defaults_off() {
+    for (body, want) in [
+        ("efforts:\n  codex: high\n", false),
+        ("ste_rewrite: false\n", false),
+        ("ste_rewrite:\n", false),
+        ("ste_rewrite: true\n", true),
+    ] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.ste_rewrite(), want, "{body:?}");
+    }
+    let (_home, missing) = loaded("");
+    assert!(!missing.ste_rewrite());
+}

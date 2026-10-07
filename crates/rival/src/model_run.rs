@@ -12,6 +12,7 @@ use crate::model_command::{
 };
 use crate::model_specs::{ModelSpec, RunCall};
 use crate::root::{CmdEnv, CmdError};
+use crate::ste_fix;
 use crate::workdir::resolve_workdir;
 
 #[cfg(test)]
@@ -176,6 +177,17 @@ pub fn run_model_run(
     };
     // A zero exit is not a review: quota errors and empty output also exit 0.
     let log_file = sess.log_file.clone();
+    let log = ste_fix::refine(
+        &ste_fix::Rerun {
+            ctx: &ctx,
+            cfg,
+            spec,
+            workdir: &run_workdir,
+            cred_workdir: &workdir,
+        },
+        &mut sess,
+        &log,
+    );
     let out = match finish_review(cfg, spec, &mut sess, &log, &scope, &log_file) {
         Ok(out) => out,
         Err(reason) => {

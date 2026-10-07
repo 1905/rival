@@ -506,6 +506,7 @@ claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
+ste_rewrite: false             # true: one more provider call rewrites findings that use words from the STE not-approved list
 
 roles:                # optional prompt overrides
   bug_hunter: "..."   # replaces the code-review instructions
@@ -516,6 +517,7 @@ roles:                # optional prompt overrides
 - An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
 - An old `efforts.sol` key is ignored.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
+- `ste_rewrite` is off by default. When it is on and a review has 3 or more flagged words, rival calls the same provider once more with the review JSON and the flagged words. It keeps the rewrite only if the findings, files, lines, severities, categories and confidences are unchanged, text lengths stay within half to double, and the flagged-word count drops. Otherwise the original review stands. The rewrite output stays in the session log. The word list is `crates/rival-core/data/ste.json`.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
 Environment variables:
