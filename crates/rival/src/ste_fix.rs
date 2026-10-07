@@ -2,13 +2,15 @@
 //! from the Simplified Technical English not-approved list. Off unless
 //! `ste_rewrite: true` is set in `~/.rival/config.yaml`.
 
+use std::io::Write;
+
 use rival_core::cancel::Context;
 use rival_core::config::Config;
 use rival_core::logging;
 use rival_core::review;
 use rival_core::session::Session;
 
-use crate::model_command::{CancelOnDrop, read_log};
+use crate::model_command::CancelOnDrop;
 use crate::model_specs::{ModelSpec, RunCall};
 
 #[cfg(test)]
@@ -27,8 +29,11 @@ pub(crate) struct Rerun<'a> {
 /// Returns the log text the review is built from. It is `raw` unchanged
 /// unless a rewrite ran and passed [`review::ste_accept_rewrite`]. Then it
 /// is `raw` plus the rewritten review as one JSON line, and the parser
-/// takes that last review. A failed or rejected rewrite leaves `raw` alone.
-/// The provider's rewrite output stays in the session log either way.
+/// takes that last review.
+///
+/// The session log ends the same way, because the TUI and Rival.app read
+/// the last review in it. The provider's rewrite transcript moves to
+/// [`sidecar_path`], so a failed or rejected rewrite never shows up there.
 pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
     if !r.cfg.ste_rewrite() {
         return raw.to_string();
@@ -45,6 +50,10 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
         return raw.to_string();
     };
     let prompt = review::ste_rewrite_prompt(&old, &hits);
+    // Where the first run's output ends. The provider appends after it.
+    let Ok(start) = std::fs::metadata(&sess.log_file).map(|m| m.len()) else {
+        return raw.to_string();
+    };
 
     let (run_ctx, cancel) = review::with_run_timeout(r.ctx, r.cfg, 1);
     let _cancel = CancelOnDrop(cancel);
@@ -63,6 +72,15 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
         review: true,
         out: None,
     });
+    let tail = match split_off_rewrite(&sess.log_file, start) {
+        Ok(tail) => tail,
+        Err(e) => {
+            logging::warn()
+                .err(e)
+                .msg("could not move the rewrite transcript out of the session log");
+            return raw.to_string();
+        }
+    };
     match ran {
         Ok(res) if res.exit_code == 0 => {}
         Ok(res) => {
@@ -79,31 +97,59 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
         }
     }
 
-    let Ok(data) = read_log(&sess.log_file) else {
-        return raw.to_string();
-    };
-    let full = String::from_utf8_lossy(&data);
-    // The log is append-only, so the rewrite is what follows the first run.
-    let tail = full.strip_prefix(raw).unwrap_or(&full);
-    let Ok(new) = review::parse_reviewer_output(review::final_answer(tail)) else {
+    let Ok(new) = review::parse_reviewer_output(review::final_answer(&tail)) else {
         logging::warn().msg("review rewrite did not parse; keeping the original");
         return raw.to_string();
     };
+    let after = review::ste_total(&review::ste_check_output(&new));
     if !review::ste_accept_rewrite(&old, &new) {
         logging::warn()
-            .int(
-                "hits_after",
-                review::ste_total(&review::ste_check_output(&new)) as i64,
-            )
+            .int("hits_after", after as i64)
             .msg("review rewrite rejected; keeping the original");
+        return raw.to_string();
+    }
+    let line = format!("\n{}\n", review::ste_to_json(&new));
+    if let Err(e) = sess
+        .open_log()
+        .and_then(|mut f| f.write_all(line.as_bytes()))
+    {
+        // The log still ends with the original review, so the command keeps
+        // it too and every reader agrees.
+        logging::warn()
+            .err(e)
+            .msg("could not record the rewrite; keeping the original");
         return raw.to_string();
     }
     logging::info()
         .int("hits_before", before as i64)
-        .int(
-            "hits_after",
-            review::ste_total(&review::ste_check_output(&new)) as i64,
-        )
+        .int("hits_after", after as i64)
         .msg("review rewrite accepted");
-    format!("{raw}\n{}\n", review::ste_to_json(&new))
+    format!("{raw}{line}")
+}
+
+/// Where the rewrite transcript goes: the session log path plus
+/// `.ste-rewrite`.
+pub(crate) fn sidecar_path(log_file: &str) -> String {
+    format!("{log_file}.ste-rewrite")
+}
+
+/// Moves everything after byte `start` of the session log to the sidecar,
+/// cuts the log back to `start`, and returns the moved text.
+fn split_off_rewrite(log_file: &str, start: u64) -> std::io::Result<String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let mut log = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(log_file)?;
+    log.seek(SeekFrom::Start(start))?;
+    let mut tail = Vec::new();
+    log.read_to_end(&mut tail)?;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.create(true).write(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    opts.open(sidecar_path(log_file))?.write_all(&tail)?;
+    log.set_len(start)?;
+    Ok(String::from_utf8_lossy(&tail).into_owned())
 }

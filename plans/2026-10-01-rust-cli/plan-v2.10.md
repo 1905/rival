@@ -406,6 +406,7 @@ Files: new `crates/rival-core/src/envname.rs`, `crates/rival-core/src/lib.rs`, `
 | ~~Plan/antislop/security parse the whole log, not the final answer~~ | `review/planrun.go`, `cmd/command_security.go` | fixed in Go before the port; ported fixed |
 | Codex double-printed answer not deduped | same | Swift dedupes |
 | CLI output parser (`review::parse`, Go port) and TUI Result parser (`result`, app port) are two implementations | `crates/rival-core/src/{review/parse,result}.rs` | unify after P6: CLI moves to `result` once parity no longer binds it |
+| `rival run` stdout mirror write has no deadline: a reader that stays open but stops reading blocks the run past cancel and `RIVAL_RUN_TIMEOUT`, and holds the queue slot | `crates/rival-core/src/executor/subprocess.rs` `tee_line` | Go had it too (`io.MultiWriter` to `os.Stdout`, then `<-drained`). Found by the v5.0.0 Codex review. Fix: a mirror writer thread with a bounded handoff so the drain grace can drop it. |
 | Force-clearing a running ticket permits another run before its holder finishes | `queue.Clear(true)` | Running holders do not self-heal. Preserved; only waiting tickets re-create themselves. |
 | Git scope detection inherits repository overrides | `gitscope.gitCmd` | `Resolve`/`DiffStat` do not use `RepositoryEnv`; inherited `GIT_DIR` can redirect discovery. Preserve during the port. |
 | File-list merging only removes duplicates across its two inputs | `gitscope.mergeFileLists` | Duplicates inside either input remain. Preserve during the port. |
