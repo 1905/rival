@@ -369,6 +369,9 @@ fn windows_helper() {
             }
         }
         "env" => {
+            // Read the prompt first. A provider that exits before rival
+            // writes it closes the pipe, and the write fails.
+            std::io::Read::read_to_end(&mut std::io::stdin(), &mut Vec::new()).unwrap();
             let mut lines: Vec<String> = std::env::vars_os()
                 .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
                 .collect();
