@@ -261,8 +261,8 @@ fn prompts_sha256_golden() {
         ),
         (
             "reviewerJSONContract",
-            736,
-            "e5b66c4c3eee68b746bb4b4b0faf20333a726da0538cbc578040aa723bd10484",
+            1550,
+            "1e280fb0f448687e305b3930adddfd54a9fdec25bd2a134330a3ace95182923f",
         ),
     ];
     let got: Vec<_> = rust_prompts()
@@ -290,12 +290,12 @@ fn built_prompts_sha256_golden() {
         .collect();
     let want = [
         (
-            2577,
-            "8533b1ff4fae23bc07b446bf3a333814774e4d89ca3dc96612ddd6055960709e",
+            3391,
+            "088e42a71aa260abf4123d756d2ac5e9a03232e4d28c84a3724a9db56cca9f5d",
         ),
         (
-            3864,
-            "9411a12af76e4fc760164d5710efc66b1bb42d590e61287d2ea7fde32f1b92b8",
+            4678,
+            "6e1b1f2c2b692b61cd3b10a501670c631b03e03db448eeda4d11c79915c95531",
         ),
     ]
     .map(|(len, hash)| (len, hash.to_string()));
