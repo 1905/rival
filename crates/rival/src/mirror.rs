@@ -54,15 +54,19 @@ impl Shared {
     }
 }
 
-/// The stdout thread and its queue.
+/// The stdout thread and its queue, bound to the run's context. Dropping it
+/// ends the mirror (see [`Drop`] below), so every return path waits for the
+/// live copy the same way.
 pub(crate) struct LiveMirror {
     shared: Arc<Shared>,
     thread: Option<JoinHandle<()>>,
+    ctx: Context,
 }
 
 impl LiveMirror {
-    /// Starts the thread that writes queued lines to `out`.
-    pub(crate) fn spawn(mut out: Box<dyn Write + Send>) -> io::Result<LiveMirror> {
+    /// Starts the thread that writes queued lines to `out`. Writes wait on
+    /// `ctx` when the queue is full.
+    pub(crate) fn spawn(mut out: Box<dyn Write + Send>, ctx: &Context) -> io::Result<LiveMirror> {
         let shared = Arc::new(Shared::default());
         let pump = Arc::clone(&shared);
         let thread = std::thread::Builder::new()
@@ -95,22 +99,27 @@ impl LiveMirror {
         Ok(LiveMirror {
             shared,
             thread: Some(thread),
+            ctx: ctx.clone(),
         })
     }
 
-    /// The writer the provider's stdout lines go to during a run.
-    pub(crate) fn sink<'a>(&'a self, ctx: &'a Context) -> Sink<'a> {
+    /// A writer into the queue: the provider's stdout lines during the run,
+    /// then the formatted review after it.
+    pub(crate) fn sink(&self) -> Sink<'_> {
         Sink {
             shared: &self.shared,
-            ctx,
+            ctx: &self.ctx,
         }
     }
+}
 
-    /// Ends the mirror. While `ctx` is live it waits until every queued line
-    /// is written, so later output follows the live copy. Once `ctx` is done
-    /// it waits at most [`PIPE_DRAIN_GRACE`], then leaves a stuck thread
-    /// behind; the process exit ends it.
-    pub(crate) fn finish(mut self, ctx: &Context) {
+/// Ends the mirror. While the context is live it waits until every queued
+/// line is written. Once the context is done it waits at most
+/// [`PIPE_DRAIN_GRACE`], then leaves a stuck thread behind; the process
+/// exit ends it.
+impl Drop for LiveMirror {
+    fn drop(&mut self) {
+        let ctx = &self.ctx;
         let mut st = self.shared.lock();
         st.closed = true;
         self.shared.cond.notify_all();

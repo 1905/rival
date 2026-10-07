@@ -219,3 +219,20 @@ fn failed_or_cancelled_runs_remove_their_container() {
     let (name, rm) = run(Err(anyhow::anyhow!("signal: killed")));
     assert_eq!(rm, format!("rm -f {name}\n"));
 }
+
+/// A hung Docker daemon must not hold the queue slot: the cleanup gives up
+/// at its deadline and kills `docker rm`.
+#[cfg(unix)]
+#[test]
+fn container_removal_gives_up_at_its_deadline() {
+    let env = Env::new();
+    env.fake("docker", "#!/bin/sh\nexec sleep 30\n");
+    let started = std::time::Instant::now();
+    remove_container(
+        &env.config(),
+        "rival-x",
+        std::time::Duration::from_millis(300),
+    );
+    let took = started.elapsed();
+    assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+}

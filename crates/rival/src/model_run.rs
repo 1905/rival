@@ -134,12 +134,12 @@ pub fn run_model_run(
     // stdout nobody reads cannot hold the run past its context.
     let live = match env.live_stdout {
         Some(open) => Some(
-            LiveMirror::spawn(open())
+            LiveMirror::spawn(open(), &run_ctx)
                 .map_err(|e| CmdError::plain(format!("start stdout mirror: {e}")))?,
         ),
         None => None,
     };
-    let mut sink = live.as_ref().map(|m| m.sink(&run_ctx));
+    let mut sink = live.as_ref().map(LiveMirror::sink);
     let out: &mut (dyn Write + Send) = match sink.as_mut() {
         Some(sink) => sink,
         None => &mut *env.stdout,
@@ -155,9 +155,6 @@ pub fn run_model_run(
         review: opts.is_review,
         out: Some(out),
     });
-    if let Some(live) = live {
-        live.finish(&run_ctx);
-    }
     let result = match result {
         Ok(result) => result,
         Err(e) => {
@@ -220,8 +217,13 @@ pub fn run_model_run(
     // stdout could block.
     drop(release);
     // The live mirror already showed the transcript; the formatted review
-    // follows it.
-    if let Err(e) = env.stdout.write_all(format!("\n{out}").as_bytes()) {
+    // follows it, through the same queue so the run's context bounds it.
+    let text = format!("\n{out}");
+    let written = match &live {
+        Some(live) => live.sink().write_all(text.as_bytes()),
+        None => env.stdout.write_all(text.as_bytes()),
+    };
+    if let Err(e) = written {
         return Err(crate::command_plan::write_stdout_error(&e));
     }
     Ok(())

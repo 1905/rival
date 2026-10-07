@@ -46,16 +46,16 @@ impl Write for Closed {
 #[test]
 fn a_live_run_writes_every_line_in_order() {
     let out = Collect::default();
-    let mirror = LiveMirror::spawn(Box::new(out.clone())).unwrap();
     let (ctx, _cancel) = Context::background().with_cancel();
-    let mut sink = mirror.sink(&ctx);
+    let mirror = LiveMirror::spawn(Box::new(out.clone()), &ctx).unwrap();
+    let mut sink = mirror.sink();
     let mut want = Vec::new();
     for i in 0..2000 {
         let line = format!("line {i}\n");
         sink.write_all(line.as_bytes()).unwrap();
         want.extend_from_slice(line.as_bytes());
     }
-    mirror.finish(&ctx);
+    drop(mirror);
     assert_eq!(*out.0.lock().unwrap(), want);
 }
 
@@ -64,9 +64,9 @@ fn a_live_run_writes_every_line_in_order() {
 #[test]
 fn a_stalled_reader_does_not_outlive_the_context() {
     let (_unblock, rx) = mpsc::channel();
-    let mirror = LiveMirror::spawn(Box::new(Stalled(Mutex::new(rx)))).unwrap();
     let (ctx, cancel) = Context::background().with_cancel();
-    let mut sink = mirror.sink(&ctx);
+    let mirror = LiveMirror::spawn(Box::new(Stalled(Mutex::new(rx))), &ctx).unwrap();
+    let mut sink = mirror.sink();
     // Fill the queue past its limit while the context is live.
     let chunk = vec![b'x'; 64 * 1024];
     let filler = std::thread::scope(|s| {
@@ -85,7 +85,7 @@ fn a_stalled_reader_does_not_outlive_the_context() {
     assert!(filler.0, "a full queue waits while the run is live");
     assert!(filler.1 < Duration::from_secs(2), "{:?}", filler.1);
     let started = Instant::now();
-    mirror.finish(&ctx);
+    drop(mirror);
     let took = started.elapsed();
     assert!(took >= PIPE_DRAIN_GRACE - POLL, "{took:?}");
     assert!(took < PIPE_DRAIN_GRACE + Duration::from_secs(2), "{took:?}");
@@ -93,9 +93,9 @@ fn a_stalled_reader_does_not_outlive_the_context() {
 
 #[test]
 fn a_closed_reader_reports_its_error_on_later_lines() {
-    let mirror = LiveMirror::spawn(Box::new(Closed)).unwrap();
     let (ctx, _cancel) = Context::background().with_cancel();
-    let mut sink = mirror.sink(&ctx);
+    let mirror = LiveMirror::spawn(Box::new(Closed), &ctx).unwrap();
+    let mut sink = mirror.sink();
     sink.write_all(b"first\n").unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     let err = loop {
@@ -106,5 +106,5 @@ fn a_closed_reader_reports_its_error_on_later_lines() {
         std::thread::sleep(Duration::from_millis(5));
     };
     assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
-    mirror.finish(&ctx);
+    drop(mirror);
 }
