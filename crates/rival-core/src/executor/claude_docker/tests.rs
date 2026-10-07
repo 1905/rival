@@ -178,3 +178,44 @@ fn mount_source_keeps_absolute_and_joins_relative_workdirs() {
     assert_eq!(mount("sub/../x"), format!("{work}/sub/../x:/workspace:ro"));
     assert_eq!(mount(r"C:\repo"), format!(r"{work}/C:\repo:/workspace:ro"));
 }
+
+/// The run names its container after the session, and removes it unless
+/// docker exited 0 (when `--rm` already did). Killing the docker client on
+/// a cancel or timeout leaves the container running against the mount.
+#[cfg(unix)]
+#[test]
+fn failed_or_cancelled_runs_remove_their_container() {
+    let mut env = Env::new();
+    env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("tok"));
+    let calls = fake_docker(&env, 0, 0, 0);
+    let cfg = env.config();
+    let run = |result: anyhow::Result<RunResult>| {
+        let _ = std::fs::remove_file(&calls);
+        let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, "/repo");
+        let mut seen = None;
+        let _ = run_claude_docker_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "high",
+            "/repo",
+            config::CLAUDE_MODEL,
+            true,
+            crate::executor::testutil::recorder(&mut seen, result),
+        );
+        let args = seen.unwrap().args;
+        let i = args.iter().position(|a| a == "--name").unwrap();
+        assert_eq!(args[i + 1], container_name(&sess.id));
+        let rm = std::fs::read_to_string(&calls).unwrap_or_default();
+        (container_name(&sess.id), rm)
+    };
+    let (_, rm) = run(Ok(RunResult::default()));
+    assert_eq!(rm, "", "exit 0: --rm already removed it");
+    let (name, rm) = run(Ok(RunResult {
+        exit_code: 137,
+        ..RunResult::default()
+    }));
+    assert_eq!(rm, format!("rm -f {name}\n"));
+    let (name, rm) = run(Err(anyhow::anyhow!("signal: killed")));
+    assert_eq!(rm, format!("rm -f {name}\n"));
+}

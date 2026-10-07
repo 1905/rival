@@ -182,10 +182,13 @@ fn claude_docker_review_mount_is_read_only() {
         text.contains("Read,Glob,Grep"),
         "unsafe Docker review: {text}"
     );
+    let name = crate::executor::claude_docker::container_name(&sess.id);
     let mut want = strings(&[
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &format!("{repo}:/workspace:ro"),
         "-w",
@@ -353,10 +356,13 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
     )
     .unwrap();
     let seen = seen.unwrap();
+    let name = crate::executor::claude_docker::container_name(&sess.id);
     let mut want = strings(&[
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &format!("{}/./rel:/workspace", env.work_str()),
         "-w",

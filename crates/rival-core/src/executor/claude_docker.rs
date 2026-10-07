@@ -142,10 +142,15 @@ pub(crate) fn run_claude_docker_with(
     if read_only {
         mount.push_str(":ro");
     }
+    // A known name lets a cancelled run remove its container: killing the
+    // docker client does not stop the container it started.
+    let name = container_name(&sess.id);
     let mut args: Vec<String> = [
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &mount,
         "-w",
@@ -171,5 +176,32 @@ pub(crate) fn run_claude_docker_with(
         drop_env: &[],
         environ: cfg.environ(),
     };
-    spawn(sess, &req)
+    let result = spawn(sess, &req);
+    // Exit 0 means the container ended and `--rm` removed it. Anything else
+    // (a provider error, a timeout, a cancel) may leave it running against
+    // the mounted project, so remove it before the queue slot is released.
+    if !matches!(&result, Ok(r) if r.exit_code == 0) {
+        remove_container(cfg, &name);
+    }
+    result
+}
+
+/// The container name for a session's Claude run.
+pub(crate) fn container_name(session_id: &str) -> String {
+    format!("rival-{session_id}")
+}
+
+/// `docker rm -f <name>`. A container `--rm` already removed is not an
+/// error worth reporting.
+fn remove_container(cfg: &Config, name: &str) {
+    let (out, res) = oscmd::run(cfg, "docker", &["rm", "-f", name], Output::Combined);
+    if let Err(e) = res {
+        let text = String::from_utf8_lossy(&out);
+        if !text.contains("No such container") {
+            logging::warn()
+                .err(e)
+                .str("container", name)
+                .msg("could not remove the Claude container");
+        }
+    }
 }
