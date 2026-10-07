@@ -351,8 +351,15 @@ fn windows_helper() {
         "echo" => {
             let mut input = String::new();
             std::io::Read::read_to_string(&mut std::io::stdin(), &mut input).unwrap();
-            println!("out:{input}");
-            eprintln!("err:{input}");
+            // One write per line. Unbuffered stderr would send `eprintln!`'s
+            // pieces as separate writes, and the merged log could put a
+            // stdout chunk between "err:" and the prompt.
+            let mut out = std::io::stdout().lock();
+            std::io::Write::write_all(&mut out, format!("out:{input}\n").as_bytes()).unwrap();
+            std::io::Write::flush(&mut out).unwrap();
+            drop(out);
+            std::io::Write::write_all(&mut std::io::stderr(), format!("err:{input}\n").as_bytes())
+                .unwrap();
             let args: Vec<String> = std::env::args()
                 .skip_while(|a| a != ARGS_MARK)
                 .skip(1)
