@@ -32,9 +32,8 @@ pub use prompt::build_reviewer_prompt;
 pub use security::{format_security_console, format_security_result, validate_security_result};
 pub use slots::{GroupSlot, SkippedCLI, SlotRelease, format_skipped, wait_for_group_slot};
 pub use ste::{
-    Hit as SteHit, MIN_HITS as STE_MIN_HITS, accept_rewrite as ste_accept_rewrite,
-    check_finding as ste_check_finding, check_output as ste_check_output,
-    check_text as ste_check_text, rewrite_prompt as ste_rewrite_prompt, to_json as ste_to_json,
-    total as ste_total,
+    MIN_HITS as STE_MIN_HITS, check_output as ste_check_output,
+    rewrite_keeps_shape as ste_rewrite_keeps_shape, rewrite_prompt as ste_rewrite_prompt,
+    to_json as ste_to_json, total as ste_total,
 };
 pub use types::{ReviewerFinding, ReviewerOutput};

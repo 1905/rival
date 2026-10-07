@@ -189,7 +189,7 @@ static CODEX_ANSWER_HEADER: LazyLock<Regex> =
 pub fn final_answer(raw: &str) -> &str {
     match CODEX_ANSWER_HEADER.find_iter(raw).last() {
         Some(m) => &raw[m.end()..],
-        None if crate::result::is_codex_transcript(raw) => &raw[raw.len()..],
+        None if crate::result::is_codex_transcript(raw) => "",
         None => raw,
     }
 }

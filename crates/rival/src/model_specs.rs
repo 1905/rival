@@ -183,7 +183,9 @@ pub fn claude_spec() -> ModelSpec {
         parse: parser::parse_claude_args,
         preflight: Box::new(|cfg, _| executor::claude_preflight(cfg)),
         run: Box::new(|c| {
-            executor::run_claude(c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.out)
+            executor::run_claude(
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.out,
+            )
         }),
     }
 }

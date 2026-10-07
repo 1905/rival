@@ -167,7 +167,7 @@ pub fn run_model_command(
         // A zero exit is not a review: quota errors and empty output also
         // exit 0.
         let log_file = sess.log_file.clone();
-        let review_text = ste_fix::refine(
+        let rewrite = ste_fix::refine(
             &ste_fix::Rerun {
                 ctx: &ctx,
                 cfg,
@@ -178,6 +178,10 @@ pub fn run_model_command(
             &mut sess,
             &log_text,
         );
+        let review_text = match rewrite {
+            Some(line) => std::borrow::Cow::Owned(format!("{log_text}{line}")),
+            None => std::borrow::Cow::Borrowed(log_text.as_str()),
+        };
         match finish_review(cfg, spec, &mut sess, &review_text, &scope, &log_file) {
             Err(reason) => {
                 exit_code = 1;

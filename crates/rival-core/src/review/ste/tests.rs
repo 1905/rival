@@ -153,29 +153,29 @@ fn rewrite_prompt_carries_json_words_and_rules() {
 }
 
 #[test]
-fn accepts_a_cleaner_rewrite_only() {
+fn a_rewrite_must_keep_the_shape() {
     let old = review("Ensure the lock is held. Verify that it is.");
     let good = review("Make sure that the lock is held. Check that it is.");
-    assert!(accept_rewrite(&old, &good));
-    // No improvement.
-    assert!(!accept_rewrite(&old, &old));
+    assert!(rewrite_keeps_shape(&old, &good));
+    // The same shape. Fewer flagged words is the caller's check.
+    assert!(rewrite_keeps_shape(&old, &old));
     // A changed non-text field.
     let mut moved = good.clone();
     moved.findings[0].line = 4;
-    assert!(!accept_rewrite(&old, &moved));
+    assert!(!rewrite_keeps_shape(&old, &moved));
     let mut sev = good.clone();
     sev.findings[0].severity = "low".into();
-    assert!(!accept_rewrite(&old, &sev));
+    assert!(!rewrite_keeps_shape(&old, &sev));
     // A dropped finding.
     let mut dropped = good.clone();
     dropped.findings.clear();
-    assert!(!accept_rewrite(&old, &dropped));
+    assert!(!rewrite_keeps_shape(&old, &dropped));
     // A body cut to almost nothing.
     let mut short = good.clone();
     short.findings[0].body = "Lock.".into();
-    assert!(!accept_rewrite(&old, &short));
+    assert!(!rewrite_keeps_shape(&old, &short));
     // A field emptied.
     let mut empty = good;
     empty.findings[0].suggestion.clear();
-    assert!(!accept_rewrite(&old, &empty));
+    assert!(!rewrite_keeps_shape(&old, &empty));
 }

@@ -144,7 +144,9 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
                     plan_model_for_cli(cli),
                     None,
                 )?,
-                "claude" => executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, None)?,
+                "claude" => {
+                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, None)?
+                }
                 _ => bail!("unsupported plan cli: {cli}"),
             };
             // `{e}`, not `{e:#}`: the error already prints as Go's *PathError.

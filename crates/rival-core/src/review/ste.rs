@@ -9,6 +9,7 @@
 //! a technical noun ("file", "list", "cover") is skipped for the same reason.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Write;
 use std::sync::LazyLock;
 
 use serde::Deserialize;
@@ -119,11 +120,6 @@ fn tokens(text: &str) -> Vec<String> {
                 || matches!(after, Some('/' | '_'))
                 || (after == Some('.') && chars.get(i + 1).is_some_and(|c| c.is_alphanumeric()))
                 || (after == Some(':') && chars.get(i + 1) == Some(&':'));
-            let skip = glued
-                || word.contains('_')
-                || word.chars().any(|c| c.is_ascii_digit())
-                || word.chars().skip(1).any(char::is_uppercase)
-                || word.chars().count() < 2;
             // "don't": an apostrophe joins the next letters to this word.
             if after == Some('\'') && chars.get(i + 1).is_some_and(|c| c.is_alphabetic()) {
                 while i < chars.len() && (chars[i].is_alphabetic() || chars[i] == '\'') {
@@ -133,6 +129,11 @@ fn tokens(text: &str) -> Vec<String> {
                 out.push(String::new());
                 continue;
             }
+            let skip = glued
+                || word.contains('_')
+                || word.chars().any(|c| c.is_ascii_digit())
+                || word.chars().skip(1).any(char::is_uppercase)
+                || word.chars().count() < 2;
             // An empty token breaks a phrase, so skipped words never join.
             out.push(if skip {
                 String::new()
@@ -146,7 +147,7 @@ fn tokens(text: &str) -> Vec<String> {
 }
 
 /// Finds not-approved words and phrases in `text`, most frequent first.
-pub fn check_text(text: &str) -> Vec<Hit> {
+fn check_text(text: &str) -> Vec<Hit> {
     let dict = &*DICT;
     let toks = tokens(text);
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
@@ -178,12 +179,17 @@ pub fn check_text(text: &str) -> Vec<Hit> {
             count,
         })
         .collect();
-    hits.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.word.cmp(&b.word)));
+    sort_hits(&mut hits);
     hits
 }
 
+/// Most frequent first, then alphabetical.
+fn sort_hits(hits: &mut [Hit]) {
+    hits.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.word.cmp(&b.word)));
+}
+
 /// Checks the free-text fields of one finding.
-pub fn check_finding(f: &ReviewerFinding) -> Vec<Hit> {
+fn check_finding(f: &ReviewerFinding) -> Vec<Hit> {
     check_text(&format!(
         "{}\n{}\n{}\n{}",
         f.title, f.body, f.failure_scenario, f.suggestion
@@ -212,7 +218,7 @@ fn merge(hits: Vec<Hit>) -> Vec<Hit> {
             .or_insert(h);
     }
     let mut hits: Vec<Hit> = by_word.into_values().collect();
-    hits.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.word.cmp(&b.word)));
+    sort_hits(&mut hits);
     hits
 }
 
@@ -226,11 +232,12 @@ pub fn total(hits: &[Hit]) -> usize {
 pub fn rewrite_prompt(out: &ReviewerOutput, hits: &[Hit]) -> String {
     let mut words = String::new();
     for h in hits.iter().take(30) {
-        if h.use_instead.is_empty() {
-            words.push_str(&format!("- {}: rephrase it\n", h.word));
+        // Writing to a String cannot fail.
+        let _ = if h.use_instead.is_empty() {
+            writeln!(words, "- {}: rephrase it", h.word)
         } else {
-            words.push_str(&format!("- {} -> {}\n", h.word, h.use_instead.join(" / ")));
-        }
+            writeln!(words, "- {} -> {}", h.word, h.use_instead.join(" / "))
+        };
     }
     let json = serde_json::to_string_pretty(out).expect("a review serializes");
     format!(
@@ -254,9 +261,10 @@ pub fn to_json(out: &ReviewerOutput) -> String {
     serde_json::to_string(out).expect("a review serializes")
 }
 
-/// Reports whether `new` is a safe replacement for `old`: the same findings
-/// with the same non-text fields, similar length, and fewer flagged words.
-pub fn accept_rewrite(old: &ReviewerOutput, new: &ReviewerOutput) -> bool {
+/// Reports whether `new` keeps the shape of `old`: the same findings with
+/// the same non-text fields, and text of similar length. The caller also
+/// requires fewer flagged words.
+pub fn rewrite_keeps_shape(old: &ReviewerOutput, new: &ReviewerOutput) -> bool {
     if old.findings.len() != new.findings.len() {
         return false;
     }
@@ -271,9 +279,7 @@ pub fn accept_rewrite(old: &ReviewerOutput, new: &ReviewerOutput) -> bool {
             && keeps_text(&a.failure_scenario, &b.failure_scenario)
             && keeps_text(&a.suggestion, &b.suggestion)
     });
-    same_shape
-        && keeps_text(&old.summary, &new.summary)
-        && total(&check_output(new)) < total(&check_output(old))
+    same_shape && keeps_text(&old.summary, &new.summary)
 }
 
 /// A text field stays empty if it was empty, stays non-empty if it was not,

@@ -26,7 +26,9 @@ pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
 }
 
 /// Go `RunClaude`: executes a prompt through the Claude Code CLI on Opus 5.5,
-/// the only model on this path.
+/// the only model on this path. `read_only` restricts tools and mounts the
+/// workdir read-only: reviews and task runs.
+#[allow(clippy::too_many_arguments)]
 pub fn run_claude(
     ctx: &Context,
     cfg: &Config,
@@ -34,6 +36,7 @@ pub fn run_claude(
     prompt: &str,
     effort: &str,
     workdir: &str,
+    read_only: bool,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_claude_model(
@@ -43,6 +46,7 @@ pub fn run_claude(
         effort,
         workdir,
         config::CLAUDE_MODEL,
+        read_only,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
 }
@@ -50,6 +54,11 @@ pub fn run_claude(
 /// Go `runClaudeModel`: runs Claude through the Claude Code CLI,
 /// auto-selecting native (claude on `PATH`) vs docker. `spawn` is the
 /// subprocess step.
+///
+/// Go derived `read_only` from the session mode. The caller passes it here
+/// instead, because this function replaces the mode with the transport
+/// ("native" or "docker"): a second call on the same session would lose it.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_claude_model(
     cfg: &Config,
     sess: &mut Session,
@@ -57,12 +66,12 @@ pub(crate) fn run_claude_model(
     effort: &str,
     workdir: &str,
     model: &str,
+    read_only: bool,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
         bail!("unsupported Claude Code model {}", quote(model));
     }
-    let read_only = sess.mode == "review" || session::is_task_mode(&sess.mode);
     let result = if oscmd::look_path(cfg, "claude").is_ok() {
         set_claude_transport_mode(sess, "native");
         run_claude_native(cfg, sess, prompt, effort, workdir, model, read_only, spawn)

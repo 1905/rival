@@ -125,16 +125,16 @@ impl Drop for LiveMirror {
         self.shared.cond.notify_all();
         let mut grace = None;
         while !st.done {
-            if grace.is_none() && ctx.is_done() {
-                grace = Some(std::time::Instant::now() + PIPE_DRAIN_GRACE);
-            }
-            if grace.is_some_and(|g| std::time::Instant::now() >= g) {
-                logging::warn()
-                    .dur("grace", PIPE_DRAIN_GRACE)
-                    .msg("stdout is not being read — leaving the live output");
-                drop(st);
-                drop(self.thread.take());
-                return;
+            if ctx.is_done() {
+                let end =
+                    *grace.get_or_insert_with(|| std::time::Instant::now() + PIPE_DRAIN_GRACE);
+                if std::time::Instant::now() >= end {
+                    // Returning drops the thread's handle, which detaches it.
+                    logging::warn()
+                        .dur("grace", PIPE_DRAIN_GRACE)
+                        .msg("stdout is not being read — leaving the live output");
+                    return;
+                }
             }
             st = self
                 .shared

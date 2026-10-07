@@ -19,8 +19,8 @@ struct Setup {
     fx: Fixture,
     sess: Session,
     calls: Rc<RefCell<Vec<String>>>,
-    /// The session mode each provider call saw.
-    modes: Rc<RefCell<Vec<String>>>,
+    /// The review flag each provider call got.
+    reviews: Rc<RefCell<Vec<bool>>>,
     spec: ModelSpec,
 }
 
@@ -43,15 +43,14 @@ fn setup(yaml: &str, second: Option<&str>) -> Setup {
     )
     .unwrap();
     let calls = Rc::new(RefCell::new(Vec::new()));
-    let modes = Rc::new(RefCell::new(Vec::new()));
+    let reviews = Rc::new(RefCell::new(Vec::new()));
     let mut spec = fake_spec(&fake_run(""));
     let seen = Rc::clone(&calls);
-    let seen_modes = Rc::clone(&modes);
+    let seen_reviews = Rc::clone(&reviews);
     let second = second.map(str::to_string);
     spec.run = Box::new(move |c| {
         seen.borrow_mut().push(c.prompt.to_string());
-        seen_modes.borrow_mut().push(c.sess.mode.clone());
-        assert!(c.review, "the rewrite runs read-only");
+        seen_reviews.borrow_mut().push(c.review);
         assert!(c.out.is_none(), "the rewrite is not mirrored");
         let Some(text) = &second else {
             anyhow::bail!("provider down");
@@ -68,7 +67,7 @@ fn setup(yaml: &str, second: Option<&str>) -> Setup {
         fx,
         sess,
         calls,
-        modes,
+        reviews,
         spec,
     }
 }
@@ -86,6 +85,7 @@ fn run(s: &mut Setup, raw: &str) -> String {
         &mut s.sess,
         raw,
     )
+    .map_or_else(|| raw.to_string(), |line| format!("{raw}{line}"))
 }
 
 /// What the TUI and Rival.app show for the session log.
@@ -201,16 +201,15 @@ fn provider_failure_keeps_the_original() {
     assert_eq!(std::fs::read_to_string(&s.sess.log_file).unwrap(), raw);
 }
 
-/// Claude's first run records its transport ("native") as the session mode,
-/// and Claude derives read-only permissions from the mode. The rewrite call
-/// must still run as a review.
+/// The rewrite runs read-only. Claude's first run replaces the session mode
+/// with its transport ("native"), so the flag, not the mode, must say so.
 #[test]
-fn rewrite_runs_as_a_review_after_the_transport_replaced_the_mode() {
+fn rewrite_runs_read_only_after_the_transport_replaced_the_mode() {
     let mut s = setup("ste_rewrite: true\n", Some(CLEAN));
     s.sess.mode = "native".into();
     std::fs::write(&s.sess.log_file, format!("{DIRTY}\n")).unwrap();
     run(&mut s, &format!("{DIRTY}\n"));
-    assert_eq!(*s.modes.borrow(), ["review"]);
+    assert_eq!(*s.reviews.borrow(), [true]);
 }
 
 /// A sidecar that cannot be written still leaves the log without the

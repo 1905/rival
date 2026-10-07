@@ -11,7 +11,7 @@ use rival_core::review;
 use rival_core::session::Session;
 
 use crate::model_command::CancelOnDrop;
-use crate::model_specs::{ModelSpec, RunCall, session_mode};
+use crate::model_specs::{ModelSpec, RunCall};
 
 #[cfg(test)]
 mod tests;
@@ -26,41 +26,30 @@ pub(crate) struct Rerun<'a> {
     pub cred_workdir: &'a str,
 }
 
-/// Returns the log text the review is built from. It is `raw` unchanged
-/// unless a rewrite ran and passed [`review::ste_accept_rewrite`]. Then it
-/// is `raw` plus the rewritten review as one JSON line, and the parser
-/// takes that last review.
+/// Returns the text to append to the log the review is built from: the
+/// rewritten review as one JSON line, when a rewrite ran and was accepted.
+/// The parser takes that last review. `None` keeps the original.
 ///
-/// The session log ends the same way, because the TUI and Rival.app read
+/// The session log gets the same line, because the TUI and Rival.app read
 /// the last review in it. The provider's rewrite transcript moves to
 /// [`sidecar_path`], so a failed or rejected rewrite never shows up there.
-pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
+pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> Option<String> {
     if !r.cfg.ste_rewrite() {
-        return raw.to_string();
+        return None;
     }
-    let Ok(old) = review::parse_reviewer_output(review::final_answer(raw)) else {
-        return raw.to_string();
-    };
+    let old = review::parse_reviewer_output(review::final_answer(raw)).ok()?;
     let hits = review::ste_check_output(&old);
     let before = review::ste_total(&hits);
     if before < review::STE_MIN_HITS {
-        return raw.to_string();
+        return None;
     }
-    let Ok(effort) = r.spec.resolve_effort(r.cfg, "low") else {
-        return raw.to_string();
-    };
+    let effort = r.spec.resolve_effort(r.cfg, "low").ok()?;
     let prompt = review::ste_rewrite_prompt(&old, &hits);
     // Where the first run's output ends. The provider appends after it.
-    let Ok(start) = std::fs::metadata(&sess.log_file).map(|m| m.len()) else {
-        return raw.to_string();
-    };
+    let start = std::fs::metadata(&sess.log_file).ok()?.len();
 
     let (run_ctx, cancel) = review::with_run_timeout(r.ctx, r.cfg, 1);
     let _cancel = CancelOnDrop(cancel);
-    // The first run may have replaced the mode with its transport (Claude
-    // records "native" or "docker"). Adapters derive read-only permissions
-    // from the mode, so the rewrite must run as a review too.
-    sess.mode = session_mode(true).to_string();
     logging::info()
         .str("session", sess.id.as_str())
         .int("hits", before as i64)
@@ -76,41 +65,44 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
         review: true,
         out: None,
     });
+    let keep = |event: logging::Event, msg: &str| {
+        event.msg(&format!("{msg}; keeping the original"));
+        None
+    };
     let tail = match split_off_rewrite(&sess.log_file, start) {
         Ok(tail) => tail,
         Err(e) => {
-            logging::warn()
-                .err(e)
-                .msg("could not move the rewrite transcript out of the session log");
-            return raw.to_string();
+            return keep(
+                logging::warn().err(e),
+                "could not move the rewrite transcript out of the session log",
+            );
         }
     };
     match ran {
         Ok(res) if res.exit_code == 0 => {}
         Ok(res) => {
-            logging::warn()
-                .int("exit_code", res.exit_code)
-                .msg("review rewrite failed; keeping the original");
-            return raw.to_string();
+            return keep(
+                logging::warn().int("exit_code", res.exit_code),
+                "review rewrite failed",
+            );
         }
         Err(e) => {
-            logging::warn()
-                .err(format!("{e:#}"))
-                .msg("review rewrite failed; keeping the original");
-            return raw.to_string();
+            return keep(
+                logging::warn().err(format!("{e:#}")),
+                "review rewrite failed",
+            );
         }
     }
 
     let Ok(new) = review::parse_reviewer_output(review::final_answer(&tail)) else {
-        logging::warn().msg("review rewrite did not parse; keeping the original");
-        return raw.to_string();
+        return keep(logging::warn(), "review rewrite did not parse");
     };
     let after = review::ste_total(&review::ste_check_output(&new));
-    if !review::ste_accept_rewrite(&old, &new) {
-        logging::warn()
-            .int("hits_after", after as i64)
-            .msg("review rewrite rejected; keeping the original");
-        return raw.to_string();
+    if after >= before || !review::ste_rewrite_keeps_shape(&old, &new) {
+        return keep(
+            logging::warn().int("hits_after", after as i64),
+            "review rewrite rejected",
+        );
     }
     let line = format!("\n{}\n", review::ste_to_json(&new));
     if let Err(e) = sess
@@ -119,16 +111,13 @@ pub(crate) fn refine(r: &Rerun<'_>, sess: &mut Session, raw: &str) -> String {
     {
         // The log still ends with the original review, so the command keeps
         // it too and every reader agrees.
-        logging::warn()
-            .err(e)
-            .msg("could not record the rewrite; keeping the original");
-        return raw.to_string();
+        return keep(logging::warn().err(e), "could not record the rewrite");
     }
     logging::info()
         .int("hits_before", before as i64)
         .int("hits_after", after as i64)
         .msg("review rewrite accepted");
-    format!("{raw}{line}")
+    Some(line)
 }
 
 /// Where the rewrite transcript goes: the session log path plus
