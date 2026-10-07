@@ -1,6 +1,6 @@
 ---
 name: rival-plan-claude
-version: 4.2.0
+version: 5.0.0
 description: Review a plan/spec markdown document with Claude only via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan-claude.
 argument-hint: "[-re low|high|ultra] <path-to-plan.md>"
 allowed-tools: Bash, Read, Write

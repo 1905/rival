@@ -13,7 +13,7 @@ brew install 1905/tap/rival                 # the CLI (macOS and Linux)
 rival install                             # skills for Claude Code (and Codex, when detected)
 ```
 
-See [macOS](#macos), [Linux](#linux), or [Windows](#windows) for full installation steps. Windows ZIP downloads start with the first Rust CLI release. Until then, use the [source build](#build-from-source).
+See [macOS](#macos), [Linux](#linux), or [Windows](#windows) for full installation steps. Windows ZIP downloads start with v5.0.0.
 
 The optional macOS viewer installs separately: `brew install --cask 1905/tap/rival-app`. Rival.app is ad-hoc signed, not notarized. If Homebrew asks, run `brew trust --tap 1905/tap`. See [Rival.app](#rivalapp) for the DMG option.
 
@@ -61,7 +61,7 @@ Everything below is checked against the `rival` binary and its source. Commands,
 
 Choose your system below. The CLI runs on macOS, Linux and Windows. Rival.app is available only on macOS.
 
-**Release availability:** v4.1.1 and earlier contain the Go CLI for macOS and Linux. The Rust CLI and Windows archives are not published yet. Build this checkout from source to use them now.
+**Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier contain the Go CLI for macOS and Linux only.
 
 #### macOS
 
@@ -144,9 +144,7 @@ Add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file (`~/.bashr
 
 #### Windows
 
-Windows ZIP archives will be available with the first Rust CLI release. Until then, use [Build from source](#build-from-source).
-
-Once published, download your ZIP and `checksums.txt` from the same [release](https://github.com/1905/rival/releases). In Settings → System → About, check **System type**:
+Download your ZIP and `checksums.txt` from the same [release](https://github.com/1905/rival/releases). In Settings → System → About, check **System type**:
 
 | System type | Archive |
 |---|---|

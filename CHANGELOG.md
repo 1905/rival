@@ -2,31 +2,31 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 2026-10-07.
+Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-07.
 
 ## [Unreleased]
 
-### Added
-- `ste_rewrite` in `~/.rival/config.yaml` (off by default). After a review with 3 or more words from the Simplified Technical English not-approved list, rival calls the provider once more to rewrite the text fields. It keeps the rewrite only if the findings and their non-text fields are unchanged and the flagged-word count drops. The word lists ship as `crates/rival-core/data/ste.json`. On 93 findings from 24 local reviews the check flags many ordinary code words, such as `request` and `state`, so expect false positives.
+## [v5.0.0] — 2026-10-07
 
-### In progress — Rust CLI port
-
-- Replaced the Go CLI/TUI source with a Rust workspace. Commands, session files, queue behavior, provider arguments and embedded skills retain their source-derived contracts.
-- Added the TUI Result tab with findings, expandable details and Markdown. Finished runs open on Result; live runs open on Raw.
-- Added Windows process management, console-aware detach and stop recovery. Native Windows lifecycle tests passed before the release switch. macOS pipe creation and spawning now share Go's descriptor-inheritance guard.
-- Configured six release archives: macOS, Linux and Windows on amd64/arm64. Manual workflow runs build unpublished archives, render the Homebrew formula and execute each packaged version on a matching host.
-- Documented installation, checksums, PATH setup, updates and source builds for every OS. Skill version updates now target only the Rust assets.
-- Blocked repository `.env` files from setting the Rust-only `RIVAL_HOME` state override. Explicit process-environment values still work. Six direct/detached fake-provider checks passed.
-- Windows inherited-environment filters now use the operating system's case-insensitive comparison. Unix comparisons stay exact. Native Windows alias tests are pending CI.
-- Selected cargo-xwin's clang mode after the first snapshot failed on Windows ARM64. The six-target package rebuild is pending.
-- Prior checks: 1,231 Rust tests, 69 runner tests, 36 release checks and three-OS CI passed. Both final model reviews are complete. The latest focused checks and strict Clippy passed on Dell; 37 release checks passed. Final CI, packaging and code cleanup remain pending.
-- The published CLI remains Go v4.1.1. Rust releases are not published yet. YAML parser details differ; documented inherited Go bugs remain unchanged. Windows UNC network access and native TUI restoration are not verified.
+The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 84 end-to-end scenarios check them on macOS and Linux.
 
 ### Changed
+- Releases ship the Rust CLI. Homebrew installs it on macOS and Linux, from the same archive names as before.
+- `rival tui` is rebuilt. It has a Result tab with parsed findings, expandable details and Markdown. Finished runs open on Result. Live runs open on Raw.
 - `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
+- Repository `.env` files can no longer set `RIVAL_HOME`. Set it in the process environment instead.
+
+### Added
+- Windows support: `rival_windows_amd64.zip` and `rival_windows_arm64.zip`. The README has install steps. The binary is not code-signed.
+- `ste_rewrite` in `~/.rival/config.yaml` (off by default). After a review with 3 or more words from the Simplified Technical English not-approved list, rival calls the provider once more to rewrite the text fields. It keeps the rewrite only if the findings and their non-text fields are unchanged and the flagged-word count drops. The word lists ship as `crates/rival-core/data/ste.json`. On 93 findings from 24 local reviews the check flags many ordinary code words, such as `request` and `state`, so expect false positives.
 
 ### Fixed
 - `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+
+### Known limits
+- The config parser is `serde-saphyr`, not Go's `yaml.v3`. Rare YAML edge cases can parse differently.
+- Windows UNC network paths and TUI terminal restore on native Windows are not verified.
+- Inherited Go bugs listed in `plans/2026-10-01-rust-cli/plan-v2.10.md` are kept on purpose.
 
 ## [v4.2.0] — 2026-10-07
 
