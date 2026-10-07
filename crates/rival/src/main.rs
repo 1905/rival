@@ -13,6 +13,7 @@ mod queue_sessions;
 mod root;
 mod signals;
 mod startup_fds;
+mod ste_fix;
 #[cfg(test)]
 mod testutil;
 mod tree;

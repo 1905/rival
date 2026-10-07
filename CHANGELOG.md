@@ -6,6 +6,9 @@ Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 
 
 ## [Unreleased]
 
+### Added
+- `ste_rewrite` in `~/.rival/config.yaml` (off by default). After a review with 3 or more words from the Simplified Technical English not-approved list, rival calls the provider once more to rewrite the text fields. It keeps the rewrite only if the findings and their non-text fields are unchanged and the flagged-word count drops. The word lists ship as `crates/rival-core/data/ste.json`. On 93 findings from 24 local reviews the check flags many ordinary code words, such as `request` and `state`, so expect false positives.
+
 ### In progress — Rust CLI port
 
 - Replaced the Go CLI/TUI source with a Rust workspace. Commands, session files, queue behavior, provider arguments and embedded skills retain their source-derived contracts.
