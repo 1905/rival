@@ -94,6 +94,27 @@ fn unescape(s: &[u8], mode: Mode) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Decodes every valid `%XX` escape once and keeps a bad escape as it is.
+/// For MR detection only: it never fails, and it never decodes twice.
+pub(super) fn decode_once(s: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(s.len());
+    let mut i = 0;
+    while i < s.len() {
+        if s[i] == b'%'
+            && i + 2 < s.len()
+            && s[i + 1].is_ascii_hexdigit()
+            && s[i + 2].is_ascii_hexdigit()
+        {
+            out.push((unhex(s[i + 1]) << 4) | unhex(s[i + 2]));
+            i += 3;
+            continue;
+        }
+        out.push(s[i]);
+        i += 1;
+    }
+    out
+}
+
 /// Escapes `s` for the path, path-segment and host modes.
 fn escape(s: &[u8], mode: Mode) -> String {
     let mut out = String::with_capacity(s.len());

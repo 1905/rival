@@ -407,6 +407,8 @@ pub(crate) struct ExitState {
     /// The code, or -1 when a signal ended the process.
     pub(crate) code: i64,
     pub(crate) success: bool,
+    /// The raw status, for std's text (`exit status: 1`, `signal: 9 (SIGKILL)`).
+    pub(crate) status: std::process::ExitStatus,
 }
 
 /// The started provider. It stays unreaped until [`ProcessHandle::try_reap`]
@@ -474,6 +476,7 @@ impl ProcessHandle {
                 return Ok(Some(ExitState {
                     code,
                     success: libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0,
+                    status: std::os::unix::process::ExitStatusExt::from_raw(status),
                 }));
             }
             let err = io::Error::last_os_error();

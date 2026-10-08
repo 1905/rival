@@ -5,7 +5,7 @@ use std::io::Write;
 use chrono::{DateTime, FixedOffset, Local};
 use rival_core::config::{self, Config};
 use rival_core::duration;
-use rival_core::queue::{self, Entry};
+use rival_core::queue::{self, ClearReport, Entry};
 use rival_core::session::Session;
 
 use crate::root::{CmdEnv, CmdError};
@@ -30,12 +30,12 @@ pub fn queue_list_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
 /// `rival queue clear [--force]`: removes queue tickets.
 pub fn queue_clear_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     let force = inv.bool("force");
-    let removed = manager(env.cfg)
+    let report = manager(env.cfg)
         .clear(force)
         .map_err(|e| CmdError::plain(format!("clear queue: {e:#}")))?;
     let _ = env
         .stdout
-        .write_all(clear_message(removed, force).as_bytes());
+        .write_all(clear_message(report, force).as_bytes());
     Ok(())
 }
 
@@ -85,13 +85,21 @@ pub fn write_queue(out: &mut dyn Write, entries: &[Entry], now: DateTime<FixedOf
 }
 
 /// `Removed N dead tickets.` and its variants.
-pub fn clear_message(removed: usize, force: bool) -> String {
+pub fn clear_message(report: ClearReport, force: bool) -> String {
     let noun = if force { "ticket" } else { "dead ticket" };
-    if removed == 1 {
+    let removed = report.removed;
+    let mut out = if removed == 1 {
         format!("Removed 1 {noun}.\n")
     } else {
         format!("Removed {removed} {noun}s.\n")
+    };
+    // A plain clear keeps every live ticket, so only `--force` reports it.
+    if force && report.kept_live > 0 {
+        let kept = report.kept_live;
+        let s = if kept == 1 { "" } else { "s" };
+        out.push_str(&format!("Kept {kept} live running ticket{s}.\n"));
     }
+    out
 }
 
 /// `a - b` in nanoseconds, saturating at the int64 range.

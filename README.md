@@ -260,7 +260,7 @@ Top-level commands (`rival --help`):
 | `rival wait` | Blocks until detached runs finish. |
 | `rival tui` | Full-screen session monitor. |
 | `rival sessions [--active] [--recent N]` | Prints sessions as a text table. |
-| `rival queue` / `rival queue clear [--force]` | Shows queue tickets. `clear` removes dead tickets; `--force` removes all. |
+| `rival queue` / `rival queue clear [--force]` | Shows queue tickets. `clear` removes dead tickets; `--force` also removes waiting tickets and keeps live running ones. |
 | `rival install`, `rival update`, `rival version`, `rival completion` | Setup and maintenance. |
 
 `rival command` subcommands. Each reads its input from stdin.

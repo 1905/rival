@@ -1,8 +1,8 @@
 //! Git scope helpers.
 //!
-//! The `env` submodule builds the provider subprocess env. The git commands
-//! in this module inherit the caller's env unfiltered, not
-//! [`repository_env`].
+//! The `env` submodule drops git's repository overrides from an env. The git
+//! commands in this module run with [`repository_env`] of the caller's env,
+//! so an inherited `GIT_DIR` (as in a git hook) cannot change the scope.
 
 mod env;
 #[cfg(test)]
@@ -51,31 +51,15 @@ pub fn resolve(cfg: &Config, workdir: &str) -> String {
     String::new()
 }
 
-/// Combines two newline-separated file lists, deduplicating.
-///
-/// Only `b` items are checked against the set, and `b` items are
-/// never added to it: duplicates inside `a`, and duplicates inside `b` that
-/// are not in `a`, are kept.
+/// Combines two newline-separated file lists: items are trimmed, blank
+/// lines dropped, and every duplicate removed (inside one list and across
+/// both). The first occurrence keeps its place.
 fn merge_file_lists(a: &str, b: &str) -> String {
-    if a.is_empty() {
-        return b.to_string();
-    }
-    if b.is_empty() {
-        return a.to_string();
-    }
-    // Deduplicate using a set.
     let mut seen = std::collections::HashSet::new();
     let mut result = Vec::new();
-    for f in a.split('\n') {
+    for f in a.split('\n').chain(b.split('\n')) {
         let f = f.trim();
-        if !f.is_empty() {
-            seen.insert(f);
-            result.push(f);
-        }
-    }
-    for f in b.split('\n') {
-        let f = f.trim();
-        if !f.is_empty() && !seen.contains(f) {
+        if !f.is_empty() && seen.insert(f) {
             result.push(f);
         }
     }
@@ -108,7 +92,8 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
 /// Runs `git` with `args` in `workdir` and returns its stdout.
 ///
 /// - `git` is looked up in `cfg`'s `$PATH`.
-/// - The env is `cfg.environ()`, unfiltered, plus `PWD=<abs workdir>` when
+/// - The env is `cfg.environ()` without git's repository overrides
+///   ([`repository_env`]), plus `PWD=<abs workdir>` when
 ///   `workdir` is set (not on Windows, which has no `PWD`), then
 ///   duplicate names are removed.
 /// - stdin is the null device; stderr is captured and dropped (the error text never
@@ -118,7 +103,7 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
 /// every caller drops it.
 fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String> {
     let path = look_path(cfg, "git").map_err(|e| e.to_string())?;
-    let mut env: Vec<OsString> = cfg.environ().to_vec();
+    let mut env: Vec<OsString> = repository_env(cfg.environ());
     if !workdir.is_empty() && !cfg!(windows) {
         // Make the workdir absolute; a failure fails the spawn.
         let pwd = paths::abs(cfg.cwd(), Path::new(workdir))

@@ -158,15 +158,16 @@ fn resolve_merges_tracked_then_untracked() {
 }
 
 #[test]
-fn merge_file_lists_keeps_duplicate_quirks() {
+fn merge_file_lists_dedups_and_trims() {
     assert_eq!(merge_file_lists("", "x\ny"), "x\ny");
     assert_eq!(merge_file_lists("x\ny", ""), "x\ny");
-    // Items are trimmed and blank lines dropped once both lists are set.
+    // Items are trimmed and blank lines dropped.
     assert_eq!(merge_file_lists(" a \n\nb", "c\n \nb"), "a\nb\nc");
-    // Duplicates inside a, and inside b when not in a, are kept.
-    assert_eq!(merge_file_lists("a\na", "b\nb\na"), "a\na\nb\nb");
-    // A single-list result is returned untouched (no trim, no dedup).
-    assert_eq!(merge_file_lists("", "x\n\nx "), "x\n\nx ");
+    // Duplicates inside a, inside b, and across both are removed.
+    assert_eq!(merge_file_lists("a\na", "b\nb\na"), "a\nb");
+    // A single list gets the same trim and dedup.
+    assert_eq!(merge_file_lists("", "x\n\nx "), "x");
+    assert_eq!(merge_file_lists("y\ny", ""), "y");
 }
 
 #[test]
@@ -202,10 +203,10 @@ fn diff_stat_follows_resolve_modes() {
     assert!(stat.starts_with("a.go | "), "{stat:?}");
 }
 
-/// `git_cmd` does not clear the inherited env, so a caller's `GIT_DIR` points
-/// git at another repository. Pinned as-is (known bug, see the Task 2.5 report).
+/// An inherited `GIT_DIR` (as in a git hook) does not point scope
+/// detection at another repository.
 #[test]
-fn inherited_git_dir_overrides_the_workdir_repo() {
+fn inherited_git_dir_does_not_change_scope() {
     let fx = Fixture::new();
     let a = fx.init_repo();
     let b = tempfile::tempdir().unwrap();
@@ -213,12 +214,20 @@ fn inherited_git_dir_overrides_the_workdir_repo() {
     std::fs::write(b.path().join("b.go"), "package b").unwrap();
     fx.git(b.path(), &["add", "."]);
     fx.git(b.path(), &["commit", "-m", "b"]);
+    std::fs::write(a.path().join("a2.go"), "package a").unwrap();
 
-    assert_eq!(resolve(&fx.config(), &s(a.path())), "");
-    let git_dir = OsString::from(format!("GIT_DIR={}", s(&b.path().join(".git"))));
-    let cfg = fx.config_with(vec![git_dir], None);
-    // B's index against A's files: b.go deleted, a.go untracked.
-    assert_eq!(resolve(&cfg, &s(a.path())), "b.go\na.go");
+    assert_eq!(resolve(&fx.config(), &s(a.path())), "a2.go");
+    let extra = vec![
+        OsString::from(format!("GIT_DIR={}", s(&b.path().join(".git")))),
+        OsString::from(format!("GIT_WORK_TREE={}", s(b.path()))),
+        OsString::from(format!(
+            "GIT_INDEX_FILE={}",
+            s(&b.path().join(".git/index"))
+        )),
+    ];
+    let cfg = fx.config_with(extra, None);
+    assert_eq!(resolve(&cfg, &s(a.path())), "a2.go");
+    assert_eq!(diff_stat(&cfg, &s(a.path())), "");
 }
 
 #[test]
@@ -264,7 +273,7 @@ fn git_cmd_adds_no_pwd_on_windows() {
 
 /// With a workdir set and no explicit env, `PWD=<Abs(Dir)>` is appended,
 /// so it wins over an inherited PWD. The fake git sees argv0 `git`, the
-/// args, and the env unfiltered.
+/// args, and the env without repository overrides such as `GIT_DIR`.
 #[cfg(unix)]
 #[test]
 fn git_cmd_env_argv_and_pwd() {
@@ -289,7 +298,7 @@ fn git_cmd_env_argv_and_pwd() {
 
     let got = retry_busy(|| git_cmd(&cfg, &s(&link), &["diff", "--stat", "HEAD"]));
     let want = format!(
-        "{}|diff --stat HEAD|{}|/elsewhere\n",
+        "{}|diff --stat HEAD|{}|\n",
         s(&bin.path().join("git")),
         s(&link)
     );

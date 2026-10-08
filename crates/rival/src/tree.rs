@@ -279,8 +279,8 @@ pub fn build(defaults: &Defaults) -> Command {
                 string_flag("target", "auto", "skill host: auto, claude, codex, all"),
             ]),
             with_args(command("queue", "Inspect the review queue")).subcommand(
-                with_args(command("clear", "Remove dead queue tickets (--force removes all)"))
-                    .arg(bool_flag("force", "remove ALL tickets, not just dead ones")),
+                with_args(command("clear", "Remove dead queue tickets (--force also removes waiting ones)"))
+                    .arg(bool_flag("force", "also remove live waiting tickets; live running tickets stay")),
             ),
             with_args(command("run", "Run a CLI executor directly (terminal use)"))
                 .long_about("Execute a model runner with explicit flags and stream output to stdout.")

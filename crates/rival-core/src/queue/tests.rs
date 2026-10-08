@@ -365,13 +365,67 @@ fn clear_force_and_dead_only() {
     let live_file = write_raw_ticket(dir.path(), 2, own_pid(), STATE_WAITING, &[]);
 
     let m = new_test_manager(dir.path(), 1, &LiveSessions::default());
-    assert_eq!(m.clear(false).unwrap(), 1, "dead-only clear removed");
+    assert_eq!(
+        m.clear(false).unwrap(),
+        ClearReport {
+            removed: 1,
+            kept_live: 0
+        },
+        "dead-only clear"
+    );
     assert!(
         dir.path().join(&live_file).exists(),
         "dead-only clear removed a live ticket"
     );
 
-    assert_eq!(m.clear(true).unwrap(), 1, "force clear removed");
+    assert_eq!(
+        m.clear(true).unwrap(),
+        ClearReport {
+            removed: 1,
+            kept_live: 0
+        },
+        "force clear"
+    );
+}
+
+/// A live running ticket holds a real slot: force clear keeps it, and
+/// still removes dead tickets and live waiting tickets.
+#[test]
+fn clear_force_keeps_live_running() {
+    let dir = tempfile::tempdir().unwrap();
+    let dead_running = write_raw_ticket(dir.path(), 1, DEAD_PID, STATE_RUNNING, &[]);
+    let dead_waiting = write_raw_ticket(dir.path(), 2, DEAD_PID, STATE_WAITING, &[]);
+    let live_running = write_raw_ticket(dir.path(), 3, own_pid(), STATE_RUNNING, &[]);
+    let live_waiting = write_raw_ticket(dir.path(), 4, own_pid(), STATE_WAITING, &[]);
+    // Alive only through a running session (the rival process is dead).
+    let session_running = write_raw_ticket(dir.path(), 5, DEAD_PID, STATE_RUNNING, &["s1"]);
+    let live = LiveSessions::default();
+    live.set("s1", true);
+
+    let m = new_test_manager(dir.path(), 1, &live);
+    assert_eq!(
+        m.clear(true).unwrap(),
+        ClearReport {
+            removed: 3,
+            kept_live: 2
+        }
+    );
+    for f in [&dead_running, &dead_waiting, &live_waiting] {
+        assert!(!dir.path().join(f).exists(), "{f} kept");
+    }
+    for f in [&live_running, &session_running] {
+        assert!(dir.path().join(f).exists(), "{f} removed");
+    }
+
+    // Dead-only clear keeps every live ticket and counts the running ones.
+    write_raw_ticket(dir.path(), 6, own_pid(), STATE_WAITING, &[]);
+    assert_eq!(
+        m.clear(false).unwrap(),
+        ClearReport {
+            removed: 0,
+            kept_live: 2
+        }
+    );
 }
 
 // ---- record, decoder, clock and lock checks ----

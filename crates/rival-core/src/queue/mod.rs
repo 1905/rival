@@ -104,6 +104,15 @@ pub struct Entry {
     pub position: usize,
 }
 
+/// What [`Manager::clear`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ClearReport {
+    /// Tickets deleted.
+    pub removed: usize,
+    /// Running tickets kept because their run is alive.
+    pub kept_live: usize,
+}
+
 /// Coordinates one process's place in the queue. Every field is injectable
 /// for tests; use [`Manager::new`] for production values.
 pub struct Manager {
@@ -344,20 +353,27 @@ impl Manager {
         });
     }
 
-    /// Removes dead tickets, or all tickets when `force` is set (live
-    /// waiters self-heal back to the tail). Returns the number removed.
-    pub fn clear(&self, force: bool) -> anyhow::Result<usize> {
+    /// Removes dead tickets. With `force` it also removes live waiting
+    /// tickets (live waiters self-heal back to the tail). A running ticket
+    /// whose run is alive is always kept: its run holds a real slot and does
+    /// not create its ticket again.
+    pub fn clear(&self, force: bool) -> anyhow::Result<ClearReport> {
         with_lock(&self.dir, || {
-            let mut removed = 0;
+            let mut report = ClearReport::default();
             for f in self.ticket_files()? {
                 let Some(t) = self.read_ticket(&f) else {
                     continue;
                 };
-                if (force || !self.ticket_alive(&t)) && fs::remove_file(self.dir.join(&f)).is_ok() {
-                    removed += 1;
+                let alive = self.ticket_alive(&t);
+                if alive && t.state == STATE_RUNNING {
+                    report.kept_live += 1;
+                    continue;
+                }
+                if (force || !alive) && fs::remove_file(self.dir.join(&f)).is_ok() {
+                    report.removed += 1;
                 }
             }
-            Ok(removed)
+            Ok(report)
         })
     }
 

@@ -8,10 +8,9 @@
 mod tests;
 
 use std::ffi::OsString;
-use std::io::Read;
+use std::io::{PipeReader, Read};
 use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
-use std::sync::Mutex;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -19,8 +18,11 @@ use serde::Deserialize;
 use crate::cancel::{CancelFunc, Context};
 use crate::config::Config;
 use crate::executor::oscmd::{self, look_path};
-use crate::executor::process::{self, set_exec};
-use crate::executor::subprocess::{dedup_env, io_text};
+use crate::executor::process::{self, Abort, Io, ProcessHandle, set_exec};
+use crate::executor::subprocess::{
+    Drain, ERR_CLOSED, PIPE_DRAIN_GRACE, PIPE_READ_NAME, WorkerGuard, cancel_group, dedup_env,
+    io_text, reap,
+};
 use crate::gitscope;
 use crate::json;
 use crate::paths;
@@ -34,13 +36,12 @@ const MAX_DIFF_BYTES: u64 = 512 * 1024;
 /// Time limit of 2 minutes around the whole prepare.
 const PREPARE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
-/// Upper bound of one sleep while polling a git or glab child for its exit.
-const REAP_POLL_MAX: Duration = Duration::from_millis(20);
-
 /// Identifies MR-shaped input, including malformed URLs, so it cannot
 /// silently fall through to a natural-language review of the current checkout.
+/// The scope is percent-decoded once first, so `%2F-%2Fmerge_requests%2F42`
+/// is found too. A bad escape is kept, so it never hides the marker.
 pub fn contains(scope: &str) -> bool {
-    scope.contains(MARKER)
+    split_once(&url::decode_once(scope.as_bytes()), MARKER.as_bytes()).is_some()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -659,13 +660,16 @@ fn git(ctx: &Context, cfg: &Config, dir: &str, args: &[OsString]) -> Result<Vec<
 ///
 /// - `name` is looked up in `cfg`'s `$PATH`. The lookup error comes first,
 ///   then a done context, then an env with a NUL, then a missing `dir`
-///   (`chdir <dir>: <errno>`), then the spawn error.
+///   (`chdir <dir>: <errno>`), then the pipe setup and the spawn errors.
 /// - stdin is the null device. stderr is read and dropped (the error text
 ///   does not show it).
 /// - The child is spawned with a raw `execve` ([`set_exec`]), so a
 ///   shebang-less executable is `exec format error`.
-/// - Cancelling `ctx` sends SIGKILL to the child only, never to a process group. The child is always reaped
-///   before return, then both pipes are read to EOF.
+/// - The child runs in its own process group (a Job on Windows), as a
+///   provider does ([`process::start_provider`]). Cancelling `ctx` kills the
+///   whole group, then reads the pipes for at most [`PIPE_DRAIN_GRACE`]: a
+///   writer that left the group cannot hold the return. The child is always
+///   reaped before return.
 /// - The error is the exit status (`exit status: 128`, `signal: 9 (SIGKILL)`),
 ///   else the context error when the kill was sent and the child still
 ///   exited 0, else a pipe read error.
@@ -686,6 +690,19 @@ fn output(
     if dir_set && let Err(e) = std::fs::metadata(dir) {
         return Err(format!("chdir {}: {}", dir.display(), io_text(&e)));
     }
+    // Our read ends must be nonblocking (Unix) or overlapped (Windows), so
+    // the drain bound holds (see process::Abort).
+    let pipe = |what: &str| {
+        let (r, w) = process::provider_pipe(true)
+            .map_err(|e| format!("{what} pipe: {}: {}", process::PIPE_SYSCALL, io_text(&e)))?;
+        process::set_nonblocking(&r)
+            .map_err(|e| format!("{what} pipe: set nonblocking: {}", io_text(&e)))?;
+        Ok::<_, String>((r, w))
+    };
+    let (stdout_r, stdout_w) = pipe("stdout")?;
+    let (stderr_r, stderr_w) = pipe("stderr")?;
+    let abort = Abort::new().map_err(|e| format!("abort event: {}", io_text(&e)))?;
+
     let fork_error = |e: &std::io::Error| oscmd::fork_error(&path, e);
     let program = process::program_in_dir(&path, dir).map_err(|e| fork_error(&e))?;
     let mut cmd = Command::new(program);
@@ -693,129 +710,120 @@ fn output(
     if dir_set {
         cmd.current_dir(dir);
     }
+    process::configure_group(&mut cmd);
     cmd.stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = process::spawn(&mut cmd).map_err(|e| fork_error(&e))?;
+        .stdout(Stdio::from(stdout_w))
+        .stderr(Stdio::from(stderr_w));
+    let spawned = process::start_provider(&mut cmd);
+    // Closes our copies of the child's pipe ends, so EOF arrives once the
+    // child side is done.
     drop(cmd);
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
+    let mut proc: ProcessHandle = spawned.map_err(|e| fork_error(&e))?;
 
     let (wake_ctx, wake) = ctx.with_cancel();
     let wake = CancelOnDrop(wake);
-    let readers_left = Mutex::new(2usize);
-    let reader_done = || {
-        let mut left = readers_left.lock().unwrap_or_else(|e| e.into_inner());
-        *left -= 1;
-        if *left == 0 {
-            wake.0.cancel();
-        }
-    };
-    let reader_done = &reader_done;
+    let drain = Drain::new(2, wake.0.clone());
+    // `Some(err)` once the group kill ran; the kill runs at most once.
+    let mut watch: Option<Option<String>> = None;
     let joined = std::thread::scope(|s| {
         let worker = |name: &str| std::thread::Builder::new().name(name.to_string());
+        let guard = || WorkerGuard {
+            drain: &drain,
+            abort: &abort,
+        };
+        let (abort_ref, stdout_ref, stderr_ref) = (&abort, &stdout_r, &stderr_r);
         let started = (|| {
-            let out_h = worker("rival-mr-stdout").spawn_scoped(s, move || {
-                let mut buf = Vec::new();
-                let res = stdout.map_or(Ok(0), |mut r| r.read_to_end(&mut buf));
-                reader_done();
-                res.map(|_| buf)
+            let out_h = worker("rival-mr-stdout").spawn_scoped(s, {
+                let g = guard();
+                move || {
+                    let _g = g;
+                    let mut buf = Vec::new();
+                    read_pipe(stdout_ref, abort_ref, |chunk| buf.extend_from_slice(chunk))
+                        .map(|()| buf)
+                }
             })?;
-            let err_h = worker("rival-mr-stderr").spawn_scoped(s, move || {
-                let res = stderr.map_or(Ok(()), |mut r| drain(&mut r));
-                reader_done();
-                res
+            let err_h = worker("rival-mr-stderr").spawn_scoped(s, {
+                let g = guard();
+                move || {
+                    let _g = g;
+                    read_pipe(stderr_ref, abort_ref, |_| {})
+                }
             })?;
             std::io::Result::Ok((out_h, err_h))
         })();
         let (out_h, err_h) = match started {
             Ok(handles) => handles,
             Err(e) => {
-                // Never leave the child unreaped.
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("start worker thread: {}", io_text(&e)));
+                // Stop whatever started; the scope joins it. The caller
+                // kills and reaps.
+                abort_ref.fire();
+                return Err(e);
             }
         };
-        let status = reap(&mut child, ctx, &wake_ctx);
+        // Read the pipes before the reap, as the provider executor does.
+        // On cancel the whole group dies, so every writer in it closes its
+        // end. A writer outside the group is cut off after the grace.
+        wake_ctx.wait();
+        if !drain.is_done() && !abort_ref.is_fired() {
+            watch = Some(cancel_group(&mut proc, ctx));
+            if !drain.wait_timeout(PIPE_DRAIN_GRACE) {
+                abort_ref.fire();
+            }
+        }
+        drain.wait();
         let stdout = out_h
             .join()
             .unwrap_or_else(|p| std::panic::resume_unwind(p));
         let stderr = err_h
             .join()
             .unwrap_or_else(|p| std::panic::resume_unwind(p));
-        Ok((status, stdout, stderr))
+        Ok((stdout, stderr))
     });
-    let ((status, watch), stdout, stderr_err) = joined?;
-    let status = status.map_err(|e| format!("{}: {}", process::WAIT_SYSCALL, io_text(&e)))?;
-    if !status.success() {
-        return Err(status.to_string());
+    drop(wake);
+    drop((stdout_r, stderr_r));
+    let (stdout, stderr_err) = match joined {
+        Ok(results) => results,
+        Err(e) => {
+            // Never leave the child unreaped.
+            proc.kill_group();
+            let _ = reap(&mut proc, None, &mut watch);
+            return Err(format!("start worker thread: {}", io_text(&e)));
+        }
+    };
+    // Reap the leader; a cancel seen before the reap still kills the group.
+    let state = reap(&mut proc, Some(ctx), &mut watch)
+        .map_err(|e| format!("{}: {}", process::WAIT_SYSCALL, io_text(&e)))?;
+    if !state.success {
+        return Err(state.status.to_string());
     }
-    if let Some(err) = watch {
+    if let Some(Some(err)) = watch {
         return Err(err);
     }
-    let stdout = stdout.map_err(|e| format!("read |0: {}", io_text(&e)))?;
-    stderr_err.map_err(|e| format!("read |0: {}", io_text(&e)))?;
+    let read_error = |e: PipeError| match e {
+        PipeError::Aborted => format!("read {PIPE_READ_NAME}: {ERR_CLOSED}"),
+        PipeError::Io(e) => format!("read {PIPE_READ_NAME}: {}", io_text(&e)),
+    };
+    let stdout = stdout.map_err(read_error)?;
+    stderr_err.map_err(read_error)?;
     Ok(stdout)
 }
 
-/// Reads `r` to EOF, dropping the data.
-fn drain(r: &mut impl Read) -> std::io::Result<()> {
+/// Why a pipe read stopped before EOF.
+enum PipeError {
+    /// The drain grace ended the read.
+    Aborted,
+    Io(std::io::Error),
+}
+
+/// Reads `r` to EOF and hands each chunk to `sink`; the abort ends it early.
+fn read_pipe(r: &PipeReader, abort: &Abort, mut sink: impl FnMut(&[u8])) -> Result<(), PipeError> {
     let mut buf = [0u8; 32 * 1024];
     loop {
-        match r.read(&mut buf) {
-            Ok(0) => return Ok(()),
-            Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(e) => return Err(e),
+        match process::read_some(r, &mut buf, abort) {
+            Io::Done(0) => return Ok(()),
+            Io::Done(n) => sink(&buf[..n]),
+            Io::Aborted => return Err(PipeError::Aborted),
+            Io::Err(e) => return Err(PipeError::Io(e)),
         }
     }
-}
-
-/// Polls the child until it is reaped.
-/// A cancellation seen before the reap kills the child once. Returns the
-/// status and the watcher's error: the context error when the kill was sent,
-/// `exec: canceling Cmd: <err>` when it failed, nothing when the child was
-/// already gone. `wake` is done when `ctx` is or both pipes hit EOF, which
-/// usually means the child is exiting.
-fn reap(
-    child: &mut std::process::Child,
-    ctx: &Context,
-    wake: &Context,
-) -> (std::io::Result<ExitStatus>, Option<String>) {
-    let mut watch: Option<Option<String>> = None;
-    let mut pause = Duration::from_millis(1);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return (Ok(status), watch.flatten()),
-            Ok(None) => {}
-            Err(e) => return (Err(e), watch.flatten()),
-        }
-        if watch.is_none()
-            && let Some(err) = ctx.err()
-        {
-            watch = Some(match child.kill() {
-                Ok(()) => Some(err.to_string()),
-                Err(e) if is_process_done(&e) => None,
-                Err(e) => Some(format!("exec: canceling Cmd: {}", io_text(&e))),
-            });
-        }
-        if watch.is_none() && !wake.is_done() {
-            wake.wait_timeout(pause);
-        } else {
-            std::thread::sleep(pause);
-        }
-        pause = (pause * 2).min(REAP_POLL_MAX);
-    }
-}
-
-/// ESRCH from the kill means the process is already done.
-#[cfg(unix)]
-fn is_process_done(e: &std::io::Error) -> bool {
-    e.raw_os_error() == Some(libc::ESRCH)
-}
-
-#[cfg(not(unix))]
-fn is_process_done(_e: &std::io::Error) -> bool {
-    false
 }

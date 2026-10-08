@@ -324,6 +324,7 @@ impl ProcessHandle {
         Ok(Some(ExitState {
             code: status.code().map_or(-1, |c| i64::from(c as u32)),
             success: status.success(),
+            status,
         }))
     }
 }

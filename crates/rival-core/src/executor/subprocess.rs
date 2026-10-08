@@ -68,10 +68,10 @@ const BLOCKED_ENV_PREFIXES: [&str; 16] = [
 pub const PIPE_DRAIN_GRACE: Duration = Duration::from_secs(5);
 
 /// Pipe file names in error texts: the read end is `|0`, the write end `|1`.
-const PIPE_READ_NAME: &str = "|0";
+pub(crate) const PIPE_READ_NAME: &str = "|0";
 const PIPE_WRITE_NAME: &str = "|1";
 /// Error text for IO on a pipe file closed by the drain grace.
-const ERR_CLOSED: &str = "file already closed";
+pub(crate) const ERR_CLOSED: &str = "file already closed";
 
 const STDOUT_BUF: usize = 64 * 1024;
 /// The stderr copy buffer.
@@ -364,23 +364,32 @@ impl SyncLog {
 
 /// Counts the workers still running. The last one to finish (or panic)
 /// wakes the calling thread through `wake`.
-struct Drain {
+pub(crate) struct Drain {
     remaining: Mutex<usize>,
     cond: Condvar,
     wake: CancelFunc,
 }
 
 impl Drain {
+    /// A drain for `workers` workers.
+    pub(crate) fn new(workers: usize, wake: CancelFunc) -> Drain {
+        Drain {
+            remaining: Mutex::new(workers),
+            cond: Condvar::new(),
+            wake,
+        }
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, usize> {
         self.remaining.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn is_done(&self) -> bool {
+    pub(crate) fn is_done(&self) -> bool {
         *self.lock() == 0
     }
 
     /// Waits until every worker finished or `timeout` passed.
-    fn wait_timeout(&self, timeout: Duration) -> bool {
+    pub(crate) fn wait_timeout(&self, timeout: Duration) -> bool {
         let guard = self.lock();
         let (guard, _) = self
             .cond
@@ -389,7 +398,7 @@ impl Drain {
         *guard == 0
     }
 
-    fn wait(&self) {
+    pub(crate) fn wait(&self) {
         let guard = self.lock();
         let _guard = self
             .cond
@@ -400,9 +409,9 @@ impl Drain {
 
 /// Marks a worker done, also on panic. A panicking worker fires the
 /// abort so its siblings stop too; the calling thread then kills and reaps.
-struct WorkerGuard<'a> {
-    drain: &'a Drain,
-    abort: &'a Abort,
+pub(crate) struct WorkerGuard<'a> {
+    pub(crate) drain: &'a Drain,
+    pub(crate) abort: &'a Abort,
 }
 
 impl Drop for WorkerGuard<'_> {
@@ -546,7 +555,7 @@ struct Pipes {
 
 /// Kills the group on cancellation and returns the error to report when the
 /// child itself exits 0.
-fn cancel_group(proc: &mut ProcessHandle, ctx: &Context) -> Option<String> {
+pub(crate) fn cancel_group(proc: &mut ProcessHandle, ctx: &Context) -> Option<String> {
     match proc.kill_group() {
         KillOutcome::Sent => ctx.err().map(|e| e.to_string()),
         KillOutcome::Done => None,
@@ -578,11 +587,7 @@ fn supervise(
         abort,
     } = io;
     let (wake_ctx, wake) = ctx.with_cancel();
-    let drain = Drain {
-        remaining: Mutex::new(3),
-        cond: Condvar::new(),
-        wake: wake.clone(),
-    };
+    let drain = Drain::new(3, wake.clone());
     // `Some(err)` once the group kill ran; the kill runs at most once.
     let mut watch: Option<Option<String>> = None;
     let mut aborted = false;
@@ -689,6 +694,7 @@ fn supervise(
         Ok(ExitState {
             success: false,
             code,
+            ..
         }) => code,
         Ok(_) => {
             if let Some(Some(err)) = watch {
@@ -729,7 +735,7 @@ fn supervise(
 /// kills as soon as the context is done, until the leader is reaped. The
 /// check runs before each reap attempt, and no signal is ever sent after
 /// the reap.
-fn reap(
+pub(crate) fn reap(
     proc: &mut ProcessHandle,
     ctx: Option<&Context>,
     watch: &mut Option<Option<String>>,
