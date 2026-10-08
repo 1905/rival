@@ -1,7 +1,7 @@
 # Inherited bugs Implementation Plan v1.0
 
 **Date:** 2026-10-08
-**Status:** in-progress
+**Status:** done
 **Spec:** ./spec.md
 
 **Goal:** fix the 15 problems in the spec on top of master `d66be1a` (rust-only merged), and replace the "Known Go bugs" table with a short "Known limits" list.

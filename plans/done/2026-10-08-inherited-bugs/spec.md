@@ -180,3 +180,14 @@ The Rust port kept these Go bugs on purpose, to make its output match Go (`plans
 - **P2** — Problems 4–5. One commit. Gate: the checks above, the parser cases from both test sets.
 - **P3** — Problems 6–10. One commit. Gate: the checks above, the manual force-clear check.
 - **P4** — Problems 11–15 and the Known limits list. One commit. Gate: the checks above.
+
+## As-built notes
+
+Delivered on branch `feat/inherited-bugs` (2026-10-08). Deviations from the text above:
+
+- P2: the shared decoder changes 22 bare-JSON test inputs to the TUI's result; every fixture log gives the same output. Three of them are judgement calls: in a review run a payload with a `rating` key counts as a plan payload; a plan payload before a review payload wins; an unrelated `1e999999` number makes the object invalid JSON for the scan.
+- P2: the blank-summary rule lives in the shared decoder, so the TUI and the CLI both reject it. The Codex review of the branch found the first version (CLI only).
+- P3: `queue clear --force` help text changed to say that live running tickets stay. `merge_file_lists` lost its early returns to trim and dedupe a single list the same way.
+- P3: MR git and glab now start through the provider executor. A failed kill reports `error sending signal to Cmd: …`.
+- P4: a rewritten skill file gets mode 0644 minus the umask; it no longer keeps its old mode. `RIVAL_NO_TELEMETRY` and `DO_NOT_TRACK` are gone with telemetry. Claude Docker keeps the leading-`/` check, because `/repo` is not absolute on Windows.
+- Manual Dell checks not run: no Claude Docker token on Dell. The e2e scenario `queue-clear-force-keeps-live` and the argv tests cover the two behaviours.
