@@ -256,29 +256,31 @@ fn kind_label_cases() {
 
 #[test]
 fn project_name_is_the_last_path_element() {
-    // Go filepath.Base of "/" is the host separator.
-    let root = if cfg!(windows) { r"\" } else { "/" };
     for (path, want) in [
         ("/a/b/orbit-web", "orbit-web"),
         ("/a/b/orbit-web/", "orbit-web"),
         ("", "-"),
-        ("/", root),
+        // A root has no last element and is shown whole (on Windows, was
+        // `\`).
+        ("/", "/"),
         ("plain", "plain"),
     ] {
         assert_eq!(project_name(path), want, "{path:?}");
     }
 }
 
-/// Both host rules on every platform: Windows splits at either separator and
-/// drops a drive or UNC volume; Unix keeps a backslash in the name.
+/// Windows splits at either separator and drops a drive or UNC volume;
+/// Unix keeps a backslash in the name.
 #[test]
 fn base_name_follows_each_platform_rule() {
+    #[cfg(windows)]
     for (path, want) in [
         (r"C:\work\orbit-web", "orbit-web"),
         (r"C:\work\orbit-web\", "orbit-web"),
         ("C:/work/orbit-web", "orbit-web"),
         (r"\\host\share\orbit-web", "orbit-web"),
-        (r"C:\", r"\"),
+        // A drive root has no last element and is shown whole (was `\`).
+        (r"C:\", r"C:\"),
         ("C:orbit-web", "orbit-web"),
         (r"a\b/c", "c"),
     ] {

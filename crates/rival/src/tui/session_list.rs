@@ -129,13 +129,16 @@ pub fn project_name(workdir: &str) -> String {
     return base_name(workdir).to_string();
 }
 
-/// Go: `filepath.Base` on Windows. Both separators count and a drive or UNC
-/// volume is dropped: `C:\work\app` and `\\host\share\app` give `app`, a
-/// drive root gives `\`. Session data written on Windows may use either
+/// The last element on Windows ([`std::path::Path::file_name`]). Both
+/// separators count and a drive or UNC volume is dropped: `C:\work\app` and
+/// `\\host\share\app` give `app`. A path without a last element, such as a
+/// drive root, is shown whole. Session data written on Windows may use either
 /// separator.
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg(windows)]
 fn windows_base_name(path: &str) -> String {
-    String::from_utf8_lossy(&rival_core::winpath::base(path.as_bytes())).into_owned()
+    std::path::Path::new(path)
+        .file_name()
+        .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
 /// Go: `filepath.Base` on Unix: only `/` separates, so a backslash is an

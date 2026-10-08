@@ -71,51 +71,73 @@ impl Paths {
     }
 }
 
-/// Go: `filepath.Clean` for the host, purely lexical: Unix rules, or on
-/// Windows the drive/UNC rules of [`crate::winpath`].
+/// Lexical clean for the host: Unix rules, or on Windows [`clean_windows`].
 pub fn clean(path: &Path) -> PathBuf {
     #[cfg(windows)]
-    return crate::winpath::clean_path(path);
+    return clean_windows(path);
     #[cfg(not(windows))]
     return clean_unix(path);
 }
 
-/// Go: `filepath.Join` of two elements for the host.
-pub fn join(a: &Path, b: &Path) -> PathBuf {
-    #[cfg(windows)]
-    return crate::winpath::join_paths(a, b);
-    #[cfg(not(windows))]
-    {
-        let (a_bytes, b_bytes) = (
-            a.as_os_str().as_encoded_bytes(),
-            b.as_os_str().as_encoded_bytes(),
-        );
-        match (a_bytes.is_empty(), b_bytes.is_empty()) {
-            (true, true) => PathBuf::new(),
-            (true, false) => clean_unix(b),
-            (false, true) => clean_unix(a),
-            (false, false) => {
-                let mut joined = a_bytes.to_vec();
-                joined.push(b'/');
-                joined.extend_from_slice(b_bytes);
-                // SAFETY: two valid encodings joined at an ASCII '/'.
-                clean_unix(Path::new(unsafe {
-                    OsStr::from_encoded_bytes_unchecked(&joined)
-                }))
+/// Lexical clean from the [`std::path`] components: drops `.` and empty
+/// elements, and removes a name before each `..`. A `..` stays at the start
+/// of a relative path and goes away after a root. The empty result is `.`.
+///
+/// A name that has a `:` (not valid in a Windows file name) can become a
+/// drive prefix when it is the first element, for example `a\..\c:`.
+#[cfg(windows)]
+fn clean_windows(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let rooted = path.has_root();
+    let mut parts: Vec<Component<'_>> = Vec::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if matches!(parts.last(), Some(Component::Normal(_))) {
+                    parts.pop();
+                } else if !rooted {
+                    parts.push(c);
+                }
             }
+            _ => parts.push(c),
+        }
+    }
+    let out: PathBuf = parts.iter().collect();
+    if out.as_os_str().is_empty() {
+        return PathBuf::from(".");
+    }
+    out
+}
+
+/// Joins two elements for the host and cleans the result. Empty elements
+/// are dropped. Unlike [`Path::join`], an absolute `b` does not replace `a`.
+pub fn join(a: &Path, b: &Path) -> PathBuf {
+    match (a.as_os_str().is_empty(), b.as_os_str().is_empty()) {
+        (true, true) => PathBuf::new(),
+        (true, false) => clean(b),
+        (false, true) => clean(a),
+        (false, false) => {
+            // `a.join("")` adds a separator only where `Path::push` would:
+            // a Windows drive alone (`C:`) stays drive-relative. `b` is
+            // appended as text, so its root does not replace `a`.
+            let mut joined = a.join("").into_os_string();
+            joined.push(b);
+            clean(Path::new(&joined))
         }
     }
 }
 
-/// Go: `filepath.IsAbs` for the host.
+/// An absolute path for the host: [`Path::is_absolute`] on Windows (a drive
+/// with a root, UNC or `\\?\`), a leading `/` on Unix.
 pub fn is_abs(path: &Path) -> bool {
     #[cfg(windows)]
-    return crate::winpath::is_abs_path(path);
+    return path.is_absolute();
     #[cfg(not(windows))]
     return path.as_os_str().as_encoded_bytes().first() == Some(&b'/');
 }
 
-/// Go: `filepath.Clean` with Unix rules on every platform. A backslash is an
+/// Lexical clean with Unix rules on every platform. A backslash is an
 /// ordinary byte here.
 pub fn clean_unix(path: &Path) -> PathBuf {
     let bytes = path.as_os_str().as_encoded_bytes();
@@ -150,22 +172,21 @@ pub fn clean_unix(path: &Path) -> PathBuf {
     PathBuf::from(unsafe { OsString::from_encoded_bytes_unchecked(out) })
 }
 
-/// Go: `filepath.Abs`. `cwd` is the snapshotted `os.Getwd()` result; `None`
-/// stands for a `Getwd` error, which makes a relative path fail.
+/// An absolute, cleaned path. `cwd` is the working directory snapshot;
+/// `None` stands for a failed lookup, which makes a relative path fail.
 ///
-/// Windows follows [`crate::winpath::abs_with`]: drive, root-relative, UNC
-/// and drive-relative forms; another drive's own directory comes from the
-/// OS (`std::path::absolute`, `GetFullPathNameW` like Go's `syscall.FullPath`).
+/// On Windows a relative path joins `cwd` and then [`std::path::absolute`]
+/// resolves it. That covers a root-relative `\x` (the drive of `cwd`) and a
+/// drive-relative `D:x`, which the OS resolves from that drive's own
+/// directory of this process.
 pub fn abs(cwd: Option<&Path>, path: &Path) -> Option<PathBuf> {
-    #[cfg(windows)]
-    return crate::winpath::abs_with(cwd, path, |p| std::path::absolute(p).ok());
-    #[cfg(not(windows))]
-    {
-        if is_abs(path) {
-            return Some(clean(path));
-        }
-        cwd.map(|cwd| clean(&cwd.join(path)))
+    if is_abs(path) {
+        return Some(clean(path));
     }
+    let joined = cwd?.join(path);
+    #[cfg(windows)]
+    let joined = std::path::absolute(&joined).ok()?;
+    Some(clean(&joined))
 }
 
 /// Go: `os.Getwd` on Unix. An absolute `$PWD` naming the current directory
@@ -523,7 +544,7 @@ mod tests {
         );
     }
 
-    /// The host's `clean`, `join` and `is_abs` follow its own Go rules.
+    /// The host's `clean`, `join` and `is_abs` follow the host's rules.
     #[test]
     fn host_rules_dispatch_by_platform() {
         let got = |p: &str| clean(Path::new(p)).into_os_string();
@@ -555,6 +576,264 @@ mod tests {
         assert_eq!(abs(Some(cwd), Path::new("/a/./b/")), Some("/a/b".into()));
         assert_eq!(abs(None, Path::new("/a")), Some("/a".into()));
         assert_eq!(abs(None, Path::new("rel")), None);
+    }
+
+    /// The portable clean cases, as Windows runs them: `/` becomes `\`.
+    #[cfg(windows)]
+    const CLEAN_PORTABLE: &[(&str, &str)] = &[
+        ("abc", "abc"),
+        ("abc/def", "abc/def"),
+        ("a/b/c", "a/b/c"),
+        (".", "."),
+        ("..", ".."),
+        ("../..", "../.."),
+        ("../../abc", "../../abc"),
+        ("/abc", "/abc"),
+        ("/", "/"),
+        ("", "."),
+        ("abc/", "abc"),
+        ("abc/def/", "abc/def"),
+        ("a/b/c/", "a/b/c"),
+        ("./", "."),
+        ("../", ".."),
+        ("../../", "../.."),
+        ("/abc/", "/abc"),
+        ("abc//def//ghi", "abc/def/ghi"),
+        ("abc//", "abc"),
+        ("abc/./def", "abc/def"),
+        ("/./abc/def", "/abc/def"),
+        ("abc/.", "abc"),
+        ("abc/def/ghi/../jkl", "abc/def/jkl"),
+        ("abc/def/../ghi/../jkl", "abc/jkl"),
+        ("abc/def/..", "abc"),
+        ("abc/def/../..", "."),
+        ("/abc/def/../..", "/"),
+        ("abc/def/../../..", ".."),
+        ("/abc/def/../../..", "/"),
+        ("abc/def/../../../ghi/jkl/../../../mno", "../../mno"),
+        ("/../abc", "/abc"),
+        ("a/../b:/../../c", "../c"),
+        ("abc/./../def", "def"),
+        ("abc//./../def", "def"),
+        ("abc/../../././../def", "../../def"),
+    ];
+
+    /// Windows clean cases: drives, UNC shares and device paths.
+    #[cfg(windows)]
+    const CLEAN_WINDOWS: &[(&str, &str)] = &[
+        // A drive alone stays as it is (was `c:.`).
+        (r"c:", r"c:"),
+        (r"c:\", r"c:\"),
+        (r"c:\abc", r"c:\abc"),
+        (r"c:abc\..\..\.\.\..\def", r"c:..\..\def"),
+        (r"c:\abc\def\..\..", r"c:\"),
+        (r"c:\..\abc", r"c:\abc"),
+        (r"c:..\abc", r"c:..\abc"),
+        (r"c:\b:\..\..\..\d", r"c:\d"),
+        (r"\", r"\"),
+        (r"/", r"\"),
+        (r"\\i\..\c$", r"\\i\..\c$"),
+        (r"\\i\..\i\c$", r"\\i\..\i\c$"),
+        (r"\\i\..\I\c$", r"\\i\..\I\c$"),
+        (r"\\host\share\foo\..\bar", r"\\host\share\bar"),
+        // std keeps the spelling of the UNC prefix (was `\\host\share\baz`).
+        (r"//host/share/foo/../baz", r"//host/share\baz"),
+        (r"\\host\share\foo\..\..\..\..\bar", r"\\host\share\bar"),
+        (r"\\.\C:\a\..\..\..\..\bar", r"\\.\C:\bar"),
+        (r"\\.\C:\\\\a", r"\\.\C:\a"),
+        (r"\\a\b\..\c", r"\\a\b\c"),
+        (r"\\a\b", r"\\a\b"),
+        // A first element with a `:` is a drive for std (were `.\c:`,
+        // `.\c:\foo` and `.\c:foo`).
+        (r".\c:", r"c:"),
+        (r".\c:\foo", r"c:foo"),
+        (r".\c:foo", r"c:foo"),
+        // Without a share, `//abc` is not UNC for std: one root (were
+        // `\\abc`, `\\\abc` and `\\abc\\`).
+        (r"//abc", r"\abc"),
+        (r"///abc", r"\abc"),
+        (r"//abc//", r"\abc"),
+        (r"\\?\C:\", r"\\?\C:\"),
+        (r"\\?\C:\a", r"\\?\C:\a"),
+        // A first element with a `:` is a drive for std (were `.\c:`,
+        // `.\c:`, `.\c:\a` and `..\c:`).
+        (r"a/../c:", r"c:"),
+        (r"a\..\c:", r"c:"),
+        (r"a/../c:/a", r"c:a"),
+        (r"a/../../c:", r"c:"),
+        (r"foo:bar", r"foo:bar"),
+        // std has no `\??\` prefix, so nothing is inserted (was `\.\??\a`).
+        (r"/a/../??/a", r"\??\a"),
+    ];
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_clean_folds_std_components() {
+        let got = |p: &str| clean(Path::new(p)).into_os_string();
+        for &(input, want) in CLEAN_PORTABLE {
+            let want = want.replace('/', r"\");
+            assert_eq!(got(input), OsString::from(&want), "clean({input:?})");
+            assert_eq!(got(&want), OsString::from(&want), "clean({want:?})");
+        }
+        for &(input, want) in CLEAN_WINDOWS {
+            assert_eq!(got(input), OsString::from(want), "clean({input:?})");
+            assert_eq!(got(want), OsString::from(want), "clean({want:?})");
+        }
+    }
+
+    /// Several elements join two at a time, as callers do.
+    #[cfg(windows)]
+    #[test]
+    fn windows_join_appends_and_cleans() {
+        let cases: &[(&[&str], &str)] = &[
+            (&[], ""),
+            (&[""], ""),
+            (&["/"], "/"),
+            (&["a"], "a"),
+            (&["a", "b"], "a/b"),
+            (&["a", ""], "a"),
+            (&["", "b"], "b"),
+            (&["/", "a"], "/a"),
+            (&["/", "a/b"], "/a/b"),
+            (&["/", ""], "/"),
+            (&["/a", "b"], "/a/b"),
+            (&["a", "/b"], "a/b"),
+            (&["/a", "/b"], "/a/b"),
+            (&["a/", "b"], "a/b"),
+            (&["a/", ""], "a"),
+            (&["", ""], ""),
+            (&["/", "a", "b"], "/a/b"),
+            (&["directory", "file"], r"directory\file"),
+            (&[r"C:\Windows\", "System32"], r"C:\Windows\System32"),
+            (&[r"C:\Windows\", ""], r"C:\Windows"),
+            (&[r"C:\", "Windows"], r"C:\Windows"),
+            (&["C:", "a"], "C:a"),
+            (&["C:", r"a\b"], r"C:a\b"),
+            (&["C:", "a", "b"], r"C:a\b"),
+            (&["C:", "", "b"], "C:b"),
+            (&["C:", "", "", "b"], "C:b"),
+            // A drive alone stays as it is (were `C:.`).
+            (&["C:", ""], "C:"),
+            (&["C:", "", ""], "C:"),
+            (&["C:", r"\a"], r"C:\a"),
+            (&["C:", "", r"\a"], r"C:\a"),
+            (&["C:.", "a"], "C:a"),
+            (&["C:a", "b"], r"C:a\b"),
+            (&["C:a", "b", "d"], r"C:a\b\d"),
+            (&[r"\\host\share", "foo"], r"\\host\share\foo"),
+            (&[r"\\host\share\foo"], r"\\host\share\foo"),
+            // std keeps the spelling of the UNC prefix (was
+            // `\\host\share\foo\bar`).
+            (&["//host/share", "foo/bar"], r"//host/share\foo\bar"),
+            (&[r"\"], r"\"),
+            (&[r"\", ""], r"\"),
+            (&[r"\", "a"], r"\a"),
+            // `\\` and `\\a` without a share are not UNC for std, and each
+            // pair is cleaned (were `\\a`, `\\a\b`, `\\a\b\c`, `\\a\b\c`
+            // and `\\a`).
+            (&[r"\\", "a"], r"\a"),
+            (&[r"\", "a", "b"], r"\a\b"),
+            (&[r"\\", "a", "b"], r"\a\b"),
+            (&[r"\", r"\\a\b", "c"], r"\a\b\c"),
+            (&[r"\\a", "b", "c"], r"\a\b\c"),
+            (&[r"\\a\", "b", "c"], r"\a\b\c"),
+            (&["//", "a"], r"\a"),
+            (&[r"a:\b\c", r"x\..\y:\..\..\z"], r"a:\b\z"),
+            // std has no `\??\` prefix, so nothing is inserted (was
+            // `\.\??\a`).
+            (&[r"\", r"??\a"], r"\??\a"),
+        ];
+        for &(elems, want) in cases {
+            let got = elems
+                .iter()
+                .fold(PathBuf::new(), |acc, e| join(&acc, Path::new(e)));
+            let want = want.replace('/', r"\");
+            assert_eq!(
+                got.into_os_string(),
+                OsString::from(want),
+                "join({elems:?})"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_is_abs_is_std_is_absolute() {
+        let cases = [
+            (r"C:\", true),
+            (r"c\", false),
+            (r"c::", false),
+            (r"c:", false),
+            (r"/", false),
+            (r"\", false),
+            (r"\Windows", false),
+            (r"c:a\b", false),
+            (r"c:\a\b", true),
+            (r"c:/a/b", true),
+            (r"\\host\share", true),
+            (r"\\host\share\", true),
+            (r"\\host\share\foo", true),
+            (r"//host/share/foo/bar", true),
+            (r"\\?\a\b\c", true),
+            // std has no `\??\` prefix: root-relative (was true).
+            (r"\??\a\b\c", false),
+        ];
+        for (path, want) in cases {
+            assert_eq!(is_abs(Path::new(path)), want, "is_abs({path:?})");
+        }
+        // Unix cases are never absolute without a drive, and keep their
+        // Unix answer with a `c:` prefix.
+        let unix = [
+            ("", false),
+            ("/", true),
+            ("/usr/bin/gcc", true),
+            ("..", false),
+            ("/a/../bb", true),
+            (".", false),
+            ("./", false),
+            ("lala", false),
+        ];
+        for (path, want) in unix {
+            assert!(!is_abs(Path::new(path)), "is_abs({path:?})");
+            let prefixed = format!("c:{path}");
+            assert_eq!(is_abs(Path::new(&prefixed)), want, "is_abs({prefixed:?})");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_abs_covers_drive_root_unc_and_relative_paths() {
+        let cwd = Path::new(r"C:\work\dir");
+        let abs = |p: &str| abs(Some(cwd), Path::new(p)).map(PathBuf::into_os_string);
+        assert_eq!(abs(r"D:\a\.\b\"), Some(r"D:\a\b".into()), "drive-rooted");
+        assert_eq!(abs(r"sub\..\x"), Some(r"C:\work\dir\x".into()), "relative");
+        assert_eq!(abs(""), Some(r"C:\work\dir".into()), "empty is cwd");
+        assert_eq!(abs(r"\top\x"), Some(r"C:\top\x".into()), "root-relative");
+        assert_eq!(
+            abs("/top/x"),
+            Some(r"C:\top\x".into()),
+            "slash root-relative"
+        );
+        assert_eq!(
+            abs(r"\\host\share\a\..\b"),
+            Some(r"\\host\share\b".into()),
+            "UNC"
+        );
+        // A drive-relative path takes the drive's own directory of this
+        // process from the OS, also on the drive of `cwd` (was
+        // `C:\work\dir\rel` for `c:rel`).
+        for p in [r"c:rel", r"D:rel"] {
+            let os = clean(&std::path::absolute(p).unwrap()).into_os_string();
+            assert_eq!(abs(p), Some(os), "drive-relative {p:?}");
+        }
+        // No working directory: only absolute paths resolve.
+        assert_eq!(super::abs(None, Path::new("rel")), None);
+        assert_eq!(super::abs(None, Path::new(r"\x")), None);
+        assert_eq!(super::abs(None, Path::new(r"c:rel")), None);
+        assert_eq!(
+            super::abs(None, Path::new(r"C:\x")).map(PathBuf::into_os_string),
+            Some(r"C:\x".into())
+        );
     }
 
     #[test]

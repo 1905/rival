@@ -21,7 +21,6 @@ pub mod sessionview;
 pub mod skills;
 pub mod telemetry;
 pub mod update;
-pub mod winpath;
 
 /// Build version: `RIVAL_VERSION` at compile time, else `"dev"` like Go's
 /// `var version = "dev"`. GoReleaser sets it to the tag without the `v`, as

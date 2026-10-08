@@ -294,22 +294,21 @@ fn resolve(binary: &str, environ: &[OsString], _dir: &str) -> Result<PathBuf, St
     process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string())
 }
 
-/// Go `exec.Command` plus `Start` on Windows: a bare name (`filepath.Base`
-/// of itself) is looked up in `%PATH%` with `PATHEXT`; any other name gets
-/// its `PATHEXT` extension from `lookExtensions`, a relative one against
-/// `dir` (the `cmd.Dir`).
+/// Command start on Windows: a bare name (no directory, no drive) is looked
+/// up in `%PATH%` with `PATHEXT`; any other name gets its `PATHEXT`
+/// extension from `look_extensions`, a relative one against `dir` (the
+/// child's directory).
 #[cfg(windows)]
 fn resolve(binary: &str, environ: &[OsString], dir: &str) -> Result<PathBuf, String> {
-    use super::process::windows::{LookEnv, look_extensions};
-    use crate::winpath;
+    use super::process::windows::{LookEnv, is_bare_name, look_extensions};
 
     if binary.is_empty() {
         return Err("exec: no command".to_string());
     }
-    if winpath::base(binary.as_bytes()) == binary.as_bytes() {
+    if is_bare_name(binary) {
         return process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string());
     }
-    let dir = if winpath::is_abs(binary.as_bytes()) {
+    let dir = if Path::new(binary).is_absolute() {
         ""
     } else {
         dir

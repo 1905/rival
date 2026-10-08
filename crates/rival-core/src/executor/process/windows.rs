@@ -30,7 +30,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle, OwnedHandle};
 use std::os::windows::process::CommandExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
@@ -62,7 +62,6 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use super::{Abort, ExitState, Io, KillOutcome, LookPathError};
-use crate::winpath;
 
 /// Takes ownership of a handle a Win32 call returned; NULL and
 /// `INVALID_HANDLE_VALUE` are the call's failure, reported from
@@ -507,59 +506,25 @@ pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
     check(unsafe { CloseHandle(handle) })
 }
 
-/// Go `syscall.FullPath`: `GetFullPathNameW`, which reads this process's
-/// current directory (and another drive's own directory for `D:x`). A NUL
-/// in `name` is `EINVAL`, as Go's `UTF16PtrFromString`.
-pub fn full_path(name: &OsStr) -> io::Result<std::ffi::OsString> {
-    use std::os::windows::ffi::OsStringExt;
-    use windows_sys::Win32::Storage::FileSystem::GetFullPathNameW;
-
-    let mut wide: Vec<u16> = name.encode_wide().collect();
-    if wide.contains(&0) {
-        return Err(io::ErrorKind::InvalidInput.into());
-    }
-    wide.push(0);
-    let mut buf = vec![0u16; 100];
-    loop {
-        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
-        // SAFETY: wide is NUL-terminated; buf has len writable u16s.
-        let n =
-            unsafe { GetFullPathNameW(wide.as_ptr(), len, buf.as_mut_ptr(), std::ptr::null_mut()) };
-        if n == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        if n as usize <= buf.len() {
-            // Fits: n excludes the NUL. Too small: n is the size needed.
-            buf.truncate(n as usize);
-            return Ok(std::ffi::OsString::from_wide(&buf));
-        }
-        buf.resize(n as usize, 0);
-    }
-}
-
-/// The program path std must start when the child runs in `dir`: Go's
-/// `StartProcess` rule ([`winpath::join_exe_dir_and_fname`]) with the OS
-/// [`full_path`]. An empty `dir` keeps `program`. The error is Go's
-/// `StartProcess` error (`InvalidInput` reads `invalid argument`).
+/// The program path std must start when the child runs in `dir`.
+/// `CreateProcessW` resolves a relative program against this process's
+/// directory, so a relative program joins `dir` first, and
+/// [`std::path::absolute`] resolves the result. An absolute program and an
+/// empty `dir` keep `program`. An empty program is an `InvalidInput` error.
 pub fn program_in_dir(program: &Path, dir: &Path) -> io::Result<PathBuf> {
-    if dir.as_os_str().is_empty() {
+    if dir.as_os_str().is_empty() || program.is_absolute() {
         return Ok(program.to_path_buf());
     }
-    let full = |b: &[u8]| -> io::Result<Vec<u8>> {
-        // SAFETY: winpath passes pieces of the two valid encoded paths below,
-        // split and joined only at ASCII bytes.
-        let name = unsafe { OsStr::from_encoded_bytes_unchecked(b) };
-        full_path(name).map(std::ffi::OsString::into_encoded_bytes)
-    };
-    let joined = winpath::join_exe_dir_and_fname(
-        dir.as_os_str().as_encoded_bytes(),
-        program.as_os_str().as_encoded_bytes(),
-        &full,
-    )?;
-    // SAFETY: valid encoded bytes from full_path or the input.
-    Ok(PathBuf::from(unsafe {
-        std::ffi::OsString::from_encoded_bytes_unchecked(joined)
-    }))
+    if program.as_os_str().is_empty() {
+        return Err(io::ErrorKind::InvalidInput.into());
+    }
+    std::path::absolute(dir.join(program))
+}
+
+/// A name with no directory and no drive: [`Path::file_name`] is the whole
+/// name.
+pub(crate) fn is_bare_name(name: &str) -> bool {
+    Path::new(name).file_name() == Some(OsStr::new(name))
 }
 
 /// Go `exec.ErrNotFound` on Windows.
@@ -675,21 +640,20 @@ pub fn look_path_exts(
     }
     let mut dot: Option<PathBuf> = None;
     if !no_dot {
-        let joined = winpath::join_paths(Path::new("."), Path::new(file));
+        let joined = crate::paths::join(Path::new("."), Path::new(file));
         if let Ok(f) = find_executable(&joined, exts) {
             dot = Some(f);
         }
     }
     let path_env = path_env.unwrap_or_default();
-    for dir in winpath::split_list(path_env.as_encoded_bytes()) {
-        if dir.is_empty() {
+    // `split_paths` splits at `;` and removes quotes; a quoted part may
+    // contain `;`.
+    for dir in std::env::split_paths(path_env) {
+        if dir.as_os_str().is_empty() {
             // Skipped, as PowerShell does.
             continue;
         }
-        // SAFETY: pieces of a valid encoding split at ASCII bytes.
-        let dir = unsafe { OsStr::from_encoded_bytes_unchecked(&dir) };
-        let Ok(f) = find_executable(&winpath::join_paths(Path::new(dir), Path::new(file)), exts)
-        else {
+        let Ok(f) = find_executable(&crate::paths::join(&dir, Path::new(file)), exts) else {
             continue;
         };
         if let Some(dotf) = &dot {
@@ -699,7 +663,7 @@ pub fn look_path_exts(
                 return Err(error(super::ERR_DOT.to_string(), dot));
             }
         }
-        if !winpath::is_abs_path(&f) {
+        if !f.is_absolute() {
             if dot.is_none() {
                 dot = Some(f);
             }
@@ -753,26 +717,30 @@ pub fn look_extensions(path: &str, dir: &str, env: &LookEnv) -> Result<PathBuf, 
         });
     }
     let mut path = path.to_string();
-    if winpath::base(path.as_bytes()) == path.as_bytes() {
+    if is_bare_name(&path) {
         path = format!(".\\{path}");
     }
     let exts = path_ext(env.path_ext.as_deref());
-    let ext = winpath::ext(path.as_bytes());
-    if !ext.is_empty() && exts.iter().any(|e| e.as_bytes().eq_ignore_ascii_case(ext)) {
+    let ext = Path::new(&path).extension();
+    if let Some(ext) = ext
+        && exts
+            .iter()
+            .any(|e| e.as_bytes()[1..].eq_ignore_ascii_case(ext.as_encoded_bytes()))
+    {
         // Assume the path was already resolved.
         return Ok(PathBuf::from(path));
     }
     let look = |p: &str| look_path_exts(p, &exts, None, env.no_dot, same_file);
-    let bytes = path.as_bytes();
-    if dir.is_empty()
-        || winpath::volume_name_len(bytes) != 0
-        || (bytes.len() > 1 && winpath::is_sep(bytes[0]))
-    {
+    // A drive or a root: `dir` does not apply.
+    let rooted = matches!(
+        Path::new(&path).components().next(),
+        Some(Component::Prefix(_) | Component::RootDir)
+    );
+    if dir.is_empty() || rooted {
         return look(&path);
     }
-    let joined = winpath::join(&[dir.as_bytes(), bytes]);
-    // SAFETY: built from two valid strings joined at ASCII bytes.
-    let joined = unsafe { String::from_utf8_unchecked(joined) };
+    let joined = crate::paths::join(Path::new(dir), Path::new(&path));
+    let joined = joined.to_string_lossy().into_owned();
     let lp = look(&joined)?;
     let lp = lp.to_string_lossy();
     let ext = lp.strip_prefix(&joined).unwrap_or_default();

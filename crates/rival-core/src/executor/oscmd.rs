@@ -133,8 +133,8 @@ fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
 
 #[cfg(windows)]
 fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
-    use super::process::windows::{LookEnv, look_extensions};
-    if crate::winpath::base(name.as_bytes()) == name.as_bytes() {
+    use super::process::windows::{LookEnv, is_bare_name, look_extensions};
+    if is_bare_name(name) {
         return look_path(cfg, name).map_err(|e| e.to_string());
     }
     // Go resolves a relative name against cmd.Dir at Start; callers here
@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn os_temp_dir_is_the_api_answer() {
         let got = os_temp_dir();
-        assert!(crate::winpath::is_abs(got.as_bytes()), "{got}");
+        assert!(std::path::Path::new(&got).is_absolute(), "{got}");
         assert_eq!(got, trim_temp_path(&std::env::temp_dir().to_string_lossy()));
     }
 
