@@ -1,0 +1,25 @@
+telemetry
+parser
+decoder
+formatter
+credential
+skill
+ticket
+scope
+plan
+summary
+git
+Docker
+Kimi
+Codex
+glab
+Sentry
+Claude
+Windows
+Rust
+Go
+spec
+grandchild
+dangling link
+saturating arithmetic
+gate
