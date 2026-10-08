@@ -658,13 +658,15 @@ mod tests {
         (r"\\i\..\i\c$", r"\\i\..\i\c$"),
         (r"\\i\..\I\c$", r"\\i\..\I\c$"),
         (r"\\host\share\foo\..\bar", r"\\host\share\bar"),
-        // std keeps the spelling of the UNC prefix (was `\\host\share\baz`).
-        (r"//host/share/foo/../baz", r"//host/share\baz"),
+        // The prefix is written with backslashes.
+        (r"//host/share/foo/../baz", r"\\host\share\baz"),
         (r"\\host\share\foo\..\..\..\..\bar", r"\\host\share\bar"),
         (r"\\.\C:\a\..\..\..\..\bar", r"\\.\C:\bar"),
         (r"\\.\C:\\\\a", r"\\.\C:\a"),
         (r"\\a\b\..\c", r"\\a\b\c"),
-        (r"\\a\b", r"\\a\b"),
+        // std reads a UNC share as a prefix plus its root, so the clean form
+        // ends with the root separator.
+        (r"\\a\b", r"\\a\b\"),
         // A first element with a `:` is a drive for std (were `.\c:`,
         // `.\c:\foo` and `.\c:foo`).
         (r".\c:", r"c:"),
