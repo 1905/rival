@@ -76,7 +76,7 @@
             "message": "failed to parse plan output, keeping raw",
             "fields": {
               "reviewer": "codex",
-              "error": "plan summary is empty"
+              "error": "no plan JSON payload found in output"
             }
           }
         ]

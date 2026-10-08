@@ -3,8 +3,6 @@
 
 use std::fmt::Write as _;
 
-use anyhow::bail;
-
 use super::format::{severity_tally, sorted_findings, write_finding, write_summary};
 use super::parse::payload_error;
 use super::slots::SkippedCLI;
@@ -31,9 +29,6 @@ pub struct PlanOutput {
 /// makes the payload invalid, as it does for a code review.
 pub fn parse_plan_log(raw: &str) -> anyhow::Result<PlanOutput> {
     let p = result::log_payload(raw, PayloadKind::Plan).map_err(|e| payload_error("plan", e))?;
-    if p.summary.trim().is_empty() {
-        bail!("plan summary is empty");
-    }
     Ok(PlanOutput {
         summary: p.summary,
         rating: p.rating.map_or(0, i64::from),

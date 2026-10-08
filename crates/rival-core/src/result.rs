@@ -347,7 +347,12 @@ pub fn find_payload(text: &str, kind: PayloadKind) -> Result<Payload, Option<Str
 
     for (map, _) in candidates.iter().rev().filter(|(_, r)| *r) {
         let Some(p) = decode(map) else { continue };
-        if p.summary.trim() == PLAN_EXAMPLE_SUMMARY || !(1..=10).contains(&p.rating) {
+        // A blank summary is not a plan answer: a rating with no summary
+        // must never show as a clean plan.
+        if p.summary.trim().is_empty()
+            || p.summary.trim() == PLAN_EXAMPLE_SUMMARY
+            || !(1..=10).contains(&p.rating)
+        {
             continue;
         }
         let rating = u8::try_from(p.rating).ok();
