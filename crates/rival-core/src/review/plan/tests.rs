@@ -36,7 +36,7 @@ tokens used 4321
 
 #[test]
 fn ignores_echoed_schema_example() {
-    let out = parse_plan_output(CODEX_STYLE_PLAN_LOG).unwrap();
+    let out = parse_plan_log(CODEX_STYLE_PLAN_LOG).unwrap();
     assert_eq!(out.summary, "Solid plan with two real gaps.");
     assert_eq!(out.rating, 6);
     assert_eq!(out.findings.len(), 1);
@@ -50,22 +50,22 @@ fn rejects_only_schema_example() {
         r#"{"summary":"1-3 sentence overall assessment of the plan","rating":7,"findings":[{"file":"section or heading the issue is in (or the filename)","line":0,"severity":"critical|high|medium|low","category":"bug|gap|ambiguity|scope|verification","title":"one-line description of the issue","confidence":8}]}"#,
         "\n```"
     );
-    let err = parse_plan_output(schema_only).unwrap_err();
+    let err = parse_plan_log(schema_only).unwrap_err();
     assert_eq!(err.to_string(), "no plan JSON payload found in output");
 }
 
 #[test]
 fn rejects_unrelated_json() {
     // Has neither findings nor rating.
-    assert!(parse_plan_output(r#"{"event":"done","ok":true}"#).is_err());
+    assert!(parse_plan_log(r#"{"event":"done","ok":true}"#).is_err());
     // Has findings but no rating — a reviewer payload, not a plan payload.
-    assert!(parse_plan_output(r#"{"summary":"x","findings":[]}"#).is_err());
+    assert!(parse_plan_log(r#"{"summary":"x","findings":[]}"#).is_err());
 }
 
 #[test]
 fn accepts_clean_plan() {
-    let out = parse_plan_output(r#"prose {"summary":"Airtight.","rating":9,"findings":[]} prose"#)
-        .unwrap();
+    let out =
+        parse_plan_log(r#"prose {"summary":"Airtight.","rating":9,"findings":[]} prose"#).unwrap();
     assert_eq!(
         (out.rating, out.summary.as_str(), out.findings.len()),
         (9, "Airtight.", 0)
@@ -79,7 +79,7 @@ fn drops_only_placeholder_findings() {
         r#"{"file":"path/to/file","line":0,"severity":"critical|high|medium|low","category":"bug|gap|ambiguity|scope|verification","title":"x","confidence":8},"#,
         r#"{"file":"Section 2","line":0,"severity":"medium","category":"gap","title":"real gap","body":"b","confidence":7}]}"#
     );
-    let out = parse_plan_output(raw).unwrap();
+    let out = parse_plan_log(raw).unwrap();
     assert_eq!(out.findings.len(), 1);
     assert_eq!(out.findings[0].title, "real gap");
 }
@@ -91,7 +91,7 @@ fn keeps_real_dual_category_finding() {
         r#"{"file":"a.go","line":3,"severity":"high","category":"bug|security","#,
         r#""title":"real dual-category finding","body":"b","confidence":8}]}"#
     );
-    let out = parse_plan_output(raw).unwrap();
+    let out = parse_plan_log(raw).unwrap();
     assert_eq!(out.findings.len(), 1);
     assert_eq!(out.findings[0].title, "real dual-category finding");
 }
@@ -106,7 +106,7 @@ fn drops_partially_echoed_slop_example() {
         r#"{"file":"cmd/main.go","line":20,"severity":"medium","category":"slop","#,
         r#""title":"real finding","body":"a real cut","confidence":7}]}"#
     );
-    let out = parse_plan_output(raw).unwrap();
+    let out = parse_plan_log(raw).unwrap();
     assert_eq!(out.findings.len(), 1);
     assert_eq!(out.findings[0].title, "real finding");
 }
@@ -117,28 +117,35 @@ fn drops_partially_echoed_slop_example() {
 fn rating_bounds_and_decode_errors() {
     for rating in ["0", "11", "-3"] {
         let raw = format!(r#"{{"summary":"s","rating":{rating},"findings":[]}}"#);
-        let err = parse_plan_output(&raw).unwrap_err();
+        let err = parse_plan_log(&raw).unwrap_err();
         assert_eq!(
             err.to_string(),
             "no plan JSON payload found in output",
             "{rating}"
         );
     }
-    let err = parse_plan_output(r#"{"summary":"s","rating":"7","findings":[]}"#).unwrap_err();
+    let err = parse_plan_log(r#"{"summary":"s","rating":"7","findings":[]}"#).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "no valid plan JSON payload (last decode error: invalid type: string \"7\", expected i64 at line 1 column 27)"
+        "no valid plan JSON payload (last decode error: rating: Expected to decode Int but found a string instead.)"
     );
     let err =
-        parse_plan_output(r#"{"summary":"s","rating":7,"findings":[{"line":true}]}"#).unwrap_err();
+        parse_plan_log(r#"{"summary":"s","rating":7,"findings":[{"line":true}]}"#).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "no valid plan JSON payload (last decode error: invalid type: boolean `true`, expected i64 at line 1 column 50)"
+        "no valid plan JSON payload (last decode error: findings.0.line: Expected to decode Int but found bool instead.)"
+    );
+    // An integral rating token is an Int (the old CLI decoder rejected 6.0).
+    assert_eq!(
+        parse_plan_log(r#"{"summary":"s","rating":6.0,"findings":[]}"#)
+            .unwrap()
+            .rating,
+        6
     );
     // A null rating stays 0 and is skipped; keys are exact.
-    assert!(parse_plan_output(r#"{"summary":"s","rating":null,"findings":[]}"#).is_err());
-    assert!(parse_plan_output(r#"{"summary":"s","Rating":7,"findings":[]}"#).is_err());
-    let out = parse_plan_output(r#"{"summary":"s","rating":1,"RATING":7,"findings":[]}"#).unwrap();
+    assert!(parse_plan_log(r#"{"summary":"s","rating":null,"findings":[]}"#).is_err());
+    assert!(parse_plan_log(r#"{"summary":"s","Rating":7,"findings":[]}"#).is_err());
+    let out = parse_plan_log(r#"{"summary":"s","rating":1,"RATING":7,"findings":[]}"#).unwrap();
     assert_eq!(out.rating, 1);
 }
 
@@ -160,7 +167,12 @@ fn parses_final_answer_not_tool_output() {
         "tool output parsed as the review"
     );
     // Without final_answer the tool's 10/10 would win.
-    assert_eq!(parse_plan_output(&raw).unwrap().rating, 10);
+    assert_eq!(
+        result::find_payload(&raw, PayloadKind::Plan)
+            .unwrap()
+            .rating,
+        Some(10)
+    );
     let raw = codex_tool_plan_transcript(r#"{"summary":"real","rating":4,"findings":[]}"#);
     assert_eq!(parse_plan_log(&raw).unwrap().rating, 4);
 }
@@ -294,4 +306,32 @@ fn format_plan_result_layouts() {
         format_plan_result(Some(&one_skipped), "f")
             .starts_with("\n═══ RIVAL PLAN REVIEW (codex) ═══\n")
     );
+}
+
+/// A rating with a blank summary is no plan review: the run shows its raw
+/// output (UNPARSED), not a clean plan.
+#[test]
+fn blank_summary_is_invalid() {
+    for summary in ["", "  \n ", "null"] {
+        let summary = if summary == "null" {
+            "null".to_string()
+        } else {
+            serde_json::to_string(summary).unwrap()
+        };
+        let raw = format!(r#"{{"summary":{summary},"rating":9,"findings":[]}}"#);
+        let err = parse_plan_log(&raw).unwrap_err();
+        assert_eq!(err.to_string(), "plan summary is empty", "{raw}");
+        let run = PlanRunResult {
+            results: vec![result(
+                "codex",
+                CODEX_MODEL,
+                parse_plan_log(&raw).ok(),
+                &raw,
+            )],
+            skipped: vec![],
+        };
+        let got = format_plan_result(Some(&run), "f");
+        assert!(!got.contains("No bugs or gaps found."), "{got}");
+        assert_eq!(got, config::public_runtime_log("codex", CODEX_MODEL, &raw));
+    }
 }

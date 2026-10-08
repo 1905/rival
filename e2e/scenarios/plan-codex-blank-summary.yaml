@@ -1,0 +1,118 @@
+{
+  "name": "plan-codex-blank-summary",
+  "description": "`rival command plan` with `plan.md` on stdin, default model (codex). The final answer is a plan payload with a 9/10 rating, no findings and a blank summary. A blank summary makes the payload invalid, so stdout is the raw log (the unparsed plan output), not a clean 9/10 plan. The run itself succeeded: the session completes and exit code is 0.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer the user's question directly\\. Do not offer follow-up options, menus, walkthroughs, or ask if they want more\\. No filler, no sign-offs\\. Just deliver the answer and stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou review an engineering PLAN / SPEC document \\(not source code\\)\\.[^\n]*\n\nPlan document to review: <ROOT>/work/plan\\.md\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "user\nreview the plan\ncodex\n{\"summary\":\"  \",\"rating\":9,\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n\nAdd a column, then ship.\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan"
+      ],
+      "stdin": "plan.md",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "user\nreview the plan\ncodex\n{\"summary\":\"  \",\"rating\":9,\"findings\":[]}\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "reviewer": "codex"
+            }
+          },
+          {
+            "level": "warn",
+            "message": "failed to parse plan output, keeping raw",
+            "fields": {
+              "reviewer": "codex",
+              "error": "plan summary is empty"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "plan",
+          "review_scope": "<ROOT>/work/plan.md",
+          "group_id": "<UUID2>",
+          "work_dir": "<ROOT>/work",
+          "output_bytes": 69,
+          "output_lines": 0
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "user\nreview the plan\ncodex\n{\"summary\":\"  \",\"rating\":9,\"findings\":[]}\n"
+      }
+    ],
+    "calls": {
+      "codex": 2
+    }
+  }
+}

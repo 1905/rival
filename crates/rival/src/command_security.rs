@@ -358,7 +358,7 @@ pub(crate) fn format_security_output(
     scope: &str,
     log_path: &str,
 ) -> (String, anyhow::Result<()>) {
-    let parsed = review::parse_reviewer_output(review::final_answer(raw));
+    let parsed = review::parse_reviewer_log(raw);
     if let Err(e) = &parsed {
         logging::warn()
             .err(format!("{e:#}"))

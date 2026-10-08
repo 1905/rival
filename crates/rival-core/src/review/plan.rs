@@ -3,87 +3,42 @@
 
 use std::fmt::Write as _;
 
-use anyhow::anyhow;
-use serde::Deserialize;
+use anyhow::bail;
 
 use super::format::{severity_tally, sorted_findings, write_finding, write_summary};
-use super::parse::{drop_placeholder_reviewer_findings, final_answer, has_json_key, json_objects};
+use super::parse::payload_error;
 use super::slots::SkippedCLI;
-use super::types::{ReviewerFinding, decode_payload};
+use super::types::ReviewerFinding;
 use crate::config;
+use crate::result::{self, PayloadKind};
 
 #[cfg(test)]
 mod tests;
 
 /// The structured JSON a plan reviewer emits. It mirrors
-/// [`super::ReviewerOutput`] but carries a 1-10 rating and is parsed
-/// independently.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[serde(default)]
+/// [`super::ReviewerOutput`] but carries a 1-10 rating.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlanOutput {
-    #[serde(deserialize_with = "crate::json::nullable")]
     pub summary: String,
-    #[serde(deserialize_with = "crate::json::nullable")]
     pub rating: i64,
-    #[serde(deserialize_with = "super::types::findings")]
     pub findings: Vec<ReviewerFinding>,
 }
 
-/// The exact summary string from the plan prompt's schema example. A real
-/// plan review never emits this verbatim, so it lets the parser skip the
-/// echoed schema and pick the model's real answer.
-const PLAN_EXAMPLE_SUMMARY: &str = "1-3 sentence overall assessment of the plan";
-
-/// Extracts the plan reviewer's structured JSON from raw CLI output. Like
-/// [`super::parse_reviewer_output`], the CLI echoes the prompt (with the
-/// schema example) and prints unrelated JSON, so every top-level JSON object
-/// is scanned and the LAST genuine plan payload wins — it must carry
-/// "findings", "rating" and "summary" keys and must not be the schema
-/// example itself.
-///
-/// This scans its whole argument. A provider log goes through
-/// [`final_answer`] first; see [`parse_plan_log`].
-pub fn parse_plan_output(raw: &str) -> anyhow::Result<PlanOutput> {
-    let objs = json_objects(raw);
-    let mut last_err = None;
-    for c in objs.iter().rev() {
-        // A genuine plan payload carries summary + rating + findings.
-        // Requiring all three rejects unrelated/tool JSON and reviewer
-        // (non-plan) payloads.
-        if !has_json_key(c, "findings") || !has_json_key(c, "rating") || !has_json_key(c, "summary")
-        {
-            continue;
-        }
-        let out: PlanOutput = match decode_payload(c) {
-            Ok(out) => out,
-            Err(e) => {
-                last_err = Some(e);
-                continue;
-            }
-        };
-        if out.summary.trim() == PLAN_EXAMPLE_SUMMARY {
-            continue; // the echoed schema example, not a real answer
-        }
-        if out.rating < 1 || out.rating > 10 {
-            continue; // not a real 1-10 plan rating; likely noise or a partial echo
-        }
-        return Ok(PlanOutput {
-            summary: out.summary,
-            rating: out.rating,
-            findings: drop_placeholder_reviewer_findings(out.findings),
-        });
-    }
-    match last_err {
-        Some(e) => Err(anyhow!(
-            "no valid plan JSON payload (last decode error: {e})"
-        )),
-        None => Err(anyhow!("no plan JSON payload found in output")),
-    }
-}
-
-/// Parses a provider log: [`parse_plan_output`] of its [`final_answer`].
+/// Extracts the plan reviewer's structured JSON from a provider log:
+/// [`result::log_payload`] for a plan payload, which finds the final answer
+/// and takes the last genuine plan payload in it (summary, rating and
+/// findings keys, a 1-10 rating, not the schema example). A blank summary
+/// makes the payload invalid, as it does for a code review.
 pub fn parse_plan_log(raw: &str) -> anyhow::Result<PlanOutput> {
-    parse_plan_output(final_answer(raw))
+    let p = result::log_payload(raw, PayloadKind::Plan).map_err(|e| payload_error("plan", e))?;
+    if p.summary.trim().is_empty() {
+        bail!("plan summary is empty");
+    }
+    Ok(PlanOutput {
+        summary: p.summary,
+        rating: p.rating.map_or(0, i64::from),
+        findings: p.findings.into_iter().map(ReviewerFinding::from).collect(),
+    })
 }
 
 /// Renders a single-CLI [`PlanOutput`]: the header, the file, the 1-10

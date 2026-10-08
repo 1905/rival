@@ -35,7 +35,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
 | `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
 | `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
-| `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-missing-file |
+| `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |

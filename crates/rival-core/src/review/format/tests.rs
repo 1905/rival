@@ -3,7 +3,7 @@
 use super::*;
 use crate::config::{CODEX_MODEL, PromptKind};
 use crate::review::testutil::temp_config;
-use crate::review::{build_reviewer_prompt, format_security_console, parse_reviewer_output};
+use crate::review::{build_reviewer_prompt, format_security_console, parse_reviewer_log};
 
 fn finding(file: &str, line: i64, severity: &str, title: &str, confidence: i64) -> ReviewerFinding {
     ReviewerFinding {
@@ -256,7 +256,7 @@ fn bug_hunter_clean_review_after_echoed_prompt_is_accepted() {
         "user\n{}\ncodex\n{{\"summary\": \"No issues found.\", \"findings\": []}}\ntokens used: 10\n",
         build_reviewer_prompt(&cfg, "src/", PromptKind::BugHunter)
     );
-    let parsed = parse_reviewer_output(&raw).unwrap();
+    let parsed = parse_reviewer_log(&raw).unwrap();
     validate_review_result(Some(&parsed), &raw).unwrap();
 }
 
@@ -267,7 +267,7 @@ fn bug_hunter_echo_only_is_rejected() {
         "user\n{}\ntokens used: 10\n",
         build_reviewer_prompt(&cfg, "src/", PromptKind::BugHunter)
     );
-    let parsed = parse_reviewer_output(&raw).expect("the echoed clean example should parse");
+    let parsed = parse_reviewer_log(&raw).expect("the echoed clean example should parse");
     assert!(validate_review_result(Some(&parsed), &raw).is_err());
 }
 
@@ -283,7 +283,7 @@ fn clean_review_quoting_prompt_markers_is_not_an_echo() {
         ),
         format!("tool: ## Role: Security Reviewer\n{answer}"),
     ] {
-        let out = parse_reviewer_output(&raw).unwrap();
+        let out = parse_reviewer_log(&raw).unwrap();
         validate_review_result(Some(&out), &raw).unwrap();
     }
 }
@@ -293,7 +293,7 @@ fn prompt_echo_without_answer_is_rejected() {
     let (_home, cfg) = temp_config();
     for kind in [PromptKind::BugHunter, PromptKind::Security] {
         let raw = build_reviewer_prompt(&cfg, "x", kind);
-        let Ok(out) = parse_reviewer_output(&raw) else {
+        let Ok(out) = parse_reviewer_log(&raw) else {
             continue; // the echo did not even parse: already UNPARSED
         };
         assert!(

@@ -16,7 +16,7 @@ use crate::review::plan::PlanOutput;
 use crate::review::testutil::config_in;
 use crate::session::{MODE_PLAN, MODE_SECURITY};
 
-/// A minimal valid plan payload `parse_plan_output` accepts.
+/// A minimal valid plan payload `parse_plan_log` accepts.
 const REAL_PLAN_JSON: &str = r#"{"summary":"ok plan","rating":7,"findings":[]}"#;
 
 /// How long a concurrent fake waits for its peer before it gives up. Only a
