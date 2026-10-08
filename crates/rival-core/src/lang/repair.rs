@@ -187,10 +187,13 @@ static FILE_LINE: LazyLock<Regex> =
 static PATH: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"[\w.-]*[/\\][\w./\\-]+|\b[\w-]{2,}\.[A-Za-z][A-Za-z0-9]{0,4}\b").unwrap()
 });
-static NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+(?:[.,]\d+)*").unwrap());
+/// A number with its sign: "-1" and "1" are different facts.
+static NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"-?\d+(?:[.,]\d+)*").unwrap());
+/// Text in straight or curly double quotation marks: a quoted error.
+static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#""[^"\n]+"|“[^”\n]+”"#).unwrap());
 
 /// The facts of a text field as a multiset: code fences, then code spans
-/// outside the fences, `file:line` items, paths and numbers.
+/// outside the fences, `file:line` items, paths, numbers and quoted text.
 fn facts(text: &str) -> HashMap<(u8, String), usize> {
     let mut out = HashMap::new();
     let mut add = |kind: u8, s: &str| *out.entry((kind, s.to_string())).or_insert(0) += 1;
@@ -201,7 +204,7 @@ fn facts(text: &str) -> HashMap<(u8, String), usize> {
     for m in CODE_SPAN.find_iter(&rest) {
         add(1, m.as_str());
     }
-    for (kind, re) in [(2, &FILE_LINE), (3, &PATH), (4, &NUMBER)] {
+    for (kind, re) in [(2, &FILE_LINE), (3, &PATH), (4, &NUMBER), (5, &QUOTED)] {
         for m in re.find_iter(text) {
             add(kind, m.as_str());
         }

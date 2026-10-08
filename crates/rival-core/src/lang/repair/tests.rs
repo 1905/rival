@@ -269,3 +269,28 @@ fn the_appended_line_is_what_every_reader_shows() {
     let p = result::log_payload(&log, PayloadKind::Any).unwrap();
     assert!(p.findings[0].body.contains("Make sure that"));
 }
+
+#[test]
+fn a_dropped_minus_sign_or_a_changed_quoted_error_reverts_the_field() {
+    let mut old = flagged();
+    old.findings[0].body = "Ensure the call returns -1 with \"permission denied\".".to_string();
+    let cases = [
+        "Make sure that the call returns 1 with \"permission denied\".",
+        "Make sure that the call returns -1 with \"access denied\".",
+        "Make sure that the call returns -1 with \u{201c}access denied\u{201d}.",
+    ];
+    for body in cases {
+        let mut new = repaired();
+        new.findings[0].body = body.to_string();
+        let got = guard(&old, &new).unwrap();
+        assert_eq!(got.findings[0].body, old.findings[0].body, "{body}");
+        assert_eq!(got.summary, "We use the cache.");
+    }
+    let mut new = repaired();
+    new.findings[0].body =
+        "Make sure that the call returns -1 with \"permission denied\".".to_string();
+    assert_eq!(
+        guard(&old, &new).unwrap().findings[0].body,
+        new.findings[0].body
+    );
+}
