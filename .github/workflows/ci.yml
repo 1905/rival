@@ -96,6 +96,7 @@ jobs:
         run: |
           ! git grep -n -I -E '\bGo\b|gostd|gojson|winpath|\bgo_[a-z]|[a-z]_go\b|_go_|\bGO_|\bste_|ste100|antislop' -- . \
             ':!plans' ':!CHANGELOG.md' ':!.github/workflows/ci.yml' \
+            ':!crates/rival-core/data/lang' ':!testdata/lang' \
             ':!testdata/logs/consilium_echoed_schema.log' \
             ':!crates/rival-core/src/review/testdata/consilium_echoed_schema.log' \
             ':!app/Tests/Fixtures' \
