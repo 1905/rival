@@ -1083,6 +1083,24 @@ fn kimi_api_key_from_walks_up_to_parent_env_file() {
     assert_eq!(config.kimi_api_key_from(&sub), "parent-key");
 }
 
+/// A HOME with a trailing separator still bounds the walk: the walked
+/// directory is compared with the cleaned HOME, not the raw value.
+#[test]
+fn dotenv_walk_stops_at_home_with_a_trailing_separator() {
+    let top = tempfile::tempdir().unwrap();
+    let home = top.path().join("home");
+    let project = home.join("p");
+    fs::create_dir_all(&project).unwrap();
+    fs::write(top.path().join(".env"), "MOONSHOT_API_KEY=above-home\n").unwrap();
+    let plain = home.to_str().unwrap().to_string();
+    let slashed = format!("{plain}{}", std::path::MAIN_SEPARATOR);
+    for raw in [plain, slashed] {
+        let config = home_config(Path::new(&raw), &[]);
+        assert_eq!(config.kimi_api_key_from(&project), "", "HOME={raw:?}");
+        assert_eq!(config.kimi_api_key_from(&home), "", "HOME={raw:?}");
+    }
+}
+
 #[test]
 fn dotenv_walk_respects_home_and_root_bounds() {
     let top = tempfile::tempdir().unwrap();

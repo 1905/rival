@@ -179,6 +179,41 @@ fn mount_source_keeps_absolute_and_joins_relative_workdirs() {
     assert_eq!(mount(r"C:\repo"), format!(r"{work}/C:\repo:/workspace:ro"));
 }
 
+/// The token never goes into the docker argv: other local users can read
+/// process arguments. Docker gets the name only and copies the value from
+/// the child environment.
+#[test]
+fn token_goes_by_name_only_and_value_in_the_child_env() {
+    let mut env = Env::new();
+    env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("s3cret-tok"));
+    let cfg = env.config();
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, "/repo");
+    let mut seen = None;
+    run_claude_docker_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "high",
+        "/repo",
+        config::CLAUDE_MODEL,
+        true,
+        crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    let seen = seen.unwrap();
+    assert!(
+        !seen.args.iter().any(|a| a.contains("s3cret-tok")),
+        "token in argv: {:?}",
+        seen.args
+    );
+    let i = seen.args.iter().position(|a| a == "-e").unwrap();
+    assert_eq!(seen.args[i + 1], "ANTHROPIC_AUTH_TOKEN");
+    assert_eq!(
+        seen.env,
+        vec!["ANTHROPIC_AUTH_TOKEN=s3cret-tok".to_string()]
+    );
+}
+
 /// The run names its container after the session, and removes it unless
 /// docker exited 0 (when `--rm` already did). Killing the docker client on
 /// a cancel or timeout leaves the container running against the mount.

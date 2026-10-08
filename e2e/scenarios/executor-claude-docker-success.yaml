@@ -37,7 +37,7 @@
               "-w",
               "/workspace",
               "-e",
-              "ANTHROPIC_AUTH_TOKEN=fixture-token",
+              "ANTHROPIC_AUTH_TOKEN",
               "rival-claude",
               "-p",
               "--model",
@@ -54,7 +54,10 @@
             "times": 1,
             "expect": {
               "stdin": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
-              "cwd": "<ROOT>/work"
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_AUTH_TOKEN": "fixture-token"
+              }
             },
             "stdout": "A done\n",
             "exit": 0

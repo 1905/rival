@@ -1113,7 +1113,9 @@ impl Config {
         let Some(mut dir) = paths::abs(self.cwd.as_deref(), workdir) else {
             return String::new();
         };
-        let home = OsStr::new(self.getenv(paths::HOME_VAR));
+        // The walked directory is clean, so HOME must be too: a raw
+        // `HOME=/home/x/` never equals `/home/x` and the walk would go above.
+        let home = paths::clean(Path::new(self.getenv(paths::HOME_VAR)));
         for _ in 0..8 {
             if let Ok(vars) = paths::read_dotenv(&dir.join(".env")) {
                 for name in names {
@@ -1125,7 +1127,7 @@ impl Config {
                 }
             }
             let parent = dir.parent().map_or_else(|| dir.clone(), Path::to_path_buf);
-            if dir.as_os_str() == home || parent == dir {
+            if dir == home || parent == dir {
                 break;
             }
             dir = parent;

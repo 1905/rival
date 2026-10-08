@@ -30,11 +30,11 @@ pub fn kimi_preflight(cfg: &Config, workdir: &str) -> anyhow::Result<()> {
 }
 
 /// Credential vars stripped from the kimi child in its
-/// full-auto (non-review) mode, where every tool call is allowed — a
+/// full-auto (raw) mode, where every tool call is allowed — a
 /// prompt-injected repo could otherwise read any inherited secret via `env`
 /// and exfiltrate it. The opencode child needs none of these; its auth
-/// arrives via `OPENCODE_CONFIG_CONTENT`. Not applied in review mode, which
-/// runs under the read-only profile where bash is denied. This shrinks the
+/// arrives via `OPENCODE_CONFIG_CONTENT`. Not applied in the other modes, which
+/// run under the read-only profile where bash is denied. This shrinks the
 /// blast radius but is NOT a sandbox in full-auto mode: the agent can still
 /// run arbitrary commands as the user.
 pub(crate) const KIMI_DROP_ENV: [&str; 9] = [
@@ -55,11 +55,11 @@ pub(crate) const KIMI_DROP_ENV: [&str; 9] = [
 /// (moonshotai/kimi-k3, the built-in Moonshot AI provider, 1M context). The
 /// reasoning variant is pinned to max by the registry entry — K3 is a
 /// thinking-only model whose API accepts no other level, so the requested
-/// rival effort is ignored. Permissions follow the session mode: review
-/// runs under the same mechanical read-only `OPENCODE_PERMISSION` profile as
-/// the megareview reviewers; every other mode runs full-auto (every tool
-/// allowed) with known credential env vars stripped as blast-radius
-/// reduction.
+/// rival effort is ignored. Permissions follow the session mode: raw runs
+/// full-auto (every tool allowed) with known credential env vars stripped
+/// as blast-radius reduction; every other mode runs under the same
+/// mechanical read-only `OPENCODE_PERMISSION` profile as the megareview
+/// reviewers.
 ///
 /// `cred_workdir` is where the Moonshot key is looked up. It differs from
 /// `workdir` only for a GitLab MR review, which runs in a temporary checkout
@@ -101,16 +101,16 @@ pub(crate) fn run_kimi_with(
 }
 
 /// Selects the permission profile and env hardening for
-/// one run by session mode. Review keeps the zero-value read-only reviewer
+/// one run by session mode. Only "raw" gets the full-auto profile and the
+/// credential strip. Every other mode (review, the task modes plan and
+/// security, and any unknown mode) keeps the zero-value read-only reviewer
 /// defaults; only the API key differs (Moonshot, read from `cred_workdir`).
-/// Every mode other than "review" — raw, and also the task modes plan
-/// and security — gets the full-auto profile.
 pub(crate) fn kimi_run_opts(cfg: &Config, mode: &str, cred_workdir: &str) -> OpencodeRunOpts {
     let mut opts = OpencodeRunOpts {
         api_key: cfg.kimi_api_key_from(Path::new(cred_workdir)),
         ..OpencodeRunOpts::default()
     };
-    if mode != "review" {
+    if mode == "raw" {
         opts.permission = OPENCODE_FULL_AUTO_PERMISSION.to_string();
         opts.drop_env = KIMI_DROP_ENV.iter().map(|s| s.to_string()).collect();
     }

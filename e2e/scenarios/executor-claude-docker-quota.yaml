@@ -37,7 +37,7 @@
               "-w",
               "/workspace",
               "-e",
-              "ANTHROPIC_AUTH_TOKEN=fixture-token",
+              "ANTHROPIC_AUTH_TOKEN",
               "rival-claude",
               "-p",
               "--model",
@@ -71,7 +71,10 @@
               "stdin": {
                 "$regex": "(?s).*src/.*"
               },
-              "cwd": "<ROOT>/work"
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_AUTH_TOKEN": "fixture-token"
+              }
             },
             "stdout": "ERROR: insufficient_quota\n",
             "exit": 0

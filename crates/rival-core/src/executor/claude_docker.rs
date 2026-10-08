@@ -152,8 +152,10 @@ pub(crate) fn run_claude_docker_with(
         &mount,
         "-w",
         "/workspace",
+        // The name only: Docker copies the value from its own environment.
+        // A value here would show in `ps` to every local user.
         "-e",
-        &format!("ANTHROPIC_AUTH_TOKEN={token}"),
+        "ANTHROPIC_AUTH_TOKEN",
         CLAUDE_DOCKER_IMAGE,
     ]
     .iter()
@@ -165,10 +167,11 @@ pub(crate) fn run_claude_docker_with(
         "{}\n{prompt}",
         cfg.build_workdir_preamble(Path::new(workdir))
     );
+    let child_env = [format!("ANTHROPIC_AUTH_TOKEN={token}")];
     let req = Request {
         binary: "docker",
         args: &args,
-        env: &[],
+        env: &child_env,
         prompt: &full_prompt,
         drop_env: &[],
         environ: cfg.environ(),
