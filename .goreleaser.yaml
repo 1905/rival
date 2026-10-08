@@ -65,12 +65,9 @@ archives:
         formats:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    # LICENSE covers rival; licenses/Go-LICENSE covers the Go Unicode tables
-    # and algorithms vendored into the Rust port.
     files:
       - LICENSE
       - README.md
-      - licenses/Go-LICENSE
 
 # Generates a Homebrew *Formula* (class Rival < Formula) at the tap repo root —
 # matching the existing 1905/homebrew-tap layout (formulae at root, no Formula/

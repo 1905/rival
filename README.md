@@ -199,7 +199,7 @@ For a Homebrew installation, run `rival update`. It checks the latest release, u
 
 For a manual archive installation, repeat your OS's download, checksum and extraction steps with the new release. Then run `rival install` again. For a source installation, update the checkout and repeat `cargo install --locked --path crates/rival`. Binary upgrades through `rival update` require Homebrew.
 
-Each Rust release archive contains `rival` (`rival.exe` on Windows), `LICENSE`, `README.md` and `licenses/Go-LICENSE`. Keep the license files with redistributed copies.
+Each Rust release archive contains `rival` (`rival.exe` on Windows), `LICENSE` and `README.md`. Keep the license file with redistributed copies.
 
 ```bash
 rival install                   # Claude Code, plus Codex when detected

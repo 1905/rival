@@ -2,8 +2,8 @@
 """Check GoReleaser's rival archives in a dist directory.
 
 For each archive: its checksums.txt entry, safe member names, the binary's
-format and CPU, the executable bit, and the bundled LICENSE, README.md and
-licenses/Go-LICENSE (byte-equal to this checkout, line endings normalised).
+format and CPU, the executable bit, and the bundled LICENSE and README.md
+(byte-equal to this checkout, line endings normalised).
 
 --formula also checks dist/homebrew/rival.rb: one URL and hash per
 darwin/linux archive. --run executes the archive built for this host as
@@ -32,7 +32,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = [(system, arch) for system in ("darwin", "linux", "windows") for arch in ("amd64", "arm64")]
-BUNDLED = ("LICENSE", "README.md", "licenses/Go-LICENSE")
+BUNDLED = ("LICENSE", "README.md")
 FORMULA_URL = "https://github.com/1905/rival/releases/download/"
 
 MACHO_CPU = {0x1000007: "amd64", 0x100000C: "arm64"}
