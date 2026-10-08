@@ -697,7 +697,7 @@ mod tests {
         let mut check = |input: &str, want: &str| {
             for i in [input, want] {
                 let g = got(i);
-                if g != OsString::from(want) {
+                if g.as_os_str() != std::ffi::OsStr::new(want) {
                     bad.push(format!("clean({i:?}) = {g:?}, want {want:?}"));
                 }
             }
@@ -780,7 +780,7 @@ mod tests {
                 .fold(PathBuf::new(), |acc, e| join(&acc, Path::new(e)))
                 .into_os_string();
             let want = want.replace('/', r"\");
-            if got != OsString::from(&want) {
+            if got.as_os_str() != std::ffi::OsStr::new(&want) {
                 bad.push(format!("join({elems:?}) = {got:?}, want {want:?}"));
             }
         }
