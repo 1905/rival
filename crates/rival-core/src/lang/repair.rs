@@ -180,12 +180,13 @@ fn keep_facts(old: &str, new: &str) -> String {
     if kept { new } else { old }.to_string()
 }
 
-static FENCE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
+static FENCE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```|~~~.*?~~~").unwrap());
 static CODE_SPAN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`[^`\n]+`").unwrap());
 static FILE_LINE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[\w./\\-]+:\d+(?::\d+)?").unwrap());
 static PATH: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[\w.-]*[/\\][\w./\\-]+|\b[\w-]{2,}\.[A-Za-z][A-Za-z0-9]{0,4}\b").unwrap()
+    Regex::new(r"(?:~|\b[A-Za-z]:)?[\w.-]*[/\\][\w./\\-]+|\b[\w-]{2,}\.[A-Za-z][A-Za-z0-9]{0,4}\b")
+        .unwrap()
 });
 /// A number with its sign: "-1" and "1" are different facts.
 static NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"-?\d+(?:[.,]\d+)*").unwrap());

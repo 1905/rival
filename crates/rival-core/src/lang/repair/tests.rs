@@ -294,3 +294,29 @@ fn a_dropped_minus_sign_or_a_changed_quoted_error_reverts_the_field() {
         new.findings[0].body
     );
 }
+
+#[test]
+fn a_changed_tilde_fence_or_path_prefix_reverts_the_field() {
+    let cases = [
+        (
+            "Run:\n~~~sh\nrm -rf cache\n~~~\nnow.",
+            "Run:\n~~~sh\nrm -rf source\n~~~\nnow.",
+        ),
+        (
+            "Ensure ~/data is present.",
+            "Make sure that /data is present.",
+        ),
+        (
+            "Ensure C:\\data\\cache is present.",
+            "Make sure that D:\\data\\cache is present.",
+        ),
+    ];
+    for (old_body, new_body) in cases {
+        let mut old = flagged();
+        old.findings[0].body = old_body.to_string();
+        let mut new = repaired();
+        new.findings[0].body = new_body.to_string();
+        let got = guard(&old, &new).unwrap();
+        assert_eq!(got.findings[0].body, old_body, "{new_body}");
+    }
+}
