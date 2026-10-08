@@ -13,13 +13,11 @@
 //! `--json` output; the golden test in `tests.rs` checks it on the corpus
 //! in `testdata/lang`.
 //!
-//! The repair pass (next phase) is the only user. Until then the module is
-//! not called from production code.
-// dead_code: no production caller until the repair pass (next phase) uses it.
-#![allow(dead_code)]
+//! The repair pass ([`repair`]) is the only user.
 
 mod check;
 mod dict;
+pub(crate) mod repair;
 mod report;
 
 use std::sync::LazyLock;
@@ -40,6 +38,8 @@ pub(crate) enum Mode {
     Descriptive,
 }
 
+// The port tests read the reference checker's mode names.
+#[cfg(test)]
 impl Mode {
     /// The mode for its name: "auto", "procedural" or "descriptive".
     pub(crate) fn parse(name: &str) -> Option<Mode> {
@@ -67,11 +67,6 @@ pub(crate) fn check_mode(text: &str, mode: Mode) -> Report {
     let mut c = Checker::new(dict::dict(), mode, &SOFTWARE);
     c.check(&text);
     c.into_report()
-}
-
-/// The dictionary entries of each word, as text.
-pub(crate) fn lookup(words: &[&str]) -> String {
-    dict::lookup(dict::dict(), words)
 }
 
 #[cfg(test)]

@@ -41,6 +41,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command security` | security-k3-structured | security-k3-nonzero-exit, security-missing-key |
 | `command security --which` | security-which-ready | security-which-missing-key |
 | `command security --no-queue`, `--workdir` | security-no-queue-workdir | workdir-missing |
+| review wording edit (code, security, plan; none for a clean review) | review-language-code, review-language-security, review-language-plan, review-language-clean | unit tests: `lang::repair`, `model_command`, `command_security`, `review::planrun` |
 | every `command *` leaf `--help` | help-every-command (help) | — |
 
 Concurrent reviewers (plan-dual-models) bind each session file by its `cli` field (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).

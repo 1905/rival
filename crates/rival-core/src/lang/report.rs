@@ -1,6 +1,7 @@
 //! The result of a check: findings, word hits and the auto-glossary, as
 //! text for the repair prompt and as the reference checker's JSON.
 
+#[cfg(test)]
 use std::fmt::Write as _;
 
 /// One structure or grammar finding.
@@ -72,6 +73,7 @@ const RULE: &str = "------------------------------------------------------------
 
 impl Report {
     /// The word hit for a base word.
+    #[cfg(test)]
     pub(crate) fn word(&self, key: &str) -> Option<&WordHit> {
         self.words.iter().find(|w| w.word == key)
     }
@@ -180,7 +182,8 @@ impl Report {
 
     /// Exactly what the reference checker prints with `--json`: indent of
     /// one space, keys in its order, no HTML escaping, and the final
-    /// newline.
+    /// newline. The golden test compares it with the reference output.
+    #[cfg(test)]
     pub(crate) fn to_json(&self) -> String {
         let mut b = String::from("{\n \"findings\": ");
         if self.findings.is_empty() {
@@ -238,6 +241,7 @@ impl Report {
 }
 
 /// One string field of an object at depth 2.
+#[cfg(test)]
 fn field(b: &mut String, key: &str, value: &str, first: bool) {
     b.push_str(if first { "\n   " } else { ",\n   " });
     quote(b, key);
@@ -248,6 +252,7 @@ fn field(b: &mut String, key: &str, value: &str, first: bool) {
 /// A JSON string as the reference encoder writes it without HTML escaping:
 /// short escapes for `\b \f \n \r \t`, `\u00XX` for other control
 /// characters, and ` `, ` ` escaped.
+#[cfg(test)]
 fn quote(b: &mut String, s: &str) {
     b.push('"');
     for c in s.chars() {

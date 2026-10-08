@@ -1,6 +1,6 @@
 {
-  "name": "plan-dual-models",
-  "description": "`rival command plan -m codex,claude --effort high` with `plan.md` on stdin. Models keep the requested order (codex, claude). The explicit --effort applies to both sessions, so both record effort high: codex gets `-c model_reasoning_effort=high` and claude gets `--effort max` (high maps to max for claude). Two plan sessions share one group and ONE queue ticket and run concurrently. Stdout is the multi-model plan review: header '(codex + claude)', a File line, then a block per model in request order. Exit code is 0 and the ticket is released, leaving the lock file.",
+  "name": "review-language-plan",
+  "description": "`rival command plan -m codex,claude --effort high`. Each model's plan review has flagged words, so each model makes ONE repair call on its own block, at effort low with its own log. The printed multi-model review shows both repaired blocks; each session log ends with its repaired review.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -38,7 +38,7 @@
               },
               "cwd": "<ROOT>/work"
             },
-            "stdout": "{\"summary\":\"Codex view.\",\"rating\":7,\"findings\":[{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
+            "stdout": "{\"summary\":\"The codex view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
             "exit": 0
           },
           {
@@ -65,7 +65,7 @@
               },
               "cwd": "<ROOT>/work"
             },
-            "stdout": "{\"summary\":\"Codex view.\",\"rating\":7,\"findings\":[{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
+            "stdout": "{\"summary\":\"The codex view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
             "exit": 0
           }
         ]
@@ -108,7 +108,46 @@
               },
               "cwd": "<ROOT>/work"
             },
-            "stdout": "{\"summary\":\"Claude view.\",\"rating\":9,\"findings\":[]}\n",
+            "stdout": "{\"summary\":\"The claude view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"The claude view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
             "exit": 0
           }
         ]
@@ -134,7 +173,7 @@
       "stdin": "plan.md",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL PLAN REVIEW (codex + claude) ═══\n\nFile: <ROOT>/work/plan.md\n\n── codex ──\n\nRating: 7/10\n\nSummary: Codex view.\n\n1. [high] no rollback step — Rollout:12\n   the plan never says how to revert the migration\n   Fix: add a down migration\n   (gap, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n\n\n── claude ──\n\nRating: 9/10\n\nSummary: Claude view.\n\nNo bugs or gaps found.\n",
+        "stdout": "\n═══ RIVAL PLAN REVIEW (codex + claude) ═══\n\nFile: <ROOT>/work/plan.md\n\n── codex ──\n\nRating: 7/10\n\nSummary: The codex view can use the cache.\n\n1. [high] No rollback step — src/a.go:3\n   The plan in step 3 does not say how to revert. Make sure that a down migration exists.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n\n\n── claude ──\n\nRating: 7/10\n\nSummary: The claude view can use the cache.\n\n1. [high] No rollback step — src/a.go:3\n   The plan in step 3 does not say how to revert. Make sure that a down migration exists.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -161,6 +200,15 @@
               "auth": "subscription",
               "model": "claude"
             }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "auth": "subscription",
+              "model": "claude"
+            }
           }
         ]
       }
@@ -173,7 +221,8 @@
       ".rival/sessions/<ID:CODEX>.log",
       ".rival/sessions/<ID:CODEX>.log.repair.log",
       ".rival/sessions/<ID:CLAUDE>.json",
-      ".rival/sessions/<ID:CLAUDE>.log"
+      ".rival/sessions/<ID:CLAUDE>.log",
+      ".rival/sessions/<ID:CLAUDE>.log.repair.log"
     ],
     "files": [
       {
@@ -196,8 +245,7 @@
           "id": "<ID:CODEX>",
           "cli": "codex",
           "model": "gpt-6-astra",
-          "effort": "high",
-          "output_bytes": 249
+          "effort": "high"
         }
       },
       {
@@ -221,22 +269,21 @@
           "cli": "claude",
           "model": "claude-opus-5-5",
           "effort": "high",
-          "account": "subscription",
-          "output_bytes": 52
+          "account": "subscription"
         }
       },
       {
         "path": "<HOME>/.rival/sessions/<ID:CODEX>.log",
-        "text": "{\"summary\":\"Codex view.\",\"rating\":7,\"findings\":[{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n"
+        "text": "{\"summary\":\"The codex view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"The codex view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
       },
       {
         "path": "<HOME>/.rival/sessions/<ID:CLAUDE>.log",
-        "text": "{\"summary\":\"Claude view.\",\"rating\":9,\"findings\":[]}\n"
+        "text": "{\"summary\":\"The claude view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"The claude view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
       }
     ],
     "calls": {
       "codex": 3,
-      "claude": 1
+      "claude": 2
     }
   }
 }

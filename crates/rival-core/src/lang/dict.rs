@@ -2,6 +2,7 @@
 //! and the index of every permitted surface form.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
 use std::fmt::Write as _;
 use std::sync::LazyLock;
 
@@ -46,6 +47,8 @@ pub(crate) struct NotApprovedEntry {
 /// The approved and non-approved word lists and the surface-form index.
 #[derive(Debug, Default)]
 pub(crate) struct Dict {
+    /// The source name; the lookup output prints it.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) source: String,
     /// Lower-case word -> its entries, one per part of speech.
     pub(crate) approved: HashMap<String, Vec<ApprovedEntry>>,
@@ -256,13 +259,16 @@ pub(crate) fn hedge_hint(w: &str) -> &'static str {
 }
 
 /// The dictionary entries of each word, as text. Examples are printed only
-/// when the dictionary has them. The repair prompt uses this.
+/// when the dictionary has them. Only the port tests use it: the report
+/// already gives the alternatives and an example for each word hit.
+#[cfg(test)]
 pub(crate) fn lookup(d: &Dict, words: &[&str]) -> String {
     let mut out = String::new();
     lookup_into(d, words, &mut out);
     out
 }
 
+#[cfg(test)]
 fn lookup_into(d: &Dict, words: &[&str], out: &mut String) {
     for w in words {
         let w = lower(w.trim());

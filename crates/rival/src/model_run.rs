@@ -10,7 +10,7 @@ use crate::merge_request::{ReviewTarget, reject_unresolved_mr};
 use crate::mirror::LiveMirror;
 use crate::model_command::{
     CancelOnDrop, OwnedSession, complete_session, fail_session, finish_review, prepare_review,
-    read_log,
+    read_log, repair_review_language,
 };
 use crate::model_specs::{ModelSpec, RunCall};
 use crate::root::{CmdEnv, CmdError};
@@ -190,6 +190,7 @@ pub fn run_model_run(
             return Err(CmdError::plain(format!("read log file: {e}")));
         }
     };
+    let log = repair_review_language(&ctx, cfg, spec, &mut sess, log, &run_workdir, &workdir);
     // A zero exit is not a review: quota errors and empty output also exit 0.
     let log_file = sess.log_file.clone();
     let out = match finish_review(cfg, spec, &mut sess, &log, &scope, &log_file) {

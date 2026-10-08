@@ -66,6 +66,33 @@
             },
             "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "--prompt-file",
+              {
+                "$regex": "<ROOT>/tmp/rival-grok-[0-9]+\\.md"
+              },
+              "-m",
+              "grok-4.6",
+              "--effort",
+              "low",
+              "--output-format",
+              "plain",
+              "--no-auto-update",
+              "--yolo",
+              "--cwd",
+              "<ROOT>/work",
+              "--sandbox",
+              "read-only"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
           }
         ]
       }
@@ -135,7 +162,8 @@
       ".rival/sessions/<UUID1>.json",
       ".rival/sessions/<UUID1>.log",
       ".rival/sessions/<UUID2>.json",
-      ".rival/sessions/<UUID2>.log"
+      ".rival/sessions/<UUID2>.log",
+      ".rival/sessions/<UUID2>.log.repair.log"
     ],
     "files": [
       {
@@ -169,7 +197,7 @@
       }
     ],
     "calls": {
-      "grok": 2
+      "grok": 3
     }
   }
 }

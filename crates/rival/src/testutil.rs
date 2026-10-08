@@ -30,6 +30,18 @@ pub fn json_answer_log() -> String {
     )
 }
 
+/// A review whose wording the checker flags: "utilize" and "ensure" are not
+/// approved words.
+pub const FLAGGED_REVIEW: &str = r#"{"summary":"We utilize the cache.","findings":[{"file":"a.go","line":3,"severity":"high","category":"bug","title":"Cache key is wrong","body":"The code in `load()` reads 3 entries. Ensure the key is unique.","suggestion":"Return an error.","confidence":9}]}"#;
+
+/// [`FLAGGED_REVIEW`] with approved words, as the repair call returns it.
+pub const REPAIRED_REVIEW: &str = r#"{"summary":"We use the cache.","findings":[{"file":"a.go","line":3,"severity":"high","category":"bug","title":"Cache key is wrong","body":"The code in `load()` reads 3 entries. Make sure that the key is unique.","suggestion":"Return an error.","confidence":9}]}"#;
+
+/// A provider log whose answer is [`FLAGGED_REVIEW`].
+pub fn flagged_answer_log() -> String {
+    format!("{TRANSCRIPT_MARKER}\n{FLAGGED_REVIEW}\n")
+}
+
 /// The `io::Error` text for the OS errors the fixtures provoke. Windows
 /// prints the English system message.
 pub const NO_SUCH_FILE: &str = if cfg!(windows) {
@@ -211,6 +223,15 @@ pub struct FakeRun {
     /// The session status seen by the provider.
     pub status_during_run: String,
     pub preflight_calls: usize,
+    /// What the repair call writes to its log; `None` writes nothing.
+    pub repair_reply: Option<String>,
+    pub repair_calls: usize,
+    pub repair_prompt: String,
+    pub repair_effort: String,
+    pub repair_review: bool,
+    pub repair_log: String,
+    pub repair_had_mirror: bool,
+    pub status_during_repair: String,
 }
 
 pub type SharedRun = Rc<RefCell<FakeRun>>;
@@ -233,6 +254,23 @@ pub fn fake_spec(f: &SharedRun) -> ModelSpec {
     let run = Rc::clone(f);
     spec.run = Box::new(move |c| {
         let mut f = run.borrow_mut();
+        if let Some(log) = c.log {
+            f.repair_calls += 1;
+            f.repair_prompt = c.prompt.to_string();
+            f.repair_effort = c.effort.to_string();
+            f.repair_review = c.review;
+            f.repair_log = log.to_string();
+            f.repair_had_mirror = c.out.is_some();
+            f.status_during_repair = c.sess.status.clone();
+            if let Some(reply) = &f.repair_reply {
+                std::fs::write(log, reply)?;
+            }
+            return Ok(RunResult {
+                exit_code: 0,
+                output_bytes: 0,
+                output_lines: 0,
+            });
+        }
         f.called = true;
         f.prompt = c.prompt.to_string();
         f.effort = c.effort.to_string();

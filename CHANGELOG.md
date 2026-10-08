@@ -6,6 +6,9 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 
 ## [Unreleased]
 
+### Added
+- Reviews are edited into controlled technical English. After a code, security or plan review, the same model makes at most one extra call, at low effort, to edit the wording. Facts, file references and numbers do not change.
+
 ### Removed
 - `rival-antislop`, the code-slop review. `rival install` deletes an installed copy.
 - The Go license file in release archives. No Go code ships.

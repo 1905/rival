@@ -78,6 +78,45 @@
             },
             "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
           }
         ]
       }
@@ -200,6 +239,15 @@
               "auth": "subscription",
               "model": "claude"
             }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID2>",
+              "auth": "subscription",
+              "model": "claude"
+            }
           }
         ]
       }
@@ -210,7 +258,8 @@
       ".rival/sessions/<UUID1>.json",
       ".rival/sessions/<UUID1>.log",
       ".rival/sessions/<UUID2>.json",
-      ".rival/sessions/<UUID2>.log"
+      ".rival/sessions/<UUID2>.log",
+      ".rival/sessions/<UUID2>.log.repair.log"
     ],
     "files": [
       {
@@ -244,7 +293,7 @@
       }
     ],
     "calls": {
-      "claude": 2
+      "claude": 3
     }
   }
 }

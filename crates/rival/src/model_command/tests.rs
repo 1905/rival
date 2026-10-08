@@ -7,8 +7,8 @@ use std::path::Path;
 
 use crate::model_specs::CODEX_USAGE;
 use crate::testutil::{
-    FakeStdin, Fixture, TEST_MR_URL, TRANSCRIPT_MARKER, fake_mr, fake_run, fake_spec,
-    json_answer_log, no_mr, run_command_with, with_env,
+    FLAGGED_REVIEW, FakeStdin, Fixture, REPAIRED_REVIEW, TEST_MR_URL, TRANSCRIPT_MARKER, fake_mr,
+    fake_run, fake_spec, flagged_answer_log, json_answer_log, no_mr, run_command_with, with_env,
 };
 
 fn tmp() -> tempfile::TempDir {
@@ -550,4 +550,114 @@ fn stdout_write_error_is_reported() {
         )))
     );
     assert_eq!(fix.sessions()[0].status, "completed");
+}
+
+// ---- the language pass ----
+
+fn session_log(fix: &Fixture) -> String {
+    let sessions = fix.sessions();
+    assert_eq!(sessions.len(), 1);
+    std::fs::read_to_string(&sessions[0].log_file).unwrap()
+}
+
+#[test]
+fn a_flagged_review_gets_one_low_effort_read_only_repair_call() {
+    let fix = Fixture::new();
+    let wd = tmp();
+    let f = fake_run(&flagged_answer_log());
+    f.borrow_mut().repair_reply = Some(REPAIRED_REVIEW.to_string());
+    let out = run_command_with(&fix, &f, "review src/", s(wd.path()), &*no_mr());
+    out.result.unwrap();
+    let f = f.borrow();
+    assert_eq!(f.repair_calls, 1);
+    assert_eq!(f.repair_effort, "low");
+    assert!(f.repair_review, "the repair call is not read-only");
+    assert!(!f.repair_had_mirror);
+    assert_eq!(f.status_during_repair, "running");
+    assert!(
+        f.repair_prompt.contains(FLAGGED_REVIEW),
+        "{}",
+        f.repair_prompt
+    );
+    let sessions = fix.sessions();
+    assert_eq!(f.repair_log, format!("{}.repair.log", sessions[0].log_file));
+    assert_eq!(sessions[0].status, "completed");
+    assert_eq!(sessions[0].effort, "xhigh");
+
+    // The printed review is the repaired one.
+    assert!(out.stdout.contains("We use the cache."), "{}", out.stdout);
+    assert!(!out.stdout.contains("utilize"), "{}", out.stdout);
+    // The session log ends with the repaired review, which every reader shows,
+    // and never holds the repair transcript.
+    let log = session_log(&fix);
+    assert!(log.ends_with(&format!("\n{REPAIRED_REVIEW}\n")), "{log}");
+    assert!(!log.contains("## Task: Edit the wording"), "{log}");
+    match rival_core::result::parse_run_result(&log) {
+        rival_core::result::RunResult::Findings { summary, .. } => {
+            assert_eq!(summary, "We use the cache.");
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_clean_review_makes_no_repair_call() {
+    let fix = Fixture::new();
+    let wd = tmp();
+    let clean = r#"{"summary":"The change is correct.","findings":[]}"#;
+    let f = fake_run(&format!("{TRANSCRIPT_MARKER}\n{clean}\n"));
+    let out = run_command_with(&fix, &f, "review src/", s(wd.path()), &*no_mr());
+    out.result.unwrap();
+    assert_eq!(f.borrow().repair_calls, 0);
+    assert_eq!(session_log(&fix), format!("{TRANSCRIPT_MARKER}\n{clean}\n"));
+}
+
+#[test]
+fn a_raw_prompt_makes_no_repair_call() {
+    let fix = Fixture::new();
+    let wd = tmp();
+    let f = fake_run(&flagged_answer_log());
+    let out = run_command_with(&fix, &f, "explain the flow", s(wd.path()), &*no_mr());
+    out.result.unwrap();
+    assert_eq!(f.borrow().repair_calls, 0);
+}
+
+#[test]
+fn a_bad_repair_reply_keeps_the_review() {
+    for reply in [
+        None,
+        Some("not json".to_string()),
+        Some(REPAIRED_REVIEW.replace("\"line\":3", "\"line\":4")),
+    ] {
+        let fix = Fixture::new();
+        let wd = tmp();
+        let f = fake_run(&flagged_answer_log());
+        f.borrow_mut().repair_reply = reply.clone();
+        let out = run_command_with(&fix, &f, "review src/", s(wd.path()), &*no_mr());
+        out.result.unwrap();
+        assert_eq!(f.borrow().repair_calls, 1);
+        assert!(
+            out.stdout.contains("We utilize the cache."),
+            "{reply:?}: {}",
+            out.stdout
+        );
+        assert_eq!(session_log(&fix), flagged_answer_log(), "{reply:?}");
+    }
+}
+
+#[test]
+fn a_repair_that_changes_a_number_keeps_only_that_field() {
+    let fix = Fixture::new();
+    let wd = tmp();
+    let f = fake_run(&flagged_answer_log());
+    f.borrow_mut().repair_reply = Some(REPAIRED_REVIEW.replace("reads 3", "reads 4"));
+    let out = run_command_with(&fix, &f, "review src/", s(wd.path()), &*no_mr());
+    out.result.unwrap();
+    assert!(out.stdout.contains("We use the cache."), "{}", out.stdout);
+    assert!(
+        out.stdout.contains("Ensure the key is unique."),
+        "{}",
+        out.stdout
+    );
+    assert!(!out.stdout.contains("reads 4"), "{}", out.stdout);
 }
