@@ -1,5 +1,3 @@
-//! Go: `internal/executor/kimi.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -15,7 +13,7 @@ use crate::cancel::Context;
 use crate::config::{self, Config};
 use crate::session::Session;
 
-/// Go `KimiPreflight`: checks that the opencode CLI is installed and a
+/// Checks that the opencode CLI is installed and a
 /// Moonshot API key is available (env / `.env` walk-up from `workdir` — see
 /// [`Config::kimi_api_key_from`]). Kimi K3 runs through OpenCode's built-in
 /// provider with the key injected per run via `OPENCODE_CONFIG_CONTENT`;
@@ -31,7 +29,7 @@ pub fn kimi_preflight(cfg: &Config, workdir: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Go `kimiDropEnv`: credential vars stripped from the kimi child in its
+/// Credential vars stripped from the kimi child in its
 /// full-auto (non-review) mode, where every tool call is allowed — a
 /// prompt-injected repo could otherwise read any inherited secret via `env`
 /// and exfiltrate it. The opencode child needs none of these; its auth
@@ -53,7 +51,7 @@ pub(crate) const KIMI_DROP_ENV: [&str; 9] = [
     "GITLAB_TOKEN",
 ];
 
-/// Go `RunKimi`: executes a prompt with Kimi K3 through the opencode CLI
+/// Executes a prompt with Kimi K3 through the opencode CLI
 /// (moonshotai/kimi-k3, the built-in Moonshot AI provider, 1M context). The
 /// reasoning variant is pinned to max by the registry entry — K3 is a
 /// thinking-only model whose API accepts no other level, so the requested
@@ -102,7 +100,7 @@ pub(crate) fn run_kimi_with(
     )
 }
 
-/// Go `kimiRunOpts`: selects the permission profile and env hardening for
+/// Selects the permission profile and env hardening for
 /// one run by session mode. Review keeps the zero-value read-only reviewer
 /// defaults; only the API key differs (Moonshot, read from `cred_workdir`).
 /// Every mode other than "review" — raw, and also the task modes plan

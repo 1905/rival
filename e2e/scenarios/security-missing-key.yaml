@@ -1,0 +1,44 @@
+{
+  "name": "security-missing-key",
+  "description": "`rival command security` with scope `src/` on stdin and no MOONSHOT_API_KEY or KIMI_API anywhere. The key preflight fails (opencode is on PATH, never run). Stdout shows the error plus the security.reviewer hint; stderr shows the bare error; exit code 1. No session is created.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv_prefix": [],
+            "stderr": "fake must not run\n",
+            "exit": 97
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": null,
+    "KIMI_API": null
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it\n\nsecurity.reviewer selects the model; accepted values: k3, grok\n",
+        "stderr_lines": [
+          "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "opencode": 0
+    }
+  }
+}

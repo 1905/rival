@@ -119,7 +119,6 @@ pub fn viewer_command(path: &Path) -> Command {
     cmd
 }
 
-/// Go: `exec.Command("open", path).Start()`.
 #[cfg(unix)]
 pub fn launch_viewer(path: &Path) -> io::Result<Option<Child>> {
     process::spawn(&mut viewer_command(path)).map(Some)

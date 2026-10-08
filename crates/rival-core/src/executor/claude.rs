@@ -1,5 +1,3 @@
-//! Go: `internal/executor/claude.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -16,7 +14,7 @@ use crate::config::{self, Config};
 use crate::logging;
 use crate::session::{self, Session};
 
-/// Go `ClaudePreflight`: checks that claude is available (native or docker).
+/// Checks that claude is available (native or docker).
 pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     if oscmd::look_path(cfg, "claude").is_ok() {
         return Ok(());
@@ -24,7 +22,7 @@ pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     claude_docker_preflight(cfg)
 }
 
-/// Go `RunClaude`: executes a prompt through the Claude Code CLI on Opus 5.5,
+/// Executes a prompt through the Claude Code CLI on Opus 5.5,
 /// the only model on this path. `read_only` restricts tools and mounts the
 /// workdir read-only: reviews and task runs.
 #[allow(clippy::too_many_arguments)]
@@ -50,7 +48,7 @@ pub fn run_claude(
     )
 }
 
-/// Go `runClaudeModel`: runs Claude through the Claude Code CLI,
+/// Runs Claude through the Claude Code CLI,
 /// auto-selecting native (claude on `PATH`) vs docker. `spawn` is the
 /// subprocess step.
 ///
@@ -87,7 +85,7 @@ pub(crate) fn run_claude_model(
     })
 }
 
-/// Go `setClaudeTransportMode`: records the transport for ordinary model
+/// Records the transport for ordinary model
 /// runs while preserving a task session's identity throughout its live
 /// execution.
 ///
@@ -145,7 +143,7 @@ fn run_claude_native(
     spawn(sess, &req)
 }
 
-/// Go `claudeArgs`: restricts the available tools, not just auto-approved
+/// Restricts the available tools, not just auto-approved
 /// tools. Safe mode prevents repository/user hooks and plugins from
 /// executing around those tools while preserving the CLI's subscription
 /// authentication.
@@ -188,7 +186,7 @@ pub(crate) fn claude_args(model: &str, effort: &str, read_only: bool) -> Vec<Str
     args.into_iter().map(str::to_string).collect()
 }
 
-/// Go `claudeAuthMarkers`: CLI output fragments that indicate an
+/// CLI output fragments that indicate an
 /// auth/billing failure rather than a model failure.
 const CLAUDE_AUTH_MARKERS: [&str; 6] = [
     "Credit balance is too low",
@@ -199,7 +197,7 @@ const CLAUDE_AUTH_MARKERS: [&str; 6] = [
     "authentication_error",
 ];
 
-/// Go `ClaudeAuthHint`: inspects a failed native run's log for auth/billing
+/// Inspects a failed native run's log for auth/billing
 /// errors and returns an actionable, auth-mode-specific explanation ("" if
 /// none).
 pub fn claude_auth_hint(cfg: &Config, log_file: &Path) -> String {

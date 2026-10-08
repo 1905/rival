@@ -244,7 +244,7 @@ impl KeyMap {
         help
     }
 
-    /// Go: `keyMap.help`. The bindings to advertise in `mode`.
+    /// The bindings to advertise in `mode`.
     pub fn help(&self, mode: Mode) -> ModeHelp {
         match mode {
             Mode::Filter => ModeHelp::simple(vec![

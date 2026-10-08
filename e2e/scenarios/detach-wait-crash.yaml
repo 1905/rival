@@ -1,0 +1,38 @@
+{
+  "name": "detach-wait-crash",
+  "description": "The detached child dies before it starts a session. The parent prints 'rival: detached pid=N' and exits 0. The child rejects `-re bogus` with 'invalid effort level \"bogus\", must be one of: low, medium, high, xhigh, ultra' on its inherited stdout and stderr, and exits 1. No session, queue dir or file is created. `rival wait --log` finds the pid but no session ID, sees the pid is dead, prints 'crashed: rival (pid N) exited before finalizing sessions' and exits 3 with 'rival wait: exit 3' on stderr. The crash pid equals the detached pid.",
+  "normalise": [
+    {"regex": "crashed: rival \\(pid (\\d+)\\)", "kind": "pid"}
+  ],
+  "steps": [
+    {
+      "run": ["command", "claude", "--detach"],
+      "stdin": "-re bogus explain the auth flow",
+      "stdout_file": "out/claude.out",
+      "stderr_file": "out/claude.err",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "invalid effort level \"bogus\", must be one of: low, medium, high, xhigh, ultra\n",
+        "stderr_lines": [
+          "rival: detached pid=<PID1>",
+          "invalid effort level \"bogus\", must be one of: low, medium, high, xhigh, ultra"
+        ],
+        "log_events": []
+      }
+    },
+    {"wait_idle": true, "timeout": 30},
+    {
+      "run": ["wait", "--log", "<ROOT>/out/claude.err"],
+      "expect": {
+        "exit_code": 3,
+        "stdout": "crashed: rival (pid <PID1>) exited before finalizing sessions\n",
+        "stderr_lines": ["rival wait: exit 3"],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {}
+  }
+}

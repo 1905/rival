@@ -60,7 +60,7 @@ Everything below is checked against the `rival` binary and its source. Commands,
 
 Choose your system below. The CLI runs on macOS, Linux and Windows. Rival.app is available only on macOS.
 
-**Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier contain the Go CLI for macOS and Linux only.
+**Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier support macOS and Linux only.
 
 #### macOS
 
@@ -215,7 +215,7 @@ rival install --force           # overwrite without prompting
 
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
-- `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable`, `rival-antislop`, `rival-antislop-plan` and older names.
+- `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable` and older names.
 
 #### Provider runtimes
 

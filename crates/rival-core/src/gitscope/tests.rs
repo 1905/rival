@@ -51,7 +51,7 @@ impl Fixture {
         cfg.with_environ(environ)
     }
 
-    /// Go `initRepo`: init, `checkout -b main`, one commit of a.go.
+    /// Init, `checkout -b main`, one commit of a.go.
     fn init_repo(&self) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         self.git(dir.path(), &["init"]);

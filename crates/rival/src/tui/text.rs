@@ -18,7 +18,7 @@ pub fn line_width(line: &Line<'_>) -> usize {
     line.spans.iter().map(|s| width(&s.content)).sum()
 }
 
-/// Go: `ansi.Truncate(s, w, tail)`. Cuts `s` to at most `w` cells. `tail` is
+/// Cuts `s` to at most `w` cells. `tail` is
 /// added only when `s` was cut, and it counts against `w`; a tail wider than
 /// `w` leaves nothing.
 pub fn truncate(s: &str, w: usize, tail: &str) -> String {
@@ -34,7 +34,7 @@ pub fn truncate(s: &str, w: usize, tail: &str) -> String {
     out
 }
 
-/// Go: `fitCell`. Truncates `s` to `w` cells with an ellipsis and pads it to
+/// Truncates `s` to `w` cells with an ellipsis and pads it to
 /// exactly `w`.
 pub fn fit_cell(s: &str, w: usize) -> String {
     if w == 0 {
@@ -240,7 +240,7 @@ pub fn wordwrap(s: &str, limit: usize) -> String {
     st.buf
 }
 
-/// Go: `wrapCells`. Word-wraps `text` to `width` cells, then hard-breaks
+/// Word-wraps `text` to `width` cells, then hard-breaks
 /// anything still longer, so no line exceeds `width`. Width 0 returns the
 /// text as one line.
 pub fn wrap_cells(text: &str, width: usize) -> Vec<String> {

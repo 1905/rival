@@ -1,0 +1,185 @@
+{
+  "name": "run-k3-flags",
+  "description": "`rival run k3` flag handling. k3 has no --effort flag and always runs at max. Step 1: `--prompt-stdin --no-queue --workdir sub` uses the same opencode argv/env as executor-k3-success with the sub workdir, and stdout is the live mirror. Step 2: `--review src/ --no-queue` runs review mode with the bug-hunter prompt, then prints the mirrored output and the formatted review ('kimi-k3 (moonshotai/kimi-k3)'). Step 3: `--effort high` is rejected with 'unknown flag: --effort' and exit 1.",
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity",
+    "AWS_PROFILE": "parity"
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work/sub\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work/sub",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"allow\",\"bash\":\"allow\",\"task\":\"allow\",\"webfetch\":\"allow\",\"websearch\":\"allow\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                },
+                "MOONSHOT_API_KEY": null,
+                "AWS_PROFILE": null
+              }
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer\\ the\\ user's\\ question\\ directly\\.\\ Do\\ not\\ offer\\ follow\\-up\\ options,\\ menus,\\ walkthroughs,\\ or\\ ask\\ if\\ they\\ want\\ more\\.\\ No\\ filler,\\ no\\ sign\\-offs\\.\\ Just\\ deliver\\ the\\ answer\\ and\\ stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nReview scope: src/\n\n## Role: Implementation Bug Hunter\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                },
+                "MOONSHOT_API_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "run",
+        "k3",
+        "--prompt-stdin",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting k3",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "max",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "run",
+        "k3",
+        "--review",
+        "src/",
+        "--no-queue"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n\n\n═══ RIVAL REVIEW ═══\n\nModel: kimi-k3 (moonshotai/kimi-k3)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID2>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting k3",
+            "fields": {
+              "session": "<UUID2>",
+              "effort": "max",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "run",
+        "k3",
+        "--effort",
+        "high",
+        "--prompt-stdin"
+      ],
+      "stdin": "hi",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "unknown flag: --effort"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID2>.json",
+      ".rival/sessions/<UUID2>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "cli": "opencode",
+          "effort": "max",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.json",
+        "json": {
+          "status": "completed",
+          "cli": "opencode",
+          "effort": "max",
+          "mode": "review",
+          "review_scope": "src/",
+          "work_dir": "<ROOT>/work"
+        }
+      }
+    ],
+    "calls": {
+      "opencode": 2
+    }
+  }
+}

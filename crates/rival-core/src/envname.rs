@@ -1,6 +1,6 @@
 //! Environment-variable name comparisons for the security filters.
 //!
-//! `case_insensitive = false` is Go's (and Unix's) exact comparison on the
+//! `case_insensitive = false` is the Unix exact comparison on the
 //! raw encoded bytes. `case_insensitive = true` is the host's
 //! case-insensitive rule. On Windows it is the operating system's ordinal
 //! ignore-case comparison (`CompareStringOrdinal`), which Microsoft names for

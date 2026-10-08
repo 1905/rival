@@ -12,7 +12,7 @@ use crate::root::CmdError;
 #[cfg(test)]
 mod tests;
 
-/// Go `resolveWorkdir`: turns the `--workdir` flag into an absolute, cleaned
+/// Turns the `--workdir` flag into an absolute, cleaned
 /// path that must name an existing directory. It runs once at each command
 /// entry, before preflight and session creation: the executors set the
 /// child's cwd to the workdir and also pass it to the provider (codex -C,
@@ -67,7 +67,7 @@ pub(crate) fn getwd_error() -> String {
     }
 }
 
-/// Go `resolveWorkdirOrExit`: [`resolve_workdir`] for a command action. A
+/// [`resolve_workdir`] for a command action. A
 /// bad workdir is printed to `stdout`, where the calling skill captures it,
 /// and ends the command with exit code 1 — the same contract as an
 /// invalid-argument error.

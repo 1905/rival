@@ -41,7 +41,6 @@ fn codex_run_args_uses_explicit_model_and_effort() {
     assert_eq!(codex_run_args(config::CODEX_MODEL, "", ""), argv("", ""));
 }
 
-/// Go: TestCodexPassesUltraAndXhighThroughUnaliased.
 #[test]
 fn codex_passes_ultra_and_xhigh_through_unaliased() {
     for effort in ["xhigh", "ultra"] {

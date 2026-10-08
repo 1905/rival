@@ -15,7 +15,6 @@ mod tests;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct Url {
     pub scheme: String,
-    /// Go `u.User != nil`.
     pub has_user: bool,
     pub host: Vec<u8>,
     pub path: Vec<u8>,
@@ -111,7 +110,6 @@ fn escape(s: &[u8], mode: Mode) -> String {
     out
 }
 
-/// Go `url.PathEscape`.
 pub(super) fn path_escape(s: &[u8]) -> String {
     escape(s, Mode::PathSegment)
 }
@@ -138,7 +136,7 @@ fn cut(s: &[u8], sep: u8) -> (&[u8], &[u8]) {
     }
 }
 
-/// Go `getScheme`. `None` is "missing protocol scheme".
+/// `None` is "missing protocol scheme".
 fn get_scheme(raw: &[u8]) -> Option<(&[u8], &[u8])> {
     for (i, &c) in raw.iter().enumerate() {
         match c {
@@ -255,7 +253,7 @@ fn valid_optional_port(port: &[u8]) -> bool {
     }
 }
 
-/// Go `validUserinfo`. It ranges over runes and allows no non-ASCII rune
+/// It ranges over runes and allows no non-ASCII rune
 /// (an invalid byte is U+FFFD), so checking bytes is the same.
 fn valid_userinfo(s: &[u8]) -> bool {
     s.iter()
@@ -322,7 +320,6 @@ fn ipv4_fields(s: &[u8]) -> bool {
     pos == 3
 }
 
-/// Go `netip.parseIPv6`.
 fn parse_ipv6(input: &[u8]) -> Option<Addr> {
     let mut s = input;
     if let Some(i) = s.iter().position(|&b| b == b'%') {

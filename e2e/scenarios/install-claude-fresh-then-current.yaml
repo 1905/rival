@@ -1,0 +1,82 @@
+{
+  "name": "install-claude-fresh-then-current",
+  "description": "`rival install --target claude` run twice. It installs only under <HOME>/.claude/skills and prints no 'Codex not detected' note. First run: every skill is missing and gets installed ('  ✓ <name> — installed (v<version>)'), then the deprecated skills rival-sol and rival-review are removed ('  🗑 deprecated skill removed' each, 2 removed). The unrelated rival-personal skill is never touched. Second run: every installed version matches the embedded one, so each skill prints '  · <name> — already up to date' and nothing is read from stdin.",
+  "fixtures": [
+    {
+      "write": "home/.claude/skills/rival-personal/SKILL.md",
+      "text": "my skill"
+    },
+    {
+      "write": "home/.claude/skills/rival-sol/SKILL.md",
+      "text": "---\nname: rival-sol\n---\n"
+    },
+    {
+      "write": "home/.claude/skills/rival-review/SKILL.md",
+      "text": "---\nname: rival-review\n---\n"
+    }
+  ],
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "install",
+        "--target",
+        "claude"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n  🗑 deprecated skill removed\n  🗑 deprecated skill removed\n\nDone: 8 installed, 0 updated, 0 up to date, 2 removed\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "install",
+        "--target",
+        "claude"
+      ],
+      "stdin": "y\n",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  · rival-codex — already up to date (v<V>)\n  · rival-plan — already up to date (v<V>)\n  · rival-plan-codex — already up to date (v<V>)\n  · rival-plan-claude — already up to date (v<V>)\n  · rival-claude — already up to date (v<V>)\n  · rival-k3 — already up to date (v<V>)\n  · rival-grok — already up to date (v<V>)\n  · rival-security — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 8 up to date, 0 removed\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".claude/skills/rival-codex/SKILL.md",
+      ".claude/skills/rival-plan/SKILL.md",
+      ".claude/skills/rival-plan-codex/SKILL.md",
+      ".claude/skills/rival-plan-claude/SKILL.md",
+      ".claude/skills/rival-claude/SKILL.md",
+      ".claude/skills/rival-k3/SKILL.md",
+      ".claude/skills/rival-grok/SKILL.md",
+      ".claude/skills/rival-security/SKILL.md",
+      ".claude/skills/rival-personal/SKILL.md"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.claude/skills/rival-personal/SKILL.md",
+        "text": "my skill"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-review/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-sol/SKILL.md",
+        "absent": true
+      }
+    ]
+  }
+}

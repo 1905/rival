@@ -1,0 +1,30 @@
+{
+  "name": "mr-raw-prompt-rejected",
+  "description": "`rival command codex` with a raw (non-review) prompt that names a GitLab MR URL. Rival rejects it before effort resolution, codex preflight or any MR lookup: stderr says GitLab MR URLs need a pinned review (`rival command codex review <MR-URL>`), exit code is 1. Neither codex nor glab runs (both fakes are present but unscripted, so any call fails the scenario) and <ROOT>/tmp stays empty.",
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "сделай ревью МР https://gitlab.example.com/group/sub/app/-/merge_requests/42",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival-codex review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
+  }
+}

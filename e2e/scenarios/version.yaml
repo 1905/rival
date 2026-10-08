@@ -1,0 +1,16 @@
+{
+  "name": "version",
+  "description": "`rival version` prints the banner, then '  dev' (the default version) on its own line. Empty home: the reap reads nothing and the queue dir stays absent. CI=1 skips the update check.",
+  "steps": [
+    {
+      "run": ["version"],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {"home_files": []}
+}

@@ -1,0 +1,100 @@
+{
+  "name": "executor-grok-success",
+  "description": "`rival command grok` with a raw prompt on stdin and a fake that exits 0. Checks the exact argv, stdin, cwd and env the fake receives. The plain log is left unchanged and the session completes.",
+  "fakes": {
+    "scripts": {
+      "grok": {
+        "responses": [
+          {
+            "argv": [
+              "--prompt-file",
+              {
+                "$regex": "<ROOT>/tmp/rival-grok-[0-9]+\\.md"
+              },
+              "-m",
+              "grok-4.6",
+              "--effort",
+              "high",
+              "--output-format",
+              "plain",
+              "--no-auto-update",
+              "--yolo",
+              "--cwd",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "home/.grok/auth.json",
+      "text": "{}\n",
+      "mode": "0600"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "grok"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting grok (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "high",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".grok/auth.json",
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "grok",
+          "model": "grok-4.6",
+          "effort": "high",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "grok": 1
+    }
+  }
+}

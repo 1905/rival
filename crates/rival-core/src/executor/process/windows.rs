@@ -1,5 +1,5 @@
 //! The Windows backend of [`super`]: provider containment with Job Objects,
-//! pipes whose IO a cancellation can interrupt, and Go's Windows `LookPath`.
+//! pipes whose IO a cancellation can interrupt, and the Windows executable lookup (`LookPath` rules).
 //!
 //! Containment has two layers:
 //!
@@ -178,7 +178,7 @@ pub(crate) mod hooks {
     }
 }
 
-/// Go `exec.Cmd.Start` for a provider: spawns `cmd` suspended inside the
+/// Starts a provider: spawns `cmd` suspended inside the
 /// owner Job, assigns it to its own new kill-on-close Job, then resumes it.
 /// A failure after the spawn terminates and reaps the child before the
 /// error returns; its Job handle closes with it.
@@ -217,7 +217,7 @@ pub fn has_console() -> bool {
 /// `CREATE_NO_WINDOW` when the owner has no console. A console program
 /// started by a process without a console otherwise gets a new visible
 /// console window; a fully redirected detached owner (`DETACHED_PROCESS`)
-/// is such a process. With a console the provider shares it, as in Go.
+/// is such a process. With a console the provider shares it.
 /// Its stdio is the provider pipes either way.
 pub fn provider_creation_flags(owner_has_console: bool) -> u32 {
     use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
@@ -300,8 +300,8 @@ impl ProcessHandle {
         self.child.id() as i32
     }
 
-    /// Ends the provider's whole Job with exit code 1, the code Go's
-    /// `Process.Kill` (`TerminateProcess(h, 1)`) leaves on Windows.
+    /// Ends the provider's whole Job with exit code 1, the code
+    /// `TerminateProcess(h, 1)` leaves on Windows.
     pub(crate) fn kill_group(&mut self) -> KillOutcome {
         if self.reaped {
             return KillOutcome::Done;
@@ -314,8 +314,8 @@ impl ProcessHandle {
         }
     }
 
-    /// One non-blocking wait. Go's Windows `ExitCode` is the `uint32` exit
-    /// code as an `int`, so `0xC0000005` stays positive.
+    /// One non-blocking wait. The exit code is the `uint32` exit
+    /// code as an `i32`, so `0xC0000005` stays positive.
     pub(crate) fn try_reap(&mut self) -> io::Result<Option<ExitState>> {
         let Some(status) = self.child.try_wait()? else {
             return Ok(None);
@@ -474,7 +474,7 @@ fn overlapped_io(handle: HANDLE, buf: *mut u8, len: usize, write: bool, abort: &
     io_error(err, write)
 }
 
-/// A failed pipe call. A read at the closed write end is EOF, as in Go.
+/// A failed pipe call. A read at the closed write end is EOF.
 fn io_error(err: u32, write: bool) -> Io {
     if !write && (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF) {
         return Io::Done(0);
@@ -499,7 +499,7 @@ pub(crate) fn write_some(w: &PipeWriter, buf: &[u8], abort: &Abort) -> Io {
     )
 }
 
-/// Go `(*os.File).Close` on Windows: `CloseHandle` with its error.
+/// Closes a file with `CloseHandle` and returns its error.
 pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
     let handle = file.into_raw_handle();
     // SAFETY: we own the handle and close it exactly once.
@@ -527,16 +527,14 @@ pub(crate) fn is_bare_name(name: &str) -> bool {
     Path::new(name).file_name() == Some(OsStr::new(name))
 }
 
-/// Go `exec.ErrNotFound` on Windows.
+/// Error text for an executable that is not found.
 pub(crate) const ERR_NOT_FOUND: &str = "executable file not found in %PATH%";
-/// Go `fs.ErrNotExist`.
 const ERR_NOT_EXIST: &str = "file does not exist";
-/// Go `fs.ErrPermission`.
 const ERR_PERMISSION: &str = "permission denied";
 
-/// The process-level inputs of Go's Windows `LookPath`, besides `PATH`:
+/// The process-level inputs of the Windows executable lookup, besides `PATH`:
 /// `PATHEXT` and whether `NoDefaultCurrentDirectoryInExePath` is set (any
-/// value). Go reads both from the process environment.
+/// value). Both come from the process environment.
 #[derive(Debug, Clone, Default)]
 pub struct LookEnv {
     pub path_ext: Option<std::ffi::OsString>,
@@ -544,7 +542,7 @@ pub struct LookEnv {
 }
 
 impl LookEnv {
-    /// This process's values, as Go's `os.Getenv` reads them.
+    /// This process's values, as `std::env::var_os` reads them.
     pub fn process() -> LookEnv {
         LookEnv {
             path_ext: std::env::var_os("PATHEXT"),
@@ -553,7 +551,7 @@ impl LookEnv {
     }
 }
 
-/// Go `exec.pathExt`: lower-cased `PATHEXT` entries with a leading dot, or
+/// Lower-cased `PATHEXT` entries with a leading dot, or
 /// `.com .exe .bat .cmd` when unset or empty.
 pub fn path_ext(value: Option<&OsStr>) -> Vec<String> {
     let value = value.map(|v| v.to_string_lossy()).unwrap_or_default();
@@ -574,7 +572,7 @@ pub fn path_ext(value: Option<&OsStr>) -> Vec<String> {
         .collect()
 }
 
-/// Go `exec.chkStat`: exists (following links) and is not a directory.
+/// Exists (following links) and is not a directory.
 fn chk_stat(file: &Path) -> Result<(), String> {
     match std::fs::metadata(file) {
         Ok(meta) if meta.is_dir() => Err(ERR_PERMISSION.to_string()),
@@ -583,7 +581,7 @@ fn chk_stat(file: &Path) -> Result<(), String> {
     }
 }
 
-/// Go `exec.hasExt`: a `.` after the last separator or colon.
+/// A `.` after the last separator or colon.
 fn has_ext(file: &[u8]) -> bool {
     let Some(dot) = file.iter().rposition(|&c| c == b'.') else {
         return false;
@@ -599,7 +597,7 @@ fn with_suffix(file: &Path, ext: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Go `exec.findExecutable` (Windows).
+/// Finds an executable by name, trying each extension in `exts`.
 fn find_executable(file: &Path, exts: &[String]) -> Result<PathBuf, String> {
     if exts.is_empty() {
         return chk_stat(file).map(|()| file.to_path_buf());
@@ -622,7 +620,7 @@ fn find_executable(file: &Path, exts: &[String]) -> Result<PathBuf, String> {
     }
 }
 
-/// Go `exec.lookPath` (Windows) for one `PATHEXT` list.
+/// Looks up `file` for one `PATHEXT` list.
 pub fn look_path_exts(
     file: &str,
     exts: &[String],
@@ -677,7 +675,7 @@ pub fn look_path_exts(
     }
 }
 
-/// Go `os.SameFile` after two `os.Lstat`s: the same volume and file index,
+/// Compares two paths by identity: the same volume and file index,
 /// without following a final link. False when either cannot be read.
 pub fn same_file(a: &Path, b: &Path) -> bool {
     use std::os::windows::fs::OpenOptionsExt as _;
@@ -706,7 +704,7 @@ pub fn same_file(a: &Path, b: &Path) -> bool {
     matches!((id(a), id(b)), (Some(x), Some(y)) if x == y)
 }
 
-/// Go `exec.lookExtensions(path, dir)`: resolves the extension of a name
+/// Resolves the extension of a name
 /// that has a separator, without a `%PATH%` search.
 pub fn look_extensions(path: &str, dir: &str, env: &LookEnv) -> Result<PathBuf, LookPathError> {
     if matches!(path, "" | "." | "..") {

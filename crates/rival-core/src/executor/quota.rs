@@ -1,5 +1,3 @@
-//! Go: `internal/executor/quota.go`.
-
 /// High-precision substrings that indicate a reviewer CLI hit a provider
 /// quota/rate limit. Some providers report these failures only in captured
 /// output, so matching is case-insensitive against the combined
@@ -31,7 +29,6 @@ pub fn is_quota_exhausted(output: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// Go: `TestIsQuotaExhausted`.
     #[test]
     fn is_quota_exhausted_cases() {
         let cases = [

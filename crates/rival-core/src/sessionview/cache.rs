@@ -207,7 +207,6 @@ mod tests {
         sessions.iter().map(|s| s.id.as_str()).collect()
     }
 
-    // Go: TestCacheLoadsAllSessionsNewestFirst.
     #[test]
     fn cache_loads_all_sessions_newest_first() {
         let tmp = tempfile::tempdir().unwrap();
@@ -224,7 +223,6 @@ mod tests {
         );
     }
 
-    // Go: TestCacheRevisionOnlyMovesOnChange.
     #[test]
     fn cache_revision_only_moves_on_change() {
         let tmp = tempfile::tempdir().unwrap();
@@ -250,7 +248,6 @@ mod tests {
         );
     }
 
-    // Go: TestCacheDropsDeletedFiles.
     #[test]
     fn cache_drops_deleted_files() {
         let tmp = tempfile::tempdir().unwrap();
@@ -267,7 +264,6 @@ mod tests {
         assert!(cache.get("b").is_none(), "get returned a deleted session");
     }
 
-    // Go: TestCacheSkipsUnparsableFileAndTempFiles.
     #[test]
     fn cache_skips_unparsable_file_and_temp_files() {
         let tmp = tempfile::tempdir().unwrap();
@@ -280,7 +276,6 @@ mod tests {
         assert_eq!(ids(&sessions), ["good"]);
     }
 
-    // Go: TestCacheOnAbsentDirectoryReturnsNil.
     #[test]
     fn cache_on_absent_directory_returns_empty() {
         let tmp = tempfile::tempdir().unwrap();
@@ -289,7 +284,6 @@ mod tests {
         assert_eq!(rev, 0);
     }
 
-    // Go: TestCacheGetReturnsCachedSession.
     #[test]
     fn cache_get_returns_cached_session() {
         let tmp = tempfile::tempdir().unwrap();
@@ -303,7 +297,6 @@ mod tests {
         assert!(cache.get("absent").is_none());
     }
 
-    // Go: TestCacheProgressIsThrottledAndReachesTotal.
     #[test]
     fn cache_progress_is_throttled_and_reaches_total() {
         let tmp = tempfile::tempdir().unwrap();
@@ -318,7 +311,6 @@ mod tests {
         assert_eq!(calls, [(100, N), (200, N), (N, N)]);
     }
 
-    // Go: TestCacheProgressSilentOnEmptyDir.
     #[test]
     fn cache_progress_silent_on_empty_dir() {
         let tmp = tempfile::tempdir().unwrap();

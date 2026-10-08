@@ -1,0 +1,29 @@
+{
+  "name": "executor-codex-missing-runtime",
+  "description": "`rival command codex` with no codex on PATH: the preflight fails before any session or queue work is created, stderr shows the error, and the exit code is 1.",
+  "fakes": {
+    "absent": [
+      "codex"
+    ]
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "codex runtime is not installed"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

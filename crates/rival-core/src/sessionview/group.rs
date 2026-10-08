@@ -181,7 +181,6 @@ mod tests {
         TimeDelta::minutes(n)
     }
 
-    // Go: TestGroupBucketsAndKeys.
     #[test]
     fn group_buckets_and_keys() {
         let solo = sess("s1", "", "completed", "review", "codex", SOL, "high");
@@ -195,7 +194,6 @@ mod tests {
         assert_eq!(buckets[1].sessions.len(), 2);
     }
 
-    // Go: TestGroupPreservesFirstAppearanceOrder.
     #[test]
     fn group_preserves_first_appearance_order() {
         let first = sess("x", "g2", "completed", "review", "codex", SOL, "high");
@@ -207,7 +205,7 @@ mod tests {
         assert_eq!(keys, ["g2", "g1"]);
     }
 
-    // Go: TestGroupDoesNotMutateInput. Also checks the input order, which a
+    // Also checks the input order, which a
     // Rust caller could otherwise lose to an in-place member sort.
     #[test]
     fn group_does_not_mutate_input() {
@@ -231,7 +229,6 @@ mod tests {
         );
     }
 
-    // Go: TestStatusTier.
     #[test]
     fn status_tier() {
         let cases: [(&str, &[&str], &str); 4] = [
@@ -261,7 +258,6 @@ mod tests {
         }
     }
 
-    // Go: TestKindPrecedence.
     #[test]
     fn kind_precedence() {
         let cases: [(&str, &[&str], &str); 3] = [
@@ -292,7 +288,6 @@ mod tests {
         assert_eq!(kind(&sessions), "security");
     }
 
-    // Go: TestEffort.
     #[test]
     fn effort_shared_mixed_and_empty() {
         let same = [
@@ -310,7 +305,7 @@ mod tests {
         assert_eq!(effort::<Session>(&[]), "");
     }
 
-    // Go: TestElapsedSpansTheWholeGroup. Elapsed is the wall-clock span of
+    // Elapsed is the wall-clock span of
     // the whole group; the TUI used to report the longest single member.
     #[test]
     fn elapsed_spans_the_whole_group() {
@@ -357,7 +352,7 @@ mod tests {
         assert_eq!(elapsed_at(&overlapping, now), "10m0s");
     }
 
-    // Go: TestElapsedUsesDurationFallbackAndQueuedAt. The injected `now`
+    // The injected `now`
     // makes the queued span exact instead of Go's 9m..12m window.
     #[test]
     fn elapsed_uses_duration_fallback_and_queued_at() {
@@ -380,7 +375,6 @@ mod tests {
         assert_eq!(elapsed_at(&queued, base + minutes(10)), "10m0s");
     }
 
-    // Go: TestElapsedWithoutStartIsDash.
     #[test]
     fn elapsed_without_start_is_dash() {
         let queued = [Session {

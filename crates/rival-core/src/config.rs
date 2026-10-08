@@ -1,9 +1,8 @@
-//! Port of Go `internal/config/config.go`: model ids and public labels, log
+//! Configuration: model ids and public labels, log
 //! and error scrubbing, effort resolution, env-driven limits, API-key lookup,
 //! reviewer prompts, and `~/.rival/config.yaml`.
 //!
-//! Go keeps the user config in package globals and reads `os.Getenv` on every
-//! call. Here a [`Config`] value owns a snapshot of the environment, the
+//! A [`Config`] value owns a snapshot of the environment, the
 //! working directory, the [`Paths`], and the loaded user config, so tests pass
 //! explicit values instead of mutating globals.
 
@@ -64,7 +63,7 @@ pub const QUEUE_POLL_INTERVAL: Duration = Duration::from_secs(2);
 /// their own boundary (see [`claude_effort_level`] and the grok adapter).
 pub const VALID_EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "ultra"];
 
-/// Go `ClaudeEffortLevel`: rival effort → claude CLI `--effort` value.
+/// Maps a rival effort → claude CLI `--effort` value.
 pub fn claude_effort_level(effort: &str) -> Option<&'static str> {
     match effort {
         "low" => Some("low"),
@@ -182,7 +181,7 @@ pub fn public_runtime_error(cli: &str, model: &str, message: &str) -> String {
     }
 }
 
-/// Go `strings.NewReplacer(...).Replace`: one left-to-right pass without
+/// Ordered multi-pattern replace: one left-to-right pass without
 /// overlapping matches; at each position the earliest listed pattern wins.
 pub(crate) fn replace_ordered(text: &str, pairs: &[(&str, String)]) -> String {
     let mut out = String::with_capacity(text.len());
@@ -413,9 +412,9 @@ fn public_review_header(line: &str) -> String {
     format!("{PREFIX}{reviewer}{role}")
 }
 
-/// Go `titleLabel`: upper-cases a label's first letter for banner display.
+/// Upper-cases a label's first letter for banner display.
 /// Labels are lowercase everywhere else, and the codex banner has always read
-/// "Sol runtime". Go upper-cases the first byte; labels are ASCII.
+/// "Sol runtime". Only the first byte changes; labels are ASCII.
 fn title_label(label: &str) -> String {
     let mut chars = label.chars();
     match chars.next() {
@@ -628,7 +627,7 @@ fn valid_configured_model_effort(label: &str, effort: &str) -> bool {
     is_valid_effort(effort)
 }
 
-/// An error with Go's exact message text.
+/// A config error carrying its exact message text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigError(String);
 
@@ -671,7 +670,7 @@ pub struct UserConfig {
     pub auto_fix_critical_high: bool,
 }
 
-/// yaml.v3 decodes YAML null into a Go string as "", and any other scalar as
+/// Decodes YAML null into a string as "", and any other scalar as
 /// its literal text; serde-saphyr rejects null for `String`.
 #[derive(Default)]
 struct GoString(String);
@@ -734,14 +733,14 @@ impl From<RawUserConfig> for UserConfig {
     }
 }
 
-/// Go `LoadUserConfig` for one file. `Ok(None)` means the file does not
-/// exist. Entries are validated in sorted key order (Go's map order is
-/// random, so any invalid entry may be the one reported there).
+/// Loads the user config from one file. `Ok(None)` means the file does not
+/// exist. Entries are validated in sorted key order, so the reported
+/// invalid entry is the same on every run.
 pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> {
     let shown = path.display();
     let mut file = match std::fs::File::open(path) {
         Ok(file) => file,
-        // Go errors.Is(err, os.ErrNotExist); on Windows also a missing
+        // A missing file is not an error; on Windows also a missing
         // parent directory (ERROR_PATH_NOT_FOUND), as in a fresh profile.
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => {
@@ -804,13 +803,13 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
     Ok(Some(cfg))
 }
 
-/// Runtime configuration: Go's package globals plus `os.Getenv`, captured
+/// Runtime configuration: the environment and the user config, captured
 /// once.
 #[derive(Clone)]
 pub struct Config {
     paths: Paths,
     env: HashMap<String, String>,
-    /// Go `os.Environ()`: every entry in process order, non-UTF-8 included.
+    /// Every environment entry in process order, non-UTF-8 included.
     environ: Vec<OsString>,
     cwd: Option<PathBuf>,
     user: Option<UserConfig>,
@@ -837,7 +836,7 @@ impl fmt::Debug for Config {
 
 impl Config {
     /// Production constructor: snapshots the process environment and the
-    /// working directory (Go `os.Getwd`), then reads the user config.
+    /// working directory, then reads the user config.
     pub fn load(paths: &Paths) -> Self {
         let (env, environ, cwd) = process_snapshot();
         let mut cfg = Self::new(paths.clone(), env, cwd).with_environ(environ);
@@ -845,9 +844,8 @@ impl Config {
         cfg
     }
 
-    /// Go reads `config.yaml` once at package init, before `main` loads
-    /// `.env`, but calls `os.Getenv`, `os.Environ` and `os.UserHomeDir` at
-    /// each use. This re-snapshots the process environment (and the working
+    /// The user config is read once, before `main` loads `.env`, while the
+    /// environment and home directory are read at each use. This re-snapshots the process environment (and the working
     /// directory) after `.env` is loaded and takes the post-`.env` `paths`,
     /// while keeping the user config and its load error from [`Config::load`].
     pub fn reload_env(self, paths: Paths) -> Self {
@@ -876,7 +874,7 @@ impl Config {
     }
 
     /// Explicit constructor for tests and embedders. Reads
-    /// `paths.config_file()` like Go's `LoadUserConfig`, which skips the file
+    /// `paths.config_file()`, and skips the file
     /// when no home directory is known (here: neither `RIVAL_HOME` nor
     /// `HOME` is set and non-empty in `env`).
     pub fn new(paths: Paths, env: HashMap<String, String>, cwd: Option<PathBuf>) -> Self {
@@ -902,8 +900,8 @@ impl Config {
         cfg
     }
 
-    /// Replaces the user config and clears any load error, as Go tests do by
-    /// assigning `userConfig` directly.
+    /// Replaces the user config and clears any load error, so tests
+    /// can set the user config directly.
     pub fn with_user_config(mut self, user: Option<UserConfig>) -> Self {
         self.user = user;
         self.user_err = None;
@@ -914,7 +912,7 @@ impl Config {
         &self.paths
     }
 
-    /// Go `os.Environ()` for child processes. [`Config::load`] keeps the
+    /// The environment entries for child processes. [`Config::load`] keeps the
     /// process order and non-UTF-8 entries; [`Config::new`] builds it from
     /// `env`, sorted by entry.
     pub fn environ(&self) -> &[OsString] {
@@ -935,7 +933,7 @@ impl Config {
         self.process_env
     }
 
-    /// The snapshotted Go `os.Getwd()` result; `None` stands for its error.
+    /// The snapshotted working directory; `None` means it could not be read.
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()
     }
@@ -944,9 +942,9 @@ impl Config {
         self.user.as_ref()
     }
 
-    /// Go `os.Getenv` against the snapshot: unset reads as "". Windows
-    /// names are case-insensitive (`Path` answers `PATH`), as Go's
-    /// `GetEnvironmentVariableW` lookup is; see [`getenv_in`].
+    /// Reads a variable from the snapshot: unset reads as "". Windows
+    /// names are case-insensitive (`Path` answers `PATH`), like the Windows
+    /// environment lookup; see [`getenv_in`].
     pub fn getenv(&self, key: &str) -> &str {
         getenv_in(cfg!(windows), &self.env, key)
     }
@@ -1192,7 +1190,7 @@ impl Config {
     /// still within its configured limits. When the run timeout is disabled
     /// (0), only the queue wait + margin is bounded.
     pub fn max_run_wait(&self) -> i64 {
-        // Go's time.Duration is signed; oversized configured budgets wrap.
+        // The budget is a signed nanosecond count; oversized configured budgets wrap.
         (self.queue_timeout().as_nanos() as i64)
             .wrapping_add((self.run_timeout().as_nanos() as i64).wrapping_mul(2))
             .wrapping_add(5 * 60 * 1_000_000_000)
@@ -1215,8 +1213,7 @@ impl Config {
         }
     }
 
-    /// Go `WithRunTimeout(ctx, mult)` without the context: the deadline
-    /// budget in signed nanoseconds, `mult × run_timeout()`, or `None` (no deadline) when the run
+    /// The run deadline budget in signed nanoseconds, `mult × run_timeout()`, or `None` (no deadline) when the run
     /// timeout is disabled or `mult <= 0`. Every current caller passes 1.
     pub fn run_timeout_budget(&self, mult: i32) -> Option<i64> {
         let d = self.run_timeout();
@@ -1233,7 +1230,7 @@ impl Config {
     }
 
     /// The workdir preamble with the absolute path injected. An unresolvable
-    /// path injects "" (Go ignores the `filepath.Abs` error).
+    /// path injects "" (the absolute-path error is ignored).
     pub fn build_workdir_preamble(&self, workdir: &Path) -> String {
         let abs = paths::abs(self.cwd.as_deref(), workdir).unwrap_or_default();
         WORKDIR_PREAMBLE.replace("{WORKDIR}", &abs.to_string_lossy())

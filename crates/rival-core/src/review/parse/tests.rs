@@ -36,7 +36,6 @@ codex
 tokens used 1234
 "#;
 
-/// Go: TestParseReviewerOutput_IgnoresEchoedSchemaExample.
 #[test]
 fn ignores_echoed_schema_example() {
     let out = parse_reviewer_output(CODEX_STYLE_REVIEWER_LOG).unwrap();
@@ -45,7 +44,6 @@ fn ignores_echoed_schema_example() {
     assert_eq!(out.findings[0].file, "rival/main.go");
 }
 
-/// Go: TestParseReviewerOutput_BareObjectWithProse.
 #[test]
 fn bare_object_with_prose() {
     let out =
@@ -54,21 +52,19 @@ fn bare_object_with_prose() {
     assert!(out.findings.is_empty());
 }
 
-/// Go: TestParseReviewerOutput_NoPayload.
 #[test]
 fn no_payload() {
     let err = parse_reviewer_output("no json here at all").unwrap_err();
     assert_eq!(err.to_string(), "no reviewer JSON payload found in output");
 }
 
-/// Go: TestParseReviewerOutput_RejectsUnrelatedJSON. A tool/telemetry event
+/// A tool/telemetry event
 /// must not be accepted as an empty successful parse.
 #[test]
 fn rejects_unrelated_json() {
     assert!(parse_reviewer_output(r#"{"event":"done","ok":true}"#).is_err());
 }
 
-/// Go: TestParseReviewerOutput_RejectsOnlySchemaExample.
 #[test]
 fn rejects_only_schema_example() {
     let schema_only = concat!(
@@ -79,7 +75,6 @@ fn rejects_only_schema_example() {
     assert!(parse_reviewer_output(schema_only).is_err());
 }
 
-/// Go: TestParseReviewerOutput_AcceptsCleanReview.
 #[test]
 fn accepts_clean_review() {
     let out =
@@ -89,7 +84,6 @@ fn accepts_clean_review() {
     assert!(out.findings.is_empty());
 }
 
-/// Go: TestParseReviewerOutput_DropsOnlyPlaceholderFindings.
 #[test]
 fn drops_only_placeholder_findings() {
     let raw = concat!(
@@ -102,14 +96,12 @@ fn drops_only_placeholder_findings() {
     assert_eq!(out.findings[0].file, "real.go");
 }
 
-/// Go: TestParseReviewerOutput_NestedInsideInvalidRegion.
 #[test]
 fn nested_inside_invalid_region() {
     let raw = r#"wrapper { not valid json but balanced: {"summary":"nested real","findings":[{"file":"a.go","line":1,"severity":"high","confidence":8}]} }"#;
     assert_eq!(parse_reviewer_output(raw).unwrap().summary, "nested real");
 }
 
-/// Go: TestParseReviewerOutput_AcceptsRealFindingDiscussingEnum.
 #[test]
 fn accepts_real_finding_discussing_enum() {
     let raw = r#"{"summary":"real review","findings":[{"file":"rival/internal/review/parse.go","line":84,"severity":"high","category":"bug","title":"placeholder check","body":"isPlaceholderFinding compares against critical|high|medium|low which is fine","confidence":9}]}"#;
@@ -119,7 +111,6 @@ fn accepts_real_finding_discussing_enum() {
     assert_eq!(out.findings[0].severity, "high");
 }
 
-/// Go: TestExtractJSON_UnbalancedBraceBeforeAnswer.
 #[test]
 fn unbalanced_brace_before_answer() {
     let raw = r#"{"summary":"schema","findings":[{"file":"path/to/file","line":42}]}
@@ -134,7 +125,7 @@ codex
     assert_eq!(out.findings[0].file, "real.go");
 }
 
-/// Go: TestParseReviewerOutput_RealCapturedLog. A real Codex log: the CLI
+/// A real Codex log: the CLI
 /// echoed the prompt and cat'd source files (braces, JSON fixtures), then
 /// emitted the real answer last.
 #[test]
@@ -151,7 +142,7 @@ fn real_captured_log() {
     assert!(!is_example_summary(&out.summary), "{:?}", out.summary);
 }
 
-/// Go: TestToolOutputJSONIsNotTheReview. Review-shaped JSON printed by a
+/// Review-shaped JSON printed by a
 /// tool must not become the review when the final codex answer is prose.
 #[test]
 fn tool_output_json_is_not_the_review() {

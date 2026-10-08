@@ -1,0 +1,40 @@
+{
+  "name": "executor-grok-missing-auth",
+  "description": "`rival command grok` with grok on PATH (looked up only, never run) but no $HOME/.grok/auth.json. The path is derived from the home directory, never from $GROK_HOME. Exits 1 with an authentication error, no session is created, and the fake is called 0 times.",
+  "fakes": {
+    "scripts": {
+      "grok": {
+        "responses": [
+          {
+            "argv_prefix": [],
+            "stderr": "fake must not run\n",
+            "exit": 97
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "grok"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "grok authentication is unavailable (<HOME>/.grok/auth.json not found); run `grok login`"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "grok": 0
+    }
+  }
+}

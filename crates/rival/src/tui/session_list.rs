@@ -37,7 +37,7 @@ pub fn group_elapsed(item: &DisplayItem, now: DateTime<FixedOffset>) -> String {
     sessionview::elapsed_at(&item.sessions, now)
 }
 
-/// Go: `formatElapsed`. A finished run's recorded duration, a running run's
+/// A finished run's recorded duration, a running run's
 /// age, or how long a queued run has waited in line.
 pub fn format_elapsed(s: &Session, now: DateTime<FixedOffset>) -> String {
     if !s.duration.is_empty() {
@@ -169,7 +169,7 @@ pub fn local_zone(utc: NaiveDateTime) -> FixedOffset {
     Local.offset_from_utc_datetime(&utc)
 }
 
-/// Go: `time.Date(y, m, d, 0, 0, 0, 0, loc)`. It guesses the offset at the
+/// It guesses the offset at the
 /// wall time read as UTC, then uses the offset in force at the guessed
 /// instant. Each midnight gets its own offset, so a DST switch between two
 /// boundaries moves neither. A midnight the switch skips or repeats
@@ -399,7 +399,7 @@ impl Row {
     }
 }
 
-/// Go: `rowsAndCounts`. Applies the status tab and the text filter, then
+/// Applies the status tab and the text filter, then
 /// groups what is left under section headers. Empty sections are omitted.
 /// Items keep their relative order inside a section, so the watcher's
 /// newest-first sort holds. It also returns the per-tab counts of filter
@@ -482,7 +482,7 @@ impl Columns {
     }
 }
 
-/// Go: `layoutColumns`. Sizes the columns for a pane width. A row is a
+/// Sizes the columns for a pane width. A row is a
 /// leading space then the cells separated by single spaces; PROJECT takes
 /// whatever is left.
 pub fn layout_columns(width: usize) -> Columns {
@@ -565,7 +565,7 @@ pub fn row_time(item: &DisplayItem, now: DateTime<FixedOffset>) -> String {
     t
 }
 
-/// Go: `renderRow`. One run as exactly `width` cells.
+/// One run as exactly `width` cells.
 pub fn render_row(
     item: &DisplayItem,
     c: &Columns,
@@ -902,7 +902,7 @@ impl ListPane {
         "No sessions yet. Run rival to get started.".to_string()
     }
 
-    /// Go: `tabBar`. The status tabs with their counts on the left and the
+    /// The status tabs with their counts on the left and the
     /// filter on the right, as exactly `w` cells.
     pub fn tab_bar(&self, w: usize, loading: bool, styles: &Styles) -> Line<'static> {
         if w == 0 {
@@ -953,7 +953,7 @@ impl ListPane {
         pad_line(Line::from(left), w)
     }
 
-    /// Go: `view`. The column titles, the visible rows of the current page
+    /// The column titles, the visible rows of the current page
     /// and the page footer as exactly `height` lines of exactly `width`
     /// cells. Only the visible window is built, so 3000 rows cost the same
     /// as 30.

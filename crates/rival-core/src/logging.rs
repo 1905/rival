@@ -1,6 +1,6 @@
 //! JSON-lines logger with zerolog's field names and order.
 //!
-//! Go: `zerolog.New(os.Stderr).With().Timestamp().Str("app", "rival")`. A line is
+//! A line is
 //! `level`, `app`, the per-call fields in call order, `time`, then `message`.
 //! `time` is RFC3339 at seconds precision in local time; an empty message is
 //! omitted, and duplicate keys are kept as written.

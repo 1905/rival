@@ -91,7 +91,6 @@ fn spawn_wait(mut m: Manager, ctx: Context) -> mpsc::Receiver<(Result<(), WaitEr
     rx
 }
 
-// Go: TestImmediatePromoteOnEmptyQueue.
 #[test]
 fn immediate_promote_on_empty_queue() {
     let dir = tempfile::tempdir().unwrap();
@@ -108,7 +107,6 @@ fn immediate_promote_on_empty_queue() {
     assert_eq!(m.ticket().unwrap().state, STATE_RUNNING);
 }
 
-// Go: TestFIFOOrder.
 #[test]
 fn fifo_order() {
     let dir = tempfile::tempdir().unwrap();
@@ -149,7 +147,6 @@ fn fifo_order() {
     assert_eq!(got, vec![2, 3], "promotion order");
 }
 
-// Go: TestCapacityTwoPromotesBothInOneCycle.
 #[test]
 fn capacity_two_promotes_both_in_one_cycle() {
     let dir = tempfile::tempdir().unwrap();
@@ -178,7 +175,6 @@ fn capacity_two_promotes_both_in_one_cycle() {
     r.unwrap();
 }
 
-// Go: TestDeadTicketReapedThenPromote.
 #[test]
 fn dead_ticket_reaped_then_promote() {
     let dir = tempfile::tempdir().unwrap();
@@ -192,7 +188,6 @@ fn dead_ticket_reaped_then_promote() {
     assert_eq!(entries.len(), 1, "entries (dead tickets reaped)");
 }
 
-// Go: TestSIGKILLSurvivorHoldsSlot.
 #[test]
 fn sigkill_survivor_holds_slot() {
     let dir = tempfile::tempdir().unwrap();
@@ -213,7 +208,6 @@ fn sigkill_survivor_holds_slot() {
     r.unwrap();
 }
 
-// Go: TestUnparseableFileTolerance.
 #[test]
 fn unparseable_file_tolerance() {
     let dir = tempfile::tempdir().unwrap();
@@ -240,7 +234,6 @@ fn unparseable_file_tolerance() {
     assert!(!old.exists(), "stale unparseable file was not cleaned up");
 }
 
-// Go: TestCtxCancelWhileWaiting.
 #[test]
 fn ctx_cancel_while_waiting() {
     let dir = tempfile::tempdir().unwrap();
@@ -259,7 +252,6 @@ fn ctx_cancel_while_waiting() {
     }
 }
 
-// Go: TestQueueTimeout.
 #[test]
 fn queue_timeout() {
     let dir = tempfile::tempdir().unwrap();
@@ -276,7 +268,7 @@ fn queue_timeout() {
     assert_eq!(err.to_string(), "queue timeout after 50ms");
 }
 
-// Go: TestPIDReuseGuardReapsRecycledHolder. A running ticket whose PID is
+// A running ticket whose PID is
 // live but whose recorded start time does NOT match the live process (i.e.
 // the PID was recycled by an unrelated process) must be reaped, freeing the
 // slot.
@@ -310,7 +302,6 @@ fn pid_reuse_guard_reaps_recycled_holder() {
         .unwrap_or_else(|e| panic!("recycled-PID ticket should have been reaped: {e}"));
 }
 
-// Go: TestSelfHealAfterTicketRemoved.
 #[test]
 fn self_heal_after_ticket_removed() {
     let dir = tempfile::tempdir().unwrap();
@@ -333,7 +324,6 @@ fn self_heal_after_ticket_removed() {
     assert!(healed.created_at > tk.created_at);
 }
 
-// Go: TestPositionCallback.
 #[test]
 fn position_callback() {
     let dir = tempfile::tempdir().unwrap();
@@ -368,7 +358,6 @@ fn position_callback() {
     );
 }
 
-// Go: TestClearForceAndDeadOnly.
 #[test]
 fn clear_force_and_dead_only() {
     let dir = tempfile::tempdir().unwrap();

@@ -22,12 +22,12 @@ use super::session_list::{
 };
 use super::text::{fit_cell_line, hardwrap, truncate, truncate_line};
 
-/// Go: `oneLine`. Collapses every whitespace run to one space.
+/// Collapses every whitespace run to one space.
 pub fn one_line(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Go: `joinMeta`. Joins the non-empty parts with a dim middle dot.
+/// Joins the non-empty parts with a dim middle dot.
 pub fn join_meta(parts: Vec<Span<'static>>, ctx: &Ctx) -> Line<'static> {
     let mut spans = Vec::new();
     for part in parts.into_iter().filter(|p| !p.content.is_empty()) {
@@ -39,7 +39,7 @@ pub fn join_meta(parts: Vec<Span<'static>>, ctx: &Ctx) -> Line<'static> {
     Line::from(spans)
 }
 
-/// Go: `startedLine`. "started 11:40 · pid 81233"; a run from another day
+/// "started 11:40 · pid 81233"; a run from another day
 /// gets its date too. Times are local in `zone`.
 pub fn started_line(
     t: Option<DateTime<FixedOffset>>,
@@ -63,7 +63,7 @@ pub fn started_line(
     line
 }
 
-/// Go: `tailSession`. The member whose log the preview tails: the judge when
+/// The member whose log the preview tails: the judge when
 /// the group has one (its verdict is the result), else the last member.
 pub fn tail_session(item: &DisplayItem) -> Option<&Arc<Session>> {
     item.sessions
@@ -72,7 +72,7 @@ pub fn tail_session(item: &DisplayItem) -> Option<&Arc<Session>> {
         .or_else(|| item.sessions.last())
 }
 
-/// Go: `previewMeta`. The block above the log: who, what, when, and for a
+/// The block above the log: who, what, when, and for a
 /// group one line per member. Every line is cut to `width`.
 pub fn preview_meta(item: &DisplayItem, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     let Some(s) = item.primary() else {
@@ -200,7 +200,7 @@ impl PreviewPane {
         Some(LogKey::new(s, width, rows.min(PREVIEW_TAIL_LINES)))
     }
 
-    /// Go: `refresh`. A read for the tail `item` needs, if the cache does not
+    /// A read for the tail `item` needs, if the cache does not
     /// hold it or `refresh` asks to check the file again.
     pub fn request(
         &mut self,
@@ -227,7 +227,7 @@ impl PreviewPane {
         self.tail.accept(res, wanted.as_ref())
     }
 
-    /// Go: `renderPreview`. The head, then the tail of the log in the rows
+    /// The head, then the tail of the log in the rows
     /// left.
     pub fn lines(
         &self,
@@ -254,7 +254,7 @@ impl PreviewPane {
         lines
     }
 
-    /// Go: `previewTail`. The last `rows` wrapped lines of `s`'s log, or a dim
+    /// The last `rows` wrapped lines of `s`'s log, or a dim
     /// note when there is nothing to show yet.
     fn tail_lines(&self, s: &Session, width: usize, rows: usize, ctx: &Ctx) -> Vec<Line<'static>> {
         let dim = ctx.styles.dim;
@@ -277,7 +277,7 @@ impl PreviewPane {
         }
     }
 
-    /// Go: `view`. Exactly `area.height` rows of exactly `area.width` cells.
+    /// Exactly `area.height` rows of exactly `area.width` cells.
     pub fn render(&self, item: Option<&DisplayItem>, area: Rect, buf: &mut Buffer, ctx: &Ctx) {
         let (w, h) = (usize::from(area.width), usize::from(area.height));
         if w == 0 || h == 0 {

@@ -1,4 +1,4 @@
-//! Reviewer output parsing. Go: `internal/review/parse.go`.
+//! Reviewer output parsing.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -54,8 +54,7 @@ pub fn parse_reviewer_output(raw: &str) -> anyhow::Result<ReviewerOutput> {
 }
 
 /// Parses a provider log: [`parse_reviewer_output`] of its
-/// [`final_answer`]. Go call sites spell this out as
-/// `ParseReviewerOutput(FinalAnswer(raw))`.
+/// [`final_answer`].
 pub fn parse_reviewer_log(raw: &str) -> anyhow::Result<ReviewerOutput> {
     parse_reviewer_output(final_answer(raw))
 }
@@ -82,7 +81,7 @@ fn is_example_summary(s: &str) -> bool {
 /// the literal pipe-delimited option lists, or the file is the contract's
 /// placeholder. Real findings never have these field values. The category
 /// is compared against every prompt contract's exact enum literal (code
-/// review, plan, and the retired antislop schema) — exact matches only, because models under
+/// review, plan, and the retired lint schema) — exact matches only, because models under
 /// uncertainty emit real dual categories like "bug|security" that a looser
 /// pipe check would silently drop.
 fn is_placeholder_finding(file: &str, severity: &str, category: &str) -> bool {

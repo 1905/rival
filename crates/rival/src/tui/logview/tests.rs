@@ -8,7 +8,6 @@ fn lines(path: &str, wrap: usize, last_n: usize) -> Result<LogLines, String> {
     read_log_lines(path, wrap, last_n, logfmt::read_tail)
 }
 
-// Go: TestSanitizeLog.
 #[test]
 fn sanitize_log_cases() {
     let cases: &[(&str, &str, &str)] = &[
@@ -40,7 +39,7 @@ fn sanitize_log_cases() {
     }
 }
 
-// Go: TestWrapLogLinesDisplayWidth. Wrapping by rune count let tabs and wide
+// Wrapping by rune count let tabs and wide
 // runes push lines past the pane width. Every emitted line must fit.
 #[test]
 fn wrap_log_lines_display_width() {
@@ -69,7 +68,6 @@ fn wrap_log_lines_display_width() {
     }
 }
 
-// Go: TestWrapLogLinesEmptyAndMissing.
 #[test]
 fn wrap_log_lines_empty_and_missing() {
     let h = harness();
@@ -84,7 +82,7 @@ fn wrap_log_lines_empty_and_missing() {
     );
 }
 
-// Go: TestWrapLogLinesKeepsRawModelID. The TUI shows raw model ids, so the
+// The TUI shows raw model ids, so the
 // log must too: no public renaming.
 #[test]
 fn wrap_log_lines_keeps_raw_model_id() {
@@ -102,7 +100,7 @@ fn wrap_log_lines_keeps_raw_model_id() {
     assert!(got.contains("red    end"), "tab not expanded: {got:?}");
 }
 
-// Go: TestReadLogLinesLastNMatchesTheFullRead. The preview cuts raw lines
+// The preview cuts raw lines
 // before sanitizing. That must give the same tail as sanitizing the whole log
 // first, even when the last lines sanitize to nothing or end in CRLF.
 #[test]
@@ -150,7 +148,6 @@ fn nth_last_newline_cases() {
     assert_eq!(nth_last_newline("", 1), None);
 }
 
-// Go: TestCreateLogViewWritesTheRawLog.
 #[test]
 fn create_log_view_writes_the_raw_log() {
     let h = harness();
@@ -171,7 +168,6 @@ fn create_log_view_writes_the_raw_log() {
     assert_eq!(fs::read_to_string(&view).unwrap(), raw);
 }
 
-// Go: TestCreateGroupLogViewUsesRawIDsAndErrors.
 #[test]
 fn create_group_log_view_uses_raw_ids_and_errors() {
     let h = harness();

@@ -1,6 +1,5 @@
 //! Prompt-free session index.
 //!
-//! Go: `internal/session/summary.go`.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};

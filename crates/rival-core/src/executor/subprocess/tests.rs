@@ -1,5 +1,5 @@
-//! Go: `internal/executor/subprocess_test.go` and `subprocess_unix_test.go`,
-//! plus Rust-only checks of the drain bound, output accounting, env and
+//! Subprocess runner tests (env filtering, timeouts, kill of process groups),
+//! plus checks of the drain bound, output accounting, env and
 //! start errors.
 //!
 //! Every test uses a temp home, an injected `environ` (no process env is read
@@ -403,9 +403,6 @@ fn write_script(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
-// ---- subprocess_test.go ----
-
-/// Go: `TestSafeEnv_BlocksOpencodePermission`.
 #[test]
 fn safe_env_blocks_opencode_permission() {
     let env = safe_env(&environ(&[
@@ -429,14 +426,12 @@ fn safe_env_blocks_opencode_permission() {
     assert!(joined.contains("RIVAL_SAFEENV_KEEP=keepme"));
 }
 
-/// Go: `TestSafeEnv_BlocksGrokRuntimeVars`.
 #[test]
 fn safe_env_blocks_grok_runtime_vars() {
     let env = safe_env(&environ(&[PATH_ENTRY, "GROK_ANYTHING=x", "XAI_API_KEY=x"]));
     assert_eq!(env, environ(&[PATH_ENTRY]));
 }
 
-/// Go: `TestSafeEnvKeepsReviewerInItsOwnRepository`.
 #[test]
 fn safe_env_keeps_reviewer_in_its_own_repository() {
     let mut items: Vec<String> = [
@@ -470,7 +465,7 @@ fn safe_env_blocks_every_prefix_as_a_raw_prefix() {
         .map(|p| format!("{p}SUFFIX=1"))
         .collect();
     let mut items: Vec<&str> = blocked.iter().map(String::as_str).collect();
-    // Go matches the raw "KEY=VALUE" prefix, so these go too.
+    // The filter matches the raw "KEY=VALUE" prefix, so these go too.
     items.extend(["HTTP_PROXY=x", "LD_PRELOAD_X=1", "DYLD_INSERT_LIBRARIES=x"]);
     items.extend(["HTTP_PROXI=kept", "ld_preload=kept", "OPENCODE=kept"]);
     assert_eq!(
@@ -489,7 +484,7 @@ fn drop_matches_prefix_and_exact_rules() {
         ("AWS_REGION=x", true),
         ("AWS_=x", true),
         ("AWSX=x", false),
-        // Go's HasPrefix(kv, ""+"="): an empty name drops "=…" entries.
+        // A prefix match on `""` plus `=`: an empty name drops "=…" entries.
         ("=C:=C:\\", true),
     ];
     for (kv, want) in cases {
@@ -543,7 +538,7 @@ fn child_env_filters_drops_then_appends_and_dedup_keeps_last() {
 }
 
 #[test]
-fn dedup_env_follows_go() {
+fn dedup_env_last_value_wins_and_nul_is_rejected() {
     let got = dedup_env(&environ(&[
         "A=1", "noequals", "", "=X=1", "=X=2", "=lone", "A=2",
     ]))
@@ -553,7 +548,6 @@ fn dedup_env_follows_go() {
     assert_eq!(err, "exec: environment variable contains NUL");
 }
 
-/// Go: `TestRunSubprocess_ContextTimeoutKillsChild`.
 #[test]
 fn context_timeout_kills_child() {
     let mut fx = Fixture::new();
@@ -575,29 +569,26 @@ fn context_timeout_kills_child() {
 
     assert!(elapsed < Duration::from_secs(2), "child ran {elapsed:?}");
     assert_eq!(ctx.err(), Some(ContextError::DeadlineExceeded));
-    // Go accepts an error or a nonzero code; SIGKILL gives Go's -1.
+    // An error or a nonzero code would be accepted; SIGKILL gives -1.
     assert_eq!(result.unwrap().exit_code, -1);
 }
 
-// ---- subprocess_unix_test.go ----
-
-/// Go: `TestRunSubprocess_TimeoutKillsLauncherGrandchild`. The npm `codex`
+/// The npm `codex`
 /// launcher shape: a wrapper spawns the real binary with inherited stdio and
 /// cannot forward SIGKILL. The grandchild ignores SIGTERM and keeps the
 /// pipes open. A context deadline must still return promptly and leave the
 /// grandchild dead.
 ///
-/// Go's deadline is 500ms and Go reads the grandchild PID after the run.
-/// Here the deadline is 3s so a loaded machine still records the
-/// grandchild's identity (PID + start time) before it expires; Go's 3.5s of
-/// slack past the deadline is kept.
+/// The deadline is 3s so a loaded machine still records the
+/// grandchild's identity (PID + start time) before it expires, and the
+/// return has 3.5s of slack past the deadline.
 #[test]
 fn timeout_kills_launcher_grandchild() {
     launcher_grandchild_case(Some(Duration::from_secs(3)));
 }
 
 /// The same launcher, cancelled by hand right after the grandchild is
-/// recorded: the return is bounded by Go's 3.5s from the cancel.
+/// recorded: the return is bounded by 3.5s from the cancel.
 #[test]
 fn cancel_kills_launcher_grandchild() {
     launcher_grandchild_case(None);
@@ -606,7 +597,7 @@ fn cancel_kills_launcher_grandchild() {
 /// `deadline`: a context deadline from the start; `None`: a manual cancel
 /// once the grandchild is recorded.
 fn launcher_grandchild_case(deadline: Option<Duration>) {
-    /// Go's bound from the cancel to the return.
+    /// Bound from the cancel to the return.
     const LIMIT: Duration = Duration::from_millis(3500);
     let mut fx = Fixture::new();
     let dir = fx.work.path().to_path_buf();
@@ -892,7 +883,7 @@ fn escaped_pipe_holder_bounds_drain_to_grace() {
 
 /// The grace starts at the cancel, not when the direct child exits: the
 /// launcher exits 0 at once, the holder keeps the pipes, and the run keeps
-/// draining (Go waits for the pipes before cmd.Wait) until the cancel plus
+/// draining (the run waits for the pipes before it reaps the child) until the cancel plus
 /// the grace.
 #[test]
 fn grace_starts_at_cancel_not_at_leader_exit() {

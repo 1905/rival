@@ -57,8 +57,8 @@ pub fn format_time(t: &DateTime<FixedOffset>) -> String {
     t.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-/// `0001-01-01T00:00:00Z` in Unix seconds. Go wrote this time for "unset",
-/// so files from older releases carry it.
+/// `0001-01-01T00:00:00Z` in Unix seconds. Older releases wrote this time for "unset",
+/// so their files carry it.
 const OLD_UNSET_TIME_SECS: i64 = -62_135_596_800;
 
 /// Parses a stored time. The old "unset" time `0001-01-01T00:00:00Z` gives
@@ -194,7 +194,7 @@ mod tests {
             ),
             "2026-01-02T03:04:05Z"
         );
-        // Go's trimmed fraction reads the same.
+        // A trimmed fraction reads the same.
         assert_eq!(rec(r#"{"at":"2026-09-30T23:59:58.12-03:30"}"#).at, Some(t));
         // Unset is not written.
         assert_eq!(

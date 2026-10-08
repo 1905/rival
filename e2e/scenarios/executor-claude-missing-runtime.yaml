@@ -1,0 +1,30 @@
+{
+  "name": "executor-claude-missing-runtime",
+  "description": "`rival command claude` with no claude or docker on PATH. The preflight fails before any session or queue work. Stdout is empty, stderr is 'claude runtime requires Docker but docker is not installed', exit 1.",
+  "fakes": {
+    "absent": [
+      "claude",
+      "docker"
+    ]
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "claude runtime requires Docker but docker is not installed"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

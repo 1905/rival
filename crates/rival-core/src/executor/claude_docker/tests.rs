@@ -1,6 +1,5 @@
-//! Go `claude_docker.go` has no own test; its review mount is covered by
-//! `claude::tests::claude_docker_review_mount_is_read_only` (Go
-//! TestClaudeDockerReviewMountIsReadOnly). These check the preflight
+//! The review mount is covered by
+//! `claude::tests::claude_docker_review_mount_is_read_only`. These check the preflight
 //! branches against a task-owned fake `docker` that never runs Docker.
 
 use super::*;
@@ -129,7 +128,7 @@ fn preflight_builds_a_missing_image_from_a_temp_dockerfile() {
 fn build_reports_a_temp_file_error() {
     let mut env = Env::new();
     let missing = path_str(&env.home.path().join("nonexistent-rival-tmp"));
-    // Go's os.TempDir reads TMPDIR on Unix and TMP first on Windows.
+    // The temp directory comes from TMPDIR on Unix and TMP first on Windows.
     let (var, sep) = if cfg!(windows) {
         ("TMP", '\\')
     } else {
@@ -147,9 +146,9 @@ fn build_reports_a_temp_file_error() {
     assert!(err.ends_with(&format!(": {not_found}")), "{err}");
 }
 
-/// The volume mount source, as Go builds it on every OS: a workdir with a
+/// The volume mount source, as built on every OS: a workdir with a
 /// leading "/" as given, anything else appended to the working directory
-/// with a bare "/" and no cleaning. The Go quirk shows on Windows: a drive
+/// with a bare "/" and no cleaning. The quirk shows on Windows: a drive
 /// path `C:\repo` is not "/"-rooted, so it mounts `<cwd>/C:\repo`.
 #[test]
 fn mount_source_keeps_absolute_and_joins_relative_workdirs() {

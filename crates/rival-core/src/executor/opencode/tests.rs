@@ -1,5 +1,5 @@
-//! Go: `internal/executor/opencode_test.go` and `opencode_entry_test.go`,
-//! plus the provider config key order and escaping, option overrides and the
+//! Opencode executor checks: the provider config key order and escaping,
+//! option overrides and the
 //! exact request.
 
 use super::*;
@@ -18,7 +18,6 @@ fn grok() -> SecurityModel {
 /// adapter must not change one byte of what K3 already sends.
 const K3_PROVIDER_BASELINE: &str = r#"{"$schema":"https://opencode.ai/config.json","provider":{"moonshotai":{"options":{"apiKey":"TESTKEY"}}}}"#;
 
-/// Go: TestK3ProviderConfigUnchanged.
 #[test]
 fn k3_provider_config_unchanged() {
     assert_eq!(
@@ -27,7 +26,7 @@ fn k3_provider_config_unchanged() {
     );
 }
 
-/// Go: TestGrokProviderConfigNamesOpenRouter (exact bytes here).
+/// The Grok provider config names OpenRouter (exact bytes).
 #[test]
 fn grok_provider_config_names_openrouter() {
     let got = opencode_provider_config(&grok(), "TESTKEY");
@@ -38,7 +37,7 @@ fn grok_provider_config_names_openrouter() {
     assert!(!got.contains("moonshotai"));
 }
 
-/// Go: TestProviderConfigRejectsEmptyKey and TestOpencodeProviderConfig.
+/// The provider config rejects an empty key and unregistered models.
 #[test]
 fn provider_config_rejects_empty_key_and_unregistered_models() {
     assert_eq!(opencode_provider_config(&k3(), ""), "");
@@ -66,7 +65,7 @@ fn provider_config_sorts_keys_and_escapes_only_what_json_needs() {
     );
 }
 
-/// Go: TestRunArgsUseTheSelectorNotTheModelID (exact vector here).
+/// Run args use the selector, not the model ID (exact vector).
 #[test]
 fn run_args_use_the_selector_not_the_model_id() {
     let args = opencode_run_args(&grok(), "xhigh", "/tmp");
@@ -90,9 +89,8 @@ fn run_args_use_the_selector_not_the_model_id() {
     );
 }
 
-/// Go: TestK3RunArgsKeepMaxVariant and
-/// TestOpencodeRunArgs_UsesOnlySupportedVariants: K3 pins max whatever
-/// effort was requested.
+/// K3 pins max whatever effort was requested, and only supported variants
+/// are used.
 #[test]
 fn k3_run_args_keep_max_variant() {
     for effort in ["high", "max", "low", ""] {
@@ -122,7 +120,7 @@ fn k3_run_args_keep_max_variant() {
     );
 }
 
-/// Go: TestPreflightNamesTheRightVariablePerModel. A fake opencode is on
+/// A fake opencode is on
 /// PATH, so the key branch is always asserted.
 #[cfg(unix)]
 #[test]
@@ -155,8 +153,8 @@ fn preflight_names_the_right_variable_per_model() {
     );
 }
 
-/// Go: TestOpencodePreflight_K3RequiresKey, with a task-owned fake instead
-/// of skipping when opencode is not installed.
+/// The K3 preflight requires a key. A task-owned fake opencode replaces the
+/// real one, so the test never skips when opencode is not installed.
 #[cfg(unix)]
 #[test]
 fn opencode_preflight_k3_requires_key() {
@@ -171,7 +169,6 @@ fn opencode_preflight_k3_requires_key() {
     opencode_preflight_model(&env.config(), config::KIMI_MODEL, "").unwrap();
 }
 
-/// Go: TestOpencodePreflightRejectsUnsupportedModel.
 #[test]
 fn opencode_preflight_rejects_unsupported_model() {
     let env = Env::new();
@@ -183,7 +180,6 @@ fn opencode_preflight_rejects_unsupported_model() {
     );
 }
 
-/// Go: TestOpencodeRunEnv_IsolatesSessionDatabases.
 #[test]
 fn opencode_run_env_isolates_session_databases() {
     let mut env = Env::new();

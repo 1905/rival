@@ -16,15 +16,12 @@ use sentry::{Client, ClientOptions, Hub, Level, Scope, TransportFactory};
 #[cfg(test)]
 mod tests;
 
-/// Go `sentryDSN`.
 pub const SENTRY_DSN: &str = "https://4cade01be5cad580635e873f91df96f5@o4506162959220736.ingest.us.sentry.io/4511041118797825";
-/// Go `sentry.Flush(2 * time.Second)`.
 pub const FLUSH_TIMEOUT: Duration = Duration::from_secs(2);
-/// Go `Enabled`: any of these set to anything but empty, `0` or `false`
+/// Any of these set to anything but empty, `0` or `false`
 /// turns telemetry off.
 pub const OPT_OUT_VARS: [&str; 3] = ["DO_NOT_TRACK", "RIVAL_NO_TELEMETRY", "CI"];
 
-/// Go `Enabled`.
 pub fn enabled<'a>(getenv: impl Fn(&str) -> &'a str) -> bool {
     OPT_OUT_VARS
         .iter()
@@ -99,7 +96,7 @@ impl Telemetry {
         self.client.as_ref()
     }
 
-    /// Go `Flush`: waits at most [`FLUSH_TIMEOUT`] when enabled.
+    /// Waits at most [`FLUSH_TIMEOUT`] when enabled.
     pub fn flush(&self) -> bool {
         match &self.client {
             Some(client) => client.flush(Some(FLUSH_TIMEOUT)),

@@ -1,4 +1,4 @@
-//! Go: `internal/gitscope/env.go`.
+//! Environment for git fetch.
 
 use std::ffi::OsString;
 
@@ -26,8 +26,8 @@ const REPOSITORY_VARS: [&str; 15] = [
 /// See <https://git-scm.com/docs/githooks> and `git rev-parse --local-env-vars`.
 /// Keeps host configuration and SSH authentication available for fetch.
 ///
-/// Entries are Go `os.Environ()` items (`KEY=VALUE`). The key is everything
-/// before the first `=` (Go `strings.Cut`); an entry without `=` is all key.
+/// Entries are process environment items (`KEY=VALUE`). The key is everything
+/// before the first `=` (split at the first `=`); an entry without `=` is all key.
 pub fn repository_env(env: &[OsString]) -> Vec<OsString> {
     env.iter()
         .filter(|item| {

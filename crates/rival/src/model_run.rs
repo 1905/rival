@@ -20,7 +20,7 @@ use crate::workdir::resolve_workdir;
 #[cfg(test)]
 mod tests;
 
-/// Go `runOptions`: the run surface's flag values.
+/// The run surface's flag values.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RunOptions {
     pub workdir: String,
@@ -32,7 +32,7 @@ pub struct RunOptions {
     pub prompt_stdin: bool,
 }
 
-/// Go `runModelRun`. It differs from the command surface on purpose: the
+/// It differs from the command surface on purpose: the
 /// prompt comes from flags rather than parsed stdin args, output mirrors to
 /// stdout as it arrives, only a successful review reads the log back (to
 /// print the formatted findings after the mirror), and a nonzero exit

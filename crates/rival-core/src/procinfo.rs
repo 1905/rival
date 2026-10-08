@@ -44,7 +44,6 @@ pub fn alive(pid: i32, want_start: i64) -> bool {
     }
 }
 
-/// Go: `syscall.Kill(pid, 0) == nil`.
 #[cfg(unix)]
 fn exists(pid: i32) -> bool {
     // SAFETY: signal 0 performs only the existence and permission check.

@@ -1,0 +1,42 @@
+{
+  "name": "security-which-ready",
+  "description": "`rival command security --which` with no security.reviewer configured and MOONSHOT_API_KEY set. Stdout shows the k3 entry, 'Config: security.reviewer = unset (default)', the key status and 'Ready.' (opencode is looked up on PATH, never run). Stdin is never read and no review starts.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv_prefix": [],
+            "stderr": "fake must not run\n",
+            "exit": 97
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security",
+        "--which"
+      ],
+      "stdin": "src/api/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Security reviewer: k3 (moonshotai/kimi-k3 via moonshotai)\nConfig: security.reviewer = unset (default)\nOpenCode selector: moonshotai/kimi-k3\nReasoning variant: max\nMOONSHOT_API_KEY: set\n\nReady.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "opencode": 0
+    }
+  }
+}

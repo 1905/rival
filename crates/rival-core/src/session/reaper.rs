@@ -119,7 +119,7 @@ mod tests {
         logged
     }
 
-    // Go: TestReapOrphansSparesDeadProviderWithLiveOwner. A running session
+    // A running session
     // whose provider child already exited but whose owning rival is still
     // alive is mid-finalization, not orphaned.
     #[test]
@@ -138,7 +138,6 @@ mod tests {
         assert_eq!(got, "running", "live owner must block the reap");
     }
 
-    // Go: TestReapOrphansReapsWhenOwnerAndProviderDead.
     #[test]
     fn reap_orphans_reaps_when_owner_and_provider_dead() {
         let (_home, paths) = temp_paths();
@@ -159,7 +158,7 @@ mod tests {
         assert!(got.end_time.is_some());
     }
 
-    // Go: TestReapOrphansReapsLegacySessionWithoutOwner. Sessions written by
+    // Sessions written by
     // releases without owner tracking (owner_pid 0) keep the provider-only
     // liveness check.
     #[test]

@@ -1,5 +1,3 @@
-//! Go: `internal/executor/claude_docker.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -27,7 +25,7 @@ WORKDIR /workspace
 ENTRYPOINT [\"claude\"]
 ";
 
-/// Go `ClaudeDockerPreflight`: checks docker is available, the token is set,
+/// Checks docker is available, the token is set,
 /// and the image exists (auto-builds it if missing).
 pub fn claude_docker_preflight(cfg: &Config) -> anyhow::Result<()> {
     if oscmd::look_path(cfg, "docker").is_err() {
@@ -70,7 +68,7 @@ pub fn claude_docker_preflight(cfg: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Go `buildClaudeDockerImage`. The error is Go's wrapped text.
+/// Builds the Docker image. The error is the wrapped text.
 fn build_claude_docker_image(cfg: &Config) -> Result<(), String> {
     // Write the embedded Dockerfile to a temp file.
     let (mut file, name) = oscmd::create_temp(cfg, "rival-claude-dockerfile-*")
@@ -95,7 +93,7 @@ fn build_claude_docker_image(cfg: &Config) -> Result<(), String> {
     result.map_err(|e| format!("docker build: {e}"))
 }
 
-/// Go's `defer os.Remove(name)` with the error dropped.
+/// Removes the file on drop; a removal error is ignored.
 struct RemoveOnDrop<'a>(&'a str);
 
 impl Drop for RemoveOnDrop<'_> {
@@ -104,7 +102,7 @@ impl Drop for RemoveOnDrop<'_> {
     }
 }
 
-/// Go `runClaudeDocker`: executes Claude through the Claude Code CLI inside
+/// Executes Claude through the Claude Code CLI inside
 /// Docker. `spawn` is the subprocess step.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_claude_docker_with(
@@ -125,10 +123,10 @@ pub(crate) fn run_claude_docker_with(
         bail!("{} env var not set", config::CLAUDE_DOCKER_TOKEN_ENV);
     }
 
-    // The workdir must be absolute for the Docker volume mount. Go joins
-    // with a bare "/" and does not clean the result. Go tests for a leading
-    // "/" on every OS, so on Windows `C:\repo` becomes `<cwd>/C:\repo`: a
-    // known Go quirk, kept as the source does it.
+    // The workdir must be absolute for the Docker volume mount. A relative
+    // path is joined with a bare "/" and the result is not cleaned. The test
+    // is for a leading "/" on every OS, so on Windows `C:\repo` becomes
+    // `<cwd>/C:\repo`: a known quirk, kept as is.
     let mut abs_workdir = workdir.to_string();
     if !abs_workdir.starts_with('/') {
         let Some(wd) = cfg.cwd() else {

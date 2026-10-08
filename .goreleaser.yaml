@@ -7,7 +7,7 @@ release:
     name: rival
 
 # GoReleaser's Rust builder runs `<tool> <command> --target=<triple> <flags>`
-# and maps each triple to the {{ .Os }} / {{ .Arch }} values the Go build used
+# and maps each triple to the {{ .Os }} / {{ .Arch }} values the old release names used
 # (x86_64 → amd64, aarch64 → arm64). release.yml runs both entries on hosted
 # macOS: the Apple SDK and LLVM come from that host.
 builds:

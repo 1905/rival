@@ -1,10 +1,8 @@
-//! Prepares a GitLab MR before a sandboxed reviewer starts. Go:
-//! `internal/mergerequest/mergerequest.go`.
+//! Prepares a GitLab MR before a sandboxed reviewer starts.
 //!
-//! Go strings are bytes. A host or project decoded from a URL, and git
-//! output, stay `Vec<u8>` so remote matching compares exactly what Go
-//! compares. Errors and the review scope are Rust strings: an invalid UTF-8
-//! byte there becomes U+FFFD (Go would print the raw byte).
+//! A host or project decoded from a URL, and git output, stay `Vec<u8>` so
+//! remote matching compares the exact bytes. Errors and the review scope are
+//! Rust strings: an invalid UTF-8 byte there becomes U+FFFD.
 
 #[cfg(all(test, unix))]
 mod tests;
@@ -33,7 +31,7 @@ const MARKER: &str = "/-/merge_requests/";
 
 const MAX_DIFF_BYTES: u64 = 512 * 1024;
 
-/// Go's `context.WithTimeout(ctx, 2*time.Minute)` around the whole prepare.
+/// Time limit of 2 minutes around the whole prepare.
 const PREPARE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
 /// Upper bound of one sleep while polling a git or glab child for its exit.
@@ -58,12 +56,12 @@ fn split_once<'a>(s: &'a [u8], sep: &[u8]) -> Option<(&'a [u8], &'a [u8])> {
     Some((&s[..i], &s[i + sep.len()..]))
 }
 
-/// Go `strconv.Atoi` on 64-bit: an optional sign and decimal digits.
+/// Parses a 64-bit integer: an optional sign and decimal digits.
 fn atoi(s: &[u8]) -> Option<i64> {
     std::str::from_utf8(s).ok()?.parse().ok()
 }
 
-/// Go `strings.Trim(s, "/")`.
+/// Removes leading and trailing `/` bytes.
 fn trim_slashes(mut s: &[u8]) -> &[u8] {
     while let [b'/', rest @ ..] = s {
         s = rest;
@@ -74,13 +72,13 @@ fn trim_slashes(mut s: &[u8]) -> &[u8] {
     s
 }
 
-/// Go `strings.TrimSuffix(strings.Trim(path, "/"), ".git")`.
+/// Removes surrounding `/` bytes and a trailing `.git`.
 fn project_path(path: &[u8]) -> Vec<u8> {
     let p = trim_slashes(path);
     p.strip_suffix(b".git").unwrap_or(p).to_vec()
 }
 
-/// Go `unicode.IsSpace` for one decoded rune; an invalid byte is not space.
+/// Whether the first decoded rune is Unicode whitespace; an invalid byte is not space.
 fn space_at(s: &[u8]) -> (bool, usize) {
     match decode_rune(s) {
         (Some(c), n) => (c.is_whitespace(), n),
@@ -88,7 +86,7 @@ fn space_at(s: &[u8]) -> (bool, usize) {
     }
 }
 
-/// Decodes the rune at the start of `s` the way Go's `utf8.DecodeRune` does:
+/// Decodes the rune at the start of `s` like `utf8.DecodeRune`:
 /// `None` with width 1 for an invalid byte, `None` with width 0 for empty input.
 fn decode_rune(s: &[u8]) -> (Option<char>, usize) {
     let Some(&lead) = s.first() else {
@@ -107,7 +105,7 @@ fn decode_rune(s: &[u8]) -> (Option<char>, usize) {
     }
 }
 
-/// Go `strings.TrimSpace` on a byte string.
+/// Trims Unicode whitespace from both ends of a byte string.
 fn trim_space(s: &[u8]) -> &[u8] {
     let mut start = 0;
     while start < s.len() {
@@ -117,8 +115,8 @@ fn trim_space(s: &[u8]) -> &[u8] {
         }
         start += n;
     }
-    // UTF-8 resynchronizes, so scanning forward finds the same last rune
-    // that Go's DecodeLastRune sees.
+    // UTF-8 resynchronizes, so scanning forward finds the last rune
+    // that a backward decode would see.
     let mut end = start;
     let mut i = start;
     while i < s.len() {
@@ -131,7 +129,7 @@ fn trim_space(s: &[u8]) -> &[u8] {
     &s[start..end]
 }
 
-/// Go `strings.Fields` on a byte string.
+/// Splits a byte string on runs of Unicode whitespace.
 fn fields(s: &[u8]) -> Vec<&[u8]> {
     let mut out = Vec::new();
     let mut field_start = None;
@@ -158,7 +156,7 @@ fn lossy(s: &[u8]) -> std::borrow::Cow<'_, str> {
     String::from_utf8_lossy(s)
 }
 
-/// A Go string as a command-line argument.
+/// A byte string as a command-line argument.
 #[cfg(unix)]
 fn os_arg(s: &[u8]) -> OsString {
     use std::os::unix::ffi::OsStringExt;
@@ -170,7 +168,7 @@ fn os_arg(s: &[u8]) -> OsString {
     OsString::from(lossy(s).into_owned())
 }
 
-/// Go `parseTarget`.
+/// Parses the review scope into an MR target.
 fn parse_target(raw: &str) -> Result<Target, String> {
     let shape = || "use one HTTPS GitLab merge request URL as the entire review scope".to_string();
     let u = match url::parse(raw.trim().as_bytes()) {
@@ -211,7 +209,7 @@ fn parse_target(raw: &str) -> Result<Target, String> {
     path.extend_from_slice(MARKER.as_bytes());
     path.extend_from_slice(iid.to_string().as_bytes());
     Ok(Target {
-        // Go: the new Path with RawPath, RawQuery and Fragment cleared.
+        // The new path; the raw path, raw query and fragment are cleared.
         url: url::https_string(&u.host, &path, u.force_query),
         host: u.host,
         project,
@@ -219,7 +217,7 @@ fn parse_target(raw: &str) -> Result<Target, String> {
     })
 }
 
-/// Go `metadata`: the fields of GitLab's MR API response that are read.
+/// The fields of GitLab's MR API response that are read.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Metadata {
     iid: i64,
@@ -273,7 +271,7 @@ fn decode_metadata(data: &[u8]) -> Result<Metadata, String> {
     })
 }
 
-/// Go `commitSHA`: `^[0-9a-f]{40}$`.
+/// Matches `^[0-9a-f]{40}$`.
 fn is_commit_sha(s: &str) -> bool {
     s.len() == 40 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
@@ -300,8 +298,7 @@ impl Snapshot {
         }
     }
 
-    /// Go `Snapshot.Close`: `os.RemoveAll(workdir)`. A missing checkout is
-    /// not an error.
+    /// Removes the checkout directory. A missing checkout is not an error.
     pub fn close(&mut self) -> Result<(), String> {
         self.closed = true;
         remove_all(&self.workdir)
@@ -316,9 +313,9 @@ impl Drop for Snapshot {
     }
 }
 
-/// Go `os.RemoveAll` on Unix: a file or symlink at `path` is unlinked (a
+/// Removes `path` like `rm -rf` on Unix: a file or symlink at `path` is unlinked (a
 /// symlink is never followed), a directory is removed with its contents,
-/// and a missing path is success. Go names the entry that failed; std
+/// and a missing path is success. The std error
 /// reports only the errno, so the text names `path` itself.
 fn remove_all(path: &str) -> Result<(), String> {
     if path.is_empty() {
@@ -341,7 +338,7 @@ fn remove_all(path: &str) -> Result<(), String> {
     }
 }
 
-/// Cancels a context when dropped, also on unwind. Go: `defer cancel()`.
+/// Cancels a context when dropped, also on unwind.
 struct CancelOnDrop(CancelFunc);
 
 impl Drop for CancelOnDrop {
@@ -350,7 +347,7 @@ impl Drop for CancelOnDrop {
     }
 }
 
-/// Go `Prepare`: `Ok(None)` for ordinary local scopes. MR-shaped input must
+/// Prepares the review target: `Ok(None)` for ordinary local scopes. MR-shaped input must
 /// resolve completely or fail; it is never replaced by HEAD or another local
 /// branch.
 ///
@@ -523,12 +520,12 @@ This is a review of the recorded snapshot; the remote MR can change afterward.
     Ok(snapshot)
 }
 
-/// Go: `info.Size() > maxDiffBytes`.
+/// Whether the diff size is over the limit.
 fn diff_too_large(size: u64) -> bool {
     size > MAX_DIFF_BYTES
 }
 
-/// Go `os.ReadFile` with its `open`/`read` error text.
+/// Reads a whole file, with `open`/`read` error text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
     let mut file = std::fs::File::open(path)
         .map_err(|e| format!("open {}: {}", path.display(), io_text(&e)))?;
@@ -542,7 +539,7 @@ fn args_of(items: &[&str]) -> Vec<OsString> {
     items.iter().map(OsString::from).collect()
 }
 
-/// Go `matchingRemote`: the URL of the first remote whose identity is the
+/// Finds the URL of the first remote whose identity is the
 /// target host and project.
 fn matching_remote(
     ctx: &Context,
@@ -572,7 +569,7 @@ fn matching_remote(
     ))
 }
 
-/// Go `remoteIdentity`: the host and project of a remote URL, or empty for
+/// Returns the host and project of a remote URL, or empty for
 /// a local, unsupported or credential-bearing one.
 fn remote_identity(raw: &[u8]) -> (Vec<u8>, Vec<u8>) {
     if split_once(raw, b"://").is_none() {
@@ -606,7 +603,7 @@ fn remote_identity(raw: &[u8]) -> (Vec<u8>, Vec<u8>) {
     (host, project_path(&u.path))
 }
 
-/// `KEY` of a Go env entry: everything before the first `=`.
+/// `KEY` of an env entry: everything before the first `=`.
 fn env_key(item: &OsString) -> &[u8] {
     let bytes = item.as_encoded_bytes();
     bytes
@@ -615,7 +612,7 @@ fn env_key(item: &OsString) -> &[u8] {
         .map_or(bytes, |i| &bytes[..i])
 }
 
-/// Go `apiEnv`: glab must use its saved credentials for the explicit URL
+/// Builds the glab env: glab must use its saved credentials for the explicit URL
 /// host. A global token can belong to a different GitLab instance.
 fn api_env(environ: &[OsString]) -> Vec<OsString> {
     let mut env: Vec<OsString> = gitscope::repository_env(environ)
@@ -639,8 +636,8 @@ fn api_env(environ: &[OsString]) -> Vec<OsString> {
     env
 }
 
-/// The env of every git child: Go's `append(gitscope.RepositoryEnv(...),
-/// "GIT_TERMINAL_PROMPT=0", "GIT_LFS_SKIP_SMUDGE=1")`.
+/// The env of every git child: the repository env plus
+/// `GIT_TERMINAL_PROMPT=0` and `GIT_LFS_SKIP_SMUDGE=1`.
 fn git_env(environ: &[OsString]) -> Vec<OsString> {
     let mut env = gitscope::repository_env(environ);
     env.push("GIT_TERMINAL_PROMPT=0".into());
@@ -648,7 +645,7 @@ fn git_env(environ: &[OsString]) -> Vec<OsString> {
     env
 }
 
-/// Go `git`: runs git in `filepath.Clean(dir)` and returns its trimmed
+/// Runs git in the cleaned `dir` and returns its trimmed
 /// stdout. The error is `git <first arg>: <exec error>`.
 fn git(ctx: &Context, cfg: &Config, dir: &str, args: &[OsString]) -> Result<Vec<u8>, String> {
     let dir = paths::clean(Path::new(dir));
@@ -657,18 +654,17 @@ fn git(ctx: &Context, cfg: &Config, dir: &str, args: &[OsString]) -> Result<Vec<
         .map_err(|e| format!("git {}: {e}", args[0].to_string_lossy()))
 }
 
-/// Go `exec.CommandContext(ctx, name, args...)` with `Dir = dir`, an
-/// explicit `Env` (so no `PWD` is added) and `Output()`.
+/// Runs `name` with `args` in `dir`, with an explicit env (so no `PWD` is
+/// added), and returns its stdout.
 ///
 /// - `name` is looked up in `cfg`'s `$PATH`. The lookup error comes first,
 ///   then a done context, then an env with a NUL, then a missing `dir`
 ///   (`chdir <dir>: <errno>`), then the spawn error.
-/// - stdin is the null device. stderr is read and dropped (Go keeps it in
-///   the `ExitError`, whose text does not show it).
-/// - The child is spawned with Go's raw `execve` ([`set_exec`]), so a
+/// - stdin is the null device. stderr is read and dropped (the error text
+///   does not show it).
+/// - The child is spawned with a raw `execve` ([`set_exec`]), so a
 ///   shebang-less executable is `exec format error`.
-/// - Cancelling `ctx` sends SIGKILL to the child only (Go's
-///   `Process.Kill`), never to a process group. The child is always reaped
+/// - Cancelling `ctx` sends SIGKILL to the child only, never to a process group. The child is always reaped
 ///   before return, then both pipes are read to EOF.
 /// - The error is the exit status (`exit status: 128`, `signal: 9 (SIGKILL)`),
 ///   else the context error when the kill was sent and the child still
@@ -776,7 +772,7 @@ fn drain(r: &mut impl Read) -> std::io::Result<()> {
     }
 }
 
-/// Go's `Process.Wait` plus `watchCtx`: polls the child until it is reaped.
+/// Polls the child until it is reaped.
 /// A cancellation seen before the reap kills the child once. Returns the
 /// status and the watcher's error: the context error when the kill was sent,
 /// `exec: canceling Cmd: <err>` when it failed, nothing when the child was
@@ -813,7 +809,7 @@ fn reap(
     }
 }
 
-/// Go maps ESRCH from the kill to `os.ErrProcessDone`.
+/// ESRCH from the kill means the process is already done.
 #[cfg(unix)]
 fn is_process_done(e: &std::io::Error) -> bool {
     e.raw_os_error() == Some(libc::ESRCH)

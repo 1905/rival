@@ -1,5 +1,3 @@
-//! Go: `internal/executor/opencode.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -16,7 +14,7 @@ use crate::cancel::Context;
 use crate::config::{self, Config, SecurityModel};
 use crate::session::Session;
 
-/// Go `OpencodePreflightModel`: validates K3, Rival's sole OpenCode-backed
+/// Validates K3, Rival's sole OpenCode-backed
 /// model. `workdir` seeds the Moonshot API-key `.env` walk-up for K3 (see
 /// [`Config::kimi_api_key_from`]); pass "" when no workdir context exists.
 pub fn opencode_preflight_model(cfg: &Config, model: &str, workdir: &str) -> anyhow::Result<()> {
@@ -26,7 +24,7 @@ pub fn opencode_preflight_model(cfg: &Config, model: &str, workdir: &str) -> any
     opencode_preflight_entry(cfg, &entry, workdir)
 }
 
-/// Go `OpencodePreflightEntry`: verifies one registry entry can run: the CLI
+/// Verifies one registry entry can run: the CLI
 /// exists and its credential resolves. The two failures are reported
 /// separately, because a present key does not help when the binary is
 /// missing.
@@ -71,7 +69,7 @@ pub(crate) const OPENCODE_READ_ONLY_PERMISSION: &str = r#"{"read":"allow","grep"
 /// can). Review mode never uses this profile.
 pub(crate) const OPENCODE_FULL_AUTO_PERMISSION: &str = r#"{"read":"allow","grep":"allow","glob":"allow","list":"allow","external_directory":"deny","edit":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow"}"#;
 
-/// Go `OpencodeRunOpts`: customizes one opencode execution beyond the
+/// Customizes one opencode execution beyond the
 /// reviewer defaults. Zero values keep megareview behavior exactly:
 /// read-only permission, the entry's own key lookup, no extra env drops.
 #[derive(Clone, Default, PartialEq, Eq)]
@@ -103,7 +101,7 @@ impl fmt::Debug for OpencodeRunOpts {
     }
 }
 
-/// Go `RunOpencode`: executes a K3 prompt through the opencode CLI. The
+/// Executes a K3 prompt through the opencode CLI. The
 /// prompt is read from stdin in non-interactive `run` mode; the entry pins
 /// opencode's `--variant` (provider-specific reasoning level). It runs under
 /// a read-only permission profile (see [`OPENCODE_READ_ONLY_PERMISSION`])
@@ -134,7 +132,7 @@ pub fn run_opencode(
     )
 }
 
-/// Go `RunOpencodeWith`: [`run_opencode`] with per-call overrides (see
+/// [`run_opencode`] with per-call overrides (see
 /// [`OpencodeRunOpts`]). The standalone kimi runner uses it for its
 /// full-auto mode and its moonshot-provider key; megareview reviewers stay
 /// on the zero-value defaults.
@@ -185,7 +183,7 @@ pub(crate) fn run_opencode_model_with(
     run_opencode_entry_with(cfg, sess, prompt, effort, workdir, &entry, opts, spawn)
 }
 
-/// Go `RunOpencodeEntry`: runs one registry entry. Everything
+/// Runs one registry entry. Everything
 /// provider-specific — the `-m` selector, the config block, the credential,
 /// the reasoning variant — comes from the entry, so adding a model is a
 /// registry change rather than a code change.
@@ -255,7 +253,6 @@ pub(crate) fn run_opencode_entry_with(
     spawn(sess, &req)
 }
 
-/// Go `opencodeRunArgs`.
 pub(crate) fn opencode_run_args(
     entry: &SecurityModel,
     _effort: &str,
@@ -282,7 +279,7 @@ pub(crate) fn opencode_run_args(
     args
 }
 
-/// Go `opencodeRunEnvWith`: the `KEY=VALUE` entries appended to the child
+/// The `KEY=VALUE` entries appended to the child
 /// env. The provider key is inside `OPENCODE_CONFIG_CONTENT`, so the result
 /// must never be logged.
 pub(crate) fn opencode_run_env_with(
@@ -326,7 +323,7 @@ pub(crate) fn opencode_run_env_with(
     env
 }
 
-/// Go `opencodeProviderConfig`: the in-memory provider config for one
+/// The in-memory provider config for one
 /// registry entry as compact JSON, keys sorted by bytes. An empty key is
 /// rejected.
 pub(crate) fn opencode_provider_config(entry: &SecurityModel, key: &str) -> String {

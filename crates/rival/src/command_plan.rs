@@ -1,5 +1,4 @@
 //! `rival command plan`: review a plan/spec file with Codex and/or Claude.
-//! Go: `cmd/command_plan.go`.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -66,7 +65,6 @@ pub fn command_plan_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(),
     )
 }
 
-/// Go `commandPlanAction`.
 pub fn run_command_plan(
     env: &mut CmdEnv<'_>,
     opts: &PlanOptions,
@@ -160,7 +158,7 @@ pub(crate) fn invalid_flag_effort(effort: &str) -> String {
     )
 }
 
-/// Go `parsePlanModels`: validates model-facing selectors and maps them to
+/// Validates model-facing selectors and maps them to
 /// the internal adapters the plan runner uses. It de-duplicates by concrete
 /// model while preserving the user's order.
 pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
@@ -190,7 +188,7 @@ pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// Go `mergePlanEffort`: an effort from stdin wins unless the flag was set
+/// An effort from stdin wins unless the flag was set
 /// to a different value.
 pub(crate) fn merge_plan_effort(
     flag_effort: &str,
@@ -209,7 +207,7 @@ pub(crate) fn merge_plan_effort(
     Ok(input_effort.to_string())
 }
 
-/// Go `parsePlanInput`: extracts an optional skill-facing `-re`/`--effort`
+/// Extracts an optional skill-facing `-re`/`--effort`
 /// prefix while leaving the rest of the input intact as the path (spaces
 /// included). A leading `-- ` escapes a path beginning with a dash.
 /// Returns `(path, effort)`.
@@ -263,7 +261,6 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
 /// The separators of Go's `popPlanToken` (`TrimLeft`/`IndexAny`).
 const TOKEN_SPACE: [char; 4] = [' ', '\t', '\r', '\n'];
 
-/// Go `popPlanToken`.
 fn pop_plan_token(s: &str) -> (&str, &str) {
     let s = s.trim_start_matches(TOKEN_SPACE);
     match s.find(TOKEN_SPACE) {
@@ -272,7 +269,7 @@ fn pop_plan_token(s: &str) -> (&str, &str) {
     }
 }
 
-/// Go `splitPlanOption`: `name=value` → `(name, Some(value))`.
+/// `name=value` → `(name, Some(value))`.
 fn split_plan_option(token: &str) -> (&str, Option<&str>) {
     match token.split_once('=') {
         Some((name, value)) => (name, Some(value)),
@@ -297,7 +294,7 @@ const STAT_OP: &str = if cfg!(windows) {
     "stat"
 };
 
-/// Go `resolvePlanPath`: turns the raw user-supplied path into a validated
+/// Turns the raw user-supplied path into a validated
 /// absolute path to an existing regular file. Relative paths are resolved
 /// against `workdir`. Any file name is accepted; `.md` is not required.
 /// `home` is Go's `os.UserHomeDir()` (`$HOME`, `%USERPROFILE%` on Windows;

@@ -200,7 +200,7 @@ def run_version(binary, exe):
 
 
 def check_version_output(stdout, version):
-    """Go and Rust print the banner, then `  <version>`."""
+    """The CLI prints the banner, then `  <version>`."""
     lines = stdout.splitlines()
     require(bool(lines) and lines[-1] == f"  {version}",
             f"rival version printed {lines[-1:]!r}, want '  {version}'")

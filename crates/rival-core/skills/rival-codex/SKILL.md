@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write
 
 # Codex runner
 
-Run Codex through the `rival` Go binary. The run is detached and
+Run Codex through the `rival` binary. The run is detached and
 watched in the background, so this skill does not block your session.
 
 ## Instructions
@@ -21,7 +21,7 @@ If `$ARGUMENTS` is empty or blank, respond with this usage message and STOP:
 
 > **Usage:**
 > - `/rival-codex 'explain the auth flow'` — run any prompt with Codex
-> - `/rival-codex -re ultra 'find bugs in src/main.go'` — use ultra reasoning
+> - `/rival-codex -re ultra 'find bugs in src/main.rs'` — use ultra reasoning
 > - `/rival-codex review` — code review (auto-detects changed files via git)
 > - `/rival-codex review src/api/` — review specific scope (bypasses git detection)
 > - `/rival-codex -re ultra review src/api/` — review with ultra reasoning

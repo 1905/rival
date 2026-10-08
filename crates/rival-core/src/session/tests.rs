@@ -217,7 +217,7 @@ fn retired_antislop_mode_loads_as_a_plain_run() {
 
 // ---- save_test.go ----
 
-// Go: TestSaveConcurrentWritersNeverShareATempFile. Concurrent writers of one
+// Concurrent writers of one
 // session (owner, TUI stop, reaper, the Mac app) must never share a temp file.
 #[test]
 fn save_concurrent_writers_never_share_a_temp_file() {
@@ -254,7 +254,7 @@ fn save_concurrent_writers_never_share_a_temp_file() {
     }
 }
 
-// Go: TestSaveLeavesForeignTempFilesAndReadersSkipThem. A temp file another
+// A temp file another
 // writer holds open is never reused or renamed away, and no reader treats
 // either temp form as a session.
 #[test]

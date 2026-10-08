@@ -1,8 +1,8 @@
-//! Git scope helpers. Go: `internal/gitscope`.
+//! Git scope helpers.
 //!
-//! Task 2.3 ported `env.go` for the provider subprocess env. This module is
-//! `gitscope.go`. Its git commands inherit the caller's env unfiltered (Go
-//! `exec.Command` with a nil `Env`), not [`repository_env`].
+//! The `env` submodule builds the provider subprocess env. The git commands
+//! in this module inherit the caller's env unfiltered, not
+//! [`repository_env`].
 
 mod env;
 #[cfg(test)]
@@ -53,7 +53,7 @@ pub fn resolve(cfg: &Config, workdir: &str) -> String {
 
 /// Combines two newline-separated file lists, deduplicating.
 ///
-/// As in Go, only `b` items are checked against the set, and `b` items are
+/// Only `b` items are checked against the set, and `b` items are
 /// never added to it: duplicates inside `a`, and duplicates inside `b` that
 /// are not in `a`, are kept.
 fn merge_file_lists(a: &str, b: &str) -> String {
@@ -105,14 +105,14 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
     }
 }
 
-/// Go `exec.Command("git", args...)` with `Dir = workdir` and `Output()`.
+/// Runs `git` with `args` in `workdir` and returns its stdout.
 ///
 /// - `git` is looked up in `cfg`'s `$PATH`.
 /// - The env is `cfg.environ()`, unfiltered, plus `PWD=<abs workdir>` when
-///   `workdir` is set (Go's `Cmd.environ`; not on Windows, which has no
-///   `PWD`), then Go `dedupEnv`.
-/// - stdin is the null device; stderr is captured and dropped (Go keeps it in
-///   the `ExitError`, which nobody reads).
+///   `workdir` is set (not on Windows, which has no `PWD`), then
+///   duplicate names are removed.
+/// - stdin is the null device; stderr is captured and dropped (the error text never
+///   includes it).
 ///
 /// stdout is decoded as lossy UTF-8. The error text is for diagnostics only;
 /// every caller drops it.
@@ -120,7 +120,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
     let path = look_path(cfg, "git").map_err(|e| e.to_string())?;
     let mut env: Vec<OsString> = cfg.environ().to_vec();
     if !workdir.is_empty() && !cfg!(windows) {
-        // Go: filepath.Abs(c.Dir); its error fails Start.
+        // Make the workdir absolute; a failure fails the spawn.
         let pwd = paths::abs(cfg.cwd(), Path::new(workdir))
             .ok_or_else(|| "getwd: no such file or directory".to_string())?;
         let mut kv = OsString::from("PWD=");

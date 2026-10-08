@@ -1,7 +1,7 @@
 {
   "_doc": [
-    "Contract corpus for the Go, Rust (and later Swift) session decoders and writers.",
-    "Every field object lists all 27 Session fields in Go struct order, defaults included.",
+    "Contract corpus for the Rust (and later Swift) session decoders and writers.",
+    "Every field object lists all 27 Session fields in struct order, defaults included.",
     "Times are [year, month, day, hour, minute, second, nanosecond, utc_offset_seconds].",
     "start_time, queued_at, end_time and exit_code: null means unset; the writer omits the key.",
     "sessions: testdata/sessions/<name> decodes to fields; writing fields gives testdata/written/<name>.",

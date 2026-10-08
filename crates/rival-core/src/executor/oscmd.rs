@@ -32,9 +32,8 @@ pub(crate) fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::Lo
 pub(crate) enum Output {
     /// Go's nil `Stdout`/`Stderr`: the null device.
     Discard,
-    /// Go `CombinedOutput`: both streams into one buffer.
+    /// Both streams into one buffer.
     Combined,
-    /// Go `cmd.Stdout = os.Stderr; cmd.Stderr = os.Stderr`.
     Stderr,
 }
 
@@ -166,7 +165,7 @@ fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
     Ok((Stdio::from(handle), Stdio::from(handle2)))
 }
 
-/// Go `os.TempDir()`: on Unix `$TMPDIR`, else `/tmp`.
+/// On Unix `$TMPDIR`, else `/tmp`.
 #[cfg(not(windows))]
 pub(crate) fn temp_dir(cfg: &Config) -> String {
     match cfg.getenv("TMPDIR") {
@@ -266,15 +265,13 @@ pub fn windows_temp_dir<'a>(getenv: impl Fn(&str) -> &'a str) -> String {
     trim_temp_path(dir)
 }
 
-/// Go `os.PathSeparator`.
 const SEPARATOR: char = if cfg!(windows) { '\\' } else { '/' };
 
-/// Go `os.IsPathSeparator`.
 fn is_separator(c: char) -> bool {
     c == '/' || (cfg!(windows) && c == '\\')
 }
 
-/// Go `os.joinPath(dir, name)`: no separator is added after one.
+/// No separator is added after one.
 fn join_temp(dir: &str, name: &str) -> String {
     if dir.ends_with(is_separator) {
         format!("{dir}{name}")
@@ -283,7 +280,7 @@ fn join_temp(dir: &str, name: &str) -> String {
     }
 }
 
-/// Go `os.CreateTemp(os.TempDir(), pattern)`: the last `*` becomes a random
+/// The last `*` becomes a random
 /// number; the file is created `0600` with `O_EXCL`. Returns the open file
 /// and its name. The error text is Go's: `open <name>: <errno>`, or
 /// `createtemp <dir>/<prefix>*<suffix>: file already exists` after 10000
@@ -360,7 +357,7 @@ const STAT_OP: &str = if cfg!(windows) {
     "stat"
 };
 
-/// Go `nextRandom`: a random `uint32` in decimal.
+/// A random `uint32` in decimal.
 fn next_random() -> String {
     (uuid::Uuid::new_v4().as_u128() as u32).to_string()
 }

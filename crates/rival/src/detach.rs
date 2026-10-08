@@ -1,6 +1,5 @@
 //! `--detach`: re-exec rival into its own process session.
 //!
-//! Go: `cmd/detach.go`, `cmd/detach_unix.go`, `cmd/detach_other.go`.
 //!
 //! Claude Code skills launch rival from shells they tear down with a
 //! process-group kill. A setsid'd child lives in its own session and process
@@ -132,7 +131,7 @@ fn start_error_text(program: &OsStr, err: &io::Error) -> String {
     format!("start {}: {err}", program.to_string_lossy())
 }
 
-/// Go `detach_unix.go`: `SysProcAttr{Setsid: true}` — own session and
+/// `SysProcAttr{Setsid: true}` — own session and
 /// process group, so a process-group kill of the launching shell cannot
 /// reach the child.
 #[cfg(unix)]

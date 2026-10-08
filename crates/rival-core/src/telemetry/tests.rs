@@ -1,4 +1,4 @@
-//! Go `internal/telemetry` behavior. Every client here uses a recording
+//! Telemetry behavior. Every client here uses a recording
 //! transport: nothing is sent to Sentry, and no test reads the process env.
 
 use super::*;
@@ -70,7 +70,7 @@ fn enabled_only_for_empty_zero_or_false() {
 }
 
 #[test]
-fn client_options_match_go_init() {
+fn client_options_match_init_defaults() {
     let m = env(&[]);
     let opts = client_options("1.2.3", getter(&m));
     let dsn = opts.dsn.as_ref().unwrap();
@@ -135,8 +135,8 @@ fn explicit_capture_carries_release_and_environment_without_pii() {
     assert!(event.user.is_none(), "no default PII: {:?}", event.user);
 }
 
-/// Go's `RecoverPanic` never captures (see `recover_panic`). Neither does the
-/// port: no event follows a call, and no panic hook is installed.
+/// `recover_panic` never captures. No event follows a call, and no panic
+/// hook is installed.
 #[test]
 fn recover_panic_captures_nothing() {
     let (rec, factory) = recording();

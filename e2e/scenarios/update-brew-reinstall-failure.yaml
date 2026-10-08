@@ -1,0 +1,74 @@
+{
+  "name": "update-brew-reinstall-failure",
+  "description": "`rival update` where `brew upgrade` and `brew reinstall` both exit 3. Output: 'brew reinstall: exit status: 3', exit code 1; skills are not touched. The `brew --prefix` failure and a prefix without bin/rival are unit-tested only (update_cmd::tests::update_error_branches): the runner's brew guard refuses any --prefix answer that is not a safe temp prefix holding bin/rival.",
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "brew": {
+        "responses": [
+          {
+            "argv": [
+              "upgrade",
+              "1905/tap/rival"
+            ],
+            "times": 1,
+            "exit": 3
+          },
+          {
+            "argv": [
+              "reinstall",
+              "1905/tap/rival"
+            ],
+            "times": 1,
+            "stderr": "Error: no bottle\n",
+            "exit": 3
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n",
+        "stderr_lines": [
+          "Error: no bottle",
+          "brew reinstall: exit status: 3"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "brew": 2
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "v9.9.9"
+        }
+      }
+    }
+  }
+}

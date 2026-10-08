@@ -1,5 +1,4 @@
 //! `rival install`: writes the embedded skills for Claude Code and Codex.
-//! Go: `cmd/install.go`.
 //!
 //! Skills go under the user's home (`$HOME`), never under `RIVAL_HOME`,
 //! which only moves Rival's own state.
@@ -21,7 +20,7 @@ use crate::tree::Invocation;
 #[cfg(test)]
 mod tests;
 
-/// Go `retiredSkillNameHashes`: lets upgrades remove two retired
+/// Lets upgrades remove two retired
 /// integration skills without retaining their obsolete public names
 /// anywhere in the shipped tree. The values are SHA-256(name), not content
 /// hashes.
@@ -71,7 +70,6 @@ fn run_install(
     install_targets(&targets, force, &mut *reader, env.stdout).map_err(CmdError::plain)
 }
 
-/// Go `os.UserHomeDir`.
 fn user_home_dir(cfg: &Config) -> Result<&str, &'static str> {
     match cfg.getenv(HOME_VAR) {
         "" if cfg!(windows) => Err("%userprofile% is not defined"),
@@ -80,14 +78,13 @@ fn user_home_dir(cfg: &Config) -> Result<&str, &'static str> {
     }
 }
 
-/// Go `skillTarget`: a skill host and its skills directory.
+/// A skill host and its skills directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillTarget {
     pub host: &'static str,
     pub base: PathBuf,
 }
 
-/// Go `skillTargets`.
 pub fn skill_targets(
     home: &Path,
     target: &str,
@@ -113,7 +110,7 @@ pub fn skill_targets(
     }
 }
 
-/// Go `detectCodex`: a `codex` on `path_env`, or a directory at
+/// A `codex` on `path_env`, or a directory at
 /// `codex_home` (`$CODEX_HOME`), `~/.codex`, `~/Applications/Codex.app` or
 /// `<applications>/Codex.app`.
 pub fn detect_codex(home: &Path, applications: &Path, path_env: &OsStr, codex_home: &str) -> bool {
@@ -130,7 +127,7 @@ pub fn detect_codex(home: &Path, applications: &Path, path_env: &OsStr, codex_ho
     .any(|path| fs::metadata(path).is_ok_and(|m| m.is_dir()))
 }
 
-/// Go `installTargets`: one reader for every target, so answers already
+/// One reader for every target, so answers already
 /// buffered for a later target are not lost.
 pub fn install_targets(
     targets: &[SkillTarget],
@@ -144,7 +141,6 @@ pub fn install_targets(
     Ok(())
 }
 
-/// Go `installSkills`.
 pub fn install_skills(
     target: &SkillTarget,
     force: bool,
@@ -205,7 +201,7 @@ fn install_skills_with(
                 out,
                 "  ? {name} — update v{dst_version} → v{src_version}? [y/N] "
             );
-            // Go `ReadString('\n')`: the error is ignored, the bytes read
+            // The error is ignored, the bytes read
             // so far are the answer.
             let mut line = Vec::new();
             let _ = reader.read_until(b'\n', &mut line);
@@ -264,7 +260,7 @@ fn install_skills_with(
     Ok(())
 }
 
-/// Go `removeSkillDirsByHash`: removes every entry of `target_base` whose
+/// Removes every entry of `target_base` whose
 /// name hashes to one of `hashes`, in name order. A missing directory
 /// removes nothing.
 fn remove_skill_dirs_by_hash(target_base: &Path, hashes: &[&str]) -> io::Result<usize> {
@@ -308,7 +304,7 @@ fn remove_all(path: &Path) -> io::Result<()> {
     }
 }
 
-/// Go `readEmbeddedSkill`: the skill's content and frontmatter version.
+/// The skill's content and frontmatter version.
 fn read_embedded_skill(name: &str) -> Result<(Vec<u8>, String), String> {
     let content = skills::read_file(&format!("{name}/SKILL.md"))?;
     let version = parse_version(&String::from_utf8_lossy(content));
@@ -324,7 +320,6 @@ fn read_file(path: &Path) -> Result<Vec<u8>, String> {
     Ok(data)
 }
 
-/// Go `writeSkill`.
 fn write_skill(dir: &Path, file: &Path, content: &[u8]) -> Result<(), String> {
     mkdir_all(dir)
         .map_err(|e| format!("mkdir {}: {}", dir.display(), path_error("mkdir", dir, &e)))?;
@@ -362,7 +357,7 @@ fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
     format!("{op} {}: {}", path.display(), err)
 }
 
-/// Go `parseVersion`: the `version:` field of the YAML frontmatter, which
+/// The `version:` field of the YAML frontmatter, which
 /// sits between the first and second `---` lines; `unknown` when absent.
 pub fn parse_version(content: &str) -> String {
     let mut in_frontmatter = false;

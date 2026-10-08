@@ -1,0 +1,86 @@
+{
+  "name": "update-check-stale-cache-and-errors",
+  "description": "Update check cache and error paths. A cache with checked_at older than 24h is stale, so the check fetches. Step 1: the server answers 500, the check ends silently with no notice, and the stale cache file keeps its exact original bytes (expect.files sha256 of the raw file; a text check would normalise the timestamp). Step 2: RIVAL_NO_UPDATE_CHECK=1 means no request at all. Step 3: CI=false and RIVAL_NO_UPDATE_CHECK=0 count as unset, so a second request is sent (still 500).",
+  "env": {
+    "CI": null,
+    "RIVAL_NO_UPDATE_CHECK": null
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/.update-check",
+      "text": "{\"latest\":\"zzz\",\"checked_at\":\"2020-01-01T00:00:00Z\"}",
+      "mode": "0600"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "version"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "version"
+      ],
+      "env": {
+        "RIVAL_NO_UPDATE_CHECK": "1"
+      },
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "version"
+      ],
+      "env": {
+        "CI": "false",
+        "RIVAL_NO_UPDATE_CHECK": "0"
+      },
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/.update-check"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/.update-check",
+        "sha256": "4cd18658530cddbb9cc9b2b5f244a6398acf2ebcf13a8349cc31b8e459ef52db"
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      },
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 500,
+        "body": "boom"
+      }
+    }
+  }
+}

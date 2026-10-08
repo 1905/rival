@@ -1,0 +1,106 @@
+{
+  "name": "command-k3-no-queue-workdir",
+  "description": "Same as executor-k3-success but runs `rival command k3 --no-queue --workdir sub`. `--workdir sub` resolves to <ROOT>/work/sub, and every provider argv, cwd, preamble and session work_dir follows it. `--no-queue` marks the session running without touching the queue, so no ~/.rival/queue/.lock is created.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work/sub\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work/sub",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"allow\",\"bash\":\"allow\",\"task\":\"allow\",\"webfetch\":\"allow\",\"websearch\":\"allow\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                },
+                "MOONSHOT_API_KEY": null,
+                "AWS_PROFILE": null
+              }
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity",
+    "AWS_PROFILE": "parity"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "k3",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting k3 (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "max",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "opencode",
+          "model": "moonshotai/kimi-k3",
+          "effort": "max",
+          "mode": "raw",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "opencode": 1
+    }
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    }
+  ]
+}

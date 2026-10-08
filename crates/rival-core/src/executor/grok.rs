@@ -1,5 +1,3 @@
-//! Go: `internal/executor/grok.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -18,7 +16,7 @@ use crate::logging;
 use crate::paths;
 use crate::session::Session;
 
-/// Go `GrokPreflight`: checks that grok is installed and authenticated. The
+/// Checks that grok is installed and authenticated. The
 /// auth file is resolved from the real home directory rather than
 /// `$GROK_HOME`: that prefix is blocked from child environments (see
 /// `BLOCKED_ENV_PREFIXES`), so honoring it here would check a location the
@@ -28,7 +26,7 @@ pub fn grok_preflight(cfg: &Config) -> anyhow::Result<()> {
         bail!("{} runtime is not installed", config::GROK_LABEL);
     }
 
-    // Go os.UserHomeDir.
+    // The real home directory.
     let home = cfg.getenv(paths::HOME_VAR);
     if home.is_empty() {
         let var = if cfg!(windows) {
@@ -52,7 +50,7 @@ pub fn grok_preflight(cfg: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Go `RunGrok`: executes a prompt with grok's default model. It is the
+/// Executes a prompt with grok's default model. It is the
 /// entry point for the single-model surfaces (`rival command grok`,
 /// `rival run grok`), which have no per-run model choice.
 #[allow(clippy::too_many_arguments)]
@@ -79,7 +77,7 @@ pub fn run_grok(
     )
 }
 
-/// Go `RunGrokModel`: executes a prompt with an explicit grok model, falling
+/// Executes a prompt with an explicit grok model, falling
 /// back to the default when `model` is empty — the contract the review
 /// pipeline relies on, where a session carries the concrete model to run or
 /// judge with. Unlike codex, the grok CLI does not read the prompt from
@@ -110,8 +108,7 @@ pub fn run_grok_model(
     )
 }
 
-/// [`run_grok_model`] with the spawn step injected (Go's `grokSubprocess`
-/// test seam). The prompt file exists for the whole spawn and is removed
+/// [`run_grok_model`] with the spawn step injected (a test seam). The prompt file exists for the whole spawn and is removed
 /// on every return path after it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_grok_model_with(
@@ -158,8 +155,8 @@ pub(crate) fn run_grok_model_with(
     spawn(sess, &req).map_err(|err| anyhow!("{label} runtime: {err:#}"))
 }
 
-/// Removes the prompt file when the run returns. Go's deferred `os.Remove`:
-/// a failure other than "not found" is logged, never returned.
+/// Removes the prompt file when the run returns. A failure other than
+/// "not found" is logged, never returned.
 struct PromptFile<'a>(&'a str);
 
 impl Drop for PromptFile<'_> {
@@ -175,7 +172,7 @@ impl Drop for PromptFile<'_> {
     }
 }
 
-/// Go `grokFullPrompt`: composes the prompt exactly as the other executors
+/// Composes the prompt exactly as the other executors
 /// do, so a grok run sees the same system prompt and workdir preamble as
 /// the others.
 pub(crate) fn grok_full_prompt(cfg: &Config, prompt: &str, workdir: &str) -> String {
@@ -186,7 +183,7 @@ pub(crate) fn grok_full_prompt(cfg: &Config, prompt: &str, workdir: &str) -> Str
     )
 }
 
-/// Go `grokModelOrDefault`: resolves an optional model to grok's default,
+/// Resolves an optional model to grok's default,
 /// so a session that never recorded one still produces a valid `-m`
 /// instead of a bare flag.
 pub(crate) fn grok_model_or_default(model: &str) -> &str {
@@ -196,7 +193,7 @@ pub(crate) fn grok_model_or_default(model: &str) -> &str {
     model
 }
 
-/// Go `grokRunArgs`: grok's argv. An empty model falls back to the default
+/// Builds grok's argv. An empty model falls back to the default
 /// here rather than at the call site, so every entry point inherits the
 /// fallback.
 pub(crate) fn grok_run_args(
@@ -234,7 +231,7 @@ pub(crate) fn grok_run_args(
     Ok(args)
 }
 
-/// Go `GrokEffort`: maps rival's effort menu onto grok-4.6's own
+/// Maps rival's effort menu onto grok-4.6's own
 /// low/medium/high. Levels above high clamp to high and levels below low
 /// clamp to low rather than failing a run over a level the model simply
 /// does not expose; an unrecognized value is still an error so typos do not
