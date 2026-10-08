@@ -1,4 +1,4 @@
-//! Go: `internal/review/plan_test.go`, `antislop_test.go`, the plan cases
+//! Go: `internal/review/plan_test.go`, the plan cases
 //! of `parse_test.go`, and the parse half of
 //! `TestAssemblePlanResults_ParsesFinalAnswerNotToolOutput` (planrun_test.go).
 
@@ -103,16 +103,16 @@ fn keeps_real_dual_category_finding() {
     assert_eq!(out.findings[0].title, "real dual-category finding");
 }
 
-/// Go: TestParsePlanOutput_DropsPartiallyEchoedAntislopExample
+/// Go: TestParsePlanOutput_DropsPartiallyEchoedSlopExample
 /// (parse_test.go).
 #[test]
-fn drops_partially_echoed_antislop_example() {
+fn drops_partially_echoed_slop_example() {
     let raw = concat!(
         r#"{"summary":"lean enough","rating":9,"findings":["#,
-        r#"{"file":"cmd/command_antislop.go","line":10,"severity":"high","#,
+        r#"{"file":"cmd/main.go","line":10,"severity":"high","#,
         r#""category":"reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni","#,
         r#""title":"echoed example","body":"copied from the schema","confidence":8},"#,
-        r#"{"file":"cmd/command_antislop.go","line":20,"severity":"medium","category":"slop","#,
+        r#"{"file":"cmd/main.go","line":20,"severity":"medium","category":"slop","#,
         r#""title":"real finding","body":"a real cut","confidence":7}]}"#
     );
     let out = parse_plan_output(raw).unwrap();
@@ -264,75 +264,6 @@ fn plan(summary: &str, rating: i64) -> PlanOutput {
     }
 }
 
-/// Go: TestFormatAntislopResultSingle.
-#[test]
-fn format_antislop_result_single() {
-    let parsed = PlanOutput {
-        summary: "One wrapper to cut.".into(),
-        rating: 8,
-        findings: vec![ReviewerFinding {
-            category: "slop".into(),
-            body: "body".into(),
-            suggestion: "inline it".into(),
-            ..finding("cmd/x.go", 12, "medium", "pass-through wrapper", 8)
-        }],
-    };
-    let run = PlanRunResult {
-        results: vec![result("codex", "gpt-5.6-sol", Some(parsed), "")],
-        skipped: vec![],
-    };
-    let out = format_antislop_result(Some(&run), "src/api/");
-    for want in [
-        "═══ RIVAL ANTISLOP REVIEW ═══",
-        "Scope: src/api/",
-        "Leanness: 8/10",
-        "pass-through wrapper",
-    ] {
-        assert!(out.contains(want), "missing {want:?} in:\n{out}");
-    }
-    assert!(!out.contains("Rating:") && !out.contains("File:"), "{out}");
-}
-
-/// Go: TestFormatAntislopResultNoFindings.
-#[test]
-fn format_antislop_result_no_findings() {
-    let run = PlanRunResult {
-        results: vec![result("claude", "claude", Some(plan("Lean.", 10)), "")],
-        skipped: vec![],
-    };
-    let out = format_antislop_result(Some(&run), "src/");
-    for want in ["Scope: src/", "Leanness: 10/10", "No slop found."] {
-        assert!(out.contains(want), "missing {want:?} in:\n{out}");
-    }
-    assert!(!out.contains("No bugs or gaps found."), "{out}");
-}
-
-/// Go: TestFormatAntislopResultMulti.
-#[test]
-fn format_antislop_result_multi() {
-    let run = PlanRunResult {
-        results: vec![
-            result("codex", "gpt-5.6-sol", Some(plan("s", 7)), ""),
-            result("claude", "claude", Some(plan("f", 9)), ""),
-        ],
-        skipped: vec![SkippedCLI {
-            cli: "grok".into(),
-            model: "grok".into(),
-            reason: "unavailable".into(),
-        }],
-    };
-    let out = format_antislop_result(Some(&run), "changed files (git auto-detect)");
-    for want in [
-        "═══ RIVAL ANTISLOP REVIEW (",
-        "Scope: changed files (git auto-detect)",
-        "Leanness: 7/10",
-        "Leanness: 9/10",
-        "Skipped:",
-    ] {
-        assert!(out.contains(want), "missing {want:?} in:\n{out}");
-    }
-}
-
 /// Rust-only: the empty, single-unparsed and multi layouts byte for byte.
 #[test]
 fn format_plan_result_layouts() {
@@ -341,10 +272,6 @@ fn format_plan_result_layouts() {
         format_plan_result(Some(&PlanRunResult::default()), "f"),
         "No plan review output.\n"
     );
-    assert_eq!(
-        format_antislop_result(None, "s"),
-        "No antislop review output.\n"
-    );
 
     let single = PlanRunResult {
         results: vec![result("codex", CODEX_MODEL, None, "raw text")],
@@ -352,10 +279,6 @@ fn format_plan_result_layouts() {
     };
     assert_eq!(
         format_plan_result(Some(&single), "f"),
-        config::public_runtime_log("codex", CODEX_MODEL, "raw text")
-    );
-    assert_eq!(
-        format_antislop_result(Some(&single), "s"),
         config::public_runtime_log("codex", CODEX_MODEL, "raw text")
     );
 

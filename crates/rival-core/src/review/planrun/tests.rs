@@ -10,13 +10,12 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::config::{
-    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, DEFAULT_ANTISLOP_EFFORT, GPT56_SOL_MODEL, KIMI_MODEL,
-    SOL_LABEL,
+    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, GPT56_SOL_MODEL, KIMI_MODEL, SOL_LABEL,
 };
 use crate::review::parse_reviewer_log;
 use crate::review::plan::PlanOutput;
 use crate::review::testutil::config_in;
-use crate::session::{MODE_ANTISLOP, MODE_PLAN};
+use crate::session::{MODE_PLAN, MODE_SECURITY};
 
 /// A minimal valid plan payload `parse_plan_output` accepts.
 const REAL_PLAN_JSON: &str = r#"{"summary":"ok plan","rating":7,"findings":[]}"#;
@@ -754,8 +753,8 @@ fn reviewers_run_simultaneously() {
     assert_eq!(got, [("claude", 9), ("codex", 4)]);
 }
 
-/// Go: TestRunDocReviewAppliesFallbackEffortAndTarget. Antislop passes its
-/// own prompt and a high fallback effort; the target lands as the session's
+/// Go: TestRunDocReviewAppliesFallbackEffortAndTarget. A doc review passes
+/// its own prompt and a fallback effort; the target lands as the session's
 /// review scope.
 #[test]
 fn run_doc_review_applies_fallback_effort_and_target() {
@@ -770,10 +769,10 @@ fn run_doc_review_applies_fallback_effort_and_target() {
         ok_plan()
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
-        prompt: "ANTISLOP PROMPT",
+        mode: MODE_PLAN,
+        prompt: "DOC PROMPT",
         target: "src/api/",
-        fallback_effort: DEFAULT_ANTISLOP_EFFORT,
+        fallback_effort: "high",
     };
     run_doc(&cfg, &ex, &doc, "", &clis(&["claude"])).unwrap();
     assert_eq!(
@@ -781,18 +780,18 @@ fn run_doc_review_applies_fallback_effort_and_target() {
         [(
             "medium".to_string(),
             "src/api/".to_string(),
-            "ANTISLOP PROMPT".to_string()
+            "DOC PROMPT".to_string()
         )]
     );
     let sess = persisted(&cfg, "claude");
     assert_eq!(sess.review_scope, "src/api/");
-    assert_eq!(sess.prompt, "ANTISLOP PROMPT");
-    assert_eq!(sess.mode, MODE_ANTISLOP);
+    assert_eq!(sess.prompt, "DOC PROMPT");
+    assert_eq!(sess.mode, MODE_PLAN);
     assert_eq!(sess.status, "completed");
 }
 
-/// Go: TestRunDocReviewRecordsTheRequestedMode. Antislop runs carry their
-/// own session mode.
+/// Go: TestRunDocReviewRecordsTheRequestedMode. Doc runs carry the mode the
+/// caller passes.
 #[test]
 fn run_doc_review_records_the_requested_mode() {
     let (_home, cfg) = plan_test_config("");
@@ -802,14 +801,14 @@ fn run_doc_review_records_the_requested_mode() {
         ok_plan()
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
+        mode: MODE_SECURITY,
         prompt: "PROMPT",
         target: "src/",
         fallback_effort: "xhigh",
     };
     run_doc(&cfg, &ex, &doc, "", &clis(&["claude"])).unwrap();
-    assert_eq!(observed.lock().unwrap().clone(), [MODE_ANTISLOP]);
-    assert_eq!(persisted(&cfg, "claude").mode, MODE_ANTISLOP);
+    assert_eq!(observed.lock().unwrap().clone(), [MODE_SECURITY]);
+    assert_eq!(persisted(&cfg, "claude").mode, MODE_SECURITY);
 }
 
 /// Go: TestRunPlanReviewStillRecordsPlanMode.
@@ -824,35 +823,6 @@ fn run_plan_review_still_records_plan_mode() {
     run_plan(&cfg, &ex, "", "mode", &clis(&["claude"])).unwrap();
     assert_eq!(observed.lock().unwrap().clone(), [MODE_PLAN]);
     assert_eq!(persisted(&cfg, "claude").mode, MODE_PLAN);
-}
-
-/// Go: TestAntislopCodexEffortReachesRuntime.
-#[test]
-fn antislop_codex_effort_reaches_runtime() {
-    for (name, config_yaml, override_effort, want) in [
-        ("default", "", "", "high"),
-        ("configured", "efforts:\n  codex: medium\n", "", "medium"),
-        ("explicit", "efforts:\n  codex: medium\n", "xhigh", "xhigh"),
-    ] {
-        let (_home, cfg) = plan_test_config(config_yaml);
-        let observed = Mutex::new(Vec::<String>::new());
-        let ex = fake(|_, sess, _, _, effort, _| {
-            if sess.effort != effort {
-                bail!("session/runtime effort mismatch");
-            }
-            observed.lock().unwrap().push(effort.into());
-            ok_plan()
-        });
-        let doc = DocReview {
-            mode: MODE_ANTISLOP,
-            prompt: "review",
-            target: "src/",
-            fallback_effort: DEFAULT_ANTISLOP_EFFORT,
-        };
-        run_doc(&cfg, &ex, &doc, override_effort, &clis(&["codex"]))
-            .unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        assert_eq!(observed.lock().unwrap().clone(), [want], "{name}");
-    }
 }
 
 /// Go: TestRunFailureReasonIgnoresQuotaTextInARealReview. Quota wording
@@ -923,10 +893,10 @@ fn run_doc_review_quota_final_answer_fails_despite_tool_plan_json() {
         ))
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
+        mode: MODE_SECURITY,
         prompt: "PROMPT",
         target: "src/",
-        fallback_effort: DEFAULT_ANTISLOP_EFFORT,
+        fallback_effort: "high",
     };
     let err = run_doc(&cfg, &ex, &doc, "", &clis(&["codex"])).unwrap_err();
     assert_eq!(

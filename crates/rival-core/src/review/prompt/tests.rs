@@ -4,7 +4,7 @@
 use std::fs;
 
 use super::*;
-use crate::config::{ANTISLOP_CODE_PROMPT, PLAN_REVIEW_PROMPT};
+use crate::config::PLAN_REVIEW_PROMPT;
 use crate::review::testutil::{config_in, temp_config};
 
 const KINDS: [PromptKind; 2] = [PromptKind::BugHunter, PromptKind::Security];
@@ -117,7 +117,6 @@ fn no_prompt_uses_a_persona() {
     let (_home, cfg) = temp_config();
     let prompts = [
         ("plan", PLAN_REVIEW_PROMPT.to_string()),
-        ("antislop", ANTISLOP_CODE_PROMPT.to_string()),
         (
             "bug",
             build_reviewer_prompt(&cfg, "x", PromptKind::BugHunter),

@@ -16,7 +16,7 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// Go `Names`: all embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 9] = [
+pub const NAMES: [&str; 8] = [
     "rival-codex",
     "rival-plan",
     "rival-plan-codex",
@@ -24,14 +24,13 @@ pub const NAMES: [&str; 9] = [
     "rival-claude",
     "rival-k3",
     "rival-grok",
-    "rival-antislop",
     "rival-security",
 ];
 
 /// Go `Deprecated`: legacy or superseded skills that install removes.
 /// Re-enable a skill by adding it back to [`NAMES`] and its directory to
 /// the embedded tree.
-pub const DEPRECATED: [&str; 14] = [
+pub const DEPRECATED: [&str; 15] = [
     "rival-sol",
     "rival-plan-sol",
     "rival-claude-only",
@@ -46,6 +45,7 @@ pub const DEPRECATED: [&str; 14] = [
     "rival-kimi",          // renamed to rival-k3 before release
     "rival-antislop-plan", // plan mode dropped on 2026-08-20
     "rival-review",        // megareview removed 2026-09-26
+    "rival-antislop",      // code-slop review removed 2026-10-08
 ];
 
 /// Go `Files.ReadFile(path)`. Go embeds only the skill directories, so a
@@ -102,13 +102,6 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
                 _ => "plan --model codex --effort xhigh",
             },
             "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.",
-        ),
-        // The Codex-only default wording is the Go source's; the command's
-        // real default is Codex plus Claude.
-        "rival-antislop" => (
-            "Review code for over-engineering and unnecessary complexity through Rival, returning a leanness rating and cut list. Use for requested antislop reviews.".into(),
-            "antislop",
-            "Pass the scope and options verbatim. Empty input reviews git-detected changes. Default Codex, high fallback; `-m claude` selects Claude. This reports quality and simplification findings, not ordinary bug findings.",
         ),
         "rival-security" => (
             "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.".into(),

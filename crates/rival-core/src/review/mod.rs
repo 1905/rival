@@ -21,8 +21,8 @@ mod types;
 pub use format::{DEFAULT_CONFIDENCE_THRESHOLD, format_review_console, format_review_result};
 pub use parse::{final_answer, parse_reviewer_log, parse_reviewer_output};
 pub use plan::{
-    PlanCLIResult, PlanOutput, PlanRunResult, format_antislop_result, format_plan_console,
-    format_plan_multi_console, format_plan_result, parse_plan_log, parse_plan_output,
+    PlanCLIResult, PlanOutput, PlanRunResult, format_plan_console, format_plan_multi_console,
+    format_plan_result, parse_plan_log, parse_plan_output,
 };
 pub use planrun::{
     DocReview, ReviewBatch, run_doc_review, run_failure_reason, run_plan_review,

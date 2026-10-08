@@ -35,7 +35,7 @@ also refreshes skills for hosts installed since the last release.
 - Target selection, both-host installs, overwrite protection, buffered update
   confirmations, same-version refresh, unrelated-skill preservation, and
   invoking the new Homebrew binary are covered by regression tests.
-- Native review/plan/antislop transport tests check restricted tools, absence
+- Native review/plan transport tests check restricted tools, absence
   of permission bypass, removal of nested-session and API-key environment
   variables, and preservation of raw mode. Docker transport checks the read-only
   mount and tool restrictions.

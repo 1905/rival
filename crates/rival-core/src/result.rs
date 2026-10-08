@@ -45,7 +45,7 @@ pub struct SeverityGroup {
 /// What the Result view shows for a finished run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunResult {
-    /// A JSON payload. `rating` is set for plan and antislop payloads, None
+    /// A JSON payload. `rating` is set for plan payloads, None
     /// for a code review. `groups` are placeholder-free, sorted and bucketed.
     Findings {
         summary: String,

@@ -35,10 +35,6 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
 | `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
 | `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
-| `command antislop` (default codex + claude) | antislop-default-dual | — |
-| `command antislop -m, --model` | antislop-claude-structured | antislop-model-conflict |
-| `command antislop --effort` | antislop-no-queue-workdir (native `--effort low` reaches claude and the session) | antislop-effort-conflict |
-| `command antislop --no-queue`, `--workdir` | antislop-no-queue-workdir | workdir-missing |
 | `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
@@ -48,7 +44,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command security --no-queue`, `--workdir` | security-no-queue-workdir | workdir-missing |
 | every `command *` leaf `--help` | help-every-command (help) | — |
 
-Concurrent reviewers (antislop-default-dual, plan-dual-models) bind each session file by its `cli` field (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
+Concurrent reviewers (plan-dual-models) bind each session file by its `cli` field (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
 
 ## run
 

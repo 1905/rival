@@ -61,7 +61,7 @@ public struct Finding: Decodable, Equatable, Sendable {
 
 /// What the Result tab shows for a finished run.
 public enum RunResult: Equatable, Sendable {
-    /// A JSON payload. `rating` is set for plan and antislop payloads, nil for
+    /// A JSON payload. `rating` is set for plan payloads, nil for
     /// a code review. `findings` are placeholder-free and sorted.
     case findings(summary: String, rating: Int?, findings: [Finding])
     /// A prose answer, sanitized for display.

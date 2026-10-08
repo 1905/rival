@@ -46,7 +46,6 @@ pub const CLAUDE_DOCKER_TOKEN_ENV: &str = "RIVAL_CLAUDE_TOKEN";
 
 pub const DEFAULT_REVIEW_EFFORT: &str = "high";
 pub const DEFAULT_PLAN_EFFORT: &str = "high";
-pub const DEFAULT_ANTISLOP_EFFORT: &str = "high";
 pub const SESSION_DIR: &str = ".rival/sessions";
 pub const QUEUE_DIR: &str = ".rival/queue";
 pub const PROMPT_PREVIEW_LEN: usize = 100;
@@ -488,75 +487,6 @@ Output: respond with EXACTLY ONE JSON object and nothing else (no prose before o
 }
 
 Severity guidance: critical = plan is wrong/will cause data loss or a broken build if followed; high = significant gap or flaw that blocks correct implementation; medium = real ambiguity or missing detail an implementer will trip on; low = minor gap or clarification. "line" may be 0 when not applicable. Sort findings by severity, highest first."#;
-
-// The output contract shared by the antislop prompts. It matches
-// PLAN_REVIEW_PROMPT's schema (summary + rating + findings) so the plan
-// output parser reads antislop output unchanged. The example summary string
-// is intentionally byte-identical to PLAN_REVIEW_PROMPT's — the parser uses
-// that exact string to skip prompt echoes. A macro so `concat!` can splice it.
-macro_rules! antislop_json_contract {
-    () => {
-        r#"Output: respond with EXACTLY ONE JSON object and nothing else (no prose before or after, no markdown fences). Schema:
-
-{
-  "summary": "1-3 sentence overall assessment of the plan",
-  "rating": 7,
-  "findings": [
-    {
-      "file": "path/to/file",
-      "line": 42,
-      "severity": "critical|high|medium|low",
-      "category": "reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni",
-      "title": "one-line description of the cut",
-      "body": "what is slop or over-engineered, and what it costs",
-      "suggestion": "the concrete cut, merge, defer, or replacement",
-      "confidence": 8
-    }
-  ]
-}
-
-"rating" is LEANNESS from 1 (mostly slop / heavily over-engineered) to 10 (nothing left to cut). Severity is the impact of the cut: critical = a large unnecessary subsystem or dependency; high = significant dead weight (unneeded abstraction, layer, or compat path); medium = real but contained slop; low = minor cleanup. "line" may be 0 when not applicable. Sort findings by severity, highest first."#
-    };
-}
-
-/// The quality-only code review template used by `rival command antislop` in
-/// code mode. `{SCOPE}` is replaced at runtime. Derived from Claude Code's
-/// built-in /simplify skill (reuse, simplification, efficiency, altitude),
-/// extended with over-engineering and AI-slop angles. Report-only: the
-/// reviewer proposes cuts; the caller applies them.
-pub const ANTISLOP_CODE_PROMPT: &str = concat!(
-    r#"You do a QUALITY-ONLY code review: hunt slop and over-engineering, not bugs. Do NOT report correctness bugs, security issues, or missing features — other reviews cover those. Skip style and formatting nitpicks entirely.
-
-Review scope: {SCOPE}
-
-Read the code in the review scope (use your tools; read enclosing functions and neighboring files for context). Work through every angle below, in sequence, in this same pass. For every finding name the concrete cut or replacement.
-
-1. **Reuse & DRY** — new code that re-implements something the codebase already has: search shared/utility modules and files adjacent to the change, and name the existing helper to call instead. Duplicated logic across files or functions is a finding even when each copy is individually fine — name the single home for it.
-
-2. **Simplification** — unnecessary complexity: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
-
-3. **Efficiency** — wasted work: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths, long-lived objects built from closures that keep the whole enclosing scope alive. Name the cheaper alternative.
-
-4. **Altitude** — changes implemented at the wrong depth: special cases layered on shared infrastructure are a sign the fix is not deep enough — prefer generalizing the underlying mechanism over adding special cases.
-
-5. **Backward-compat hoarding** — compat shims, legacy fallbacks, deprecated-but-kept paths, versioned duplicates (doThingV2), re-export layers kept "just in case". Default stance: delete the old path and migrate the callers. Spare compat code ONLY when a named external consumer (published API, on-disk format, wire protocol) depends on it — name that consumer, otherwise recommend the cut.
-
-6. **Library reinvention** — hand-rolled implementations of what a well-established library already does (parsers, retry/backoff, date math, semver, globbing, and the like). Prefer the language stdlib and the project's existing dependencies before proposing a new one. Name the exact replacement package or function.
-
-7. **Slop signatures** — the telltale patterns of generated code:
-- Comment slop: comments narrating the obvious, docstrings restating the signature, section banners, comments justifying the change to a reviewer. Keep only comments stating a constraint the code cannot show.
-- Silent-fallback slop: unrequested graceful degradation — quiet defaults on missing config, empty catch blocks returning a zero value. Flag as unspecified behavior masking failures; ask "where was this fallback specified?" rather than asserting what the intended behavior is.
-- Wrapper/pass-through slop: functions whose body is a single call, interfaces with one implementation, getters over public fields, grab-bag utils/helpers layers.
-- Speculative generality: options nobody passes, parameters always called with the same value, generics instantiated at one type, both directions implemented when only one is needed. Verify via call-site search before reporting.
-
-Rules:
-- Only report issues you verified against the code. Every finding cites an exact file and line.
-- Prefer fewer, stronger findings over many weak ones.
-- If the code is already lean, say so in the summary, give a high rating, and return few or zero findings. Do not invent problems.
-
-"#,
-    antislop_json_contract!()
-);
 
 /// The review scope used when none is given and git detects no changed files.
 pub const WHOLE_PROJECT: &str = "the entire project";
@@ -1111,26 +1041,6 @@ impl Config {
         override_effort: &str,
         fallback: &str,
     ) -> Result<String, ConfigError> {
-        self.resolve_effort_inner(model, override_effort, fallback, true)
-    }
-
-    /// Uses the task's cheaper default instead of Codex's correctness-review
-    /// pin. Explicit overrides and configured efforts still win.
-    pub fn resolve_antislop_effort(
-        &self,
-        model: &str,
-        override_effort: &str,
-    ) -> Result<String, ConfigError> {
-        self.resolve_effort_inner(model, override_effort, DEFAULT_ANTISLOP_EFFORT, false)
-    }
-
-    fn resolve_effort_inner(
-        &self,
-        model: &str,
-        override_effort: &str,
-        fallback: &str,
-        pin_codex: bool,
-    ) -> Result<String, ConfigError> {
         let label = model_label(model);
         let override_effort = gostd::to_lower(override_effort.trim());
         if !override_effort.is_empty() {
@@ -1153,9 +1063,7 @@ impl Config {
         // fallback. Without this, every caller that passes a non-empty
         // fallback (the review and plan paths both pass one) silently
         // overrides the pin, which is how Codex ran at high instead of xhigh.
-        if let Some(pinned) = pinned_model_effort(label)
-            && (label != CODEX_LABEL || pin_codex)
-        {
+        if let Some(pinned) = pinned_model_effort(label) {
             return Ok(pinned.to_string());
         }
         if fallback.is_empty() {

@@ -92,7 +92,7 @@ pub(crate) fn run_claude_model(
 /// runs while preserving a task session's identity throughout its live
 /// execution.
 ///
-/// Plan and antislop runs are named by their mode in both dashboards.
+/// Plan and security runs are named by their mode in both dashboards.
 /// Writing the transport over that mode would label them for the whole live
 /// run, so only ordinary runs record it.
 pub(crate) fn set_claude_transport_mode(sess: &mut Session, transport: &str) {

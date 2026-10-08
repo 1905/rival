@@ -93,27 +93,22 @@ fn antislop_plan_skill_is_gone() {
     );
 }
 
-// Go: TestAntislopSkillsAreEmbedded.
+// The antislop review was removed on 2026-10-08. The skill must stay
+// deprecated so install removes copies already on disk.
 #[test]
-fn antislop_skills_are_embedded() {
-    let cases: [(&str, &[&str]); 1] = [(
-        "rival-antislop",
-        &[
-            "name: rival-antislop\n",
-            "argument-hint: \"[<scope>]\"",
-            "rival command antislop --detach --workdir",
-            "rival wait --log <rival_err>",
-            "never bugs",
-        ],
-    )];
-    for (name, wants) in cases {
-        assert!(NAMES.contains(&name), "skill {name:?} is not active");
-        assert!(!DEPRECATED.contains(&name), "skill {name:?} is deprecated");
-        let content = skill(name);
-        for want in wants.iter().chain(&["version: "]) {
-            assert!(content.contains(want), "{name} skill missing {want:?}");
-        }
-    }
+fn antislop_skill_is_deprecated() {
+    assert!(
+        !NAMES.contains(&"rival-antislop"),
+        "rival-antislop is active again; the review was removed"
+    );
+    assert!(
+        DEPRECATED.contains(&"rival-antislop"),
+        "rival-antislop must stay in Deprecated so installs clean it up"
+    );
+    assert!(
+        read_file("rival-antislop/SKILL.md").is_err(),
+        "the antislop skill file is still embedded"
+    );
 }
 
 // Go: TestSolSkillsAreRetired.
@@ -275,7 +270,6 @@ fn codex_skill_commands() {
         ("rival-plan", "plan --model codex --effort xhigh"),
         ("rival-plan-codex", "plan --model codex --effort xhigh"),
         ("rival-plan-claude", "plan --model claude"),
-        ("rival-antislop", "antislop"),
         ("rival-security", "security"),
     ] {
         let data = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
@@ -340,11 +334,6 @@ fn codex_skill_text_golden() {
         ("rival-plan", plan_description, plan),
         ("rival-plan-codex", plan_description, plan),
         ("rival-plan-claude", plan_description, plan),
-        (
-            "rival-antislop",
-            "Review code for over-engineering and unnecessary complexity through Rival, returning a leanness rating and cut list. Use for requested antislop reviews.",
-            "Pass the scope and options verbatim. Empty input reviews git-detected changes. Default Codex, high fallback; `-m claude` selects Claude. This reports quality and simplification findings, not ordinary bug findings.",
-        ),
         (
             "rival-security",
             "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.",

@@ -195,12 +195,25 @@ fn sort_group_members_falls_back_to_start_time_then_id() {
 
 #[test]
 fn is_task_mode_names_only_task_modes() {
-    for mode in [MODE_PLAN, MODE_ANTISLOP, MODE_SECURITY] {
+    for mode in [MODE_PLAN, MODE_SECURITY] {
         assert!(is_task_mode(mode), "{mode}");
     }
     for mode in ["review", "native", "docker", ""] {
         assert!(!is_task_mode(mode), "{mode}");
     }
+}
+
+// A session file written by the retired antislop command still loads. Its
+// mode is an ordinary string, not a task mode.
+#[test]
+fn retired_antislop_mode_loads_as_a_plain_run() {
+    let s = Session::from_json(
+        br#"{"id":"old1","cli":"codex","mode":"antislop","status":"completed"}"#,
+    )
+    .unwrap();
+    assert_eq!((s.id.as_str(), s.mode.as_str()), ("old1", "antislop"));
+    assert_eq!(s.status, "completed");
+    assert!(!is_task_mode(&s.mode));
 }
 
 // ---- save_test.go ----

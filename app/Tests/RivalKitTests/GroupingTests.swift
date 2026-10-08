@@ -111,9 +111,6 @@ final class GroupingTests: XCTestCase {
     // TestKindPrecedence (group side, via the TUI short labels)
     func testKindPrecedence() {
         let cases: [([String], String)] = [
-            (["antislop"], "slop"),
-            (["antislop", "antislop"], "slop"),
-            (["plan", "antislop"], "slop"),
             (["plan", "plan"], "plan"),
             (["review", "review"], "mega"),
             (["raw"], "mega"),
@@ -137,7 +134,6 @@ final class GroupingTests: XCTestCase {
             ("review", s("codex", "review"), "review"),
             ("plan", s("codex", "plan"), "plan"),
             ("security", s("opencode", "security"), "sec"),
-            ("antislop", s("codex", "antislop"), "slop"),
             ("raw", s("opencode", "raw"), "raw"),
             ("native", s("claude", "native"), "review"),
             ("empty mode", s("codex", ""), "review"),
@@ -145,7 +141,6 @@ final class GroupingTests: XCTestCase {
             ("docker fable", s("fable", "docker"), "review/dk"),
             ("megareview group", g("megareview", "megareview", "consilium"), "mega"),
             ("plan group", g("plan", "plan"), "plan"),
-            ("antislop group", g("antislop", "antislop"), "slop"),
             ("security group", g("security"), "sec"),
         ]
         for (name, item, want) in cases {
@@ -215,19 +210,19 @@ final class GroupingTests: XCTestCase {
     }
 
     // TestTUIRowValuesMatchSharedDerivations
-    func testAntislopGroupRowValues() {
+    func testPlanGroupRowValues() {
         let base = Date().addingTimeInterval(-20 * 60)
         let firstEnd = base.addingTimeInterval(4 * 60)
         let secondEnd = firstEnd.addingTimeInterval(3 * 60)
         let item = group([
-            Session(id: "a", groupID: "g", cli: "codex", mode: "antislop", model: solModel, effort: "xhigh",
+            Session(id: "a", groupID: "g", cli: "codex", mode: "plan", model: solModel, effort: "xhigh",
                     status: "completed", startTime: base, endTime: firstEnd),
-            Session(id: "b", groupID: "g", cli: "claude", mode: "antislop", model: claudeModel, effort: "xhigh",
+            Session(id: "b", groupID: "g", cli: "claude", mode: "plan", model: claudeModel, effort: "xhigh",
                     status: "completed", startTime: firstEnd, endTime: secondEnd),
         ])
         XCTAssertEqual(runStatus(item), .completed)
         XCTAssertEqual(runEffort(item), "xhigh")
-        XCTAssertEqual(runKind(item), "slop")
+        XCTAssertEqual(runKind(item), "plan")
         XCTAssertEqual(runModelName(item), solModel + " +1")
         XCTAssertEqual(runElapsed(item, now: Date()), "7m0s")
     }

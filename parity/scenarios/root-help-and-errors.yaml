@@ -60,7 +60,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\AUsed by Rival skills\\. Reads raw slash-command arguments from stdin, parses them, executes the selected model, and prints the final output\\.\\n)(?=.*Usage:\\s+rival\\s+command(?![\\w-]))(?=.*\\n\\s+antislop +Quality-only slop & over-engineering review \\(code or plan\\))(?=.*\\n\\s+claude +Skill-facing Claude executor)(?=.*\\n\\s+codex +Skill-facing Codex executor)(?=.*\\n\\s+grok +Skill-facing Grok executor)(?=.*\\n\\s+k3 +Run Kimi K3 prompts from stdin)(?=.*\\n\\s+plan +Review a plan/spec with Codex and/or Claude)(?=.*\\n\\s+security +Security review with the configured model)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for command)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+          "$regex": "(?s)(?=.*\\AUsed by Rival skills\\. Reads raw slash-command arguments from stdin, parses them, executes the selected model, and prints the final output\\.\\n)(?=.*Usage:\\s+rival\\s+command(?![\\w-]))(?=.*\\n\\s+claude +Skill-facing Claude executor)(?=.*\\n\\s+codex +Skill-facing Codex executor)(?=.*\\n\\s+grok +Skill-facing Grok executor)(?=.*\\n\\s+k3 +Run Kimi K3 prompts from stdin)(?=.*\\n\\s+plan +Review a plan/spec with Codex and/or Claude)(?=.*\\n\\s+security +Security review with the configured model)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for command)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
         },
         "stderr_lines": [],
         "log_events": []
@@ -74,7 +74,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\AUsed by Rival skills)(?=.*Usage:\\s+rival\\s+command(?![\\w-]))(?=.*\\n\\s+antislop +Quality-only slop & over-engineering review \\(code or plan\\))(?=.*\\n\\s+claude +Skill-facing Claude executor)(?=.*\\n\\s+codex +Skill-facing Codex executor)(?=.*\\n\\s+grok +Skill-facing Grok executor)(?=.*\\n\\s+k3 +Run Kimi K3 prompts from stdin)(?=.*\\n\\s+plan +Review a plan/spec with Codex and/or Claude)(?=.*\\n\\s+security +Security review with the configured model)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for command)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+          "$regex": "(?s)(?=.*\\AUsed by Rival skills)(?=.*Usage:\\s+rival\\s+command(?![\\w-]))(?=.*\\n\\s+claude +Skill-facing Claude executor)(?=.*\\n\\s+codex +Skill-facing Codex executor)(?=.*\\n\\s+grok +Skill-facing Grok executor)(?=.*\\n\\s+k3 +Run Kimi K3 prompts from stdin)(?=.*\\n\\s+plan +Review a plan/spec with Codex and/or Claude)(?=.*\\n\\s+security +Security review with the configured model)(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for command)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
         },
         "stderr_lines": [],
         "log_events": []

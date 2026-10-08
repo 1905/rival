@@ -232,7 +232,6 @@ fn kind_label_cases() {
             solo_of("opencode", session::MODE_SECURITY),
             "sec",
         ),
-        ("antislop", solo_of("codex", session::MODE_ANTISLOP), "slop"),
         ("raw", solo_of("opencode", "raw"), "raw"),
         ("native", solo_of("claude", "native"), "review"),
         ("empty mode", solo_of("codex", ""), "review"),
@@ -248,11 +247,6 @@ fn kind_label_cases() {
             "mega",
         ),
         ("plan group", group(&["plan", "plan"]), "plan"),
-        (
-            "antislop group",
-            group(&[session::MODE_ANTISLOP, session::MODE_ANTISLOP]),
-            "slop",
-        ),
         ("security group", group(&[session::MODE_SECURITY]), "sec"),
     ];
     for (name, item, want) in cases {

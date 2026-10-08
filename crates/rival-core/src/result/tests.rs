@@ -446,15 +446,15 @@ codex
 }
 
 #[test]
-fn go_keeps_dual_category_and_drops_antislop_echo() {
+fn go_keeps_dual_category_and_drops_retired_slop_echo() {
     let dual = r#"{"summary":"real","rating":6,"findings":[{"file":"a.go","line":3,"severity":"high","category":"bug|security","title":"real dual-category finding","body":"b","confidence":8}]}"#;
     let r = parse_run_result(dual);
     let titles: Vec<&str> = findings(&r).2.iter().map(|f| f.title.as_str()).collect();
     assert_eq!(titles, ["real dual-category finding"]);
     let echo = concat!(
         r#"{"summary":"lean enough","rating":9,"findings":["#,
-        r#"{"file":"cmd/command_antislop.go","line":10,"severity":"high","category":"reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni","title":"echoed example","body":"copied","confidence":8},"#,
-        r#"{"file":"cmd/command_antislop.go","line":20,"severity":"medium","category":"slop","title":"real finding","body":"a real cut","confidence":7}]}"#,
+        r#"{"file":"cmd/main.go","line":10,"severity":"high","category":"reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni","title":"echoed example","body":"copied","confidence":8},"#,
+        r#"{"file":"cmd/main.go","line":20,"severity":"medium","category":"slop","title":"real finding","body":"a real cut","confidence":7}]}"#,
     );
     let r = parse_run_result(echo);
     let titles: Vec<&str> = findings(&r).2.iter().map(|f| f.title.as_str()).collect();

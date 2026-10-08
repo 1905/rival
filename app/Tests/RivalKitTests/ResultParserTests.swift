@@ -279,12 +279,12 @@ final class ResultParserTests: XCTestCase {
         XCTAssertEqual(r.findings.map(\.file), ["real.go"])
     }
 
-    func testGoKeepsDualCategoryAndDropsAntislopEcho() {
+    func testGoKeepsDualCategoryAndDropsRetiredSlopEcho() {
         let dual = #"{"summary":"real","rating":6,"findings":[{"file":"a.go","line":3,"severity":"high","category":"bug|security","title":"real dual-category finding","body":"b","confidence":8}]}"#
         XCTAssertEqual(findings(parseRunResult(raw: dual))?.findings.map(\.title), ["real dual-category finding"])
         let echo = #"{"summary":"lean enough","rating":9,"findings":["# +
-            #"{"file":"cmd/command_antislop.go","line":10,"severity":"high","category":"reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni","title":"echoed example","body":"copied","confidence":8},"# +
-            #"{"file":"cmd/command_antislop.go","line":20,"severity":"medium","category":"slop","title":"real finding","body":"a real cut","confidence":7}]}"#
+            #"{"file":"cmd/main.go","line":10,"severity":"high","category":"reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni","title":"echoed example","body":"copied","confidence":8},"# +
+            #"{"file":"cmd/main.go","line":20,"severity":"medium","category":"slop","title":"real finding","body":"a real cut","confidence":7}]}"#
         XCTAssertEqual(findings(parseRunResult(raw: echo))?.findings.map(\.title), ["real finding"])
     }
 

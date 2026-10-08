@@ -25,7 +25,7 @@
       "stdin": "",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-antislop — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 8 installed, 1 updated, 0 up to date, 0 removed\n",
+        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 1 updated, 0 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -40,7 +40,6 @@
       ".agents/skills/rival-claude/SKILL.md",
       ".agents/skills/rival-k3/SKILL.md",
       ".agents/skills/rival-grok/SKILL.md",
-      ".agents/skills/rival-antislop/SKILL.md",
       ".agents/skills/rival-security/SKILL.md"
     ]
   }

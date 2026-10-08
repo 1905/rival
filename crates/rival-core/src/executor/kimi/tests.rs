@@ -73,7 +73,7 @@ fn kimi_run_opts_by_mode() {
     );
     assert_eq!(review.api_key, "test-key");
 
-    for mode in ["raw", "plan", "antislop", "security", ""] {
+    for mode in ["raw", "plan", "security", ""] {
         let opts = kimi_run_opts(&cfg, mode, &env.work_str());
         assert_eq!(opts.permission, OPENCODE_FULL_AUTO_PERMISSION, "{mode}");
         assert_eq!(opts.drop_env, strings(&KIMI_DROP_ENV), "{mode}");
@@ -244,7 +244,7 @@ fn kimi_child_env_per_mode() {
     env.fake("opencode", "#!/bin/sh\n/bin/cat >/dev/null\n/usr/bin/env\n");
     let cfg = env.config();
     let work = env.work_str();
-    for (mode, stripped) in [("review", false), ("raw", true), ("antislop", true)] {
+    for (mode, stripped) in [("review", false), ("raw", true), ("plan", true)] {
         let mut sess = env.session("opencode", mode, config::KIMI_MODEL, &work);
         let mut out = Vec::new();
         retry_busy(

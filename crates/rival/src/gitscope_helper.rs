@@ -1,9 +1,7 @@
 //! Git-scoped review prompts shared by the commands. Go:
 //! `cmd/gitscope_helper.go`.
 
-use rival_core::config::{
-    ANTISLOP_CODE_PROMPT, Config, DIFF_REVIEW_PREAMBLE, PromptKind, WHOLE_PROJECT,
-};
+use rival_core::config::{Config, DIFF_REVIEW_PREAMBLE, PromptKind, WHOLE_PROJECT};
 use rival_core::{gitscope, logging, review};
 
 #[cfg(test)]
@@ -67,9 +65,4 @@ pub fn build_review_prompt(
 /// Returns the reviewer prompt builder for one lens.
 pub fn lens_prompt(cfg: &Config, kind: PromptKind) -> impl Fn(&str) -> String + '_ {
     move |scope| review::build_reviewer_prompt(cfg, scope, kind)
-}
-
-/// Renders the code-mode antislop prompt for `scope`.
-pub fn antislop_code_prompt(scope: &str) -> String {
-    ANTISLOP_CODE_PROMPT.replace("{SCOPE}", scope)
 }

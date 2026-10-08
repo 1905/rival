@@ -589,7 +589,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
             "g0000009-slop",
             "grok",
             rival_core::config::GROK_MODEL,
-            "antislop",
+            "plan",
             "completed",
             "2m0s",
             ago(50),

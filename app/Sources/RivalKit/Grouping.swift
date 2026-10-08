@@ -166,9 +166,9 @@ private func kindCell(_ sessions: [Session], isGroup: Bool) -> String {
     return kind
 }
 
-/// `sessionview.Kind`: security, then antislop, then plan, else megareview.
+/// `sessionview.Kind`: security, then plan, else megareview.
 func groupKind(_ sessions: [Session]) -> String {
-    for mode in ["security", "antislop", "plan"] where sessions.contains(where: { $0.mode == mode }) {
+    for mode in ["security", "plan"] where sessions.contains(where: { $0.mode == mode }) {
         return mode
     }
     return "megareview"
@@ -178,7 +178,6 @@ func shortKind(_ mode: String) -> String {
     switch mode {
     case "megareview", "consilium": return "mega"
     case "security": return "sec"
-    case "antislop": return "slop"
     case "plan": return "plan"
     case "raw": return "raw"
     case "", "review", "native", "docker": return "review"

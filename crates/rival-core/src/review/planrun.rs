@@ -1,4 +1,4 @@
-//! Plan and doc (antislop) review runs. Go: `internal/review/planrun.go`.
+//! Plan and doc review runs. Go: `internal/review/planrun.go`.
 //!
 //! Each requested model runs at once under one queue ticket. Results come
 //! back in the requested order, whatever order the models finish in.
@@ -175,7 +175,7 @@ pub struct ReviewBatch<'a> {
 /// arguments of `RunDocReview`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DocReview<'a> {
-    /// The session mode and the queue ticket label ("plan" or "antislop").
+    /// The session mode and the queue ticket label ("plan").
     /// Queue behavior does not depend on it: the concurrency limit is global.
     pub mode: &'a str,
     pub prompt: &'a str,
@@ -183,8 +183,7 @@ pub struct DocReview<'a> {
     pub target: &'a str,
     /// The surface's default when neither the invocation nor
     /// `~/.rival/config.yaml` names an effort. Empty keeps the plan-review
-    /// defaults ([`config::DEFAULT_PLAN_EFFORT`]). Antislop resolves its own
-    /// high default.
+    /// defaults ([`config::DEFAULT_PLAN_EFFORT`]).
     pub fallback_effort: &'a str,
 }
 
@@ -307,17 +306,14 @@ fn run_doc_review_with(
             "" => config::DEFAULT_PLAN_EFFORT,
             fallback => fallback,
         };
-        let resolved = if doc.mode == session::MODE_ANTISLOP {
-            cfg.resolve_antislop_effort(model, batch.effort)
-        } else {
-            cfg.resolve_effort(model, batch.effort, model_fallback)
-        };
-        let effective_effort = resolved.map_err(|e| {
-            anyhow!(
-                "resolve {} plan effort: {e}",
-                config::engine_label(cli, model)
-            )
-        })?;
+        let effective_effort = cfg
+            .resolve_effort(model, batch.effort, model_fallback)
+            .map_err(|e| {
+                anyhow!(
+                    "resolve {} plan effort: {e}",
+                    config::engine_label(cli, model)
+                )
+            })?;
         let mut sess = Session::new_queued(
             cfg.paths(),
             NewSession {

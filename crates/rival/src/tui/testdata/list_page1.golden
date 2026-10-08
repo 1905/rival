@@ -8,7 +8,7 @@ rival  ⠋ 1 running  ◌ 1 queued  ✓ 45  ✗ 22  69 sessions  3.34.0         
  ✓   review/… claude-opus-5-5      medium  6m24s   rival                                            |
  ✗   sec      gpt-5.6-sol          medium  41s     rival                                            |
  ✓   plan     claude-opus-5-5      medium  12m3s   rival                                            |
- ✓   slop     grok-4.6             medium  2m0s    rival                                            |
+ ✓   plan     grok-4.6             medium  2m0s    rival                                            |
  ✗   review   gpt-5.5              high    1m      proj                                             |
  ✓   review   gpt-5.5              high    1m      proj                                             |
  ✓   review   gpt-5.5              high    1m      proj                                             |

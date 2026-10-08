@@ -112,9 +112,7 @@ fn command_subtree_matches_cli_surface() {
     let command = node(&r, &["command"]);
     assert_eq!(
         names(command),
-        [
-            "antislop", "claude", "codex", "grok", "k3", "plan", "security"
-        ]
+        ["claude", "codex", "grok", "k3", "plan", "security"]
     );
     let detach = command
         .get_arguments()
@@ -133,15 +131,6 @@ fn command_subtree_matches_cli_surface() {
         );
     }
     let m = |default: &str| ("model".to_string(), Some('m'), default.to_string());
-    assert_eq!(
-        flags(node(&r, &["command", "antislop"])),
-        [
-            f("workdir", "."),
-            f("no-queue", "false"),
-            m("codex,claude"),
-            f("effort", "")
-        ]
-    );
     assert_eq!(
         flags(node(&r, &["command", "plan"])),
         [
@@ -593,10 +582,6 @@ fn model_values_accumulate_like_pflag_string_slices() {
     let inv = parse_ok(&["command", "plan"]);
     assert_eq!(inv.strings("model"), ["codex"]);
     assert!(!inv.changed("model"));
-    assert_eq!(
-        parse_ok(&["command", "antislop"]).strings("model"),
-        ["codex", "claude"]
-    );
     let inv = parse_ok(&["command", "plan", "-m", "claude"]);
     assert_eq!(
         inv.strings("model"),

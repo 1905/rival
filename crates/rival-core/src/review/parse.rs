@@ -82,7 +82,7 @@ fn is_example_summary(s: &str) -> bool {
 /// the literal pipe-delimited option lists, or the file is the contract's
 /// placeholder. Real findings never have these field values. The category
 /// is compared against every prompt contract's exact enum literal (code
-/// review, plan, antislop) — exact matches only, because models under
+/// review, plan, and the retired antislop schema) — exact matches only, because models under
 /// uncertainty emit real dual categories like "bug|security" that a looser
 /// pipe check would silently drop.
 fn is_placeholder_finding(file: &str, severity: &str, category: &str) -> bool {

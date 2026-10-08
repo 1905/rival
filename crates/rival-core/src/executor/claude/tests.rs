@@ -5,7 +5,7 @@ use super::*;
 #[cfg(unix)]
 use crate::executor::testutil::retry_busy;
 use crate::executor::testutil::{Env, Spawned, recorder, strings};
-use crate::session::{MODE_ANTISLOP, MODE_PLAN, MODE_SECURITY};
+use crate::session::{MODE_PLAN, MODE_SECURITY};
 
 /// The read-only (review and task modes) argv, including the empty
 /// `--setting-sources` value and the repeated tool list.
@@ -89,7 +89,7 @@ fn claude_args_exact_vectors_and_effort_mapping() {
 #[cfg(unix)]
 #[test]
 fn claude_review_transport_restrictions() {
-    for mode in ["review", "plan", "antislop", "security", "raw"] {
+    for mode in ["review", "plan", "security", "raw"] {
         let mut env = Env::new();
         env.set("CLAUDECODE", Some("1"))
             .set("RIVAL_CLAUDE_AUTH", Some("subscription"))
@@ -498,7 +498,6 @@ fn set_claude_transport_mode_preserves_plan_task() {
 fn set_claude_transport_mode_preserves_task_modes() {
     for (name, mode, want) in [
         ("plan survives", MODE_PLAN, MODE_PLAN),
-        ("antislop survives", MODE_ANTISLOP, MODE_ANTISLOP),
         ("security survives", MODE_SECURITY, MODE_SECURITY),
         ("raw records transport", "raw", "native"),
         ("review records transport", "review", "native"),

@@ -107,7 +107,6 @@ pub fn short_kind(mode: &str) -> &str {
     match mode {
         "megareview" | "consilium" => "mega",
         session::MODE_SECURITY => "sec",
-        session::MODE_ANTISLOP => "slop",
         session::MODE_PLAN => "plan",
         "raw" => "raw",
         "" | "review" | "native" | "docker" => "review",

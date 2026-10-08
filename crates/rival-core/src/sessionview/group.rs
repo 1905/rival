@@ -69,19 +69,13 @@ pub fn status<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
     "completed"
 }
 
-/// Classifies a GROUP, and returns exactly one of "security", "antislop",
-/// "plan", or "megareview". There is no empty value. A solo row must display
-/// the session's own mode instead of calling this.
+/// Classifies a GROUP, and returns exactly one of "security", "plan", or
+/// "megareview". There is no empty value. A solo row must display the
+/// session's own mode instead of calling this.
 ///
-/// Precedence: security, then antislop, then plan, else megareview. A group
-/// never mixes antislop and plan members, because one command creates all of
-/// them.
+/// Precedence: security, then plan, else megareview.
 pub fn kind<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
-    for mode in [
-        session::MODE_SECURITY,
-        session::MODE_ANTISLOP,
-        session::MODE_PLAN,
-    ] {
+    for mode in [session::MODE_SECURITY, session::MODE_PLAN] {
         if sessions.iter().any(|s| s.borrow().mode == mode) {
             return mode;
         }
@@ -275,10 +269,7 @@ mod tests {
     // Go: TestKindPrecedence.
     #[test]
     fn kind_precedence() {
-        let cases: [(&str, &[&str], &str); 6] = [
-            ("antislop solo", &["antislop"], "antislop"),
-            ("antislop group", &["antislop", "antislop"], "antislop"),
-            ("antislop wins over plan", &["plan", "antislop"], "antislop"),
+        let cases: [(&str, &[&str], &str); 3] = [
             ("plan", &["plan", "plan"], "plan"),
             ("review is megareview", &["review", "review"], "megareview"),
             ("raw is megareview", &["raw"], "megareview"),
@@ -300,7 +291,7 @@ mod tests {
     #[test]
     fn kind_security_wins() {
         let sessions = [
-            sess("a", "g", "completed", "antislop", "codex", SOL, "high"),
+            sess("a", "g", "completed", "plan", "codex", SOL, "high"),
             sess("b", "g", "completed", "security", "codex", SOL, "high"),
         ];
         assert_eq!(kind(&sessions), "security");

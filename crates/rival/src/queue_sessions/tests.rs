@@ -60,7 +60,7 @@ fn queue_table_matches_go_format() {
             // Waiting longer than 30 minutes.
             ticket: ticket(
                 "waiting",
-                "antislop-long-mode",
+                "security-long-mode",
                 12345678,
                 -(31 * 60_000),
                 None,
@@ -75,7 +75,7 @@ fn queue_table_matches_go_format() {
         "POS   STATE     MODE          PID      WAIT       WORKDIR\n\
          -     running   review        4242     31s        /w/a\n\
          #1    waiting   plan          7        1m1s       /w/b\n\
-         #12   stale?    antislop-long-mode  12345678  32m31s     \n"
+         #12   stale?    security-long-mode  12345678  32m31s     \n"
     );
 }
 

@@ -5,21 +5,6 @@
     {
       "run": [
         "command",
-        "antislop",
-        "--help"
-      ],
-      "expect": {
-        "exit_code": 0,
-        "stdout": {
-          "$regex": "(?s)(?=.*\\AQuality-only slop & over-engineering review \\(code or plan\\))(?=.*Usage:\\s+rival\\s+command\\s+antislop(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for antislop)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort for every selected model)(?=.*(?<![\\w-])\\-m,\\ \\-\\-model(?![\\w-])[ =\\[<]*strings\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?antislop model\\(s\\): codex, claude)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
-        },
-        "stderr_lines": [],
-        "log_events": []
-      }
-    },
-    {
-      "run": [
-        "command",
         "claude",
         "--help"
       ],

@@ -55,7 +55,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n==> Reinstalling 1905/tap/rival\n\nUpdating skills...\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-antislop — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-antislop — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\n\n✓ Updated to v<V>\n",
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n==> Reinstalling 1905/tap/rival\n\nUpdating skills...\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 8 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 8 installed, 0 updated, 0 up to date, 0 removed\n\n✓ Updated to v<V>\n",
         "stderr_lines": [
           "Error: rival is already installed"
         ],
@@ -72,7 +72,6 @@
       ".claude/skills/rival-claude/SKILL.md",
       ".claude/skills/rival-k3/SKILL.md",
       ".claude/skills/rival-grok/SKILL.md",
-      ".claude/skills/rival-antislop/SKILL.md",
       ".claude/skills/rival-security/SKILL.md",
       ".agents/skills/rival-codex/SKILL.md",
       ".agents/skills/rival-plan/SKILL.md",
@@ -81,7 +80,6 @@
       ".agents/skills/rival-claude/SKILL.md",
       ".agents/skills/rival-k3/SKILL.md",
       ".agents/skills/rival-grok/SKILL.md",
-      ".agents/skills/rival-antislop/SKILL.md",
       ".agents/skills/rival-security/SKILL.md"
     ],
     "calls": {

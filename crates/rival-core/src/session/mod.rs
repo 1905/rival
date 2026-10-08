@@ -32,14 +32,13 @@ use crate::procinfo;
 // Session modes. The dashboards label a run by its mode, so a new run type
 // needs its own value here rather than reusing an existing one.
 pub const MODE_PLAN: &str = "plan";
-pub const MODE_ANTISLOP: &str = "antislop";
 pub const MODE_SECURITY: &str = "security";
 
 /// Reports whether mode names a task rather than a transport.
 /// A task mode identifies the run in both dashboards, so a runtime must not
 /// overwrite it with a transport name such as "native" or "docker".
 pub fn is_task_mode(mode: &str) -> bool {
-    mode == MODE_PLAN || mode == MODE_ANTISLOP || mode == MODE_SECURITY
+    mode == MODE_PLAN || mode == MODE_SECURITY
 }
 
 /// One run. Field order and `omitempty` rules match the Go struct, so the

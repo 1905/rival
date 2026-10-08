@@ -25,7 +25,6 @@ mod tests;
 pub enum CommandId {
     Root,
     Command,
-    CommandAntislop,
     CommandClaude,
     CommandCodex,
     CommandGrok,
@@ -58,7 +57,6 @@ impl CommandId {
         Some(match path {
             ["rival"] => Root,
             ["rival", "command"] => Command,
-            ["rival", "command", "antislop"] => CommandAntislop,
             ["rival", "command", "claude"] => CommandClaude,
             ["rival", "command", "codex"] => CommandCodex,
             ["rival", "command", "grok"] => CommandGrok,
@@ -256,19 +254,6 @@ pub fn build(defaults: &Defaults) -> Command {
         .global(true),
     )
     .subcommands([
-        with_args(command(
-            "antislop",
-            "Quality-only slop & over-engineering review (code or plan)",
-        ))
-        .args([
-            workdir(),
-            no_queue(),
-            model_flag(
-                "codex,claude",
-                "antislop model(s): codex, claude (comma-separated). Default models are codex and claude",
-            ),
-            effort("override reasoning effort for every selected model: low, medium, high, xhigh, ultra"),
-        ]),
         model_command("claude", "Skill-facing Claude executor"),
         model_command("codex", "Skill-facing Codex executor"),
         model_command("grok", "Skill-facing Grok executor"),

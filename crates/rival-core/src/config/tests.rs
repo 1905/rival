@@ -1,4 +1,4 @@
-//! Ports of Go `internal/config/{config,codex,kimi,security,antislop}_test.go`
+//! Ports of Go `internal/config/{config,codex,kimi,security}_test.go`
 //! plus golden pins of the ported Go texts. Every test builds its own
 //! [`Config`] from an explicit env map; nothing reads or mutates the process
 //! environment or the real `~/.rival`.
@@ -569,36 +569,6 @@ fn resolve_effort_normalizes_and_reports_go_errors() {
     assert_eq!(
         config.resolve_effort("custom/model", "", "").unwrap(),
         "high"
-    );
-}
-
-#[test]
-fn resolve_antislop_effort_skips_only_the_codex_pin() {
-    let config = cfg(&[]);
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "").unwrap(),
-        "high"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "low").unwrap(),
-        "low"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(CLAUDE_MODEL, "").unwrap(),
-        "medium"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(KIMI_MODEL, "").unwrap(),
-        "max"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(GROK_MODEL, "").unwrap(),
-        "high"
-    );
-    let config = config.with_user_config(Some(efforts(&[(CODEX_LABEL, "ultra")])));
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "").unwrap(),
-        "ultra"
     );
 }
 
@@ -1486,45 +1456,14 @@ fn replace_concrete_model_ids_protects_labels() {
     );
 }
 
-// ---- antislop_test.go ----
-
-#[test]
-fn antislop_prompt_templates() {
-    // Go TestAntislopPromptTemplates.
-    const EXAMPLE_SUMMARY: &str = r#""summary": "1-3 sentence overall assessment of the plan""#;
-    const CATEGORY_ENUM: &str = "reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni";
-    let prompt = ANTISLOP_CODE_PROMPT;
-    assert!(prompt.contains("{SCOPE}"), "missing placeholder {{SCOPE}}");
-    assert!(
-        !prompt.contains("{FILE}"),
-        "contains foreign placeholder {{FILE}}"
-    );
-    for key in [
-        r#""summary""#,
-        r#""rating""#,
-        r#""findings""#,
-        EXAMPLE_SUMMARY,
-        CATEGORY_ENUM,
-    ] {
-        assert!(prompt.contains(key), "missing {key:?}");
-    }
-    // The echo-skip only works if the example summary matches the plan prompt's.
-    assert!(
-        PLAN_REVIEW_PROMPT.contains(EXAMPLE_SUMMARY),
-        "PLAN_REVIEW_PROMPT example summary diverged from the antislop contract"
-    );
-}
-
 // ---- golden pins of the texts and constants ported from Go `config.go` ----
 
-fn rust_prompts() -> [(&'static str, &'static str); 7] {
+fn rust_prompts() -> [(&'static str, &'static str); 5] {
     [
         ("SystemPrompt", SYSTEM_PROMPT),
         ("WorkdirPreamble", WORKDIR_PREAMBLE),
         ("DiffReviewPreamble", DIFF_REVIEW_PREAMBLE),
         ("PlanReviewPrompt", PLAN_REVIEW_PROMPT),
-        ("antislopJSONContract", antislop_json_contract!()),
-        ("AntislopCodePrompt", ANTISLOP_CODE_PROMPT),
         ("WholeProject", WHOLE_PROJECT),
     ]
 }
@@ -1563,16 +1502,6 @@ fn prompts_sha256_golden() {
             "8c532f2b42d55282aee13a1eb216046b5d2ebe3946ab225359ef9e1317ac9fcc",
         ),
         (
-            "antislopJSONContract",
-            1020,
-            "812ac30dcd653182def8a2cc78eb24c40bb3b38b6a12d4b3bff21a05287c2969",
-        ),
-        (
-            "AntislopCodePrompt",
-            4476,
-            "032e130637a1d5448da3c67544f61a96466b7e055615067655e2e8f86e9ef553",
-        ),
-        (
             "WholeProject",
             18,
             "0e30295534e780eada78822c170a57c0ac174fae0f86ca76b41bcf811e0b95ea",
@@ -1588,7 +1517,7 @@ fn prompts_sha256_golden() {
     }
 }
 
-/// The 26 string constants of Go `config.go`, with the values it held
+/// The 25 string constants of Go `config.go`, with the values it held
 /// before the Go tree was removed.
 #[test]
 fn string_constants_golden() {
@@ -1608,7 +1537,6 @@ fn string_constants_golden() {
         CLAUDE_DOCKER_TOKEN_ENV,
         DEFAULT_REVIEW_EFFORT,
         DEFAULT_PLAN_EFFORT,
-        DEFAULT_ANTISLOP_EFFORT,
         SESSION_DIR,
         QUEUE_DIR,
         SECURITY_REVIEWER_K3,
@@ -1634,7 +1562,6 @@ fn string_constants_golden() {
         "grok",
         "rival-claude",
         "RIVAL_CLAUDE_TOKEN",
-        "high",
         "high",
         "high",
         ".rival/sessions",

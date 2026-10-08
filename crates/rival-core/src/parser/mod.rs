@@ -1,10 +1,7 @@
 //! User argument parsing. Go: `internal/parser`.
 
-mod review;
 #[cfg(test)]
 mod tests;
-
-pub use review::parse_review_args;
 
 use anyhow::{Result, bail};
 

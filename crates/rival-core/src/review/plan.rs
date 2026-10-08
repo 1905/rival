@@ -1,4 +1,4 @@
-//! Plan and antislop output parsing and rendering. Go: the pure half of
+//! Plan output parsing and rendering. Go: the pure half of
 //! `internal/review/plan.go`, plus the `PlanRunResult` record from
 //! `planrun.go`. Running the reviews is not here.
 
@@ -15,7 +15,7 @@ use crate::config;
 #[cfg(test)]
 mod tests;
 
-/// The structured JSON a plan or antislop reviewer emits. It mirrors
+/// The structured JSON a plan reviewer emits. It mirrors
 /// [`super::ReviewerOutput`] but carries a 1-10 rating and is parsed
 /// independently.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -93,15 +93,13 @@ pub fn format_plan_console(out: &PlanOutput, file: &str) -> String {
     sb
 }
 
-// Body labels for the two review flavors sharing `format_plan_body`.
+// Body labels passed to `format_plan_body`.
 const PLAN_RATING_LABEL: &str = "Rating";
 const PLAN_EMPTY_LINE: &str = "No bugs or gaps found.";
-const ANTISLOP_RATING_LABEL: &str = "Leanness";
-const ANTISLOP_EMPTY_LINE: &str = "No slop found.";
 
 /// Writes the rating/summary/findings/tally for one [`PlanOutput`]. It
-/// carries no header or File line, so the single-model, multi-model and
-/// antislop renderers share it; `rating_label` and `empty_line` are the only
+/// carries no header or File line, so the single-model and multi-model
+/// renderers share it; `rating_label` and `empty_line` are the only
 /// flavor-specific strings.
 fn format_plan_body(out: &PlanOutput, sb: &mut String, rating_label: &str, empty_line: &str) {
     let _ = write!(sb, "{rating_label}: {}/10\n\n", out.rating);
@@ -118,7 +116,7 @@ fn format_plan_body(out: &PlanOutput, sb: &mut String, rating_label: &str, empty
     }
 
     for (i, f) in findings.iter_mut().enumerate() {
-        // The plan/antislop schema has no failure_scenario; drop one a model
+        // The plan schema has no failure_scenario; drop one a model
         // volunteers so doc reviews never print a Scenario line.
         f.failure_scenario.clear();
         write_finding(sb, i + 1, f);
@@ -129,7 +127,7 @@ fn format_plan_body(out: &PlanOutput, sb: &mut String, rating_label: &str, empty
     sb.push('\n');
 }
 
-/// The outcome of a plan or antislop run: one result per model that ran,
+/// The outcome of a plan run: one result per model that ran,
 /// plus the models that were skipped. Go: `PlanRunResult` in `planrun.go`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlanRunResult {
@@ -168,36 +166,6 @@ pub fn format_plan_result(result: Option<&PlanRunResult>, file: &str) -> String 
     format_plan_multi_console(&result.results, &result.skipped, file)
 }
 
-/// Renders an antislop run. Same dispatch as [`format_plan_result`] with the
-/// antislop header and body labels.
-pub fn format_antislop_result(result: Option<&PlanRunResult>, target: &str) -> String {
-    let target_line = format!("Scope: {target}");
-
-    let Some(result) = result.filter(|r| !r.results.is_empty()) else {
-        return "No antislop review output.\n".to_string();
-    };
-    if let [r] = result.results.as_slice()
-        && result.skipped.is_empty()
-    {
-        let Some(parsed) = &r.parsed else {
-            return config::public_runtime_log(&r.cli, &r.model, &r.raw);
-        };
-        let mut sb = String::from("\n═══ RIVAL ANTISLOP REVIEW ═══\n\n");
-        sb.push_str(&target_line);
-        sb.push('\n');
-        format_plan_body(parsed, &mut sb, ANTISLOP_RATING_LABEL, ANTISLOP_EMPTY_LINE);
-        return sb;
-    }
-    format_doc_multi_console(
-        &result.results,
-        &result.skipped,
-        "RIVAL ANTISLOP REVIEW",
-        &target_line,
-        ANTISLOP_RATING_LABEL,
-        ANTISLOP_EMPTY_LINE,
-    )
-}
-
 /// Renders 2+ models' plan reviews as separate labelled blocks under one
 /// header, followed by any skipped models. A result with no parsed output
 /// prints its raw output so a parse failure never drops the model's work.
@@ -216,9 +184,8 @@ pub fn format_plan_multi_console(
     )
 }
 
-/// The multi-model renderer shared by plan and antislop reviews;
-/// `header_name`, `target_line` and the body labels are the only
-/// differences.
+/// The multi-model renderer used by plan reviews;
+/// `header_name`, `target_line` and the body labels set the text.
 fn format_doc_multi_console(
     results: &[PlanCLIResult],
     skipped: &[SkippedCLI],
