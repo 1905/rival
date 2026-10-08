@@ -367,28 +367,18 @@ fn repair_security_language(
     workdir: &str,
     raw: String,
 ) -> String {
-    let log = review::repair_log_path(&sess.log_file);
-    let session_log = sess.log_file.clone();
     let variant = if entry.variant == "max" { "max" } else { "low" };
-    let (run_ctx, cancel_run) = review::with_run_timeout(parent, cfg, 1);
-    let _cancel_run = CancelOnDrop(cancel_run);
-    review::repair_language(&session_log, raw, PayloadKind::Any, |prompt| {
-        let result = (ex.run)(
-            &run_ctx,
-            cfg,
-            sess,
-            prompt,
-            variant,
-            workdir,
-            entry,
-            Some(&log),
-        )?;
-        if result.exit_code != 0 {
-            anyhow::bail!("{} exited with code {}", entry.label, result.exit_code);
-        }
-        let data = read_log(&log).map_err(anyhow::Error::msg)?;
-        Ok(String::from_utf8_lossy(&data).into_owned())
-    })
+    review::repair_language(
+        parent,
+        cfg,
+        sess,
+        raw,
+        PayloadKind::Any,
+        |ctx, sess, prompt, log| {
+            let result = (ex.run)(ctx, cfg, sess, prompt, variant, workdir, entry, Some(log))?;
+            Ok(result.exit_code)
+        },
+    )
 }
 
 /// Parses a zero-exit security run and renders

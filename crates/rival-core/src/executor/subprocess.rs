@@ -105,18 +105,8 @@ pub struct Request<'a> {
     pub environ: &'a [OsString],
     /// The file that gets the child output. `None` is the session log.
     /// `Some(path)` is created (mode 0600 on Unix) or appended to; the
-    /// session log and the session record are then not touched.
+    /// session log is then not touched.
     pub log: Option<&'a str>,
-}
-
-/// Opens `path` to append, creating it with mode 0600 on Unix (as
-/// [`Session::open_log`] does).
-fn open_append(path: &str) -> io::Result<File> {
-    let mut opts = std::fs::OpenOptions::new();
-    opts.create(true).append(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-    opts.open(path)
 }
 
 /// `environ` without Git repository overrides and without the
@@ -490,11 +480,7 @@ pub fn run_subprocess(
     let abort = Abort::new().map_err(|e| anyhow!("abort event: {}", io_text(&e)))?;
 
     let log_name = req.log.unwrap_or(&sess.log_file).to_string();
-    let opened = match req.log {
-        None => sess.open_log(),
-        Some(path) => open_append(path),
-    };
-    let log_file = opened.map_err(|e| {
+    let log_file = session::open_append(Path::new(&log_name)).map_err(|e| {
         anyhow!(
             "open log: {}",
             session::path_error("open", Path::new(&log_name), &e)

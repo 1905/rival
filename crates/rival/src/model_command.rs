@@ -160,17 +160,14 @@ pub fn run_model_command(
         .map(|data| String::from_utf8_lossy(data).into_owned())
         .unwrap_or_default();
     let mut out = public_runtime_log(&sess.cli, &sess.model, &log_text);
-    let log_text = if exit_code == 0 && parsed.is_review && log.is_ok() {
-        repair_review_language(&ctx, cfg, spec, &mut sess, log_text, &run_workdir, &workdir)
-    } else {
-        log_text
-    };
     if exit_code != 0 {
         let reason = review::run_timeout_reason(&run_ctx, cfg, &spec.label(), &exit_msg);
         fail_session(cfg.paths(), &mut sess, exit_code, &reason);
     } else if parsed.is_review && log.is_ok() {
         // A zero exit is not a review: quota errors and empty output also
         // exit 0.
+        let log_text =
+            repair_review_language(&ctx, cfg, spec, &mut sess, log_text, &run_workdir, &workdir);
         let log_file = sess.log_file.clone();
         match finish_review(cfg, spec, &mut sess, &log_text, &scope, &log_file) {
             Err(reason) => {
@@ -296,33 +293,32 @@ pub(crate) fn repair_review_language(
     workdir: &str,
     cred_workdir: &str,
 ) -> String {
-    let log = review::repair_log_path(&sess.log_file);
-    let session_log = sess.log_file.clone();
     // K3 resolves to max, its only level.
     let effort = spec
         .resolve_effort(cfg, "low")
         .unwrap_or_else(|_| "low".to_string());
-    let (run_ctx, cancel_run) = review::with_run_timeout(parent, cfg, 1);
-    let _cancel_run = CancelOnDrop(cancel_run);
-    review::repair_language(&session_log, raw, PayloadKind::Any, |prompt| {
-        let result = (spec.run)(RunCall {
-            ctx: &run_ctx,
-            cfg,
-            sess,
-            prompt,
-            effort: &effort,
-            workdir,
-            cred_workdir,
-            review: true,
-            log: Some(&log),
-            out: None,
-        })?;
-        if result.exit_code != 0 {
-            anyhow::bail!("{} exited with code {}", spec.label(), result.exit_code);
-        }
-        let data = read_log(&log).map_err(anyhow::Error::msg)?;
-        Ok(String::from_utf8_lossy(&data).into_owned())
-    })
+    review::repair_language(
+        parent,
+        cfg,
+        sess,
+        raw,
+        PayloadKind::Any,
+        |ctx, sess, prompt, log| {
+            let result = (spec.run)(RunCall {
+                ctx,
+                cfg,
+                sess,
+                prompt,
+                effort: &effort,
+                workdir,
+                cred_workdir,
+                review: true,
+                log: Some(log),
+                out: None,
+            })?;
+            Ok(result.exit_code)
+        },
+    )
 }
 
 /// Records a failure and logs when the record cannot be saved.

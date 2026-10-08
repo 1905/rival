@@ -8,7 +8,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, bail};
 
-use super::language::{repair_language, repair_log_path};
+use super::language::repair_language;
 use super::plan::{PlanCLIResult, PlanRunResult, parse_plan_log};
 use super::slots::{GroupSlot, SkippedCLI, format_skipped, wait_for_group_slot};
 use crate::cancel::{CancelFunc, Context, ContextError};
@@ -410,7 +410,7 @@ fn run_doc_review_with(
 }
 
 /// Cancels the run context when dropped, also on unwind.
-struct CancelOnDrop(CancelFunc);
+pub(super) struct CancelOnDrop(pub(super) CancelFunc);
 
 impl Drop for CancelOnDrop {
     fn drop(&mut self) {
@@ -561,19 +561,18 @@ fn repair_plan_language(
     mode: &str,
     raw: String,
 ) -> String {
-    let log = repair_log_path(&sess.log_file);
-    let session_log = sess.log_file.clone();
-    let (run_ctx, cancel_run) = with_run_timeout(parent, cfg, 1);
-    let _cancel_run = CancelOnDrop(cancel_run);
-    repair_language(&session_log, raw, PayloadKind::Plan, |prompt| {
-        let ran = (ex.run)(&run_ctx, sess, cli, prompt, "low", workdir, Some(&log));
-        sess.mode = mode.to_string();
-        let (out, exit_code) = ran?;
-        if exit_code != 0 {
-            bail!("exited with code {exit_code}");
-        }
-        Ok(String::from_utf8_lossy(&out).into_owned())
-    })
+    repair_language(
+        parent,
+        cfg,
+        sess,
+        raw,
+        PayloadKind::Plan,
+        |ctx, sess, prompt, log| {
+            let ran = (ex.run)(ctx, sess, cli, prompt, "low", workdir, Some(log));
+            sess.mode = mode.to_string();
+            ran.map(|(_, exit_code)| exit_code)
+        },
+    )
 }
 
 /// Turns raw CLI runs (plus the pre-run skipped list) into the final

@@ -176,7 +176,8 @@ fn same_shape(old: &Review, new: &Review) -> bool {
 
 /// `new` when it keeps the emptiness and the facts of `old`, else `old`.
 fn keep_facts(old: &str, new: &str) -> String {
-    let kept = old.trim().is_empty() == new.trim().is_empty() && facts(old) == facts(new);
+    let kept =
+        old == new || (old.trim().is_empty() == new.trim().is_empty() && facts(old) == facts(new));
     if kept { new } else { old }.to_string()
 }
 
@@ -193,19 +194,37 @@ static NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"-?\d+(?:[.,]\d+)*
 /// Text in straight or curly double quotation marks: a quoted error.
 static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#""[^"\n]+"|“[^”\n]+”"#).unwrap());
 
+/// The kind of a fact, so the same text found by two rules counts twice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Fact {
+    Fence,
+    CodeSpan,
+    FileLine,
+    Path,
+    Number,
+    Quoted,
+}
+
 /// The facts of a text field as a multiset: code fences, then code spans
 /// outside the fences, `file:line` items, paths, numbers and quoted text.
-fn facts(text: &str) -> HashMap<(u8, String), usize> {
+fn facts<'a>(text: &'a str) -> HashMap<(Fact, &'a str), usize> {
     let mut out = HashMap::new();
-    let mut add = |kind: u8, s: &str| *out.entry((kind, s.to_string())).or_insert(0) += 1;
+    let mut add = |kind: Fact, s: &'a str| *out.entry((kind, s)).or_insert(0) += 1;
     for m in FENCE.find_iter(text) {
-        add(0, m.as_str());
+        add(Fact::Fence, m.as_str());
     }
-    let rest = FENCE.replace_all(text, " ");
+    // Code spans outside the fences. Blanking keeps the offsets, so each
+    // span still borrows from `text`.
+    let rest = FENCE.replace_all(text, |c: &regex::Captures| " ".repeat(c[0].len()));
     for m in CODE_SPAN.find_iter(&rest) {
-        add(1, m.as_str());
+        add(Fact::CodeSpan, &text[m.range()]);
     }
-    for (kind, re) in [(2, &FILE_LINE), (3, &PATH), (4, &NUMBER), (5, &QUOTED)] {
+    for (kind, re) in [
+        (Fact::FileLine, &FILE_LINE),
+        (Fact::Path, &PATH),
+        (Fact::Number, &NUMBER),
+        (Fact::Quoted, &QUOTED),
+    ] {
         for m in re.find_iter(text) {
             add(kind, m.as_str());
         }
