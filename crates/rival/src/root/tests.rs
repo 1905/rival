@@ -659,7 +659,7 @@ fn std_fd_helper_child() {
     };
     let write = match ProcessStdout.write(b"") {
         Ok(n) => format!("ok:{n}"),
-        Err(e) => rival_core::gostd::os_error_text(&e),
+        Err(e) => e.to_string(),
     };
     std::fs::write(
         &out,
@@ -713,11 +713,11 @@ fn closed_stdin_and_stdout_fail_like_go() {
     );
     assert_eq!(
         run_fd_helper(&[0]),
-        "char_device=false\nread=read /dev/stdin: bad file descriptor\nwrite=ok:0"
+        "char_device=false\nread=read /dev/stdin: Bad file descriptor (os error 9)\nwrite=ok:0"
     );
     assert_eq!(
         run_fd_helper(&[1]),
-        "char_device=true\nread=ok:0\nwrite=bad file descriptor"
+        "char_device=true\nread=ok:0\nwrite=Bad file descriptor (os error 9)"
     );
 }
 
@@ -867,9 +867,10 @@ fn windows_stdin_kinds_match_go() {
         run_win_stdin_helper("invalid"),
         format!("char_device=false\nstat_failed=true\nread=invalid argument\n{ok_write}")
     );
-    let invalid_handle = rival_core::gostd::os_error_text(&std::io::Error::from_raw_os_error(
+    let invalid_handle = std::io::Error::from_raw_os_error(
         windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32,
-    ));
+    )
+    .to_string();
     assert_eq!(
         run_win_stdin_helper("nullhandle"),
         format!(
@@ -890,9 +891,10 @@ fn windows_stdout_missing_handles_fail_like_go() {
         run_win_stdin_helper("out-invalid"),
         format!("{head}\nwrite=write stdout: invalid argument")
     );
-    let invalid_handle = rival_core::gostd::os_error_text(&std::io::Error::from_raw_os_error(
+    let invalid_handle = std::io::Error::from_raw_os_error(
         windows_sys::Win32::Foundation::ERROR_INVALID_HANDLE as i32,
-    ));
+    )
+    .to_string();
     assert_eq!(
         run_win_stdin_helper("out-nullhandle"),
         format!("{head}\nwrite=write stdout: write /dev/stdout: {invalid_handle}")

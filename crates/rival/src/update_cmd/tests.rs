@@ -96,7 +96,7 @@ fn update_installs_from_selected_binary() {
     let o = run_busy(&fix, |env| {
         install_updated_skills(env, ChildIo::Capture, &bin)
     });
-    assert_eq!(o.result, Err("exit status 7".to_string()));
+    assert_eq!(o.result, Err("exit status: 7".to_string()));
     assert_eq!(o.stderr, "oops\n");
 }
 
@@ -104,7 +104,7 @@ fn update_installs_from_selected_binary() {
 /// binary is a batch file in a directory with a space, run through
 /// `oscmd::command` (std quotes it for `cmd.exe`). It gets the installer
 /// argv, its stdout and stderr reach the captured streams, and a non-zero
-/// exit is Go's `exit status N`.
+/// exit is std's `exit code: N`.
 #[cfg(windows)]
 #[test]
 fn windows_installer_cmd_gets_argv_and_streams() {
@@ -128,7 +128,7 @@ fn windows_installer_cmd_gets_argv_and_streams() {
     let o = run_busy(&fix, |env| {
         install_updated_skills(env, ChildIo::Capture, &bin)
     });
-    assert_eq!(o.result, Err("exit status 7".to_string()));
+    assert_eq!(o.result, Err("exit code: 7".to_string()));
     assert_eq!(o.stderr.replace("\r\n", "\n"), "oops \n");
 }
 
@@ -240,7 +240,7 @@ fn update_error_branches() {
     let both_fail = "#!/bin/sh\nexit 9\n";
     let b = brew(both_fail, NEW_RIVAL);
     let o = update(&b.fix, &b.apps, "1", "2");
-    assert_eq!(o.result, Err("brew reinstall: exit status 9".to_string()));
+    assert_eq!(o.result, Err("brew reinstall: exit status: 9".to_string()));
     assert_eq!(
         o.stdout,
         "v1 → v2\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n"
@@ -251,13 +251,13 @@ fn update_error_branches() {
     let o = update(&b.fix, &b.apps, "1", "2");
     assert_eq!(
         o.result,
-        Err("locate upgraded rival: exit status 4".to_string())
+        Err("locate upgraded rival: exit status: 4".to_string())
     );
     assert!(o.stdout.ends_with("\nUpdating skills...\n"), "{}", o.stdout);
 
     let b = brew(BREW_OK, "#!/bin/sh\nexit 7\n");
     let o = update(&b.fix, &b.apps, "1", "2");
-    assert_eq!(o.result, Err("install skills: exit status 7".to_string()));
+    assert_eq!(o.result, Err("install skills: exit status: 7".to_string()));
 
     // A prefix without bin/rival: Go skips LookPath for a path and fails at
     // the exec.
@@ -265,8 +265,9 @@ fn update_error_branches() {
     std::fs::remove_file(b.prefix.join("bin").join("rival")).unwrap();
     let o = update(&b.fix, &b.apps, "1", "2");
     let want = format!(
-        "install skills: fork/exec {}: no such file or directory",
-        b.prefix.join("bin").join("rival").display()
+        "install skills: start {}: {}",
+        b.prefix.join("bin").join("rival").display(),
+        crate::testutil::NO_SUCH_FILE
     );
     assert_eq!(o.result, Err(want));
 

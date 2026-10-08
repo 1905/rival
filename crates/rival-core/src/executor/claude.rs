@@ -13,7 +13,6 @@ use super::oscmd;
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::logging;
 use crate::session::{self, Session};
 
@@ -70,7 +69,7 @@ pub(crate) fn run_claude_model(
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
-        bail!("unsupported Claude Code model {}", quote(model));
+        bail!("unsupported Claude Code model {:?}", model);
     }
     let result = if oscmd::look_path(cfg, "claude").is_ok() {
         set_claude_transport_mode(sess, "native");

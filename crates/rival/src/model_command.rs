@@ -4,10 +4,10 @@
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::{Config, PromptKind, public_runtime_log};
 use rival_core::executor::RunResult;
+use rival_core::logging;
 use rival_core::paths::Paths;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::{NewSession, Session};
-use rival_core::{gostd, logging};
 
 use crate::gitscope_helper::{build_review_prompt, lens_prompt};
 use crate::merge_request::{ReviewTarget, prepare_review_target_with, reject_unresolved_mr};
@@ -308,12 +308,11 @@ pub(crate) fn complete_session(paths: &Paths, sess: &mut Session, result: &RunRe
 /// Go `os.ReadFile` of the session log, with its `*PathError` text.
 pub(crate) fn read_log(path: &str) -> Result<Vec<u8>, String> {
     use std::io::Read;
-    let open =
-        gostd::open_file(path).map_err(|e| format!("open {path}: {}", gostd::os_error_text(&e)))?;
+    let open = std::fs::File::open(path).map_err(|e| format!("open {path}: {}", e))?;
     let mut data = Vec::new();
     let mut file = open;
     file.read_to_end(&mut data)
-        .map_err(|e| format!("read {path}: {}", gostd::os_error_text(&e)))?;
+        .map_err(|e| format!("read {path}: {}", e))?;
     Ok(data)
 }
 

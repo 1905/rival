@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
-use crate::gostd::{self, quote};
+use crate::duration;
 use crate::paths::{self, Paths};
 
 // GPT56_SOL_MODEL and SOL_LABEL name a removed model (2026-09-26). Nothing
@@ -261,7 +261,7 @@ pub fn public_runtime_log(cli: &str, model: &str, raw: &str) -> String {
             _ => {}
         }
 
-        if banner_seen && header_open && gostd::to_lower(&trimmed).starts_with("model:") {
+        if banner_seen && header_open && trimmed.to_lowercase().starts_with("model:") {
             body = format!("{leading}model: {label}");
         }
         if trimmed.starts_with("=== REVIEW FROM ") {
@@ -274,7 +274,7 @@ pub fn public_runtime_log(cli: &str, model: &str, raw: &str) -> String {
                 header_open = false;
             }
         }
-        if gostd::equal_fold(&trimmed, "user") {
+        if trimmed.eq_ignore_ascii_case("user") {
             header_open = false;
         }
         out.push_str(&body);
@@ -369,11 +369,11 @@ fn public_review_header(line: &str) -> String {
         return line.to_string();
     };
     let mut reviewer = first.trim_matches(['(', ')']).to_string();
-    let lower_identity = gostd::to_lower(identity);
+    let lower_identity = identity.to_lowercase();
     if lower_identity.contains("retired-model") {
         return format!("{PREFIX}retired-model{role}");
     }
-    match gostd::to_lower(&reviewer).as_str() {
+    match reviewer.to_lowercase().as_str() {
         "codex" => {
             // Sol and Codex share this adapter, so disambiguate by identity
             // before defaulting to Sol. The label is the adapter word itself,
@@ -739,15 +739,15 @@ impl From<RawUserConfig> for UserConfig {
 /// random, so any invalid entry may be the one reported there).
 pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> {
     let shown = path.display();
-    let mut file = match gostd::open_file(path) {
+    let mut file = match std::fs::File::open(path) {
         Ok(file) => file,
         // Go errors.Is(err, os.ErrNotExist); on Windows also a missing
         // parent directory (ERROR_PATH_NOT_FOUND), as in a fresh profile.
-        Err(e) if gostd::is_not_exist(&e) => return Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => {
             return Err(ConfigError::new(format!(
                 "read {shown}: open {shown}: {}",
-                gostd::os_error_text(&e)
+                e
             )));
         }
     };
@@ -755,7 +755,7 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
     if let Err(e) = file.read_to_end(&mut data) {
         return Err(ConfigError::new(format!(
             "read {shown}: read {shown}: {}",
-            gostd::os_error_text(&e)
+            e
         )));
     }
     let parse_err = |e: &dyn fmt::Display| ConfigError::new(format!("parse {shown}: {e}"));
@@ -767,11 +767,11 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
     // nothing that can run, so drop it instead of failing every command.
     cfg.efforts.remove(SOL_LABEL);
     for (label, raw) in cfg.efforts.iter_mut() {
-        let effort = gostd::to_lower(raw.trim());
+        let effort = raw.trim().to_lowercase();
         if !known_effort_model(label) {
             return Err(ConfigError::new(format!(
-                "invalid effort model {} in {shown}; use one of: codex, kimi-k3, claude, grok",
-                quote(label)
+                "invalid effort model {:?} in {shown}; use one of: codex, kimi-k3, claude, grok",
+                label
             )));
         }
         if !valid_configured_model_effort(label, &effort) {
@@ -781,8 +781,8 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
                 "low, medium, high, xhigh, ultra"
             };
             return Err(ConfigError::new(format!(
-                "invalid effort {} for {label} in {shown}; use one of: {allowed}",
-                quote(raw)
+                "invalid effort {:?} for {label} in {shown}; use one of: {allowed}",
+                raw
             )));
         }
         *raw = effort;
@@ -791,11 +791,11 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
     // a typo fails every command instead of waiting for a security run.
     let configured = cfg.security.reviewer.trim().to_string();
     if !configured.is_empty() {
-        let name = gostd::to_lower(&configured);
+        let name = configured.to_lowercase();
         if security_model_named(&name).is_none() {
             return Err(ConfigError::new(format!(
-                "invalid security.reviewer {} in {shown}; use one of: {}",
-                quote(&configured),
+                "invalid security.reviewer {:?} in {shown}; use one of: {}",
+                configured,
                 security_reviewer_names().join(", ")
             )));
         }
@@ -993,12 +993,12 @@ impl Config {
         let mut name = SECURITY_REVIEWER_K3.to_string();
         let configured = self.configured_security_reviewer();
         if !configured.is_empty() {
-            name = gostd::to_lower(configured);
+            name = configured.to_lowercase();
         }
         security_model_named(&name).ok_or_else(|| {
             ConfigError::new(format!(
-                "invalid security.reviewer {}, must be one of: {}",
-                quote(&name),
+                "invalid security.reviewer {:?}, must be one of: {}",
+                name,
                 security_reviewer_names().join(", ")
             ))
         })
@@ -1030,15 +1030,15 @@ impl Config {
         fallback: &str,
     ) -> Result<String, ConfigError> {
         let label = model_label(model);
-        let override_effort = gostd::to_lower(override_effort.trim());
+        let override_effort = override_effort.trim().to_lowercase();
         if !override_effort.is_empty() {
             if label == "kimi-k3" {
                 return Ok("max".to_string());
             }
             if !is_valid_effort(&override_effort) {
                 return Err(ConfigError::new(format!(
-                    "invalid effort {} for {label}",
-                    quote(&override_effort)
+                    "invalid effort {:?} for {label}",
+                    override_effort
                 )));
             }
             return Ok(override_effort);
@@ -1046,7 +1046,7 @@ impl Config {
         if let Some(effort) = self.user.as_ref().and_then(|u| u.efforts.get(label)) {
             return Ok(effort.clone());
         }
-        let mut fallback = gostd::to_lower(fallback.trim());
+        let mut fallback = fallback.trim().to_lowercase();
         // A model that pins its own effort outranks a surface-specific
         // fallback. Without this, every caller that passes a non-empty
         // fallback (the review and plan paths both pass one) silently
@@ -1062,8 +1062,8 @@ impl Config {
         }
         if !is_valid_effort(&fallback) {
             return Err(ConfigError::new(format!(
-                "invalid fallback effort {} for {label}",
-                quote(&fallback)
+                "invalid fallback effort {:?} for {label}",
+                fallback
             )));
         }
         Ok(fallback)
@@ -1153,10 +1153,8 @@ impl Config {
                 Ok(CLAUDE_AUTH_API)
             }
             v => Err(ConfigError::new(format!(
-                "invalid RIVAL_CLAUDE_AUTH={} — use {} (default) or {}",
-                quote(v),
-                quote(CLAUDE_AUTH_SUBSCRIPTION),
-                quote(CLAUDE_AUTH_API)
+                "invalid RIVAL_CLAUDE_AUTH={:?} — use {:?} (default) or {:?}",
+                v, CLAUDE_AUTH_SUBSCRIPTION, CLAUDE_AUTH_API
             ))),
         }
     }
@@ -1178,7 +1176,7 @@ impl Config {
     pub fn queue_timeout(&self) -> Duration {
         let v = self.getenv("RIVAL_QUEUE_TIMEOUT");
         if !v.is_empty()
-            && let Ok(d) = gostd::parse_duration(v)
+            && let Ok(d) = duration::parse(v)
             && d > 0
         {
             return Duration::from_nanos(d as u64);
@@ -1211,7 +1209,7 @@ impl Config {
         if v.is_empty() {
             return DEFAULT_RUN_TIMEOUT;
         }
-        match gostd::parse_duration(v) {
+        match duration::parse(v) {
             Ok(d) if d >= 0 => Duration::from_nanos(d as u64), // zero → no timeout
             _ => DEFAULT_RUN_TIMEOUT,
         }
@@ -1231,7 +1229,7 @@ impl Config {
     /// Whether queueing is bypassed via `RIVAL_NO_QUEUE`.
     pub fn queue_disabled(&self) -> bool {
         let v = self.getenv("RIVAL_NO_QUEUE");
-        !v.is_empty() && v != "0" && !gostd::equal_fold(v, "false")
+        !v.is_empty() && v != "0" && !v.eq_ignore_ascii_case("false")
     }
 
     /// The workdir preamble with the absolute path injected. An unresolvable

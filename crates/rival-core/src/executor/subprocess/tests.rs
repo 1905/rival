@@ -1186,7 +1186,7 @@ fn stdin_error_is_returned_only_when_child_exits_zero() {
     let err = run_sh(&mut fx, "exec 0<&-; exit 0", &prompt, None).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "write prompt to stdin: write |1: broken pipe"
+        "write prompt to stdin: write |1: Broken pipe (os error 32)"
     );
     let res = run_sh(&mut fx, "exec 0<&-; exit 4", &prompt, None).unwrap();
     assert_eq!(res.exit_code, 4);
@@ -1278,7 +1278,7 @@ fn tee_line_returns_go_multiwriter_count_and_error() {
     }
     assert_eq!(
         tee_line(b"one\n", &log, Some(&mut Failing)),
-        (0, Some("broken pipe".into()))
+        (0, Some("Broken pipe (os error 32)".into()))
     );
     assert_eq!(tee_line::<Short>(b"one\n", &log, None), (4, None));
     assert_eq!(fs::read(&path).unwrap(), b"one\none\none\n");
@@ -1290,7 +1290,7 @@ fn tee_line_returns_go_multiwriter_count_and_error() {
     assert_eq!(n, 0);
     assert_eq!(
         err.unwrap(),
-        format!("write {}: bad file descriptor", path.display())
+        format!("write {}: Bad file descriptor (os error 9)", path.display())
     );
     assert!(short.0.is_empty());
 }
@@ -1501,20 +1501,20 @@ fn start_errors_match_go() {
     let plain = plain.to_str().unwrap();
     assert_eq!(
         start_error(&mut fx, &bg, plain, &base),
-        format!("start {plain}: fork/exec {plain}: permission denied")
+        format!("start {plain}: start {plain}: Permission denied (os error 13)")
     );
     let missing = fx.work.path().join("missing");
     let missing = missing.to_str().unwrap();
     assert_eq!(
         start_error(&mut fx, &bg, missing, &base),
-        format!("start {missing}: fork/exec {missing}: no such file or directory")
+        format!("start {missing}: start {missing}: No such file or directory (os error 2)")
     );
 
     // A missing workdir fails inside the child, as with Go's Setpgid start.
     fx.sess.work_dir = fx.work.path().join("gone").to_str().unwrap().to_string();
     assert_eq!(
         start_error(&mut fx, &bg, "/bin/sh", &base),
-        "start /bin/sh: fork/exec /bin/sh: no such file or directory"
+        "start /bin/sh: start /bin/sh: No such file or directory (os error 2)"
     );
 
     // Go's dedupEnv rejects a NUL.
@@ -1556,7 +1556,7 @@ fn open_log_error_comes_before_start() {
             &base
         ),
         format!(
-            "open log: open {}: no such file or directory",
+            "open log: open {}: No such file or directory (os error 2)",
             fx.sess.log_file
         )
     );
@@ -1606,12 +1606,15 @@ fn argv0_is_the_bare_name_and_empty_args_stay() {
         fx.run(&Context::background(), &req, None)
             .unwrap_err()
             .to_string(),
-        format!("start sh: fork/exec {}: invalid argument", sh.display())
+        format!(
+            "start sh: start {}: Invalid argument (os error 22)",
+            sh.display()
+        )
     );
 }
 
 /// Controller finding (Task 2.4): an executable text file without a shebang
-/// is Go's `fork/exec <path>: exec format error`, never a `/bin/sh`
+/// is `start <path>: Exec format error (os error 8)`, never a `/bin/sh`
 /// fallback. The provider spawn sets a process group and a workdir, so it
 /// may take a different std spawn path than a plain `Command`.
 #[test]
@@ -1642,7 +1645,7 @@ fn executable_without_shebang_is_exec_format_error() {
     assert_eq!(
         format!("{err:#}"),
         format!(
-            "start noshebang: fork/exec {}: exec format error",
+            "start noshebang: start {}: Exec format error (os error 8)",
             script.display()
         )
     );

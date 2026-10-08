@@ -62,7 +62,6 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use super::{Abort, ExitState, Io, KillOutcome, LookPathError};
-use crate::gostd;
 use crate::winpath;
 
 /// Takes ownership of a handle a Win32 call returned; NULL and
@@ -85,9 +84,9 @@ fn check(ok: i32) -> io::Result<()> {
     }
 }
 
-/// `<op>: <Go errno text>`, keeping the error kind.
+/// `<op>: <io error>`, keeping the error kind.
 fn context(op: &str, err: io::Error) -> io::Error {
-    io::Error::new(err.kind(), format!("{op}: {}", gostd::os_error_text(&err)))
+    io::Error::new(err.kind(), format!("{op}: {err}"))
 }
 
 /// An unnamed Job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no other
@@ -312,7 +311,7 @@ impl ProcessHandle {
         if unsafe { TerminateJobObject(self.job.as_raw_handle(), 1) } != 0 {
             KillOutcome::Sent
         } else {
-            KillOutcome::Failed(gostd::os_error_text(&io::Error::last_os_error()))
+            KillOutcome::Failed(io::Error::last_os_error().to_string())
         }
     }
 
@@ -596,7 +595,8 @@ pub fn path_ext(value: Option<&OsStr>) -> Vec<String> {
     if value.is_empty() {
         return [".com", ".exe", ".bat", ".cmd"].map(String::from).to_vec();
     }
-    gostd::to_lower(&value)
+    value
+        .to_lowercase()
         .split(';')
         .filter(|e| !e.is_empty())
         .map(|e| {
@@ -614,11 +614,7 @@ fn chk_stat(file: &Path) -> Result<(), String> {
     match std::fs::metadata(file) {
         Ok(meta) if meta.is_dir() => Err(ERR_PERMISSION.to_string()),
         Ok(_) => Ok(()),
-        Err(e) => Err(format!(
-            "GetFileAttributesEx {}: {}",
-            file.display(),
-            gostd::os_error_text(&e)
-        )),
+        Err(e) => Err(format!("GetFileAttributesEx {}: {e}", file.display())),
     }
 }
 

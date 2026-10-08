@@ -1,7 +1,5 @@
 //! Go: `internal/executor/quota.go`.
 
-use crate::gostd;
-
 /// High-precision substrings that indicate a reviewer CLI hit a provider
 /// quota/rate limit. Some providers report these failures only in captured
 /// output, so matching is case-insensitive against the combined
@@ -25,7 +23,7 @@ const QUOTA_SIGNATURES: [&str; 8] = [
 /// the request due to a quota/rate limit. Lowercasing is Go's per-rune
 /// `strings.ToLower`.
 pub fn is_quota_exhausted(output: &str) -> bool {
-    let lower = gostd::to_lower(output);
+    let lower = output.to_lowercase();
     QUOTA_SIGNATURES.iter().any(|sig| lower.contains(sig))
 }
 
@@ -81,11 +79,12 @@ mod tests {
     }
 
     #[test]
-    fn remaining_signatures_and_go_lowercasing() {
+    fn remaining_signatures_and_unicode_lowercasing() {
         for sig in QUOTA_SIGNATURES {
             assert!(is_quota_exhausted(&sig.to_uppercase()), "{sig}");
         }
-        // Go maps U+0130 to plain 'i' (Rust's full mapping adds U+0307).
-        assert!(is_quota_exhausted("\u{130}NSUFFICIENT_QUOTA"));
+        // The full lowercase mapping turns U+0130 into 'i' plus U+0307, so
+        // the text does not match.
+        assert!(!is_quota_exhausted("\u{130}NSUFFICIENT_QUOTA"));
     }
 }

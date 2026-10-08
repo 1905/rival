@@ -94,7 +94,7 @@ fn preflight_builds_a_missing_image_from_a_temp_dockerfile() {
         (
             3,
             Err(
-                "failed to build rival-claude docker image: docker build: exit status 3"
+                "failed to build rival-claude docker image: docker build: exit status: 3"
                     .to_string(),
             ),
         ),
@@ -130,11 +130,12 @@ fn build_reports_a_temp_file_error() {
     let mut env = Env::new();
     let missing = path_str(&env.home.path().join("nonexistent-rival-tmp"));
     // Go's os.TempDir reads TMPDIR on Unix and TMP first on Windows.
-    let (var, sep, not_found) = if cfg!(windows) {
-        ("TMP", '\\', "The system cannot find the path specified.")
+    let (var, sep) = if cfg!(windows) {
+        ("TMP", '\\')
     } else {
-        ("TMPDIR", '/', "no such file or directory")
+        ("TMPDIR", '/')
     };
+    let not_found = crate::errtext::NO_SUCH_PATH;
     env.set(var, Some(&missing));
     let err = build_claude_docker_image(&env.config()).unwrap_err();
     assert!(

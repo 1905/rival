@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config;
-use crate::gostd;
+use crate::duration;
 use crate::json;
 use crate::paths::Paths;
 use crate::procinfo;
@@ -275,12 +275,12 @@ fn mono_sub(t: Instant, u: Instant) -> i64 {
 
 /// Go: `d.Round(time.Second).String()`.
 pub fn duration_text(nanos: i64) -> String {
-    gostd::format_duration(round_duration(nanos, 1_000_000_000))
+    duration::format(round_duration(nanos, 1_000_000_000))
 }
 
 /// Go's `*PathError` text: `<op> <path>: <errno text>`.
 pub(crate) fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
-    format!("{op} {}: {}", path.display(), gostd::os_error_text(err))
+    format!("{op} {}: {}", path.display(), err)
 }
 
 /// An I/O error that prints as Go's `*PathError` and still downcasts to
@@ -292,7 +292,7 @@ pub(crate) fn io_error(op: &str, path: &Path, err: io::Error) -> anyhow::Error {
 
 /// Go: `os.ReadFile`.
 pub(crate) fn read_file(path: &Path) -> anyhow::Result<Vec<u8>> {
-    let mut f = crate::gostd::open_file(path).map_err(|e| io_error("open", path, e))?;
+    let mut f = std::fs::File::open(path).map_err(|e| io_error("open", path, e))?;
     let mut data = Vec::new();
     f.read_to_end(&mut data)
         .map_err(|e| io_error("read", path, e))?;
@@ -465,7 +465,7 @@ impl Session {
                 "rename session: rename {} {}: {}",
                 tmp.display(),
                 dst.display(),
-                gostd::os_error_text(&e)
+                e
             ));
         }
         Ok(())
@@ -626,25 +626,18 @@ pub fn is_session_file(name: &str) -> bool {
 /// reset as members are promoted to running. The deterministic fallbacks keep
 /// legacy sessions stable when they do not have queue metadata.
 pub fn sort_group_members<S: Borrow<Session>>(sessions: &mut [S]) {
-    gostd::slice_stable(sessions, |a, b| {
+    // A strict total order, so the std sort never sees a cycle: members
+    // with `queued_at` come first, in creation order; legacy members without
+    // it follow, by model rank, start time and id.
+    sessions.sort_by(|a, b| {
         let (a, b) = (a.borrow(), b.borrow());
-        let (rank_a, rank_b) = (group_mode_rank(&a.mode), group_mode_rank(&b.mode));
-        if rank_a != rank_b {
-            return rank_a < rank_b;
-        }
-        if let (Some(qa), Some(qb)) = (a.queued_at, b.queued_at)
-            && qa != qb
-        {
-            return qa < qb;
-        }
-        let (rank_a, rank_b) = (group_model_rank(a), group_model_rank(b));
-        if rank_a != rank_b {
-            return rank_a < rank_b;
-        }
-        if a.start_time != b.start_time {
-            return a.start_time < b.start_time;
-        }
-        a.id < b.id
+        group_mode_rank(&a.mode)
+            .cmp(&group_mode_rank(&b.mode))
+            .then(a.queued_at.is_none().cmp(&b.queued_at.is_none()))
+            .then(a.queued_at.cmp(&b.queued_at))
+            .then_with(|| group_model_rank(a).cmp(&group_model_rank(b)))
+            .then(a.start_time.cmp(&b.start_time))
+            .then_with(|| a.id.cmp(&b.id))
     });
 }
 

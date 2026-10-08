@@ -8,7 +8,7 @@ use std::time::{Duration as StdDuration, Instant};
 
 use super::summary::{load_all_summaries, load_summary_file};
 use super::*;
-use crate::gostd::errtext::{IS_A_DIRECTORY, NO_SUCH_FILE, NO_SUCH_PATH};
+use crate::errtext::{DIR_AS_FILE, NO_SUCH_FILE, NO_SUCH_PATH};
 
 fn temp_paths() -> (tempfile::TempDir, Paths) {
     let home = tempfile::tempdir().unwrap();
@@ -970,13 +970,14 @@ fn load_errors_read_like_go_and_downcast_to_io() {
     let err = Session::load(&paths, "a/../b").unwrap_err();
     assert_eq!(err.to_string(), open_missing("b.json", NO_SUCH_PATH));
 
-    // A directory opens but cannot be read; Go's Windows open of a
-    // directory for reading succeeds too (FILE_FLAG_BACKUP_SEMANTICS).
+    // A directory opens but cannot be read on Unix. On Windows the open
+    // fails.
     fs::create_dir_all(dir.join("d.json")).unwrap();
+    let (dir_op, dir_text) = DIR_AS_FILE;
     let err = Session::load(&paths, "d").unwrap_err();
     assert_eq!(
         err.to_string(),
-        format!("read {}: {IS_A_DIRECTORY}", dir.join("d.json").display())
+        format!("{dir_op} {}: {dir_text}", dir.join("d.json").display())
     );
     assert!(err.downcast_ref::<io::Error>().is_some());
 
@@ -997,7 +998,7 @@ fn load_errors_read_like_go_and_downcast_to_io() {
     let err = load_summary_file(&dir.join("d.json"), 1 << 20).unwrap_err();
     assert_eq!(
         err.to_string(),
-        format!("read {}: {IS_A_DIRECTORY}", dir.join("d.json").display())
+        format!("{dir_op} {}: {dir_text}", dir.join("d.json").display())
     );
 }
 
@@ -1099,4 +1100,33 @@ fn save_load_save_gives_equal_bytes() {
         loaded.save(&paths).unwrap();
         assert_eq!(file(&s.id), first, "{}", s.id);
     }
+}
+
+/// A group that mixes legacy members (no `queued_at`) with queued ones must
+/// sort without a cycle: the queued members first, in creation order.
+#[test]
+fn sort_group_members_mixed_legacy_and_queued_is_total() {
+    let t = |s: i64| {
+        chrono::DateTime::from_timestamp(s, 0)
+            .unwrap()
+            .fixed_offset()
+    };
+    let mut members: Vec<Session> = (0..12)
+        .map(|i| Session {
+            id: format!("id{i:02}"),
+            cli: if i % 2 == 0 { "codex" } else { "claude" }.into(),
+            queued_at: (i % 3 != 0).then(|| t(100 - i)),
+            start_time: Some(t(50 + i)),
+            ..Session::default()
+        })
+        .collect();
+    sort_group_members(&mut members);
+    let queued: Vec<bool> = members.iter().map(|m| m.queued_at.is_some()).collect();
+    let first_legacy = queued.iter().position(|q| !q).unwrap();
+    assert!(queued[first_legacy..].iter().all(|q| !q), "{queued:?}");
+    assert!(
+        members[..first_legacy]
+            .windows(2)
+            .all(|w| w[0].queued_at <= w[1].queued_at)
+    );
 }

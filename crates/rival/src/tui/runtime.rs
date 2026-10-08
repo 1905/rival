@@ -207,7 +207,7 @@ fn check_input() -> Result<(), String> {
         .map_err(|e| {
             format!(
                 "bubbletea: error opening TTY: bubbletea: could not open TTY: open /dev/tty: {}",
-                rival_core::gostd::os_error_text(&e)
+                e
             )
         })
 }
@@ -858,12 +858,7 @@ pub struct TerminalScreen {
 
 impl Screen for TerminalScreen {
     fn enter(&mut self) -> Result<(), String> {
-        terminal::enable_raw_mode().map_err(|e| {
-            format!(
-                "error entering raw mode: {}",
-                rival_core::gostd::os_error_text(&e)
-            )
-        })?;
+        terminal::enable_raw_mode().map_err(|e| format!("error entering raw mode: {}", e))?;
         self.raw = true;
         self.alt = true;
         // Go ignores renderer write errors too.

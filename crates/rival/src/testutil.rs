@@ -30,28 +30,36 @@ pub fn json_answer_log() -> String {
     )
 }
 
-/// Go's `syscall.Errno` text for the OS errors the fixtures provoke. Windows
-/// prints the English `FormatMessage` text.
+/// The `io::Error` text for the OS errors the fixtures provoke. Windows
+/// prints the English system message.
 pub const NO_SUCH_FILE: &str = if cfg!(windows) {
-    "The system cannot find the file specified."
+    "The system cannot find the file specified. (os error 2)"
 } else {
-    "no such file or directory"
+    "No such file or directory (os error 2)"
 };
 
 /// A missing parent directory: ENOENT on Unix, `ERROR_PATH_NOT_FOUND` on
 /// Windows.
 pub const NO_SUCH_PATH: &str = if cfg!(windows) {
-    "The system cannot find the path specified."
+    "The system cannot find the path specified. (os error 3)"
 } else {
-    "no such file or directory"
+    "No such file or directory (os error 2)"
 };
 
 /// A write to a closed standard handle: EBADF on Unix,
 /// `ERROR_INVALID_HANDLE` on Windows.
 pub const CLOSED_HANDLE: &str = if cfg!(windows) {
-    "The handle is invalid."
+    "The handle is invalid. (os error 6)"
 } else {
-    "bad file descriptor"
+    "Bad file descriptor (os error 9)"
+};
+
+/// The failed step and its text when a directory is read as a file. On Unix
+/// the open works and the read fails. On Windows the open fails.
+pub const DIR_AS_FILE: (&str, &str) = if cfg!(windows) {
+    ("open", "Access is denied. (os error 5)")
+} else {
+    ("read", "Is a directory (os error 21)")
 };
 
 /// The OS error behind [`CLOSED_HANDLE`].

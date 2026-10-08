@@ -869,12 +869,12 @@ fn prepare_fails_closed() {
             let err = assert_err(got);
             let want: &str = match name {
                 "api" => {
-                    "resolve MR via glab: exit status 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+                    "resolve MR via glab: exit status: 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
                 }
                 "json" => "decode GitLab MR: ",
                 "wrong-mr" | "wrong-project" => no_mr,
                 "missing-base" | "stale-head" => stale,
-                "missing-object" => "prepare MR checkout: git fetch: exit status ",
+                "missing-object" => "prepare MR checkout: git fetch: exit status: ",
                 "wrong-remote" => {
                     "no Git remote matches MR project gitlab.example.com/group/sub/app; use --workdir for that repository (or add its target remote for a fork MR)"
                 }
@@ -898,7 +898,7 @@ fn prepare_fails_closed() {
 
 // ---- process launch ----
 
-/// Go reports `exec format error` for a shebang-less glab; it never falls
+/// A shebang-less glab is an `Exec format error`; it never falls
 /// back to `/bin/sh`.
 #[test]
 fn glab_without_shebang_is_exec_format_error() {
@@ -912,7 +912,7 @@ fn glab_without_shebang_is_exec_format_error() {
     assert_eq!(
         err,
         format!(
-            "resolve MR via glab: fork/exec {}: exec format error; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)",
+            "resolve MR via glab: start {}: Exec format error (os error 8); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)",
             glab.display()
         )
     );
@@ -932,7 +932,7 @@ fn git_without_shebang_is_exec_format_error() {
     assert_eq!(
         err,
         format!(
-            "MR review requires a local repository with a remote for the target project: git remote: fork/exec {}: exec format error",
+            "MR review requires a local repository with a remote for the target project: git remote: start {}: Exec format error (os error 8)",
             git.display()
         )
     );
@@ -947,7 +947,7 @@ fn missing_tools_and_workdir_report_go_errors() {
     assert_eq!(
         err,
         format!(
-            "MR review requires a local repository with a remote for the target project: git remote: chdir {}: no such file or directory",
+            "MR review requires a local repository with a remote for the target project: git remote: chdir {}: No such file or directory (os error 2)",
             missing.display()
         )
     );
@@ -998,7 +998,7 @@ fn cancel_kills_running_glab() {
     );
     assert_eq!(
         err,
-        "resolve MR via glab: signal: killed; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+        "resolve MR via glab: signal: 9 (SIGKILL); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
     );
     assert!(f.snapshot_entries().is_empty());
 }
@@ -1042,7 +1042,7 @@ fn cancel_during_fetch_removes_the_checkout() {
         "cancel did not stop git fetch"
     );
     assert_eq!(during.len(), 1, "no checkout during the fetch: {during:?}");
-    assert_eq!(err, "prepare MR checkout: git fetch: signal: killed");
+    assert_eq!(err, "prepare MR checkout: git fetch: signal: 9 (SIGKILL)");
     assert!(
         f.snapshot_entries().is_empty(),
         "leaked checkout after a cancelled fetch: {:?}",

@@ -13,7 +13,6 @@ use super::oscmd::{self, Output};
 use super::process;
 use super::subprocess::{Request, RunResult, io_text};
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::logging;
 use crate::session::Session;
 
@@ -119,7 +118,7 @@ pub(crate) fn run_claude_docker_with(
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
-        bail!("unsupported Claude Code model {}", quote(model));
+        bail!("unsupported Claude Code model {:?}", model);
     }
     let token = cfg.getenv(config::CLAUDE_DOCKER_TOKEN_ENV);
     if token.is_empty() {
@@ -239,11 +238,7 @@ fn remove_container(cfg: &Config, name: &str, timeout: std::time::Duration) {
             let _ = err.read_to_string(&mut text);
         }
         if !text.contains("No such container") {
-            warn(&format!(
-                "{}: {}",
-                oscmd::exit_status_text(status),
-                text.trim()
-            ));
+            warn(&format!("{}: {}", status, text.trim()));
         }
     }
 }

@@ -22,7 +22,6 @@ use std::sync::Arc;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
-use rival_core::gostd;
 use rival_core::logfmt;
 use rival_core::result::{Finding, RunResult, SEVERITY_NAMES, SeverityGroup, severity_rank};
 use rival_core::session::Session;
@@ -116,7 +115,7 @@ pub fn load_result(req: ResultRequest, read_tail: ReadTail) -> ResultResponse {
                 &String::from_utf8_lossy(&data),
             )),
         },
-        Err(e) => ResultOutcome::Failed(format!("open {path}: {}", gostd::os_error_text(&e))),
+        Err(e) => ResultOutcome::Failed(format!("open {path}: {}", e)),
     };
     let outcome = match file_state(path) {
         // Let the read report the error, as the Raw tab does.

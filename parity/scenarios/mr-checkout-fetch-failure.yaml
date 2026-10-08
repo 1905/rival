@@ -1,6 +1,6 @@
 {
   "name": "mr-checkout-fetch-failure",
-  "description": "Derived from mr-review-success. glab returns the MR with sha = diff_refs.head_sha = a well-formed SHA that the remote does not have, so internal/mergerequest/mergerequest.go Prepare passes the identity and diff-ref checks, creates $TMPDIR/rival-mr-N (os.MkdirTemp), runs git init and remote add, and `git fetch ... origin <base> <head>` fails. git() wraps it as 'git fetch: exit status 128' (stderr only in ExitError); Prepare returns 'prepare MR checkout: ...' and its deferred snapshot.Close removes the checkout. cmd/model_command.go prepareReview fails before any session or queue work, so only `codex login status` ran. expect.dirs proves tmp/ exists and is empty.",
+  "description": "Derived from mr-review-success. glab returns the MR with sha = diff_refs.head_sha = a well-formed SHA that the remote does not have, so internal/mergerequest/mergerequest.go Prepare passes the identity and diff-ref checks, creates $TMPDIR/rival-mr-N (os.MkdirTemp), runs git init and remote add, and `git fetch ... origin <base> <head>` fails. git() wraps it as 'git fetch: exit status: 128' (stderr only in ExitError); Prepare returns 'prepare MR checkout: ...' and its deferred snapshot.Close removes the checkout. cmd/model_command.go prepareReview fails before any session or queue work, so only `codex login status` ran. expect.dirs proves tmp/ exists and is empty.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -163,7 +163,7 @@
         "exit_code": 1,
         "stdout": "",
         "stderr_lines": [
-          "prepare MR checkout: git fetch: exit status 128"
+          "prepare MR checkout: git fetch: exit status: 128"
         ],
         "log_events": []
       }

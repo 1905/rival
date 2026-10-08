@@ -12,7 +12,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gostd;
 use rival_core::session::{self, Session};
 use rival_core::sessionview;
 
@@ -317,7 +316,8 @@ pub fn status_glyph<'a>(status: &str, spin: &'a str) -> &'a str {
 
 /// Splits a filter into lowercase, AND-ed terms.
 pub fn filter_terms(filter: &str) -> Vec<String> {
-    gostd::to_lower(filter)
+    filter
+        .to_lowercase()
         .split_whitespace()
         .map(str::to_string)
         .collect()
@@ -330,7 +330,7 @@ pub fn matches_filter(item: &DisplayItem, hay: &mut Option<String>, terms: &[Str
     if terms.is_empty() {
         return true;
     }
-    let hay = hay.get_or_insert_with(|| gostd::to_lower(&filter_haystack(item)));
+    let hay = hay.get_or_insert_with(|| filter_haystack(item).to_lowercase());
     terms.iter().all(|t| hay.contains(t.as_str()))
 }
 
@@ -891,10 +891,7 @@ impl ListPane {
     /// Explains an empty body.
     pub fn empty_message(&self) -> String {
         if !self.filter.is_empty() {
-            return format!(
-                "no runs match {} · esc clears",
-                gostd::quote(&self.filter.value())
-            );
+            return format!("no runs match {:?} · esc clears", self.filter.value());
         }
         if self.tab != StatusTab::All {
             return format!("no {} runs", self.tab.label().to_lowercase());

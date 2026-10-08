@@ -88,7 +88,7 @@
         "exit_code": 1,
         "stdout": "",
         "stderr_lines": [
-          "resolve MR via glab: exit status 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+          "resolve MR via glab: exit status: 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
         ],
         "log_events": []
       }

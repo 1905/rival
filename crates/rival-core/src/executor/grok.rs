@@ -14,7 +14,6 @@ use super::process;
 use super::subprocess::{Request, RunResult, io_text, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::logging;
 use crate::paths;
 use crate::session::Session;
@@ -248,9 +247,9 @@ pub fn grok_effort(effort: &str) -> anyhow::Result<String> {
         "minimal" | "none" => Ok("low".to_string()),
         "" => bail!("effort is required for {}", config::GROK_LABEL),
         _ => bail!(
-            "unsupported {} effort {}; use one of: low, medium, high",
+            "unsupported {} effort {:?}; use one of: low, medium, high",
             config::GROK_LABEL,
-            quote(effort)
+            effort
         ),
     }
 }

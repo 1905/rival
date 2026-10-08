@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use rival_core::config::Config;
 use rival_core::executor::look_path;
 use rival_core::paths::{self, HOME_VAR};
-use rival_core::{gostd, skills};
+use rival_core::skills;
 use sha2::{Digest, Sha256};
 
 use crate::root::{CmdEnv, CmdError};
@@ -107,8 +107,8 @@ pub fn skill_targets(
         "codex" => Ok(vec![codex()]),
         "all" => Ok(vec![claude(), codex()]),
         _ => Err(format!(
-            "unknown install target {}; use auto, claude, codex, or all",
-            gostd::quote(target)
+            "unknown install target {:?}; use auto, claude, codex, or all",
+            target
         )),
     }
 }
@@ -209,7 +209,7 @@ fn install_skills_with(
             // so far are the answer.
             let mut line = Vec::new();
             let _ = reader.read_until(b'\n', &mut line);
-            let answer = gostd::to_lower(&String::from_utf8_lossy(&line));
+            let answer = String::from_utf8_lossy(&line).to_lowercase();
             let answer = answer.trim();
             if answer != "y" && answer != "yes" {
                 let _ = writeln!(out, "    skipped");
@@ -317,7 +317,7 @@ fn read_embedded_skill(name: &str) -> Result<(Vec<u8>, String), String> {
 
 /// Go `os.ReadFile`, with its `*PathError` text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let mut file = gostd::open_file(path).map_err(|e| path_error("open", path, &e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| path_error("open", path, &e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| path_error("read", path, &e))?;
@@ -359,7 +359,7 @@ fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
 
 /// Go `*fs.PathError` text: `<op> <path>: <errno text>`.
 fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
-    format!("{op} {}: {}", path.display(), gostd::os_error_text(err))
+    format!("{op} {}: {}", path.display(), err)
 }
 
 /// Go `parseVersion`: the `version:` field of the YAML frontmatter, which

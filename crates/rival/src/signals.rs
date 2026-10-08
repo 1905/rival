@@ -163,7 +163,7 @@ mod windows {
             if unsafe { SetConsoleCtrlHandler(Some(handler), 1) } == 0 {
                 return Err(format!(
                     "SetConsoleCtrlHandler: {}",
-                    rival_core::gostd::os_error_text(&std::io::Error::last_os_error())
+                    std::io::Error::last_os_error()
                 ));
             }
             st.installed = true;
@@ -230,7 +230,7 @@ mod unix {
     }
 
     fn io_err(what: &str, err: &io::Error) -> String {
-        format!("{what}: {}", rival_core::gostd::os_error_text(err))
+        format!("{what}: {}", err)
     }
 
     extern "C" fn on_signal(sig: libc::c_int) {
@@ -618,7 +618,7 @@ mod tests {
         assert_eq!(
             report,
             "limited=true restored=true\n\
-             err=pipe: too many open files\n\
+             err=pipe: Too many open files (os error 24)\n\
              handler_installed=false dispositions_kept=true idle=true\n\
              fds_leaked=false\n\
              retry_installed=true\n\

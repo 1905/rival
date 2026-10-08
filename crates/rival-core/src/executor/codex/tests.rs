@@ -74,7 +74,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
         .unwrap_err();
         assert_eq!(
             err.to_string(),
-            format!("unsupported codex model {}", quote(model))
+            format!("unsupported codex model {:?}", model)
         );
         assert!(seen.is_none(), "{model}: spawned");
     }

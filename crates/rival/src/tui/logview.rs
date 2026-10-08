@@ -11,7 +11,6 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use rival_core::gostd;
 use rival_core::logfmt;
 use rival_core::session::Session;
 
@@ -87,8 +86,8 @@ pub fn read_log_lines(
     if last_n > 0 {
         max_bytes = max_bytes.min(PREVIEW_TAIL_BYTES);
     }
-    let (data, truncated) = read_tail(Path::new(path), max_bytes)
-        .map_err(|e| format!("open {path}: {}", gostd::os_error_text(&e)))?;
+    let (data, truncated) =
+        read_tail(Path::new(path), max_bytes).map_err(|e| format!("open {path}: {}", e))?;
     if data.is_empty() {
         return Ok(LogLines::default());
     }
@@ -371,11 +370,7 @@ pub fn create_group_log_view<S: AsRef<Session>>(dir: &Path, sessions: &[S]) -> i
         match fs::read(&s.log_file) {
             Err(e) => {
                 if s.error_msg.is_empty() {
-                    let msg = format!(
-                        "(log unavailable: open {}: {})\n",
-                        s.log_file,
-                        gostd::os_error_text(&e)
-                    );
+                    let msg = format!("(log unavailable: open {}: {})\n", s.log_file, e);
                     content.extend_from_slice(msg.as_bytes());
                 }
             }

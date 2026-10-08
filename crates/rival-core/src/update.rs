@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::config::Config;
+use crate::json;
 use crate::paths::Paths;
-use crate::{gostd, json};
 
 #[cfg(test)]
 mod tests;
@@ -164,7 +164,7 @@ pub fn fetch_latest(url: &str) -> Result<String, String> {
     let mut resp = agent
         .get(url)
         .call()
-        .map_err(|e| format!("Get {}: {e}", gostd::quote(url)))?;
+        .map_err(|e| format!("Get {:?}: {e}", url))?;
     let status = resp.status().as_u16();
     if status != 200 {
         return Err(format!("status {status}"));

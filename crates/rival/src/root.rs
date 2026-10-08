@@ -108,8 +108,7 @@ impl StdinSource for ProcessStdin {
     }
 
     fn read_all(&mut self) -> Result<Vec<u8>, String> {
-        let text =
-            |e: &io::Error| format!("read /dev/stdin: {}", rival_core::gostd::os_error_text(e));
+        let text = |e: &io::Error| format!("read /dev/stdin: {}", e);
         if startup_fds::closed_at_start(0) {
             return Err(text(&io::Error::from_raw_os_error(libc::EBADF)));
         }

@@ -627,10 +627,7 @@ fn ints_parse_like_strconv_base_zero() {
     for v in ["", "x", "08", "0x", "1__0", "_1", "1_", "--1", "1.5"] {
         assert_eq!(
             parse_int(v),
-            Err(format!(
-                "strconv.ParseInt: parsing {}: invalid syntax",
-                gostd::quote(v)
-            )),
+            Err(format!("strconv.ParseInt: parsing {:?}: invalid syntax", v)),
             "{v}"
         );
     }
@@ -642,8 +639,8 @@ fn ints_parse_like_strconv_base_zero() {
         assert_eq!(
             parse_int(v),
             Err(format!(
-                "strconv.ParseInt: parsing {}: value out of range",
-                gostd::quote(v)
+                "strconv.ParseInt: parsing {:?}: value out of range",
+                v
             )),
             "{v}"
         );

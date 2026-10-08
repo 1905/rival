@@ -12,7 +12,6 @@ use super::oscmd::{self, Output};
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::session::Session;
 
 /// Go `CodexPreflightFor`: checks that codex is installed and authenticated,
@@ -63,7 +62,7 @@ pub(crate) fn run_codex_model_with(
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CODEX_MODEL {
-        bail!("unsupported codex model {}", quote(model));
+        bail!("unsupported codex model {:?}", model);
     }
     let args = codex_run_args(model, effort, workdir);
 

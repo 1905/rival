@@ -186,7 +186,7 @@ fn max_run_wait() {
         (35 * MIN).as_nanos() as i64,
         "run timeout disabled → queue + margin only"
     );
-    assert_eq!(gostd::format_duration(95 * 60 * 1_000_000_000), "1h35m0s");
+    assert_eq!(duration::format(95 * 60 * 1_000_000_000), "1h35m0s");
 }
 
 #[test]
@@ -845,14 +845,12 @@ fn load_user_config_reports_unreadable_config_path() {
         .expect("directory at config path was silently ignored");
     let shown = path.display().to_string();
     assert!(err.to_string().contains(&format!("read {shown}")), "{err}");
-    // Go: os.ReadFile wraps the read(2) failure in a *PathError. On Windows
-    // Go's syscall.Open opens the directory too; ReadFile then fails.
+    // On Unix the directory opens and the read fails. On Windows the open
+    // fails.
+    let (op, text) = crate::errtext::DIR_AS_FILE;
     assert_eq!(
         err.to_string(),
-        format!(
-            "read {shown}: read {shown}: {}",
-            crate::gostd::errtext::IS_A_DIRECTORY
-        )
+        format!("read {shown}: {op} {shown}: {text}")
     );
 }
 

@@ -8,8 +8,8 @@ use rival_core::cancel::Context;
 use rival_core::config::{
     self, CLAUDE_LABEL, CLAUDE_MODEL, CODEX_LABEL, CODEX_MODEL, Config, VALID_EFFORTS,
 };
+use rival_core::paths;
 use rival_core::review::{self, PlanRunResult, ReviewBatch};
-use rival_core::{gostd, paths};
 
 use crate::root::{CmdEnv, CmdError};
 use crate::tree::Invocation;
@@ -146,10 +146,7 @@ pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
     if crate::root::is_nil_file(e) {
         return CmdError::plain(format!("write stdout: {e}"));
     }
-    CmdError::plain(format!(
-        "write stdout: write /dev/stdout: {}",
-        gostd::os_error_text(e)
-    ))
+    CmdError::plain(format!("write stdout: write /dev/stdout: {}", e))
 }
 
 /// Go `fmt.Errorf("invalid effort %q, must be one of: %v", effort,
@@ -157,8 +154,8 @@ pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
 /// `[low medium …]`.
 pub(crate) fn invalid_flag_effort(effort: &str) -> String {
     format!(
-        "invalid effort {}, must be one of: [{}]",
-        gostd::quote(effort),
+        "invalid effort {:?}, must be one of: [{}]",
+        effort,
         VALID_EFFORTS.join(" ")
     )
 }
@@ -170,15 +167,15 @@ pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = Vec::new();
     for value in raw {
         for part in value.split(',') {
-            let model = gostd::to_lower(part.trim());
+            let model = part.trim().to_lowercase();
             let cli = match model.as_str() {
                 CODEX_LABEL | CODEX_MODEL => "codex",
                 CLAUDE_LABEL | CLAUDE_MODEL => "claude",
                 "" => return Err("model selector cannot be empty".to_string()),
                 _ => {
                     return Err(format!(
-                        "unknown plan model {}; use one of: codex, claude",
-                        gostd::quote(part)
+                        "unknown plan model {:?}; use one of: codex, claude",
+                        part
                     ));
                 }
             };
@@ -205,9 +202,8 @@ pub(crate) fn merge_plan_effort(
     }
     if flag_set && input_effort != flag_effort {
         return Err(format!(
-            "reasoning effort conflicts: command uses {} but plan arguments request {}",
-            gostd::quote(flag_effort),
-            gostd::quote(input_effort)
+            "reasoning effort conflicts: command uses {:?} but plan arguments request {:?}",
+            flag_effort, input_effort
         ));
     }
     Ok(input_effort.to_string())
@@ -231,8 +227,8 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     if name != "-re" && name != "--effort" {
         if option.starts_with('-') {
             return Err(format!(
-                "unknown plan option {}; use -re/--effort or -- before a path beginning with '-'",
-                gostd::quote(option)
+                "unknown plan option {:?}; use -re/--effort or -- before a path beginning with '-'",
+                option
             ));
         }
         return Ok((s.to_string(), String::new()));
@@ -252,8 +248,8 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     }
     if !config::is_valid_effort(effort) {
         return Err(format!(
-            "invalid effort {}, must be one of: {}",
-            gostd::quote(effort),
+            "invalid effort {:?}, must be one of: {}",
+            effort,
             VALID_EFFORTS.join(", ")
         ));
     }
@@ -335,8 +331,8 @@ pub(crate) fn resolve_plan_path(
 
     let Some(abs) = paths::abs(cwd, Path::new(&p)) else {
         return Err(format!(
-            "resolve plan path {}: {}",
-            gostd::quote(raw_path),
+            "resolve plan path {:?}: {}",
+            raw_path,
             getwd_error()
         ));
     };
@@ -350,7 +346,7 @@ pub(crate) fn resolve_plan_path(
         Err(e) => {
             return Err(format!(
                 "cannot read plan file {abs}: {STAT_OP} {abs}: {}",
-                gostd::os_error_text(&e)
+                e
             ));
         }
         Ok(meta) => meta,
@@ -364,10 +360,7 @@ pub(crate) fn resolve_plan_path(
     // Confirm the file is readable now, so an unreadable file fails here
     // with a clear message rather than later inside a model runner.
     if let Err(e) = std::fs::File::open(&abs) {
-        return Err(format!(
-            "cannot read plan file {abs}: open {abs}: {}",
-            gostd::os_error_text(&e)
-        ));
+        return Err(format!("cannot read plan file {abs}: open {abs}: {}", e));
     }
     Ok(abs)
 }

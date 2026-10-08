@@ -14,7 +14,6 @@ use super::oscmd;
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config, SecurityModel};
-use crate::gostd::quote;
 use crate::session::Session;
 
 /// Go `OpencodePreflightModel`: validates K3, Rival's sole OpenCode-backed
@@ -22,7 +21,7 @@ use crate::session::Session;
 /// [`Config::kimi_api_key_from`]); pass "" when no workdir context exists.
 pub fn opencode_preflight_model(cfg: &Config, model: &str, workdir: &str) -> anyhow::Result<()> {
     let Some(entry) = config::open_code_entry_for(model) else {
-        bail!("unsupported OpenCode model {}", quote(model));
+        bail!("unsupported OpenCode model {:?}", model);
     };
     opencode_preflight_entry(cfg, &entry, workdir)
 }
@@ -181,7 +180,7 @@ pub(crate) fn run_opencode_model_with(
         model
     };
     let Some(entry) = config::open_code_entry_for(model) else {
-        bail!("unsupported OpenCode model {}", quote(model));
+        bail!("unsupported OpenCode model {:?}", model);
     };
     run_opencode_entry_with(cfg, sess, prompt, effort, workdir, &entry, opts, spawn)
 }

@@ -6,8 +6,6 @@
 
 use include_dir::{Dir, include_dir};
 
-use crate::gostd;
-
 #[cfg(test)]
 mod tests;
 
@@ -108,7 +106,7 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
             "security",
             "First run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Pass the user's scope verbatim; empty input reviews git-detected changes. The model is selected by security.reviewer in Rival's configuration.",
         ),
-        _ => return Err(format!("no Codex skill for {}", gostd::quote(name))),
+        _ => return Err(format!("no Codex skill for {:?}", name)),
     };
     let mut content = format!(
         "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: {version}\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"

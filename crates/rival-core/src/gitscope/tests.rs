@@ -311,7 +311,7 @@ fn git_cmd_env_argv_and_pwd_follow_go() {
     // A failing git is an error with Go's exit text.
     write_exe(&bin.path().join("git"), "#!/bin/sh\necho out\nexit 3\n");
     let got = retry_busy(|| git_cmd(&cfg, "", &["x"]));
-    assert_eq!(got.unwrap_err(), "exit status 3");
+    assert_eq!(got.unwrap_err(), "exit status: 3");
 }
 
 /// Linux ETXTBSY: another test thread may fork while a fake is open for

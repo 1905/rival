@@ -15,9 +15,9 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::config::Config;
-use crate::executor::oscmd::{exit_status_text, look_path};
+use crate::executor::oscmd::{fork_error, look_path};
 use crate::executor::process::{self, set_exec};
-use crate::executor::subprocess::{dedup_env, spawn_error_text};
+use crate::executor::subprocess::dedup_env;
 use crate::paths;
 
 /// Detects which files to review based on git state.
@@ -128,8 +128,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
         env.push(kv);
     }
     let env = dedup_env(&env)?;
-    let fork_error =
-        |e: &std::io::Error| format!("fork/exec {}: {}", path.display(), spawn_error_text(e));
+    let fork_error = |e: &std::io::Error| fork_error(&path, e);
 
     let program = process::program_in_dir(&path, Path::new(workdir)).map_err(|e| fork_error(&e))?;
     let mut cmd = Command::new(program);
@@ -145,7 +144,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
         .and_then(std::process::Child::wait_with_output)
         .map_err(|e| fork_error(&e))?;
     if !out.status.success() {
-        return Err(exit_status_text(out.status));
+        return Err(out.status.to_string());
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }

@@ -10,10 +10,10 @@ use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 
 use super::process;
-use super::subprocess::{dedup_env, getenv, io_text, spawn_error_text};
+use super::subprocess::{dedup_env, getenv, io_text};
 use crate::config::Config;
 
 /// The `$PATH` that Go's `exec.LookPath` reads: the first `PATH=` entry of
@@ -39,9 +39,9 @@ pub(crate) enum Output {
 }
 
 /// Go `exec.Command(name, args...)` plus `Run` or `CombinedOutput`. Returns
-/// the captured output (empty unless [`Output::Combined`]) and Go's error
-/// text: the `LookPath` error, `fork/exec <path>: <errno>`, or the exit
-/// status (`exit status 1`). stdin is the null device.
+/// the captured output (empty unless [`Output::Combined`]) and the error
+/// text: the `LookPath` error, `start <path>: <io error>`, or the exit
+/// status (`exit status: 1`). stdin is the null device.
 pub(crate) fn run(
     cfg: &Config,
     name: &str,
@@ -56,8 +56,7 @@ pub(crate) fn run(
         Ok(env) => env,
         Err(e) => return (Vec::new(), Err(e)),
     };
-    let fork_error =
-        |e: &io::Error| format!("fork/exec {}: {}", path.display(), spawn_error_text(e));
+    let fork_error = |e: &io::Error| fork_error(&path, e);
     let mut cmd = Command::new(&path);
     if let Err(e) = process::set_exec(&mut cmd, &path, name, args, &env) {
         return (Vec::new(), Err(fork_error(&e)));
@@ -104,7 +103,7 @@ pub(crate) fn run(
             Some(e) => Err(format!("read |0: {}", io_text(&e))),
             None => Ok(()),
         },
-        Ok(status) => Err(exit_status_text(status)),
+        Ok(status) => Err(status.to_string()),
     };
     (captured, result)
 }
@@ -143,9 +142,9 @@ fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
     look_extensions(name, "", &LookEnv::process()).map_err(|e| e.to_string())
 }
 
-/// Go's `Start` error: `fork/exec <path>: <errno text>`.
+/// The error text of a failed start: `start <path>: <io error>`.
 pub fn fork_error(path: &std::path::Path, e: &io::Error) -> String {
-    format!("fork/exec {}: {}", path.display(), spawn_error_text(e))
+    format!("start {}: {e}", path.display())
 }
 
 /// Two handles on this process's stderr, for a child's stdout and stderr.
@@ -166,132 +165,6 @@ fn stderr_stdio() -> io::Result<(Stdio, Stdio)> {
     let handle2 = handle.try_clone()?;
     Ok((Stdio::from(handle), Stdio::from(handle2)))
 }
-
-/// Go `(*exec.ExitError).Error()`: `exit status N`, or `signal: <name>`.
-/// Windows prints an exit code of `1<<16` or more in hex (`0xc0000005`).
-pub fn exit_status_text(status: ExitStatus) -> String {
-    #[cfg(windows)]
-    if let Some(code) = status.code() {
-        return windows_exit_text(code as u32);
-    }
-    #[cfg(not(windows))]
-    if let Some(code) = status.code() {
-        return format!("exit status {code}");
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        if let Some(sig) = status.signal() {
-            let mut text = format!("signal: {}", signal_name(sig));
-            if status.core_dumped() {
-                text.push_str(" (core dumped)");
-            }
-            return text;
-        }
-    }
-    format!("exit status {status}")
-}
-
-/// Go `ProcessState.String` on Windows for exit code `code` (the `uint32`
-/// from `GetExitCodeProcess`): decimal below `1<<16`, else `0x` hex.
-pub fn windows_exit_text(code: u32) -> String {
-    if code >= 1 << 16 {
-        format!("exit status {code:#x}")
-    } else {
-        format!("exit status {code}")
-    }
-}
-
-/// Go's `syscall.Signal.String()`: the per-OS `signals` table from
-/// `zerrors_<os>_<arch>.go` (Go 1.25), else `signal N`.
-#[cfg(unix)]
-fn signal_name(sig: i32) -> String {
-    usize::try_from(sig)
-        .ok()
-        .and_then(|i| GO_SIGNALS.get(i))
-        .filter(|name| !name.is_empty())
-        .map_or_else(|| format!("signal {sig}"), |name| name.to_string())
-}
-
-/// Go `syscall.signals` on darwin (`zerrors_darwin_arm64.go`).
-#[cfg(target_os = "macos")]
-const GO_SIGNALS: [&str; 32] = [
-    "",
-    "hangup",
-    "interrupt",
-    "quit",
-    "illegal instruction",
-    "trace/BPT trap",
-    "abort trap",
-    "EMT trap",
-    "floating point exception",
-    "killed",
-    "bus error",
-    "segmentation fault",
-    "bad system call",
-    "broken pipe",
-    "alarm clock",
-    "terminated",
-    "urgent I/O condition",
-    "suspended (signal)",
-    "suspended",
-    "continued",
-    "child exited",
-    "stopped (tty input)",
-    "stopped (tty output)",
-    "I/O possible",
-    "cputime limit exceeded",
-    "filesize limit exceeded",
-    "virtual timer expired",
-    "profiling timer expired",
-    "window size changes",
-    "information request",
-    "user defined signal 1",
-    "user defined signal 2",
-];
-
-/// Go `syscall.signals` on linux (`zerrors_linux_amd64.go`; arm64 is the
-/// same table).
-#[cfg(target_os = "linux")]
-const GO_SIGNALS: [&str; 32] = [
-    "",
-    "hangup",
-    "interrupt",
-    "quit",
-    "illegal instruction",
-    "trace/breakpoint trap",
-    "aborted",
-    "bus error",
-    "floating point exception",
-    "killed",
-    "user defined signal 1",
-    "segmentation fault",
-    "user defined signal 2",
-    "broken pipe",
-    "alarm clock",
-    "terminated",
-    "stack fault",
-    "child exited",
-    "continued",
-    "stopped (signal)",
-    "stopped",
-    "stopped (tty input)",
-    "stopped (tty output)",
-    "urgent I/O condition",
-    "CPU time limit exceeded",
-    "file size limit exceeded",
-    "virtual timer expired",
-    "profiling timer expired",
-    "window changed",
-    "I/O possible",
-    "power failure",
-    "bad system call",
-];
-
-/// Other Unix targets are not release platforms: every signal prints as
-/// `signal N`.
-#[cfg(all(unix, not(any(target_os = "macos", target_os = "linux"))))]
-const GO_SIGNALS: [&str; 0] = [];
 
 /// Go `os.TempDir()`: on Unix `$TMPDIR`, else `/tmp`.
 #[cfg(not(windows))]
@@ -531,7 +404,7 @@ mod tests {
             assert!(captured.is_empty());
             assert_eq!(
                 err.unwrap_err(),
-                format!("fork/exec {}: exec format error", script.display())
+                format!("start {}: Exec format error (os error 8)", script.display())
             );
         }
         assert!(!marker.exists(), "the file ran through a shell");
@@ -591,90 +464,27 @@ mod tests {
         assert!(out.is_empty());
         assert_eq!(
             err.unwrap_err(),
-            format!("fork/exec {}: invalid argument", sh.display())
+            format!("start {}: Invalid argument (os error 22)", sh.display())
         );
     }
 
+    /// The exit text is std's `ExitStatus` text. Raw wait statuses: exit
+    /// code in bits 8-15, a signal in bits 0-6, 0x80 = core dumped. No
+    /// process is signalled.
     #[cfg(unix)]
     #[test]
-    fn exit_status_text_matches_go_signal_tables() {
+    fn exit_status_text_is_the_std_text() {
         use std::os::unix::process::ExitStatusExt;
-        // Raw wait statuses: exit code in bits 8-15, a signal in bits 0-6,
-        // 0x80 = core dumped. No process is signalled.
+        use std::process::ExitStatus;
+        assert_eq!(ExitStatus::from_raw(3 << 8).to_string(), "exit status: 3");
         assert_eq!(
-            exit_status_text(ExitStatus::from_raw(3 << 8)),
-            "exit status 3"
+            ExitStatus::from_raw(libc::SIGKILL).to_string(),
+            "signal: 9 (SIGKILL)"
         );
         assert_eq!(
-            exit_status_text(ExitStatus::from_raw(libc::SIGKILL)),
-            "signal: killed"
+            ExitStatus::from_raw(libc::SIGSEGV | 0x80).to_string(),
+            "signal: 11 (SIGSEGV) (core dumped)"
         );
-        assert_eq!(
-            exit_status_text(ExitStatus::from_raw(libc::SIGSEGV | 0x80)),
-            "signal: segmentation fault (core dumped)"
-        );
-        assert_eq!(signal_name(0), "signal 0");
-        assert_eq!(signal_name(-1), "signal -1");
-        assert_eq!(signal_name(64), "signal 64");
-        #[cfg(target_os = "macos")]
-        let want = [
-            (libc::SIGTRAP, "trace/BPT trap"),
-            (libc::SIGABRT, "abort trap"),
-            (libc::SIGEMT, "EMT trap"),
-            (libc::SIGBUS, "bus error"),
-            (libc::SIGSYS, "bad system call"),
-            (libc::SIGTSTP, "suspended"),
-            (libc::SIGXCPU, "cputime limit exceeded"),
-            (libc::SIGWINCH, "window size changes"),
-            (libc::SIGINFO, "information request"),
-            (libc::SIGUSR1, "user defined signal 1"),
-            (libc::SIGUSR2, "user defined signal 2"),
-            (31, "user defined signal 2"),
-            (32, "signal 32"),
-        ];
-        #[cfg(target_os = "linux")]
-        let want = [
-            (libc::SIGTRAP, "trace/breakpoint trap"),
-            (libc::SIGABRT, "aborted"),
-            (libc::SIGBUS, "bus error"),
-            (libc::SIGSTKFLT, "stack fault"),
-            (libc::SIGSYS, "bad system call"),
-            (libc::SIGTSTP, "stopped"),
-            (libc::SIGXCPU, "CPU time limit exceeded"),
-            (libc::SIGWINCH, "window changed"),
-            (libc::SIGPWR, "power failure"),
-            (libc::SIGUSR1, "user defined signal 1"),
-            (libc::SIGUSR2, "user defined signal 2"),
-            (31, "bad system call"),
-            (32, "signal 32"),
-        ];
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        for (sig, name) in want {
-            assert_eq!(signal_name(sig), name, "signal {sig}");
-        }
-        for (sig, name) in [
-            (libc::SIGHUP, "hangup"),
-            (libc::SIGINT, "interrupt"),
-            (libc::SIGQUIT, "quit"),
-            (libc::SIGILL, "illegal instruction"),
-            (libc::SIGFPE, "floating point exception"),
-            (libc::SIGKILL, "killed"),
-            (libc::SIGSEGV, "segmentation fault"),
-            (libc::SIGPIPE, "broken pipe"),
-            (libc::SIGALRM, "alarm clock"),
-            (libc::SIGTERM, "terminated"),
-            (libc::SIGCHLD, "child exited"),
-            (libc::SIGCONT, "continued"),
-            (libc::SIGTTIN, "stopped (tty input)"),
-            (libc::SIGTTOU, "stopped (tty output)"),
-            (libc::SIGURG, "urgent I/O condition"),
-            (libc::SIGIO, "I/O possible"),
-            (libc::SIGVTALRM, "virtual timer expired"),
-            (libc::SIGPROF, "profiling timer expired"),
-        ] {
-            #[cfg(any(target_os = "macos", target_os = "linux"))]
-            assert_eq!(signal_name(sig), name, "signal {sig}");
-        }
     }
 
     /// The host's temp-dir variable: Go reads `TMPDIR` on Unix and `TMP`
@@ -816,26 +626,17 @@ mod tests {
         assert_eq!(got, want.to_str().unwrap());
     }
 
-    #[test]
-    fn windows_exit_text_uses_hex_above_16_bits() {
-        assert_eq!(windows_exit_text(0), "exit status 0");
-        assert_eq!(windows_exit_text(3), "exit status 3");
-        assert_eq!(windows_exit_text(0xffff), "exit status 65535");
-        assert_eq!(windows_exit_text(1 << 16), "exit status 0x10000");
-        assert_eq!(windows_exit_text(0xC000_0005), "exit status 0xc0000005");
-        assert_eq!(windows_exit_text(u32::MAX), "exit status 0xffffffff");
-    }
-
-    /// Raw Windows statuses through the real `ExitStatus`: Go's unsigned
-    /// reading, never a negative code.
+    /// Raw Windows statuses through the real `ExitStatus`: std prints a
+    /// code with the high bit set in hex.
     #[cfg(windows)]
     #[test]
-    fn exit_status_text_matches_go_windows() {
+    fn exit_status_text_is_the_std_windows_text() {
         use std::os::windows::process::ExitStatusExt;
-        assert_eq!(exit_status_text(ExitStatus::from_raw(1)), "exit status 1");
+        use std::process::ExitStatus;
+        assert_eq!(ExitStatus::from_raw(1).to_string(), "exit code: 1");
         assert_eq!(
-            exit_status_text(ExitStatus::from_raw(0xC000_013A)),
-            "exit status 0xc000013a"
+            ExitStatus::from_raw(0xC000_013A).to_string(),
+            "exit code: 0xc000013a"
         );
     }
 
@@ -874,11 +675,7 @@ mod tests {
             err.starts_with(&format!("open {missing}{SEPARATOR}rival-grok-")),
             "{err}"
         );
-        let not_found = if cfg!(windows) {
-            "The system cannot find the path specified."
-        } else {
-            "no such file or directory"
-        };
+        let not_found = crate::errtext::NO_SUCH_PATH;
         assert!(err.ends_with(&format!(".md: {not_found}")), "{err}");
     }
 
@@ -907,11 +704,7 @@ mod tests {
         assert!(name.starts_with(&format!("{d}{SEPARATOR}plain")), "{name}");
 
         let missing = format!("{d}{SEPARATOR}missing");
-        let gone = if cfg!(windows) {
-            "The system cannot find the file specified."
-        } else {
-            "no such file or directory"
-        };
+        let gone = crate::errtext::NO_SUCH_FILE;
         assert_eq!(
             mkdir_temp(&cfg(&[(TMP_VAR, &missing)]), "rival-mr-*").unwrap_err(),
             format!("{STAT_OP} {missing}: {gone}")
@@ -940,7 +733,7 @@ mod tests {
             "{err}"
         );
         #[cfg(unix)]
-        assert!(err.ends_with(": not a directory"), "{err}");
+        assert!(err.ends_with(": Not a directory (os error 20)"), "{err}");
     }
 
     #[cfg(unix)]
@@ -969,13 +762,13 @@ mod tests {
             |r| format!("{:?}", r.1),
         );
         assert_eq!(String::from_utf8(out).unwrap(), "out:a  a\nerr\n");
-        assert_eq!(err.unwrap_err(), "exit status 3");
+        assert_eq!(err.unwrap_err(), "exit status: 3");
 
         let (out, err) = retry_busy(
             || run(&c, "tool", &[], Output::Discard),
             |r| format!("{:?}", r.1),
         );
         assert!(out.is_empty());
-        assert_eq!(err.unwrap_err(), "exit status 3");
+        assert_eq!(err.unwrap_err(), "exit status: 3");
     }
 }

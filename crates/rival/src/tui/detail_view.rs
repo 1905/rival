@@ -16,7 +16,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gostd;
 use rival_core::session::Session;
 
 use super::input::TextInput;
@@ -842,6 +841,14 @@ pub fn info_lines(s: &Session, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     out
 }
 
+/// Lowers `s` one char at a time and keeps the first char of each
+/// lowercase form, so `İ` becomes `i` and the char count does not change.
+fn lower_chars(s: &str) -> String {
+    s.chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
+}
+
 /// The plain text of a styled line.
 fn plain(line: &Line<'_>) -> String {
     line.spans.iter().map(|s| s.content.as_ref()).collect()
@@ -851,14 +858,14 @@ fn plain(line: &Line<'_>) -> String {
 /// ignoring case (Go's per-rune lowering) and styling. An empty query
 /// matches nothing.
 pub fn find_matches(lines: &[Line<'static>], query: &str) -> Vec<usize> {
-    let q = gostd::to_lower(query);
+    let q = lower_chars(query);
     if q.is_empty() {
         return Vec::new();
     }
     lines
         .iter()
         .enumerate()
-        .filter(|(_, l)| gostd::to_lower(&plain(l)).contains(&q))
+        .filter(|(_, l)| lower_chars(&plain(l)).contains(&q))
         .map(|(i, _)| i)
         .collect()
 }
@@ -866,12 +873,13 @@ pub fn find_matches(lines: &[Line<'static>], query: &str) -> Vec<usize> {
 /// Go: `highlightLine`. Gives every case-insensitive occurrence of `query`
 /// the match style. Colours only, so the line keeps its width and text.
 pub fn highlight_line(line: &Line<'static>, query: &str, matched: Style) -> Line<'static> {
-    let q: Vec<char> = gostd::to_lower(query).chars().collect();
+    let q: Vec<char> = lower_chars(query).chars().collect();
     if q.is_empty() {
         return line.clone();
     }
-    // Go lowers rune by rune, so the lowered text has the same char count.
-    let lower: Vec<char> = gostd::to_lower(&plain(line)).chars().collect();
+    // `lower_chars` maps char to char, so the lowered text has the same
+    // char count.
+    let lower: Vec<char> = lower_chars(&plain(line)).chars().collect();
     let mut hit = vec![false; lower.len()];
     let mut i = 0;
     while i + q.len() <= lower.len() {

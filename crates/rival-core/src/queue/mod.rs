@@ -40,7 +40,7 @@ use chrono::{DateTime, FixedOffset, Local, TimeDelta};
 
 use crate::cancel::{Context, ContextError};
 use crate::config::{self, Config};
-use crate::gostd;
+use crate::duration;
 use crate::logging;
 use crate::paths::{self, Paths};
 use crate::procinfo;
@@ -88,7 +88,7 @@ impl fmt::Display for WaitError {
             WaitError::Timeout(d) => write!(
                 f,
                 "{ERR_QUEUE_TIMEOUT} after {}",
-                gostd::format_duration(duration_nanos(*d))
+                duration::format(duration_nanos(*d))
             ),
             WaitError::Context(e) => fmt::Display::fmt(e, f),
             WaitError::Io(e) => write!(f, "{e:#}"),
@@ -548,9 +548,7 @@ fn with_lock<T>(dir: &Path, f: impl FnOnce() -> anyhow::Result<T>) -> anyhow::Re
         .open(&path)
         .map_err(|e| anyhow!("open queue lock: {}", path_error("open", &path, &e)))?;
     let mut lock = fd_lock::RwLock::new(file);
-    let _guard = lock
-        .write()
-        .map_err(|e| anyhow!("flock queue: {}", gostd::os_error_text(&e)))?;
+    let _guard = lock.write().map_err(|e| anyhow!("flock queue: {}", e))?;
     f()
 }
 

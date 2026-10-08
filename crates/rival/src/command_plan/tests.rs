@@ -261,7 +261,7 @@ fn resolve_plan_path_reports_unreadable_files() {
     assert_eq!(
         resolve_plan_path(&s(&f), "/x", "", None).unwrap_err(),
         format!(
-            "cannot read plan file {0}: open {0}: permission denied",
+            "cannot read plan file {0}: open {0}: Permission denied (os error 13)",
             s(&f)
         )
     );
@@ -269,7 +269,7 @@ fn resolve_plan_path_reports_unreadable_files() {
     assert_eq!(
         resolve_plan_path(&format!("{}/x.md", s(&f)), "/x", "", None).unwrap_err(),
         format!(
-            "cannot read plan file {0}/x.md: stat {0}/x.md: not a directory",
+            "cannot read plan file {0}/x.md: stat {0}/x.md: Not a directory (os error 20)",
             s(&f)
         )
     );

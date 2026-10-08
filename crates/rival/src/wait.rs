@@ -22,7 +22,7 @@ use regex::Regex;
 use regex::bytes::Regex as BytesRegex;
 use rival_core::cancel::Context;
 use rival_core::paths::Paths;
-use rival_core::{gostd, procinfo, session};
+use rival_core::{duration, procinfo, session};
 
 /// All watched sessions completed.
 pub const WAIT_EXIT_COMPLETED: i32 = 0;
@@ -149,8 +149,8 @@ pub fn wait_action(
         for id in args {
             if !is_session_id(id) {
                 return Err(WaitError::usage(format!(
-                    "invalid session ID {} (expected a UUID)",
-                    gostd::quote(id)
+                    "invalid session ID {:?} (expected a UUID)",
+                    id
                 )));
             }
         }
@@ -270,7 +270,7 @@ impl Waiter<'_> {
             if (self.now)() >= deadline {
                 let mut line = format!(
                     "still running after {} (rival pid {})",
-                    gostd::format_duration(self.timeout),
+                    duration::format(self.timeout),
                     self.pid
                 )
                 .into_bytes();
@@ -390,7 +390,7 @@ pub fn parse_log_file_with(
     path: &Path,
     start_nanos: impl FnOnce(i64) -> i64,
 ) -> Result<ParsedLog, String> {
-    let quoted = gostd::quote(&path.to_string_lossy());
+    let quoted = format!("{:?}", path.to_string_lossy());
     let data = read_file(path).map_err(|e| format!("read log file {quoted}: {e}"))?;
 
     let mut pid = 0;
@@ -465,14 +465,8 @@ fn decode_session_status(data: &[u8]) -> Option<SessionStatus> {
 /// Go: `os.ReadFile`, with its `*PathError` text (`open <path>: <errno>`,
 /// `read <path>: <errno>`).
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let op_err = |op: &str, err: io::Error| {
-        format!(
-            "{op} {}: {}",
-            path.to_string_lossy(),
-            gostd::os_error_text(&err)
-        )
-    };
-    let mut file = gostd::open_file(path).map_err(|e| op_err("open", e))?;
+    let op_err = |op: &str, err: io::Error| format!("{op} {}: {}", path.to_string_lossy(), err);
+    let mut file = std::fs::File::open(path).map_err(|e| op_err("open", e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data).map_err(|e| op_err("read", e))?;
     Ok(data)

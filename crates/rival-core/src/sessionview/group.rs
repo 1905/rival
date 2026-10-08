@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, FixedOffset, Local, TimeDelta};
 
-use crate::gostd;
+use crate::duration;
 use crate::session::{self, Session};
 
 /// One row in a dashboard: either a multi-session group or a single
@@ -123,7 +123,7 @@ pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>
         } else if let Some(end_time) = s.end_time {
             end = end_time;
         } else if !s.duration.is_empty()
-            && let Ok(nanos) = gostd::parse_duration(&s.duration)
+            && let Ok(nanos) = duration::parse(&s.duration)
         {
             end = start
                 .checked_add_signed(TimeDelta::nanoseconds(nanos))

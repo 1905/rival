@@ -19,7 +19,6 @@ use std::io::{self, PipeReader, PipeWriter};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
-use crate::gostd;
 #[cfg(not(windows))]
 use crate::paths;
 
@@ -128,7 +127,7 @@ pub struct LookPathError {
 
 impl fmt::Display for LookPathError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "exec: {}: {}", gostd::quote(&self.name), self.err)
+        write!(f, "exec: {:?}: {}", self.name, self.err)
     }
 }
 
@@ -201,15 +200,12 @@ fn find_executable(path: &Path) -> Result<(), String> {
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::PermissionsExt;
 
-    let meta = std::fs::metadata(path)
-        .map_err(|e| format!("stat {}: {}", path.display(), gostd::os_error_text(&e)))?;
+    let meta = std::fs::metadata(path).map_err(|e| format!("stat {}: {}", path.display(), e))?;
     if meta.is_dir() {
-        return Err(gostd::os_error_text(&io::Error::from_raw_os_error(
-            libc::EISDIR,
-        )));
+        return Err(io::Error::from_raw_os_error(libc::EISDIR).to_string());
     }
     let cpath = std::ffi::CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| gostd::os_error_text(&io::Error::from_raw_os_error(libc::EINVAL)))?;
+        .map_err(|_| io::Error::from_raw_os_error(libc::EINVAL).to_string())?;
     // SAFETY: cpath is a valid NUL-terminated string for the call.
     let rc =
         unsafe { libc::faccessat(libc::AT_FDCWD, cpath.as_ptr(), libc::X_OK, libc::AT_EACCESS) };
@@ -222,10 +218,10 @@ fn find_executable(path: &Path) -> Result<(), String> {
             if meta.permissions().mode() & 0o111 != 0 {
                 Ok(())
             } else {
-                Err("permission denied".to_string())
+                Err(io::Error::from_raw_os_error(libc::EACCES).to_string())
             }
         }
-        _ => Err(gostd::os_error_text(&err)),
+        _ => Err(err.to_string()),
     }
 }
 
@@ -456,7 +452,7 @@ impl ProcessHandle {
         if err.raw_os_error() == Some(libc::ESRCH) {
             KillOutcome::Done
         } else {
-            KillOutcome::Failed(gostd::os_error_text(&err))
+            KillOutcome::Failed(err.to_string())
         }
     }
 
@@ -726,19 +722,19 @@ mod tests {
         let plain_s = plain.to_str().unwrap();
         assert_eq!(
             look_path(plain_s, None).unwrap_err().to_string(),
-            format!("exec: \"{plain_s}\": permission denied")
+            format!("exec: \"{plain_s}\": Permission denied (os error 13)")
         );
         let dir_s = bin.join("dir");
         let dir_s = dir_s.to_str().unwrap();
         assert_eq!(
             look_path(dir_s, None).unwrap_err().to_string(),
-            format!("exec: \"{dir_s}\": is a directory")
+            format!("exec: \"{dir_s}\": Is a directory (os error 21)")
         );
         let missing = bin.join("missing");
         let missing = missing.to_str().unwrap();
         assert_eq!(
             look_path(missing, None).unwrap_err().to_string(),
-            format!("exec: \"{missing}\": stat {missing}: no such file or directory")
+            format!("exec: \"{missing}\": stat {missing}: No such file or directory (os error 2)")
         );
 
         // A relative $PATH hit is Go's ErrDot. The process cwd is never

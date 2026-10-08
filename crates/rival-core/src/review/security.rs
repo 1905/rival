@@ -11,7 +11,6 @@ use super::parse::parse_reviewer_output;
 use super::prompt::CLEAN_REVIEW_EXAMPLE_LINE;
 use super::types::ReviewerOutput;
 use crate::config;
-use crate::gostd;
 
 #[cfg(test)]
 mod tests;
@@ -34,8 +33,8 @@ pub fn validate_security_result(out: Option<&ReviewerOutput>, raw: &str) -> anyh
         }
         if !known_severity(&f.severity) {
             return Err(anyhow!(
-                "finding {n} has an unknown severity {}",
-                gostd::quote(&f.severity)
+                "finding {n} has an unknown severity {:?}",
+                f.severity
             ));
         }
     }

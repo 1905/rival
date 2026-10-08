@@ -209,6 +209,6 @@ fn exit_result(status: std::process::ExitStatus) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err(oscmd::exit_status_text(status))
+        Err(status.to_string())
     }
 }

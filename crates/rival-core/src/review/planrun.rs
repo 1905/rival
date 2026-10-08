@@ -12,8 +12,8 @@ use super::plan::{PlanCLIResult, PlanRunResult, parse_plan_log};
 use super::slots::{GroupSlot, SkippedCLI, format_skipped, wait_for_group_slot};
 use crate::cancel::{CancelFunc, Context, ContextError};
 use crate::config::{self, Config};
+use crate::duration;
 use crate::executor;
-use crate::gostd;
 use crate::logging;
 use crate::paths::Paths;
 use crate::session::{self, NewSession, Session};
@@ -49,8 +49,7 @@ pub fn run_timeout_reason(ctx: &Context, cfg: &Config, label: &str, fallback: &s
     if ctx.err() != Some(ContextError::DeadlineExceeded) {
         return fallback.to_string();
     }
-    let timeout =
-        gostd::format_duration(i64::try_from(cfg.run_timeout().as_nanos()).unwrap_or(i64::MAX));
+    let timeout = duration::format(i64::try_from(cfg.run_timeout().as_nanos()).unwrap_or(i64::MAX));
     if label.is_empty() {
         return format!("run timeout after {timeout} (RIVAL_RUN_TIMEOUT) — model did not finish");
     }

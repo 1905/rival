@@ -341,9 +341,9 @@ fn locate_key_name(src: &str) -> Result<(String, &str), String> {
                     continue;
                 }
                 return Err(format!(
-                    "unexpected character {} in variable name near {}",
-                    crate::gostd::quote(&c.to_string()),
-                    crate::gostd::quote(src)
+                    "unexpected character {:?} in variable name near {:?}",
+                    c.to_string(),
+                    src
                 ));
             }
         }

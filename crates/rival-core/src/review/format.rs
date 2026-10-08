@@ -8,7 +8,6 @@ use anyhow::anyhow;
 use super::security::bug_hunter_echo;
 use super::types::{ReviewerFinding, ReviewerOutput};
 use crate::config;
-use crate::gostd;
 
 #[cfg(test)]
 mod tests;
@@ -29,7 +28,7 @@ const SEVERITIES: [(&str, &str); 4] = [
 /// Orders severities critical-first. An unknown severity ranks
 /// `SEVERITIES.len()`, after every known one.
 fn severity_rank(s: &str) -> usize {
-    let s = gostd::to_lower(s);
+    let s = s.to_lowercase();
     SEVERITIES
         .iter()
         .position(|(name, _)| *name == s)
@@ -46,7 +45,7 @@ pub(crate) fn known_severity(s: &str) -> bool {
 pub(crate) fn display_severity(s: &str) -> String {
     match SEVERITIES.get(severity_rank(s)) {
         Some((_, short)) => (*short).to_string(),
-        None => gostd::to_lower(s),
+        None => s.to_lowercase(),
     }
 }
 
@@ -55,12 +54,10 @@ pub(crate) fn display_severity(s: &str) -> String {
 /// the model's order. Shared by the review, security and plan renderers.
 pub(crate) fn sorted_findings(findings: &[ReviewerFinding]) -> Vec<ReviewerFinding> {
     let mut out = findings.to_vec();
-    gostd::slice_stable(&mut out, |a, b| {
-        let (ra, rb) = (severity_rank(&a.severity), severity_rank(&b.severity));
-        if ra != rb {
-            return ra < rb;
-        }
-        a.confidence > b.confidence
+    out.sort_by(|a, b| {
+        severity_rank(&a.severity)
+            .cmp(&severity_rank(&b.severity))
+            .then(b.confidence.cmp(&a.confidence))
     });
     out
 }

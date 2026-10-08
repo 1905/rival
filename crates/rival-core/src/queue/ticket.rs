@@ -10,7 +10,6 @@ use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
-use crate::gostd;
 use crate::json;
 use crate::session::path_error;
 
@@ -105,7 +104,7 @@ pub(crate) fn write_ticket(dir: &Path, t: &Ticket) -> anyhow::Result<()> {
             "rename ticket: rename {} {}: {}",
             tmp.display(),
             fin.display(),
-            gostd::os_error_text(&e)
+            e
         ));
     }
     Ok(())

@@ -50,11 +50,7 @@ pub fn detach_if_requested(detach: bool) -> DetachOutcome {
             crate::startup_fds::any_closed_at_start(),
         ),
         Err(err) => {
-            let _ = writeln!(
-                stderr,
-                "rival: detach failed: {}",
-                rival_core::gostd::os_error_text(&err)
-            );
+            let _ = writeln!(stderr, "rival: detach failed: {}", err);
             DetachOutcome::Exit(1)
         }
     }
@@ -131,13 +127,9 @@ pub fn start_and_report(mut child: Command, stderr: &mut dyn Write) -> DetachOut
     DetachOutcome::Exit(0)
 }
 
-/// Go's `*os.PathError` from `os.StartProcess`: `fork/exec <path>: <errno>`.
+/// The error text of a failed start: `start <path>: <io error>`.
 fn start_error_text(program: &OsStr, err: &io::Error) -> String {
-    format!(
-        "fork/exec {}: {}",
-        program.to_string_lossy(),
-        rival_core::gostd::os_error_text(err)
-    )
+    format!("start {}: {err}", program.to_string_lossy())
 }
 
 /// Go `detach_unix.go`: `SysProcAttr{Setsid: true}` — own session and
@@ -251,17 +243,10 @@ mod tests {
         let mut err = Vec::new();
         let out = spawn_detached(&exe, &[], &mut err);
         assert_eq!(out, DetachOutcome::Exit(1));
-        let text = if cfg!(windows) {
-            "The system cannot find the file specified."
-        } else {
-            "no such file or directory"
-        };
+        let text = crate::testutil::NO_SUCH_FILE;
         assert_eq!(
             String::from_utf8(err).unwrap(),
-            format!(
-                "rival: detach failed: fork/exec {}: {text}\n",
-                exe.display()
-            )
+            format!("rival: detach failed: start {}: {text}\n", exe.display())
         );
     }
 }
@@ -292,7 +277,7 @@ mod unix_tests {
         assert_eq!(out, DetachOutcome::Exit(1));
         assert_eq!(
             String::from_utf8(err).unwrap(),
-            "rival: detach failed: fork/exec /bin/sleep: bad file descriptor\n"
+            "rival: detach failed: start /bin/sleep: Bad file descriptor (os error 9)\n"
         );
     }
 

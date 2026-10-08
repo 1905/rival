@@ -228,8 +228,9 @@ fn parse_args_token_joining_follows_go() {
     // "reviewer" is a raw prompt; "review\tx" too (needs a space).
     assert_eq!(parse_codex_args("reviewer").unwrap().prompt, "reviewer");
     assert_eq!(parse_codex_args("review\tx").unwrap().prompt, "review\tx");
-    // Go's simple lowering maps İ to i, then slices the original at 6 bytes.
+    // The full lowercase mapping turns İ into 'i' plus U+0307, so this is
+    // a raw prompt.
     let r = parse_codex_args("revİew x").unwrap();
-    assert!(r.is_review, "{r:?}");
-    assert_eq!(r.review_scope, "w x");
+    assert!(!r.is_review, "{r:?}");
+    assert_eq!(r.prompt, "revİew x");
 }

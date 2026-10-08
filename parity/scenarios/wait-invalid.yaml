@@ -30,7 +30,7 @@
       "expect": {
         "exit_code": 64,
         "stdout": "",
-        "stderr_lines": ["read log file \"<ROOT>/logs/missing.log\": open <ROOT>/logs/missing.log: no such file or directory"]
+        "stderr_lines": ["read log file \"<ROOT>/logs/missing.log\": open <ROOT>/logs/missing.log: No such file or directory (os error 2)"]
       }
     },
     {

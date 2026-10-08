@@ -5,7 +5,7 @@ use std::io::Write;
 
 use chrono::{DateTime, FixedOffset, Local};
 use rival_core::config::{self, Config};
-use rival_core::gostd;
+use rival_core::duration;
 use rival_core::queue::{self, Entry};
 use rival_core::session::Session;
 
@@ -70,7 +70,7 @@ pub fn write_queue(out: &mut dyn Write, entries: &[Entry], now: DateTime<FixedOf
         // An unset time saturates, as the distant unset time of older
         // releases did.
         let age = |t: Option<DateTime<FixedOffset>>| t.map_or(i64::MAX, |t| sub(now, t));
-        let wait = gostd::format_duration(round_seconds(age(since)));
+        let wait = duration::format(round_seconds(age(since)));
         // A waiting ticket far past the default timeout is suspect.
         let state = if t.state == queue::STATE_WAITING && age(t.created_at) > STALE_NANOS {
             "stale?"

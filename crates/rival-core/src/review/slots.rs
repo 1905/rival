@@ -8,7 +8,7 @@ use anyhow::anyhow;
 
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd;
+use crate::duration;
 use crate::logging;
 use crate::paths::Paths;
 use crate::queue::Manager;
@@ -148,7 +148,7 @@ fn wait_with_manager(
         let msg = if wait_err.is_queue_timeout() {
             format!(
                 "queue timeout after {} — queue may be wedged; inspect with 'rival queue', purge with 'rival queue clear'",
-                gostd::format_duration(nanos(m.timeout))
+                duration::format(nanos(m.timeout))
             )
         } else {
             "cancelled while queued".to_string()

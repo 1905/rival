@@ -65,7 +65,7 @@ fn resolve_workdir_cases() {
                 )
             } else {
                 format!(
-                    "cannot read workdir {p}: stat {p}: not a directory",
+                    "cannot read workdir {p}: stat {p}: Not a directory (os error 20)",
                     p = cwd.join("plain.txt/x").display()
                 )
             },
@@ -104,7 +104,7 @@ fn resolve_workdir_invalid_windows_name() {
     let want = if cfg!(windows) {
         format!(
             "cannot read workdir {p}: CreateFile {p}: \
-             The filename, directory name, or volume label syntax is incorrect.",
+             The filename, directory name, or volume label syntax is incorrect. (os error 123)",
             p = p.display()
         )
     } else {

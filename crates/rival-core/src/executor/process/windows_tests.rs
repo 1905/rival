@@ -217,10 +217,7 @@ fn look_path_follows_go_windows_rules() {
     let missing_s = missing.to_str().unwrap();
     assert_eq!(
         look(missing_s, "").unwrap_err().to_string(),
-        format!(
-            "exec: {}: file does not exist",
-            crate::gostd::quote(missing_s)
-        )
+        format!("exec: {:?}: file does not exist", missing_s)
     );
     let no_ext = bin.join("nope");
     assert_eq!(
@@ -305,16 +302,13 @@ fn program_in_dir_uses_the_os_full_path() {
     // Absolute and UNC programs are kept.
     assert_eq!(p(r"Z:\x\tool.exe"), PathBuf::from(r"Z:\x\tool.exe"));
     assert_eq!(p(r"\\srv\share\t.exe"), PathBuf::from(r"\\srv\share\t.exe"));
-    // No directory: unchanged. A bare drive: Go's EINVAL.
+    // No directory: unchanged. A bare drive: an invalid input.
     assert_eq!(
         windows::program_in_dir(Path::new("rel.exe"), Path::new("")).unwrap(),
         PathBuf::from("rel.exe")
     );
     let err = windows::program_in_dir(Path::new(drive), dir).unwrap_err();
-    assert_eq!(
-        crate::executor::subprocess::spawn_error_text(&err),
-        "invalid argument"
-    );
+    assert_eq!(err.to_string(), "invalid input parameter");
     // A relative directory is resolved against this process's directory.
     let cwd = std::env::current_dir().unwrap();
     assert_eq!(

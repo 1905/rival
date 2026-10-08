@@ -116,21 +116,16 @@ fn parse_log_file_missing_file_errors() {
     );
 }
 
-/// Go's Windows `syscall.Open` opens a directory for reading
-/// (`FILE_FLAG_BACKUP_SEMANTICS`); the read then fails with
-/// `ERROR_INVALID_FUNCTION`.
+/// A directory as the log file: on Unix the open works and the read fails.
+/// On Windows the open fails.
 #[test]
 fn parse_log_file_directory_is_a_read_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().to_string_lossy().into_owned();
-    let text = if cfg!(windows) {
-        "Incorrect function."
-    } else {
-        "is a directory"
-    };
+    let (op, text) = crate::testutil::DIR_AS_FILE;
     assert_eq!(
         parse_log_file(dir.path()).unwrap_err(),
-        format!("read log file {}: read {path}: {text}", quoted(&path))
+        format!("read log file {}: {op} {path}: {text}", quoted(&path))
     );
 }
 

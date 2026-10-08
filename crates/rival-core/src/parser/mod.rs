@@ -6,7 +6,6 @@ mod tests;
 use anyhow::{Result, bail};
 
 use crate::config::{self, VALID_EFFORTS, WHOLE_PROJECT};
-use crate::gostd;
 
 /// The parsed user arguments. Go `ParseResult`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -91,8 +90,8 @@ fn parse_args_with_effort(
         let effort = parts.next().unwrap_or_default();
         if !valid_effort(effort) {
             bail!(
-                "invalid effort level {}, must be one of: {}",
-                gostd::quote(effort),
+                "invalid effort level {:?}, must be one of: {}",
+                effort,
                 effort_names.join(", ")
             );
         }
@@ -101,12 +100,11 @@ fn parse_args_with_effort(
     }
 
     // Step 2: Check for review subcommand.
-    let lower = gostd::to_lower(s);
+    let lower = s.to_lowercase();
     if lower == "review" || lower.starts_with("review ") {
         result.is_review = true;
-        // Go slices the original at len("review") bytes. Go's simple
-        // lowering can map a 2-byte rune (`İ`) to ASCII, so the cut is
-        // byte-based; it always lands on a rune boundary here.
+        // Only an ASCII "review" lowers to "review", so the first
+        // len("review") bytes of the original are the keyword.
         let scope = String::from_utf8_lossy(&s.as_bytes()["review".len()..]);
         let mut scope = scope.trim().to_string();
         if scope.is_empty() {

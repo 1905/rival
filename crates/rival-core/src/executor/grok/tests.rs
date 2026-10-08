@@ -317,7 +317,7 @@ fn run_grok_model_errors_remove_the_prompt_file() {
         "{err}"
     );
     assert!(
-        err.ends_with(&format!(".md: {}", crate::gostd::errtext::NO_SUCH_PATH)),
+        err.ends_with(&format!(".md: {}", crate::errtext::NO_SUCH_PATH)),
         "{err}"
     );
 }

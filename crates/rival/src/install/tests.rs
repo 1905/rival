@@ -500,7 +500,10 @@ fn base_under_a_file_fails_like_go() {
     let file = base.join(skills::NAMES[0]).join("SKILL.md");
     assert_eq!(
         err,
-        format!("read {0}: open {0}: not a directory", file.display())
+        format!(
+            "read {0}: open {0}: Not a directory (os error 20)",
+            file.display()
+        )
     );
 }
 
@@ -521,11 +524,14 @@ fn write_errors_name_the_path() {
     let err = write_skill(&skill_dir, &file, b"x").unwrap_err();
     assert_eq!(
         err,
-        format!("write {0}: open {0}: is a directory", file.display())
+        format!(
+            "write {0}: open {0}: Is a directory (os error 21)",
+            file.display()
+        )
     );
 }
 
-/// A SKILL.md that is a directory fails Go's read, not its open.
+/// A SKILL.md that is a directory fails the read, not the open.
 #[cfg(unix)]
 #[test]
 fn skill_file_that_is_a_directory_fails_on_read() {
@@ -537,7 +543,10 @@ fn skill_file_that_is_a_directory_fails_on_read() {
     let err = install_skills(&target, false, &mut reader(""), &mut out).unwrap_err();
     assert_eq!(
         err,
-        format!("read {0}: read {0}: is a directory", file.display())
+        format!(
+            "read {0}: read {0}: Is a directory (os error 21)",
+            file.display()
+        )
     );
 }
 

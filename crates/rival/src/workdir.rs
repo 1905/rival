@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 use rival_core::config::Config;
-use rival_core::{gostd, paths};
+use rival_core::paths;
 
 use crate::root::CmdError;
 
@@ -23,17 +23,10 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
     // Go filepath.Abs on Windows always calls syscall.FullPath, whose
     // UTF16PtrFromString rejects a NUL with EINVAL.
     if cfg!(windows) && raw.contains('\0') {
-        return Err(format!(
-            "resolve workdir {}: invalid argument",
-            gostd::quote(raw)
-        ));
+        return Err(format!("resolve workdir {:?}: invalid argument", raw));
     }
     let Some(abs) = paths::abs(cfg.cwd(), Path::new(raw)) else {
-        return Err(format!(
-            "resolve workdir {}: {}",
-            gostd::quote(raw),
-            getwd_error()
-        ));
+        return Err(format!("resolve workdir {:?}: {}", raw, getwd_error()));
     };
     let shown = abs.to_string_lossy().into_owned();
     // Go os.Stat on Unix: BytePtrFromString rejects a NUL with EINVAL
@@ -44,12 +37,13 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
         ));
     }
     match std::fs::metadata(&abs) {
-        // Go os.IsNotExist: ENOENT on Unix (ENOTDIR is "cannot read"); on
-        // Windows its own three codes, narrower than std's NotFound.
-        Err(e) if gostd::is_not_exist(&e) => Err(format!("workdir not found: {shown}")),
+        // ENOENT on Unix (ENOTDIR is "cannot read"); on Windows the codes
+        // that std maps to NotFound.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(format!("workdir not found: {shown}"))
+        }
         Err(e) => Err(format!(
-            "cannot read workdir {shown}: {STAT_OP} {shown}: {}",
-            gostd::os_error_text(&e)
+            "cannot read workdir {shown}: {STAT_OP} {shown}: {e}"
         )),
         Ok(meta) if !meta.is_dir() => Err(format!("workdir is not a directory: {shown}")),
         Ok(_) => Ok(shown),
@@ -68,7 +62,7 @@ const STAT_OP: &str = if cfg!(windows) { "CreateFile" } else { "stat" };
 /// failure.
 pub(crate) fn getwd_error() -> String {
     match std::env::current_dir() {
-        Err(e) => format!("getwd: {}", gostd::os_error_text(&e)),
+        Err(e) => format!("getwd: {e}"),
         Ok(_) => "getwd: no such file or directory".to_string(),
     }
 }

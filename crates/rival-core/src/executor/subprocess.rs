@@ -26,7 +26,6 @@ use super::process::{self, Abort, ExitState, Io, KillOutcome, ProcessHandle};
 use crate::cancel::{CancelFunc, Context};
 use crate::envname;
 use crate::gitscope;
-use crate::gostd;
 use crate::logging::{self, Event};
 use crate::paths::Paths;
 use crate::procinfo;
@@ -217,7 +216,7 @@ pub(crate) fn dedup_env_case(
         let key = &bytes[..i];
         let key = if case_insensitive {
             match std::str::from_utf8(key) {
-                Ok(k) => gostd::to_lower(k).into_bytes(),
+                Ok(k) => k.to_lowercase().into_bytes(),
                 Err(_) => key.to_ascii_lowercase(),
             }
         } else {
@@ -318,13 +317,11 @@ fn resolve(binary: &str, environ: &[OsString], dir: &str) -> Result<PathBuf, Str
     look_extensions(binary, dir, &LookEnv::process()).map_err(|e| e.to_string())
 }
 
-/// Go's text for an `io::Error` without a file name.
+/// The text of an `io::Error` without a file name. A write that stops
+/// short reads `short write`.
 pub(crate) fn io_text(err: &io::Error) -> String {
     if err.kind() == io::ErrorKind::WriteZero {
         return "short write".to_string();
-    }
-    if err.raw_os_error().is_some() {
-        return gostd::os_error_text(err);
     }
     err.to_string()
 }
@@ -332,14 +329,6 @@ pub(crate) fn io_text(err: &io::Error) -> String {
 /// Go `*os.PathError` text for IO on a named file.
 fn file_error(op: &str, name: &str, err: &io::Error) -> String {
     format!("{op} {name}: {}", io_text(err))
-}
-
-/// Go's `fork/exec` error text. A NUL in an argument is EINVAL in Go.
-pub(crate) fn spawn_error_text(err: &io::Error) -> String {
-    if err.raw_os_error().is_none() && err.kind() == io::ErrorKind::InvalidInput {
-        return "invalid argument".to_string();
-    }
-    io_text(err)
 }
 
 /// Go's `w.Write(p)` contract over a Rust writer: loops over short writes and
@@ -497,13 +486,8 @@ pub fn run_subprocess(
         }
         let env = dedup_env(&env).map_err(|e| anyhow!("start {binary}: {e}"))?;
 
-        let fork_error = |e: &io::Error| {
-            anyhow!(
-                "start {binary}: fork/exec {}: {}",
-                lp.display(),
-                spawn_error_text(e)
-            )
-        };
+        let fork_error =
+            |e: &io::Error| anyhow!("start {binary}: {}", super::oscmd::fork_error(&lp, e));
         let program =
             process::program_in_dir(&lp, Path::new(&sess.work_dir)).map_err(|e| fork_error(&e))?;
         let mut cmd = Command::new(program);
