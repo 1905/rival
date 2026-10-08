@@ -10,7 +10,7 @@ use crate::config::{self, Config};
 use crate::duration;
 use crate::logging;
 use crate::paths::Paths;
-use crate::queue::Manager;
+use crate::queue::{Manager, WaitError};
 use crate::session::{Session, duration_text};
 
 #[cfg(test)]
@@ -143,13 +143,14 @@ fn wait_with_manager(
     };
     if let Err(wait_err) = m.wait_for_slot(ctx, Some(&mut on_position)) {
         m.release();
-        let msg = if wait_err.is_queue_timeout() {
-            format!(
+        let msg = match &wait_err {
+            WaitError::Timeout(_) => format!(
                 "queue timeout after {} — queue may be wedged; inspect with 'rival queue', purge with 'rival queue clear'",
                 duration::format(nanos(m.timeout))
-            )
-        } else {
-            "cancelled while queued".to_string()
+            ),
+            WaitError::Context(_) => "cancelled while queued".to_string(),
+            // A lock or ticket write failure: show the real error.
+            WaitError::Io(_) | WaitError::NotEnqueued => format!("queue wait failed: {wait_err}"),
         };
         for s in sessions.iter_mut() {
             let _ = s.fail(paths, 1, &msg);

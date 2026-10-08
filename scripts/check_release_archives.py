@@ -8,7 +8,7 @@ format and CPU, the executable bit, and the bundled LICENSE and README.md
 --formula also checks dist/homebrew/rival.rb: one URL and hash per
 darwin/linux archive. --run executes the archive built for this host as
 `rival version` with a private HOME/USERPROFILE/RIVAL_HOME and update checks
-and telemetry off. With --only, a host that does not match the archive fails.
+off. With --only, a host that does not match the archive fails.
 
 Usage (release.yml):
   check_release_archives.py dist --formula --run      # build host, all six
@@ -190,7 +190,7 @@ def run_version(binary, exe):
         env = {key: value for key, value in os.environ.items()
                if key.upper() in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG")}
         env.update(HOME=str(home), USERPROFILE=str(home), RIVAL_HOME=str(home / ".rival"),
-                   RIVAL_NO_UPDATE_CHECK="1", RIVAL_NO_TELEMETRY="1", DO_NOT_TRACK="1")
+                   RIVAL_NO_UPDATE_CHECK="1")
         result = subprocess.run([str(path), "version"], cwd=home, env=env,
                                 capture_output=True, text=True, timeout=60)
         require(result.returncode == 0,

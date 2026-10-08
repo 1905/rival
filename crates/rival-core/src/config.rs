@@ -1113,7 +1113,9 @@ impl Config {
         let Some(mut dir) = paths::abs(self.cwd.as_deref(), workdir) else {
             return String::new();
         };
-        let home = OsStr::new(self.getenv(paths::HOME_VAR));
+        // The walked directory is clean, so HOME must be too: a raw
+        // `HOME=/home/x/` never equals `/home/x` and the walk would go above.
+        let home = paths::clean(Path::new(self.getenv(paths::HOME_VAR)));
         for _ in 0..8 {
             if let Ok(vars) = paths::read_dotenv(&dir.join(".env")) {
                 for name in names {
@@ -1125,7 +1127,7 @@ impl Config {
                 }
             }
             let parent = dir.parent().map_or_else(|| dir.clone(), Path::to_path_buf);
-            if dir.as_os_str() == home || parent == dir {
+            if dir == home || parent == dir {
                 break;
             }
             dir = parent;
@@ -1190,10 +1192,10 @@ impl Config {
     /// still within its configured limits. When the run timeout is disabled
     /// (0), only the queue wait + margin is bounded.
     pub fn max_run_wait(&self) -> i64 {
-        // The budget is a signed nanosecond count; oversized configured budgets wrap.
-        (self.queue_timeout().as_nanos() as i64)
-            .wrapping_add((self.run_timeout().as_nanos() as i64).wrapping_mul(2))
-            .wrapping_add(5 * 60 * 1_000_000_000)
+        // A signed nanosecond count; oversized budgets saturate at i64::MAX.
+        nanos(self.queue_timeout())
+            .saturating_add(nanos(self.run_timeout()).saturating_mul(2))
+            .saturating_add(5 * 60 * 1_000_000_000)
     }
 
     /// The max wall-clock a single provider run may take once it holds a
@@ -1220,7 +1222,7 @@ impl Config {
         if d.is_zero() || mult <= 0 {
             return None;
         }
-        Some((d.as_nanos() as i64).wrapping_mul(i64::from(mult)))
+        Some(nanos(d).saturating_mul(i64::from(mult)))
     }
 
     /// Whether queueing is bypassed via `RIVAL_NO_QUEUE`.
@@ -1235,6 +1237,11 @@ impl Config {
         let abs = paths::abs(self.cwd.as_deref(), workdir).unwrap_or_default();
         WORKDIR_PREAMBLE.replace("{WORKDIR}", &abs.to_string_lossy())
     }
+}
+
+/// `d` in signed nanoseconds, saturating at `i64::MAX`.
+fn nanos(d: Duration) -> i64 {
+    i64::try_from(d.as_nanos()).unwrap_or(i64::MAX)
 }
 
 /// [`Config::getenv`] with the platform rule explicit, so both test

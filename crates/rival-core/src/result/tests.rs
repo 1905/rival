@@ -701,3 +701,19 @@ fn final_answer_footer_and_hook_edges() {
     assert_eq!(final_answer("codex\na\nb\na"), "a\nb\na");
     assert_eq!(final_answer("codex\na\na"), "a");
 }
+
+/// The CLI and the TUI share this rule: a plan payload with a blank summary
+/// is not a plan answer, so the TUI never shows it as a clean plan.
+#[test]
+fn blank_plan_summary_is_never_a_clean_plan() {
+    for raw in [
+        r#"{"summary":"","rating":9,"findings":[]}"#,
+        r#"{"summary":"   ","rating":9,"findings":[]}"#,
+    ] {
+        assert!(
+            !matches!(parse_run_result(raw), RunResult::Findings { .. }),
+            "{raw}"
+        );
+        assert!(crate::review::parse_plan_log(raw).is_err(), "{raw}");
+    }
+}

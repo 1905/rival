@@ -115,7 +115,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\ARemove dead queue tickets \\(--force removes all\\))(?=.*Usage:\\s+rival\\s+queue\\s+clear(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for clear)(?=.*(?<![\\w-])\\-\\-force(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?remove ALL tickets, not just dead ones).*"
+          "$regex": "(?s)(?=.*\\ARemove dead queue tickets \\(--force also removes waiting ones\\))(?=.*Usage:\\s+rival\\s+queue\\s+clear(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for clear)(?=.*(?<![\\w-])\\-\\-force(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?also remove live waiting tickets; live running tickets stay).*"
         },
         "stderr_lines": [],
         "log_events": []

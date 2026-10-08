@@ -1083,6 +1083,24 @@ fn kimi_api_key_from_walks_up_to_parent_env_file() {
     assert_eq!(config.kimi_api_key_from(&sub), "parent-key");
 }
 
+/// A HOME with a trailing separator still bounds the walk: the walked
+/// directory is compared with the cleaned HOME, not the raw value.
+#[test]
+fn dotenv_walk_stops_at_home_with_a_trailing_separator() {
+    let top = tempfile::tempdir().unwrap();
+    let home = top.path().join("home");
+    let project = home.join("p");
+    fs::create_dir_all(&project).unwrap();
+    fs::write(top.path().join(".env"), "MOONSHOT_API_KEY=above-home\n").unwrap();
+    let plain = home.to_str().unwrap().to_string();
+    let slashed = format!("{plain}{}", std::path::MAIN_SEPARATOR);
+    for raw in [plain, slashed] {
+        let config = home_config(Path::new(&raw), &[]);
+        assert_eq!(config.kimi_api_key_from(&project), "", "HOME={raw:?}");
+        assert_eq!(config.kimi_api_key_from(&home), "", "HOME={raw:?}");
+    }
+}
+
 #[test]
 fn dotenv_walk_respects_home_and_root_bounds() {
     let top = tempfile::tempdir().unwrap();
@@ -1572,11 +1590,18 @@ fn claude_effort_level_map() {
     );
 }
 
+/// A huge `RIVAL_RUN_TIMEOUT` saturates at the maximum, never wraps negative.
 #[test]
-fn overflowing_budgets_keep_signed_wrap() {
+fn overflowing_budgets_saturate() {
     let c = cfg(&[("RIVAL_RUN_TIMEOUT", "2000000h")]);
-    assert_eq!(c.run_timeout_budget(2), Some(-4_046_744_073_709_551_616));
-    assert_eq!(c.max_run_wait(), -4_046_741_973_709_551_616);
+    assert_eq!(c.run_timeout_budget(2), Some(i64::MAX));
+    assert_eq!(c.max_run_wait(), i64::MAX);
+    let c = cfg(&[
+        ("RIVAL_RUN_TIMEOUT", "2000000h"),
+        ("RIVAL_QUEUE_TIMEOUT", "2000000h"),
+    ]);
+    assert_eq!(c.run_timeout_budget(i32::MAX), Some(i64::MAX));
+    assert_eq!(c.max_run_wait(), i64::MAX);
 }
 
 #[test]

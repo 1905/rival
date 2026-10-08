@@ -152,7 +152,7 @@ fn claude_docker_review_mount_is_read_only() {
     env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("fixture-token"));
     env.fake(
         "docker",
-        "#!/bin/sh\n/bin/cat >/dev/null\nprintf '%s\\n' \"$@\"\n",
+        "#!/bin/sh\n/bin/cat >/dev/null\nprintf '%s\\n' \"$@\"\nprintf 'token=%s\\n' \"$ANTHROPIC_AUTH_TOKEN\"\n",
     );
     let cfg = env.config();
     let repo = env.work_str();
@@ -197,11 +197,12 @@ fn claude_docker_review_mount_is_read_only() {
         "-w",
         "/workspace",
         "-e",
-        "ANTHROPIC_AUTH_TOKEN=fixture-token",
+        "ANTHROPIC_AUTH_TOKEN",
         "rival-claude",
     ]);
     want.extend(read_only_argv("medium"));
-    assert_eq!(text, format!("{}\n", want.join("\n")));
+    // The token reaches docker through its environment, not its argv.
+    assert_eq!(text, format!("{}\ntoken=fixture-token\n", want.join("\n")));
     assert_eq!(sess.mode, "docker");
     // Docker runs never record a native auth mode.
     assert_eq!(sess.account, "");
@@ -377,12 +378,13 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
         "-w",
         "/workspace",
         "-e",
-        "ANTHROPIC_AUTH_TOKEN=tok",
+        "ANTHROPIC_AUTH_TOKEN",
         "rival-claude",
     ]);
     want.extend(raw_argv("low"));
     assert_eq!(seen.binary, "docker");
     assert_eq!(seen.args, want);
+    assert_eq!(seen.env, strings(&["ANTHROPIC_AUTH_TOKEN=tok"]));
     assert!(seen.drop_env.is_empty());
     assert_eq!(
         seen.prompt,

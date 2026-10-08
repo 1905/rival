@@ -6,10 +6,10 @@ use super::format::{
     format_unusable, known_severity, severity_tally, sorted_findings, validate_output,
     write_finding, write_header,
 };
-use super::parse::parse_reviewer_output;
 use super::prompt::CLEAN_REVIEW_EXAMPLE_LINE;
 use super::types::ReviewerOutput;
 use crate::config;
+use crate::result::{self, PayloadKind};
 
 #[cfg(test)]
 mod tests;
@@ -71,7 +71,11 @@ pub(crate) fn bug_hunter_echo(out: &ReviewerOutput, raw: &str) -> bool {
     let Some(i) = raw.rfind(CLEAN_REVIEW_EXAMPLE_LINE) else {
         return false;
     };
-    parse_reviewer_output(&raw[i + CLEAN_REVIEW_EXAMPLE_LINE.len()..]).is_err()
+    result::find_payload(
+        &raw[i + CLEAN_REVIEW_EXAMPLE_LINE.len()..],
+        PayloadKind::Any,
+    )
+    .is_err()
 }
 
 /// Renders a security review, or falls back to the raw log when the payload

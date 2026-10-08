@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::cancel::Context;
+use crate::executor::subprocess::PIPE_DRAIN_GRACE;
 use crate::executor::testutil::{retry_busy, write_exe};
 use crate::paths::Paths;
 
@@ -442,11 +443,38 @@ fn parse_target_keeps_strict_url_decoding() {
 }
 
 #[test]
-fn contains_reads_the_raw_scope() {
+fn contains_reads_the_scope_after_one_decode() {
     assert!(contains(TEST_URL));
     assert!(contains("review /-/merge_requests/ please"));
-    assert!(!contains("https://h/g/app%2F-%2Fmerge_requests%2F7"));
+    // An encoded link is found: the scope is percent-decoded once.
+    assert!(contains("https://h/g/app%2F-%2Fmerge_requests%2F42"));
+    assert!(contains("https://h/g/app%2f-%2fmerge_requests%2f42"));
+    assert!(contains("%2F-%2Fmerge_requests%2F42"));
+    // One decode only: a double-encoded link stays plain text.
+    assert!(!contains("https://h/g/app%252F-%252Fmerge_requests%252F42"));
+    // A bad escape is kept as it is and does not hide the marker.
+    assert!(contains("100% done /-/merge_requests/ %zz %"));
     assert!(!contains("src/api/"));
+    assert!(!contains("50% of src/api/%"));
+}
+
+/// The encoded link is not a plain review of the checkout: it is pinned like
+/// the plain link.
+#[test]
+fn prepare_pins_an_encoded_mr_link() {
+    let f = Fixture::new();
+    let encoded = "https://gitlab.example.com/group/sub/app%2F-%2Fmerge_requests%2F42";
+    let snapshot = f.prepare(encoded).unwrap().expect("encoded MR link pinned");
+    assert!(
+        snapshot.identity.contains(TEST_URL),
+        "{}",
+        snapshot.identity
+    );
+    assert!(
+        snapshot.identity.contains(&f.mr.sha),
+        "{}",
+        snapshot.identity
+    );
 }
 
 #[test]
@@ -987,6 +1015,128 @@ fn cancel_kills_running_glab() {
         "resolve MR via glab: signal: 9 (SIGKILL); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
     );
     assert!(f.snapshot_entries().is_empty());
+}
+
+/// Waits up to 10 s until `pid` is gone (reaped by its new parent).
+fn wait_gone(pid: i32) -> bool {
+    let begin = Instant::now();
+    while begin.elapsed() < Duration::from_secs(10) {
+        // SAFETY: signal 0 only checks that the process exists.
+        if unsafe { libc::kill(pid, 0) } != 0 {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    false
+}
+
+fn read_pid(path: &Path) -> i32 {
+    read(path).trim().parse().unwrap()
+}
+
+/// Cancel kills glab's whole process group. A grandchild that holds the
+/// stdout pipe dies too, so prepare returns well inside the drain bound.
+#[test]
+fn cancel_kills_a_grandchild_that_holds_the_pipe() {
+    let f = Fixture::new();
+    let started = f.root.join("started");
+    let grandchild = f.root.join("grandchild.pid");
+    write_exe(
+        &f.root.join("bin/glab"),
+        &format!(
+            "#!/bin/sh\nsleep 30 &\necho $! > '{}'\ntouch '{}'\nexec sleep 30\n",
+            grandchild.display(),
+            started.display()
+        ),
+    );
+    let (ctx, cancel) = Context::background().with_cancel();
+    let begin = Instant::now();
+    let err = std::thread::scope(|s| {
+        s.spawn(|| {
+            while !started.exists() {
+                std::thread::sleep(Duration::from_millis(10));
+                assert!(
+                    begin.elapsed() < Duration::from_secs(20),
+                    "glab never started"
+                );
+            }
+            cancel.cancel();
+        });
+        assert_err(f.prepare_in(&ctx, TEST_URL, &f.workdir))
+    });
+    let elapsed = begin.elapsed();
+    let pid = read_pid(&grandchild);
+    let gone = wait_gone(pid);
+    if !gone {
+        // SAFETY: plain syscall on the test's own grandchild.
+        unsafe { libc::kill(pid, libc::SIGKILL) };
+    }
+    assert!(
+        elapsed < PIPE_DRAIN_GRACE,
+        "cancel took {elapsed:?}, drain bound {PIPE_DRAIN_GRACE:?}"
+    );
+    assert!(gone, "grandchild {pid} survived the cancel");
+    assert_eq!(
+        err,
+        "resolve MR via glab: signal: 9 (SIGKILL); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+    );
+}
+
+/// A grandchild that left the group (setsid) still holds the pipe after the
+/// group kill. Prepare stops reading after the drain bound and returns.
+#[cfg(target_os = "linux")]
+#[test]
+fn cancel_returns_within_the_drain_bound_when_a_writer_escapes() {
+    let setsid = Path::new("/usr/bin/setsid");
+    if !setsid.exists() {
+        eprintln!("skip: no {}", setsid.display());
+        return;
+    }
+    let f = Fixture::new();
+    let started = f.root.join("started");
+    let escaped = f.root.join("escaped.pid");
+    write_exe(
+        &f.root.join("bin/glab"),
+        &format!(
+            "#!/bin/sh\n{} sh -c 'echo $$ > \"$1\"; exec sleep 30' sh '{}' &\nwhile [ ! -s '{}' ]; do sleep 0.01; done\ntouch '{}'\nexec sleep 30\n",
+            setsid.display(),
+            escaped.display(),
+            escaped.display(),
+            started.display()
+        ),
+    );
+    let (ctx, cancel) = Context::background().with_cancel();
+    let begin = Instant::now();
+    let mut cancelled_at = None;
+    let err = std::thread::scope(|s| {
+        let waiter = s.spawn(|| {
+            while !started.exists() {
+                std::thread::sleep(Duration::from_millis(10));
+                assert!(
+                    begin.elapsed() < Duration::from_secs(20),
+                    "glab never started"
+                );
+            }
+            let at = Instant::now();
+            cancel.cancel();
+            at
+        });
+        let err = assert_err(f.prepare_in(&ctx, TEST_URL, &f.workdir));
+        cancelled_at = Some(waiter.join().unwrap());
+        err
+    });
+    let waited = cancelled_at.unwrap().elapsed();
+    let pid = read_pid(&escaped);
+    // SAFETY: plain syscall on the test's own escaped grandchild.
+    unsafe { libc::kill(pid, libc::SIGKILL) };
+    assert!(
+        waited >= PIPE_DRAIN_GRACE && waited < PIPE_DRAIN_GRACE + Duration::from_secs(5),
+        "cancel took {waited:?}, drain bound {PIPE_DRAIN_GRACE:?}"
+    );
+    assert_eq!(
+        err,
+        "resolve MR via glab: signal: 9 (SIGKILL); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+    );
 }
 
 /// Cancelling during the fetch, once the isolated checkout exists, kills

@@ -34,7 +34,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\AInspect the review queue\\n)(?=.*Usage:\\s+rival\\s+queue(?![\\w-]))(?=.*\\n\\s+clear +Remove dead queue tickets \\(--force removes all\\))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for queue).*"
+          "$regex": "(?s)(?=.*\\AInspect the review queue\\n)(?=.*Usage:\\s+rival\\s+queue(?![\\w-]))(?=.*\\n\\s+clear +Remove dead queue tickets \\(--force also removes waiting ones\\))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for queue).*"
         },
         "stderr_lines": [],
         "log_events": []

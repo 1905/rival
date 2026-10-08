@@ -1,9 +1,10 @@
 //! Reviewer prompts, output parsing and console formatting, plus plan and
 //! doc review runs.
 //!
-//! Every caller that parses a provider log passes it through
-//! [`final_answer`] first ([`parse_reviewer_log`], [`parse_plan_log`]), so
-//! review-shaped JSON a tool printed earlier is never taken for the answer.
+//! [`parse_reviewer_log`] and [`parse_plan_log`] use the shared answer
+//! finder and decoder in [`crate::result`], so the CLI and the TUI read a log
+//! the same way, and review-shaped JSON a tool printed earlier is never taken
+//! for the answer.
 
 mod format;
 mod parse;
@@ -17,10 +18,10 @@ mod testutil;
 mod types;
 
 pub use format::{DEFAULT_CONFIDENCE_THRESHOLD, format_review_console, format_review_result};
-pub use parse::{final_answer, parse_reviewer_log, parse_reviewer_output};
+pub use parse::parse_reviewer_log;
 pub use plan::{
     PlanCLIResult, PlanOutput, PlanRunResult, format_plan_console, format_plan_multi_console,
-    format_plan_result, parse_plan_log, parse_plan_output,
+    format_plan_result, parse_plan_log,
 };
 pub use planrun::{
     DocReview, ReviewBatch, run_doc_review, run_failure_reason, run_plan_review,

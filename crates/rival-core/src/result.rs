@@ -1,10 +1,10 @@
 //! What a finished run's Result view shows. Port of the app's
 //! `RivalKit/ResultParser.swift`.
 //!
-//! This is the app's newer answer extraction (codex footer, hook lines,
-//! double-answer dedupe, unanswered-transcript rejection). It is separate from
-//! [`crate::review::parse`], which keeps the CLI review parse behavior for
-//! output parity.
+//! It holds the one answer finder ([`final_answer`]) and the one payload
+//! decoder ([`log_payload`], [`find_payload`]) for every reader: the TUI and
+//! Rival.app ([`parse_run_result`]) and the CLI review, security and plan
+//! commands (`review::parse_reviewer_log`, `review::parse_plan_log`).
 
 use std::collections::HashMap;
 
@@ -250,7 +250,7 @@ pub fn json_objects(s: &str) -> Vec<&str> {
 const REVIEWER_EXAMPLE_SUMMARY: &str = "1-3 sentence reviewer summary";
 const PLAN_EXAMPLE_SUMMARY: &str = "1-3 sentence overall assessment of the plan";
 
-const NO_ANSWER: &str = "no answer in the log";
+pub(crate) const NO_ANSWER: &str = "no answer in the log";
 
 /// A finding copied from a schema example. Exact literals only: real dual
 /// categories like "bug|security" stay.
@@ -263,39 +263,69 @@ pub fn is_placeholder_finding(f: &Finding) -> bool {
     }
 }
 
-struct Payload {
-    summary: String,
-    rating: i64,
-    findings: Vec<Finding>,
+/// A decoded review or plan payload. Placeholder findings are dropped; the
+/// model's order is kept.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Payload {
+    pub summary: String,
+    /// The 1..=10 rating of a plan payload; None for a code review.
+    pub rating: Option<u8>,
+    pub findings: Vec<Finding>,
 }
 
-/// Extracts a run's answer from the raw (unsanitized) log tail:
-///
-/// 1. [`final_answer`] of `raw`.
-/// 2. The last JSON object with summary, rating and findings keys, a 1..=10
-///    rating and not the plan schema example → `Findings` with a rating.
-/// 3. Else the last object with summary and findings keys, no rating key, not
-///    the reviewer schema example → `Findings` without a rating. An object
-///    with a rating outside 1..=10 is rejected, not demoted to a review.
-/// 4. Else, when the answer looks like JSON (starts with "{", or a ```json
-///    fence) → `Failed` with the decode reason.
-/// 5. Else a non-empty sanitized answer → `Markdown`, unless the log is a
-///    codex transcript with no answer header: that text is the echoed prompt
-///    and tool output, not an answer.
-/// 6. Else `Failed("no answer in the log")`.
-pub fn parse_run_result(raw: &str) -> RunResult {
-    let answer = final_answer(raw);
-    // A codex transcript with no answer header holds only the echoed prompt
-    // and tool output. The prompt's own examples (the clean-review
-    // {"summary": "No issues found.", "findings": []}) must never pass as the
-    // answer, so this check comes before the JSON scan.
-    if answer == raw && is_codex_transcript(raw) {
-        return failed(NO_ANSWER.to_string());
-    }
+/// Which payloads [`find_payload`] accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PayloadKind {
+    /// Only a plan payload: summary, rating and findings keys.
+    Plan,
+    /// A plan payload, else a code review payload (no rating key).
+    Any,
+}
 
-    // Key presence is real presence: a null value still counts.
+/// Why a log has no payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PayloadError {
+    /// A codex transcript with no answer header: its text is the echoed
+    /// prompt and tool output, not an answer.
+    NoAnswer,
+    /// No payload decoded. The text is the last decode error of a
+    /// payload-shaped object, if there was one.
+    NotFound(Option<String>),
+}
+
+/// The payload of a provider log: [`find_payload`] in its [`final_answer`].
+/// A codex transcript with no answer header gives
+/// [`PayloadError::NoAnswer`]: the prompt's own examples (the clean-review
+/// `{"summary": "No issues found.", "findings": []}`) must never pass as the
+/// answer.
+pub fn log_payload(raw: &str, kind: PayloadKind) -> Result<Payload, PayloadError> {
+    let answer = final_answer(raw);
+    if is_unanswered(raw, &answer) {
+        return Err(PayloadError::NoAnswer);
+    }
+    find_payload(&answer, kind).map_err(PayloadError::NotFound)
+}
+
+/// A codex transcript whose answer finder found no header.
+fn is_unanswered(raw: &str, answer: &str) -> bool {
+    answer == raw && is_codex_transcript(raw)
+}
+
+/// The payload in `text`. It scans the whole text; a provider log goes
+/// through [`log_payload`].
+///
+/// 1. The last JSON object with summary, rating and findings keys, a 1..=10
+///    rating and not the plan schema example: a plan payload.
+/// 2. Else, for [`PayloadKind::Any`], the last object with summary and
+///    findings keys, no rating key, not the reviewer schema example: a code
+///    review payload. An object with a rating outside 1..=10 is rejected,
+///    not demoted to a review.
+///
+/// Key presence is real presence: a null value still counts. An object that
+/// does not decode is skipped; the error is the last such decode error.
+pub fn find_payload(text: &str, kind: PayloadKind) -> Result<Payload, Option<String>> {
     let mut candidates: Vec<(Fields, bool)> = Vec::new();
-    for obj in json_objects(&answer) {
+    for obj in json_objects(text) {
         let Ok(map) = serde_json::from_str::<Fields>(obj) else {
             continue;
         };
@@ -317,19 +347,59 @@ pub fn parse_run_result(raw: &str) -> RunResult {
 
     for (map, _) in candidates.iter().rev().filter(|(_, r)| *r) {
         let Some(p) = decode(map) else { continue };
-        if p.summary.trim() == PLAN_EXAMPLE_SUMMARY || !(1..=10).contains(&p.rating) {
+        // A blank summary is not a plan answer: a rating with no summary
+        // must never show as a clean plan.
+        if p.summary.trim().is_empty()
+            || p.summary.trim() == PLAN_EXAMPLE_SUMMARY
+            || !(1..=10).contains(&p.rating)
+        {
             continue;
         }
         let rating = u8::try_from(p.rating).ok();
-        return findings_result(p.summary, rating, p.findings);
+        return Ok(payload(p.summary, rating, p.findings));
     }
-    for (map, _) in candidates.iter().rev().filter(|(_, r)| !*r) {
-        let Some(p) = decode(map) else { continue };
-        if p.summary.trim() == REVIEWER_EXAMPLE_SUMMARY {
-            continue;
+    if kind == PayloadKind::Any {
+        for (map, _) in candidates.iter().rev().filter(|(_, r)| !*r) {
+            let Some(p) = decode(map) else { continue };
+            if p.summary.trim() == REVIEWER_EXAMPLE_SUMMARY {
+                continue;
+            }
+            return Ok(payload(p.summary, None, p.findings));
         }
-        return findings_result(p.summary, None, p.findings);
     }
+    Err(last_error)
+}
+
+fn payload(summary: String, rating: Option<u8>, findings: Vec<Finding>) -> Payload {
+    Payload {
+        summary,
+        rating,
+        findings: findings
+            .into_iter()
+            .filter(|f| !is_placeholder_finding(f))
+            .collect(),
+    }
+}
+
+/// Extracts a run's answer from the raw (unsanitized) log tail:
+///
+/// 1. [`final_answer`] of `raw`. A codex transcript with no answer header →
+///    `Failed("no answer in the log")`.
+/// 2. [`find_payload`] of the answer → `Findings`.
+/// 3. Else, when the answer looks like JSON (starts with "{", or a ```json
+///    fence) → `Failed` with the decode reason.
+/// 4. Else a non-empty sanitized answer → `Markdown`.
+/// 5. Else `Failed("no answer in the log")`.
+pub fn parse_run_result(raw: &str) -> RunResult {
+    let answer = final_answer(raw);
+    // This check comes before the JSON scan: see `log_payload`.
+    if is_unanswered(raw, &answer) {
+        return failed(NO_ANSWER.to_string());
+    }
+    let last_error = match find_payload(&answer, PayloadKind::Any) {
+        Ok(p) => return findings_result(p),
+        Err(e) => e,
+    };
 
     let trimmed = answer.trim();
     if let Some(json) = json_looking(trimmed) {
@@ -356,15 +426,11 @@ fn failed(reason: String) -> RunResult {
     RunResult::Failed { reason }
 }
 
-fn findings_result(summary: String, rating: Option<u8>, findings: Vec<Finding>) -> RunResult {
-    let real = findings
-        .into_iter()
-        .filter(|f| !is_placeholder_finding(f))
-        .collect();
+fn findings_result(p: Payload) -> RunResult {
     RunResult::Findings {
-        summary,
-        rating,
-        groups: severity_groups(sorted_findings(real)),
+        summary: p.summary,
+        rating: p.rating,
+        groups: severity_groups(sorted_findings(p.findings)),
     }
 }
 
@@ -399,8 +465,15 @@ fn json_looking(s: &str) -> Option<&str> {
 /// (serde_json without `float_roundtrip` parses floats best-effort).
 type Fields = HashMap<String, Box<RawValue>>;
 
-fn decode_payload(map: &Fields) -> Result<Payload, String> {
-    Ok(Payload {
+/// A payload as decoded, before the rating and summary checks.
+struct RawPayload {
+    summary: String,
+    rating: i64,
+    findings: Vec<Finding>,
+}
+
+fn decode_payload(map: &Fields) -> Result<RawPayload, String> {
+    Ok(RawPayload {
         summary: decode_str(map, "", "summary")?,
         rating: decode_int(map, "", "rating")?,
         findings: decode_findings(map)?,

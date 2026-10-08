@@ -1,6 +1,6 @@
 {
-  "name": "queue-contention",
-  "description": "Two `rival run claude --prompt-stdin` runs with RIVAL_MAX_CONCURRENT=1. Run A takes the only slot and holds it inside the fake claude. `rival queue` lists A's running ticket: position '-', mode raw, A's rival pid, a wait duration, the workdir. Run B (RIVAL_QUEUE_TIMEOUT=1s) is not promoted, prints once 'rival queue: position 1/1 (1 running), waiting <DURATION>', then fails with 'rival queue: queue timeout after 1s — queue may be wedged; ...' and exit 1. B never reaches the provider and has no session .log. `queue clear --force` then keeps A's live running ticket ('Removed 0 tickets.', 'Kept 1 live running ticket.') and `rival queue` still lists it. A keeps running, finishes with exit 0 and its stdout is the live mirror ('A done'). The pid column is normalised to <PID1> and must equal owner_pid in A's session; wait and waiting values are durations.",
+  "name": "queue-clear-force-keeps-live",
+  "description": "`rival queue clear --force` while run A (`rival run claude --prompt-stdin`, RIVAL_MAX_CONCURRENT=1) holds the only slot inside the fake claude. The force clear keeps A's live running ticket: it prints 'Removed 0 tickets.' and 'Kept 1 live running ticket.'. `rival queue` still lists A as running (position '-', mode raw, A's rival pid). Run B (RIVAL_QUEUE_TIMEOUT=1s) then cannot start: the run limit still holds after the force clear. B prints once 'rival queue: position 1/1 (1 running), waiting <DURATION>', fails with the queue timeout and exit 1, and never reaches the provider. A finishes with exit 0 and stdout 'A done'. The pid column is normalised to <PID1> and must equal owner_pid in A's session. A live waiting ticket, which the force clear removes, is covered by the Rust tests: the harness cannot sync on a queued run.",
   "timeout": 120,
   "env": {
     "RIVAL_MAX_CONCURRENT": "1"
@@ -64,6 +64,19 @@
     },
     {
       "run": [
+        "queue",
+        "clear",
+        "--force"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Removed 0 tickets.\nKept 1 live running ticket.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
         "queue"
       ],
       "expect": {
@@ -101,19 +114,6 @@
             }
           }
         ]
-      }
-    },
-    {
-      "run": [
-        "queue",
-        "clear",
-        "--force"
-      ],
-      "expect": {
-        "exit_code": 0,
-        "stdout": "Removed 0 tickets.\nKept 1 live running ticket.\n",
-        "stderr_lines": [],
-        "log_events": []
       }
     },
     {

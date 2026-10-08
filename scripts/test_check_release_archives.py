@@ -232,7 +232,7 @@ class VersionTest(unittest.TestCase):
     def test_run_version_isolates_home(self):
         stub = (b"#!/bin/sh\n"
                 b'[ "$HOME" = "$USERPROFILE" ] && [ "$RIVAL_HOME" = "$HOME/.rival" ] || exit 7\n'
-                b'[ "$RIVAL_NO_UPDATE_CHECK$RIVAL_NO_TELEMETRY$DO_NOT_TRACK" = 111 ] || exit 8\n'
+                b'[ "$RIVAL_NO_UPDATE_CHECK" = 1 ] || exit 8\n'
                 b'[ "$1" = version ] || exit 9\n'
                 b'printf "banner\\n  1.2.3\\n"\n')
         self.assertEqual(cra.run_version(stub, "rival"), "banner\n  1.2.3\n")

@@ -116,14 +116,78 @@ fn round_seconds_rounds_half_away_from_zero() {
     }
 }
 
+fn report(removed: usize, kept_live: usize) -> ClearReport {
+    ClearReport { removed, kept_live }
+}
+
 #[test]
 fn clear_message_plurals() {
-    assert_eq!(clear_message(0, false), "Removed 0 dead tickets.\n");
-    assert_eq!(clear_message(1, false), "Removed 1 dead ticket.\n");
-    assert_eq!(clear_message(2, false), "Removed 2 dead tickets.\n");
-    assert_eq!(clear_message(0, true), "Removed 0 tickets.\n");
-    assert_eq!(clear_message(1, true), "Removed 1 ticket.\n");
-    assert_eq!(clear_message(5, true), "Removed 5 tickets.\n");
+    assert_eq!(
+        clear_message(report(0, 0), false),
+        "Removed 0 dead tickets.\n"
+    );
+    assert_eq!(
+        clear_message(report(1, 0), false),
+        "Removed 1 dead ticket.\n"
+    );
+    assert_eq!(
+        clear_message(report(2, 0), false),
+        "Removed 2 dead tickets.\n"
+    );
+    assert_eq!(clear_message(report(0, 0), true), "Removed 0 tickets.\n");
+    assert_eq!(clear_message(report(1, 0), true), "Removed 1 ticket.\n");
+    assert_eq!(clear_message(report(5, 0), true), "Removed 5 tickets.\n");
+}
+
+/// `--force` says how many live running tickets it kept. A plain clear
+/// keeps every live ticket, so it prints no kept line.
+#[test]
+fn clear_message_kept_live() {
+    assert_eq!(
+        clear_message(report(2, 1), true),
+        "Removed 2 tickets.\nKept 1 live running ticket.\n"
+    );
+    assert_eq!(
+        clear_message(report(0, 3), true),
+        "Removed 0 tickets.\nKept 3 live running tickets.\n"
+    );
+    assert_eq!(
+        clear_message(report(1, 2), false),
+        "Removed 1 dead ticket.\n"
+    );
+}
+
+/// Through the root: `--force` removes a live waiting ticket and keeps a
+/// live running one (this test process is the live owner).
+#[test]
+fn queue_clear_force_keeps_live_running_ticket() {
+    let fix = Fixture::new();
+    let dir = fix.cfg.paths().queue_dir();
+    std::fs::create_dir_all(&dir).unwrap();
+    let pid = std::process::id();
+    let start = rival_core::procinfo::start_nanos(pid as i32).unwrap_or(0);
+    let write = |name: &str, state: &str| {
+        std::fs::write(
+            dir.join(format!("{name}.json")),
+            format!(
+                r#"{{"id":"{name}","mode":"review","pid":{pid},"pid_start":{start},"state":"{state}","created_at":"2026-01-02T03:04:05Z"}}"#
+            ),
+        )
+        .unwrap();
+    };
+    write("0000000000000000001-1-run", queue::STATE_RUNNING);
+    write("0000000000000000002-1-wait", queue::STATE_WAITING);
+    let mut stdin = FakeStdin::new("");
+    assert_eq!(
+        execute(&fix, &mut stdin, &["queue", "clear", "--force"]),
+        (
+            0,
+            "Removed 1 ticket.\nKept 1 live running ticket.\n".into(),
+            String::new()
+        )
+    );
+    assert!(dir.join("0000000000000000001-1-run.json").exists());
+    assert!(!dir.join("0000000000000000002-1-wait.json").exists());
 }
 
 fn session(id: &str, cli: &str, model: &str, status: &str, effort: &str, dur: &str) -> Session {

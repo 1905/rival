@@ -9,7 +9,6 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 ## Phase boundary
 
 - `tui`: only the parser and `tui --help` are covered here. The interactive dashboard is Task 4.5 and Gate P4. Nothing at Gate P3 is TUI acceptance.
-- Telemetry: the runner always sets `RIVAL_NO_TELEMETRY=1`, so no scenario initializes Sentry. Opt-out rules, client options and the no-automatic-capture rule are unit-tested (`rival_core::telemetry::tests`, `root::tests::only_a_normal_return_reaches_the_telemetry_flush`).
 
 ## Root and help
 
@@ -27,7 +26,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 |---|---|---|
 | `command` (prints help), `-h` | root-help-and-errors (help) | root-help-and-errors (`command extra`) |
 | `--detach` | detach-wait-success, detach-wait-failure, detach-wait-crash, detach-wait-timeout, detach-redirect-unlink | detach-wait-crash |
-| `command codex` | executor-codex-success, mr-review-success | executor-codex-failure, executor-codex-quota, executor-codex-missing-runtime, executor-codex-auth-unavailable, mr-* refusals, mr-checkout-fetch-failure |
+| `command codex` | executor-codex-success, mr-review-success, mr-encoded-link | executor-codex-failure, executor-codex-quota, executor-codex-missing-runtime, executor-codex-auth-unavailable, mr-* refusals, mr-checkout-fetch-failure |
 | `command codex --no-queue`, `--workdir` | command-codex-no-queue-workdir | workdir-missing |
 | `command claude` | executor-claude-success, executor-claude-docker-success | executor-claude-failure, executor-claude-quota, executor-claude-missing-runtime, executor-claude-docker-failure, executor-claude-docker-quota |
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
@@ -35,7 +34,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
 | `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
 | `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
-| `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-missing-file |
+| `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |
@@ -80,7 +79,7 @@ Concurrent reviewers (plan-dual-models) bind each session file by its `cli` fiel
 | `queue` (empty) | queue-empty, queue-clear, queue-contention | root-help-and-errors (unknown flag) |
 | `queue` (live ticket listing) | queue-contention | — |
 | `queue clear` | queue-clear | — |
-| `queue clear --force` | queue-clear, queue-contention | — |
+| `queue clear --force` | queue-clear, queue-contention, queue-clear-force-keeps-live | — |
 | `sessions` (empty) | sessions-empty | — |
 | `sessions` (listing, newest first, engine labels, `running...`) | sessions-list | — |
 | `sessions --active` | sessions-list | — |
@@ -126,7 +125,7 @@ Numeric ordering (`1.2.3` < `1.10.0`, `v` prefixes, two-part versions) is unit-t
 
 `expect.dirs` asserts that `<ROOT>/tmp` (TMPDIR) exists and is empty after the run:
 
-- mr-review-success: the checkout was created, used and removed.
+- mr-review-success, mr-encoded-link: the checkout was created, used and removed.
 - mr-checkout-fetch-failure: the checkout was created, the fetch failed, and Prepare removed it.
 - mr-glab-wrong-mr, mr-glab-wrong-project, mr-glab-stale-diff-refs, mr-glab-api-failure, mr-no-matching-remote, mr-raw-prompt-rejected: no checkout was ever created; tmp stays empty.
 - run-grok-flags: the grok prompt temp file is removed.

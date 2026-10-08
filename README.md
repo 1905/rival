@@ -260,7 +260,7 @@ Top-level commands (`rival --help`):
 | `rival wait` | Blocks until detached runs finish. |
 | `rival tui` | Full-screen session monitor. |
 | `rival sessions [--active] [--recent N]` | Prints sessions as a text table. |
-| `rival queue` / `rival queue clear [--force]` | Shows queue tickets. `clear` removes dead tickets; `--force` removes all. |
+| `rival queue` / `rival queue clear [--force]` | Shows queue tickets. `clear` removes dead tickets; `--force` also removes waiting tickets and keeps live running ones. |
 | `rival install`, `rival update`, `rival version`, `rival completion` | Setup and maintenance. |
 
 `rival command` subcommands. Each reads its input from stdin.
@@ -521,7 +521,6 @@ Environment variables:
 | `RIVAL_CLAUDE_AUTH` | `subscription` | `subscription`/`sub` or `api`. See [Claude authentication](#claude-authentication-and-sandboxing). |
 | `RIVAL_CLAUDE_TOKEN` | unset | OAuth token for the Docker Claude runtime. |
 | `RIVAL_NO_UPDATE_CHECK` | unset | Disable the update check (`CI` also disables it). |
-| `RIVAL_NO_TELEMETRY` | unset | Disable telemetry (`DO_NOT_TRACK` and `CI` also disable it). |
 | `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Set it in the process environment; repository `.env` files cannot set it. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
 
 ### Queue and timeouts

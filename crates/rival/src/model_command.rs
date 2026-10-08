@@ -258,7 +258,7 @@ pub(crate) fn finish_review(
     scope: &str,
     log_path: &str,
 ) -> Result<String, String> {
-    let parsed = review::parse_reviewer_output(review::final_answer(raw));
+    let parsed = review::parse_reviewer_log(raw);
     let reason = review::run_failure_reason(&spec.label(), raw, parsed.is_ok());
     if !reason.is_empty() {
         fail_session(cfg.paths(), sess, 1, &reason);

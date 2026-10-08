@@ -53,32 +53,32 @@ fn moonshot_env_prefixes_are_blocked() {
     assert_eq!(kept, vec![OsString::from("PATH=/bin")]);
 }
 
-/// Run options by mode, plus the task modes: every mode other than
-/// "review" gets the full-auto profile and the credential strip
-/// (`mode != "review"`).
+/// Run options by mode: only "raw" gets the full-auto profile and the
+/// credential strip. Review, the task modes (plan, security) and any other
+/// mode keep the read-only reviewer defaults.
 #[test]
 fn kimi_run_opts_by_mode() {
     let mut env = Env::new();
     env.set("MOONSHOT_API_KEY", Some("test-key"));
     let cfg = env.config();
 
-    let review = kimi_run_opts(&cfg, "review", &env.work_str());
-    assert_eq!(
-        review.permission, "",
-        "review keeps the read-only default profile"
-    );
-    assert!(
-        review.drop_env.is_empty(),
-        "review needs no extra drops (bash is denied)"
-    );
-    assert_eq!(review.api_key, "test-key");
-
-    for mode in ["raw", "plan", "security", ""] {
+    for mode in ["review", "plan", "security", "", "native"] {
         let opts = kimi_run_opts(&cfg, mode, &env.work_str());
-        assert_eq!(opts.permission, OPENCODE_FULL_AUTO_PERMISSION, "{mode}");
-        assert_eq!(opts.drop_env, strings(&KIMI_DROP_ENV), "{mode}");
+        assert_eq!(
+            opts.permission, "",
+            "{mode}: keeps the read-only default profile"
+        );
+        assert!(
+            opts.drop_env.is_empty(),
+            "{mode}: needs no extra drops (bash is denied)"
+        );
         assert_eq!(opts.api_key, "test-key", "{mode}");
     }
+
+    let raw = kimi_run_opts(&cfg, "raw", &env.work_str());
+    assert_eq!(raw.permission, OPENCODE_FULL_AUTO_PERMISSION);
+    assert_eq!(raw.drop_env, strings(&KIMI_DROP_ENV));
+    assert_eq!(raw.api_key, "test-key");
 }
 
 #[test]
@@ -171,7 +171,8 @@ fn run_kimi_request_per_mode() {
     for (mode, permission, extra_drop) in [
         ("review", OPENCODE_READ_ONLY_PERMISSION, &[][..]),
         ("raw", OPENCODE_FULL_AUTO_PERMISSION, &KIMI_DROP_ENV[..]),
-        ("plan", OPENCODE_FULL_AUTO_PERMISSION, &KIMI_DROP_ENV[..]),
+        ("plan", OPENCODE_READ_ONLY_PERMISSION, &[][..]),
+        ("security", OPENCODE_READ_ONLY_PERMISSION, &[][..]),
     ] {
         let mut sess = env.session("opencode", mode, config::KIMI_MODEL, &work);
         let mut seen = None;
@@ -228,8 +229,8 @@ fn run_kimi_request_per_mode() {
 }
 
 /// End to end: the fake opencode drains the prompt and prints its env.
-/// Review keeps inherited credentials (bash is denied there); every other
-/// mode strips them. Blocked prefixes and inherited OPENCODE_* never pass.
+/// Review and plan keep inherited credentials (bash is denied there); raw
+/// strips them. Blocked prefixes and inherited OPENCODE_* never pass.
 #[cfg(unix)]
 #[test]
 fn kimi_child_env_per_mode() {
@@ -242,7 +243,7 @@ fn kimi_child_env_per_mode() {
     env.fake("opencode", "#!/bin/sh\n/bin/cat >/dev/null\n/usr/bin/env\n");
     let cfg = env.config();
     let work = env.work_str();
-    for (mode, stripped) in [("review", false), ("raw", true), ("plan", true)] {
+    for (mode, stripped) in [("review", false), ("raw", true), ("plan", false)] {
         let mut sess = env.session("opencode", mode, config::KIMI_MODEL, &work);
         let mut out = Vec::new();
         retry_busy(
@@ -268,10 +269,10 @@ fn kimi_child_env_per_mode() {
         assert!(has("OPENAI_API_KEY_BACKUP=kept"), "{mode}");
         assert!(!text.contains("MOONSHOT_API_KEY"), "{mode}");
         assert!(!has("OPENCODE_PERMISSION={}"), "{mode}");
-        let permission = if mode == "review" {
-            OPENCODE_READ_ONLY_PERMISSION
-        } else {
+        let permission = if mode == "raw" {
             OPENCODE_FULL_AUTO_PERMISSION
+        } else {
+            OPENCODE_READ_ONLY_PERMISSION
         };
         assert!(has(&format!("OPENCODE_PERMISSION={permission}")), "{mode}");
         assert!(text.contains(r#""apiKey":"sk-env""#), "{mode}");

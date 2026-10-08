@@ -207,6 +207,41 @@ fn queue_timeout_message() {
     assert_eq!(ticket_count(&cfg), 0);
 }
 
+/// A queue I/O error during the wait prints its own text, not the cancel
+/// text. A directory at `.lock` lets `enqueue` (which takes no lock) work
+/// and makes the wait's lock open fail.
+#[test]
+fn queue_io_error_while_waiting_prints_the_error() {
+    let (_home, cfg) = temp_config();
+    let lock = cfg.paths().queue_dir().join(".lock");
+    std::fs::create_dir_all(&lock).unwrap();
+    let mut sessions = vec![queued(&cfg)];
+    let mut stderr = Vec::new();
+    let err = wait_with_manager(
+        &Context::background(),
+        cfg.paths(),
+        Some(manager(&cfg, 1, Duration::from_secs(5))),
+        &SLOT,
+        &mut sessions,
+        &mut stderr,
+    )
+    .unwrap_err()
+    .to_string();
+    let prefix = format!(
+        "rival queue: queue wait failed: open queue lock: open {}",
+        lock.display()
+    );
+    assert!(err.starts_with(&prefix), "{err}");
+    assert!(!err.contains("cancelled"), "{err}");
+    assert_eq!(sessions[0].status, "failed");
+    assert_eq!(
+        format!("rival queue: {}", sessions[0].error_msg),
+        err,
+        "session error"
+    );
+    assert_eq!(ticket_count(&cfg), 0);
+}
+
 /// An unusable queue dir logs a warning and runs unqueued.
 #[test]
 fn enqueue_failure_runs_without_queueing() {

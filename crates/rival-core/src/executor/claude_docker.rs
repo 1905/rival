@@ -124,11 +124,11 @@ pub(crate) fn run_claude_docker_with(
     }
 
     // The workdir must be absolute for the Docker volume mount. A relative
-    // path is joined with a bare "/" and the result is not cleaned. The test
-    // is for a leading "/" on every OS, so on Windows `C:\repo` becomes
-    // `<cwd>/C:\repo`: a known quirk, kept as is.
+    // path is joined with a bare "/" and the result is not cleaned. A
+    // Windows drive path (`C:\repo`) is absolute; a "/"-rooted path stays
+    // as given on every OS.
     let mut abs_workdir = workdir.to_string();
-    if !abs_workdir.starts_with('/') {
+    if !workdir.starts_with('/') && !Path::new(workdir).is_absolute() {
         let Some(wd) = cfg.cwd() else {
             bail!("get working dir: getwd: no such file or directory");
         };
@@ -152,8 +152,10 @@ pub(crate) fn run_claude_docker_with(
         &mount,
         "-w",
         "/workspace",
+        // The name only: Docker copies the value from its own environment.
+        // A value here would show in `ps` to every local user.
         "-e",
-        &format!("ANTHROPIC_AUTH_TOKEN={token}"),
+        "ANTHROPIC_AUTH_TOKEN",
         CLAUDE_DOCKER_IMAGE,
     ]
     .iter()
@@ -165,10 +167,11 @@ pub(crate) fn run_claude_docker_with(
         "{}\n{prompt}",
         cfg.build_workdir_preamble(Path::new(workdir))
     );
+    let child_env = [format!("ANTHROPIC_AUTH_TOKEN={token}")];
     let req = Request {
         binary: "docker",
         args: &args,
-        env: &[],
+        env: &child_env,
         prompt: &full_prompt,
         drop_env: &[],
         environ: cfg.environ(),
