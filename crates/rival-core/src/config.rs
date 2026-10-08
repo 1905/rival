@@ -669,10 +669,6 @@ pub struct UserConfig {
     /// Lets the skills apply fixes for CONFIRMED critical and high findings
     /// without asking. Medium and low are never auto-fixed.
     pub auto_fix_critical_high: bool,
-    /// After a review, calls the provider a second time to rewrite findings
-    /// that use words from the Simplified Technical English not-approved
-    /// list.
-    pub ste_rewrite: bool,
 }
 
 /// yaml.v3 decodes YAML null into a Go string as "", and any other scalar as
@@ -714,8 +710,6 @@ struct RawUserConfig {
     roles: Option<BTreeMap<String, GoString>>,
     #[serde(default)]
     auto_fix_critical_high: Option<bool>,
-    #[serde(default)]
-    ste_rewrite: Option<bool>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -736,7 +730,6 @@ impl From<RawUserConfig> for UserConfig {
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
             auto_fix_critical_high: raw.auto_fix_critical_high.unwrap_or_default(),
-            ste_rewrite: raw.ste_rewrite.unwrap_or_default(),
         }
     }
 }
@@ -985,11 +978,6 @@ impl Config {
         } else {
             "off"
         }
-    }
-
-    /// Whether `ste_rewrite` is on (default off).
-    pub fn ste_rewrite(&self) -> bool {
-        self.user.as_ref().is_some_and(|u| u.ste_rewrite)
     }
 
     /// The raw `security.reviewer` value, or "" when unset.

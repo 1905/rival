@@ -87,9 +87,6 @@ const SEVERITY_RUBRIC: &str = severity_rubric!();
 #[cfg(test)]
 const FAILURE_SCENARIO_RULE: &str = failure_scenario_rule!();
 
-/// The writing rules as one constant, for the rewrite prompt.
-pub(crate) const WRITING_RULES: &str = writing_rules!();
-
 /// Go: `cleanReviewExampleLine`.
 pub(crate) const CLEAN_REVIEW_EXAMPLE_LINE: &str = clean_review_example_line!();
 
