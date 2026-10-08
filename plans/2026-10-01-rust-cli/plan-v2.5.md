@@ -1,7 +1,7 @@
 # Rust CLI + TUI — Implementation Plan v2.5
 
 **Date:** 2026-10-03
-**Status:** in-progress — implementation corrections within the scope approved 2026-10-02
+**Status:** superseded by v2.6
 **Changes from v2.4:** Split the remaining Windows error-format corrections into Task 5.3 after native CI exposed platform assumptions. The process, detach, stop and queue tests already passed natively. This preserves the approved CLI behavior and release scope.
 **Changes from v2.3:** Add Task 5.0 to preserve Go's macOS pipe/spawn synchronization. Source inspection proved the port omitted it. Its relation to the intermittent P4 cancellation failure remains unproven. The feature and release scope is unchanged.
 **Changes from v2.2:** P3 is merged. The required live plan test exposed Windows spawn/console gaps and an incomplete Go-retirement checklist. This revision keeps the approved behavior and adds a documented owner Job guard, console-aware detach flags, startup-race tests and explicit source-test retirement. No feature or release authorization changes. Full functional-test review output: `reviews/p3-live-plan-review.txt`.
@@ -308,14 +308,16 @@ Files: `crates/rival-core/src/gostd.rs`, `crates/rival-core/Cargo.toml` if a Win
 - [x] Port Go1.25.14 `syscall.Errno.Error` for Windows raw OS errors: request English text first, then the system language if the English message is unavailable. Preserve buffer growth, trimming and unknown-code fallback from the source. Leave Unix errors unchanged. Use the existing windows-sys dependency; do not change the process's locale.
 - [x] Correct the Windows `resolve_workdir` non-not-found error operation, verified against Go `os/stat_windows.go`. Preserve Go's not-found classification and existing success/path semantics. Cover a deterministic non-not-found case under a private fixture, such as an embedded NUL. Do not turn every OS error into one generic message. Record any rare syscall-fallback distinction that cannot be reproduced or preserved by the chosen boundary.
 - [x] Keep native directory-open/read assertions introduced by the CI correction. Add focused source-derived error-format tests, including English-first/fallback behavior at an injectable boundary where needed. Do not require a language pack, network share, elevated privileges, real CLI or shared environment mutation.
-- [ ] Run affected focused tests, formatting, strict Clippy and build. The controller runs all three native CI jobs and checks the final Windows assertions before the P5 merge. Stub-C lint/type checks alone do not satisfy this gate.
+- [x] Run affected focused tests, formatting, strict Clippy and build. The controller runs all three native CI jobs and checks the final Windows assertions before the P5 merge. Stub-C lint/type checks alone do not satisfy this gate.
 
 **Task 5.3 local verification:** 1,231 workspace tests passed with ten intentional helper/generator ignores. Formatting, strict Clippy, build and Windows-target lint passed. Go uses a fixed 300-unit error buffer; no growth was added. Windows NUL fails in filepath.Abs before os.Stat. Full native CI at the final revision remains the P5 gate.
 
 ### Gate P5 `gate`
-- [ ] CI green on all three; orchestrator reviews the Windows-only code paths. Merge.
+- [x] CI green on all three; orchestrator reviews the Windows-only code paths. Merge.
 
 ---
+
+**P5 delivered:** `cb182c1` merged and pushed after [CI37086794043](https://github.com/1905/rival/actions/runs/37086794043) passed Windows, macOS and Linux. Windows passed 1,145 tests with eleven intentional helper/generator ignores. All new error-format/workdir assertions passed natively. Both Unix hosts passed all 84 scenarios; Swift decoding passed on macOS. Native process-test names and results are in `reviews/p5-windows-native.txt`.
 
 ## P6 — switch (`feature/rust-p6-switch`)
 

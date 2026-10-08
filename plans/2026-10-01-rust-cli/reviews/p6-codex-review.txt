@@ -1,0 +1,22 @@
+
+═══ RIVAL REVIEW ═══
+
+Model: codex (gpt-6-astra)
+Scope: 36f2e6c..HEAD
+
+Summary: Found two defects in Windows support: blocked environment variables can bypass filtering, and the Claude Docker fallback constructs invalid mount paths.
+
+1. [crit] Environment filtering ignores Windows case-insensitive names — crates/rival-core/src/executor/subprocess.rs:118
+   safe_env uses case-sensitive prefix comparisons, although Windows treats environment names case-insensitively. Repository .env entries such as Node_Options therefore survive filtering and reach the provider. For a Node-based Claude installation, this permits JavaScript execution before its review restrictions initialize. drop_matches has the same defect for credential removal.
+   Scenario: On Windows, review a repository containing Node_Options=--require=./payload.cjs in .env using a Node-based Claude installation → the repository's payload executes with the user's privileges before the review starts.
+   Fix: Compare environment names and prefixes case-insensitively on Windows in safe_env and drop_matches, preserving Unix behavior. Add mixed-case regression cases.
+   (security, confidence 9)
+
+2. [high] Absolute Windows workdirs produce invalid Docker mounts — crates/rival-core/src/executor/claude_docker.rs:134
+   Command entry points already resolve workdir to an absolute path. Checking only for a leading slash misclassifies Windows drive paths and prepends the current directory again. The resulting volume specification prevents the documented Docker fallback from starting.
+   Scenario: On Windows, run a Claude command from C:\repo with Docker configured and no native claude executable → the mount becomes C:\repo/C:\repo:/workspace:ro, and Docker rejects it.
+   Fix: Use the platform-aware paths::is_abs/paths::abs helpers, or pass the already resolved workdir directly. Update the test that currently asserts the malformed Windows mount.
+   (bug, confidence 10)
+
+Findings: 2 total — 1 crit, 1 high, 0 med, 0 low
+Log: /Users/kass/dev/rival/worktrees/rust-cli/.superpowers/sdd/plan-v2.2/final-review-GYFzIJ/home/.rival/sessions/13142704-00d2-42af-81be-88464efbfc21.log

@@ -64,6 +64,7 @@ fn run_with(
             stdin,
             stdout: &mut stdout,
             stderr: &mut stderr,
+            live_stdout: None,
             prepare_mr: &*prepare,
             signals: false,
         };
@@ -331,6 +332,7 @@ fn update_check_wait_is_bounded() {
         stdin: &mut stdin,
         stdout: &mut stdout,
         stderr: &mut stderr,
+        live_stdout: None,
         prepare_mr: &*prepare,
         signals: false,
     };
@@ -513,6 +515,7 @@ fn only_a_normal_return_reaches_the_telemetry_flush() {
             stdin: &mut stdin,
             stdout: &mut stdout,
             stderr: &mut stderr,
+            live_stdout: None,
             prepare_mr: &*prepare,
             signals: false,
         };

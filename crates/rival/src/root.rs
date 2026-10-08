@@ -289,11 +289,18 @@ pub struct CmdEnv<'a> {
     pub stdin: &'a mut dyn StdinSource,
     pub stdout: &'a mut (dyn Write + Send),
     pub stderr: &'a mut (dyn Write + Send),
+    /// Opens an owned handle to the real stdout for `rival run`'s live
+    /// mirror (see [`crate::mirror`]). `None` mirrors to `stdout` directly,
+    /// as tests do.
+    pub live_stdout: Option<&'a LiveStdout>,
     pub prepare_mr: &'a PrepareMr,
     /// Whether SIGINT/SIGTERM cancel a run (production). Tests use a plain
     /// cancellable context instead of process-wide handlers.
     pub signals: bool,
 }
+
+/// Makes an owned stdout writer for a thread that can outlive a borrow.
+pub type LiveStdout = dyn Fn() -> Box<dyn Write + Send> + Sync;
 
 /// Go `signal.NotifyContext(...)` plus its deferred `stop()`.
 pub enum SignalScope {
@@ -392,11 +399,13 @@ pub fn main_entry() -> i32 {
     let mut stdout = ProcessStdout;
     let mut stderr = io::stderr();
     let prepare: &PrepareMr = &mergerequest::prepare;
+    let live: &LiveStdout = &|| Box::new(ProcessStdout);
     let mut env = CmdEnv {
         cfg: &cfg,
         stdin: &mut stdin,
         stdout: &mut stdout,
         stderr: &mut stderr,
+        live_stdout: Some(live),
         prepare_mr: prepare,
         signals: true,
     };

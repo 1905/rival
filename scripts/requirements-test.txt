@@ -1,0 +1,4 @@
+# Python dependencies of the scripts/ unittest suite (test_release_config.py
+# imports yaml). CI installs this file; locally use a venv:
+#   python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements-test.txt
+PyYAML==6.0.3

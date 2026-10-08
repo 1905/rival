@@ -2,61 +2,34 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v4.2.0](https://github.com/1905/rival/releases/tag/v4.2.0) — 2026-10-07.
+Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-07.
 
 ## [Unreleased]
 
-### In progress — Rust CLI port
-- Matched Go's Windows error language, fallback text and invalid work-directory errors. Local checks pass 1,231 tests; final native CI remains pending. Rare stat fallback operations remain a documented compatibility limit.
-- Corrected Windows test fixtures for paths, OS errors, executable extensions, temp directories and timestamp precision. Read-only file opens now preserve Go's directory-read behavior. All 1,227 local workspace tests pass; the native rerun remains pending.
-- Added native Windows CI alongside macOS/Linux. Pinned byte-contract inputs to LF and retained all Windows process tests. Local Windows Rust lint checks pass; hosted results remain pending.
-- Added the Windows process layer: owner/provider Jobs, cancellable pipes, console-aware detach, PID-safe stop recovery, executable lookup and path handling. Local validation: 1,227 workspace tests, build and strict Clippy passed. Native Windows checks remain pending.
-- Guarded macOS pipe setup against concurrent process launches, including the signal pipe. An isolated regression detects the missing lock. Local validation: 1,207 workspace tests and seven terminal checks passed. The guard covers Rival calls; foreign libraries remain outside it.
-- Added the Result tab with parsed findings, expandable details, Markdown and live/failure notes. Background parsing is cached and rejects stale responses. Local validation: 1,205 workspace tests, terminal cleanup checks and 33 Go/Rust screenshots passed. Native Windows and release-switch gates remain pending.
-- Corrected the cancellation fixture to stop forking after readiness. Failures now record bounded process-tree diagnostics. All 1,162 workspace tests pass locally; the earlier hosted failure remains unexplained.
-- Added terminal Markdown rendering with styled headings, hanging lists, code and links. Entity-decoded terminal controls are stripped. Local validation: 1,160 workspace tests passed; a macOS cancellation timing failure remains under investigation.
-- Added the app's Result parser with answer deduplication, prompt-echo rejection and severity grouping. All 39 Swift parser cases pass in Rust, plus integer-boundary regressions. Local validation: 1,134 workspace tests passed; Result rendering remains pending.
-- Wired the interactive TUI with background jobs, signal handling and terminal cleanup. Update notices wait until exit. Fixed piped-input startup and quick-quit log opening. Local validation: 1,091 workspace tests and seven real terminal checks passed; Result and native Windows acceptance remain pending.
-- Added Raw, Prompt and Info detail tabs, search, follow mode, group-member selection and log previews. Stop jobs recheck completed sessions and process identity. Log copies have owned cleanup. Local validation: 1,068 workspace tests passed; terminal wiring and Result remain pending.
-- Added TUI text/status filtering, calendar sections, stable selection and 50-run pages. Six full frame goldens and daylight-saving regressions pass. Local validation: 966 workspace tests passed; detail views and terminal acceptance remain pending.
-- Added TUI keyboard modes, loading progress, resize handling and theme. Text clipping keeps joined emoji and combining characters intact. Local validation: 915 workspace tests passed; full list/detail content and terminal wiring remain in progress.
-- Added cached session summaries, grouped status and elapsed time, and a file watcher with cancellation and cleanup. Local validation: 851 workspace tests passed; interactive TUI and native Windows acceptance remain pending.
-- Added the Rust workspace, configuration, session storage, log parsing, and macOS/Linux process identity support.
-- Added Rust queue tickets, FIFO locking, cancellation, and independent-process queue tests. CLI wiring remains pending.
-- Added detach and wait logic, inherited-descriptor checks, and authored success/failure/crash/timeout scenarios. The command scenarios remain unrun until P3.
-- Scenario checks now link short session IDs to full UUIDs and reject unknown or ambiguous prefixes.
-- Added provider subprocess execution, quota detection, process-group cancellation, and bounded pipe draining. Required macOS and Linux CI checks pass.
-- Ported Codex, Claude native/Docker, Grok, K3 and OpenCode adapters with exact argument and environment tests. Added 22 command scenarios; execution remains pending P3.
-- Fixed the Rust macOS launch path to reject invalid executable formats, matching Go. Regression checks pass on hosted macOS and Linux.
-- Ported prompt and review argument parsing, Git scope detection, and diff preambles. Local source-derived tests pass; command wiring remains pending P3.
-- Ported review prompts, assessment parsing, console formatting, and queue-slot cleanup. Prompt byte checks and final-answer regressions pass on macOS and Linux.
-- Ported concurrent plan/document reviews with stable result order, one queue slot per batch, and cleanup on cancellation or panic. Added four review scenarios; command wiring and scenario execution remain pending P3.
-- Ported GitLab MR snapshots, exact base/head checks, host-specific authentication, and checkout cleanup. Local Git tests preserve the caller's files, index and refs. Seven MR scenarios await P3 command execution.
-- Added shared Go/Rust session fixtures and byte-level writer checks, plus an isolated fake-provider scenario runner.
-- Added macOS/Linux CI and Swift decoding checks for the Rust writer fixtures.
-- Fixed existing Go test fixtures that required an installed OpenCode CLI or raced stdin writes.
-- Fixed the Go Codex plan fixture to consume stdin before exit, removing an intermittent Linux CI broken-pipe failure.
-- Added bounded runner startup diagnostics and task-owned failure cleanup. Local update fixtures avoid reverse DNS lookups.
-- Separated fake-process stack dumps so concurrent diagnostics cannot corrupt each other's output.
-- Added clap command parsing, model command/run execution, shared absolute workdir handling, help and shell completion. Eleven fake-provider and detach/wait scenarios pass locally.
-- Added scoped SIGINT/SIGTERM cancellation and closed-standard-descriptor compatibility. Linked debug/release checks pass on macOS and Linux.
-- Fixed a cancellation test fixture that published readiness before its expected output.
-- Added Rust plan, antislop and security commands with source-compatible validation, final-answer parsing and completion-save error handling. Twelve command scenarios pass locally.
-- Removed the same readiness race from the escaped-pipe test fixture without changing its cleanup checks.
-- Added Rust skill installation for Claude Code and Codex, including buffered prompts, forced updates and retired-skill cleanup. Four isolated installer scenarios pass.
-- Copied all embedded skill assets unchanged and updated the version-bump script for both source trees. Temporary-copy checks pass; missing skill files now make the script fail.
-- Added Rust queue/session commands, the version banner, cached update checks, Homebrew updates and the existing telemetry opt-outs. Release builds ignore the scenario endpoint override.
-- All 84 non-TUI command scenarios now pass locally. CI runs the full set, including isolated updates, concurrent reviewers, MR cleanup and help/flag coverage.
-- Verified detached-owner crash reporting and later session/queue recovery. Real code and plan reviews completed and opened in Rival.app. The P3 gate passed on macOS and Linux.
-- Recorded the existing partial skill-write risk and ineffective Go panic wrapper. The port preserves these behaviors.
-- TUI, Windows support, and the release switch remain unfinished. The shipped CLI is still Go.
-- Invalid YAML keeps the existing error prefix; parser detail text differs in Rust.
+## [v5.0.0] — 2026-10-07
+
+The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 84 end-to-end scenarios check them on macOS and Linux.
 
 ### Changed
+- Releases ship the Rust CLI. Homebrew installs it on macOS and Linux, from the same archive names as before.
+- `rival tui` is rebuilt. It has a Result tab with parsed findings, expandable details and Markdown. Finished runs open on Result. Live runs open on Raw.
 - `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
+- Repository `.env` files can no longer set `RIVAL_HOME`. Set it in the process environment instead.
+
+### Added
+- Windows support: `rival_windows_amd64.zip` and `rival_windows_arm64.zip`. The README has install steps. The binary is not code-signed.
+- `ste_rewrite` in `~/.rival/config.yaml` (off by default). After a review with 3 or more words from the Simplified Technical English not-approved list, rival calls the provider once more to rewrite the text fields. It keeps the rewrite only if the findings and their non-text fields are unchanged and the flagged-word count drops. The word lists ship as `crates/rival-core/data/ste.json`. On 93 findings from 24 local reviews the check flags many ordinary code words, such as `request` and `state`, so expect false positives.
 
 ### Fixed
 - `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+- Claude in Docker: a cancelled or timed-out run now removes its container. Before, the container kept running against the mounted project after Rival freed the queue slot.
+- `rival run`: a stdout reader that keeps the pipe open but stops reading no longer holds the run past a cancel or `RIVAL_RUN_TIMEOUT`. The live copy is dropped after the timeout; the session log keeps all output.
+- Codex reviews: a transcript with no final answer no longer counts as a review when a tool printed review-shaped JSON.
+
+### Known limits
+- The config parser is `serde-saphyr`, not Go's `yaml.v3`. Rare YAML edge cases can parse differently.
+- Windows UNC network paths and TUI terminal restore on native Windows are not verified.
+- Inherited Go bugs listed in `plans/2026-10-01-rust-cli/plan-v2.10.md` are kept on purpose.
 
 ## [v4.2.0] — 2026-10-07
 

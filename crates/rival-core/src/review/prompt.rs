@@ -1,8 +1,7 @@
 //! Reviewer prompts. Go: `internal/review/prompt.go`.
 //!
-//! The texts are byte copies of the Go constants and function results. Tests
-//! pin them by length and SHA-256 and, while the Go tree exists, compare
-//! them with `prompt.go`.
+//! The texts started as byte copies of the Go constants. Tests pin them by
+//! length and SHA-256.
 
 use crate::config::{Config, PromptKind};
 
@@ -52,6 +51,26 @@ macro_rules! failure_scenario_rule {
     };
 }
 
+/// The plain-writing rules for the free-text fields. The reviewer contract
+/// and the rewrite pass both splice them.
+macro_rules! writing_rules {
+    () => {
+        r#"## Writing rules
+
+Write summary, title, body, failure_scenario and suggestion in plain, literal English.
+- One fact per sentence. Use 20 words or fewer per instruction and 25 or fewer per explanation.
+- Use the active voice and simple tenses. Name who or what acts.
+- Use the verb, not a noun built from it: "check the log", not "perform a check of the log".
+- Use one word for one thing. Do not rotate synonyms.
+- Do not stack hedges. Keep real doubt as one "may" or "might" and say what you did not check. Never turn "may fail" into "fails".
+- Do not use semicolons, phrasal verbs ("spin up", "kick off"), or words that claim quality ("robust", "seamless", "powerful").
+- Do not state a cause, a frequency or a fix you did not verify in the code.
+- Keep identifiers, paths and quoted errors exactly as written.
+
+"#
+    };
+}
+
 /// The contract's clean-review example. Echo detection looks for it in the
 /// raw output, so it is one constant.
 macro_rules! clean_review_example_line {
@@ -67,6 +86,9 @@ const SEVERITY_RUBRIC: &str = severity_rubric!();
 /// Go: `failureScenarioRule`. Production code splices the macro.
 #[cfg(test)]
 const FAILURE_SCENARIO_RULE: &str = failure_scenario_rule!();
+
+/// The writing rules as one constant, for the rewrite prompt.
+pub(crate) const WRITING_RULES: &str = writing_rules!();
 
 /// Go: `cleanReviewExampleLine`.
 pub(crate) const CLEAN_REVIEW_EXAMPLE_LINE: &str = clean_review_example_line!();
@@ -204,19 +226,8 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
 }
 ```
 
-## Writing rules
-
-Write summary, title, body, failure_scenario and suggestion in plain, literal English.
-- One fact per sentence. Use 20 words or fewer per instruction and 25 or fewer per explanation.
-- Use the active voice and simple tenses. Name who or what acts.
-- Use the verb, not a noun built from it: "check the log", not "perform a check of the log".
-- Use one word for one thing. Do not rotate synonyms.
-- Do not stack hedges. Keep real doubt as one "may" or "might" and say what you did not check. Never turn "may fail" into "fails".
-- Do not use semicolons, phrasal verbs ("spin up", "kick off"), or words that claim quality ("robust", "seamless", "powerful").
-- Do not state a cause, a frequency or a fix you did not verify in the code.
-- Keep identifiers, paths and quoted errors exactly as written.
-
 "#,
+    writing_rules!(),
     clean_review_example_line!(),
     "\n"
 );

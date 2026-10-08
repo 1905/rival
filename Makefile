@@ -1,5 +1,6 @@
-# Rival.app developer shortcuts. Logic lives in app/scripts/*.py.
-.PHONY: run install test soak
+# Developer shortcuts. Rival.app targets (logic in app/scripts/*.py), then
+# the cli-* targets for the Rust CLI.
+.PHONY: run install test soak cli-build cli-install cli-test cli-release-check
 
 # Debug build, wrapped as "Rival (dev)", opened against your real ~/.rival.
 run:
@@ -20,3 +21,26 @@ test:
 # The soak test alone (builds first).
 soak:
 	python3 app/scripts/soak_test.py
+
+# CLI (Rust). `rival version` prints RIVAL_VERSION; the default is the git
+# description, like the removed Go Makefile's VERSION.
+RIVAL_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
+# Release build of the CLI for this host: target/release/rival.
+cli-build:
+	RIVAL_VERSION=$(RIVAL_VERSION) cargo build --release --locked -p rival
+
+# Installs the CLI to ~/.cargo/bin/rival.
+cli-install:
+	RIVAL_VERSION=$(RIVAL_VERSION) cargo install --locked --path crates/rival
+
+# Workspace tests plus the release-script and release-config tests. The
+# config tests need PyYAML: install scripts/requirements-test.txt into the
+# python3 on PATH (a venv), as CI does.
+cli-test:
+	cargo test --workspace --locked
+	python3 -m unittest discover -s scripts -p 'test_*.py'
+
+# Validates .goreleaser.yaml. Builds nothing.
+cli-release-check:
+	goreleaser check

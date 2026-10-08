@@ -578,6 +578,7 @@ fn stdout_write_error_leaves_the_session_interrupted() {
             stdin: &mut stdin,
             stdout: &mut stdout,
             stderr: &mut stderr,
+            live_stdout: None,
             prepare_mr: &*prepare,
             signals: false,
         };

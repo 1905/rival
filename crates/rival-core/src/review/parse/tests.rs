@@ -395,3 +395,26 @@ fn json_objects_closing_order() {
     // A huge number is valid JSON.
     assert_eq!(json_objects(r#"{"n":1e999999}"#).len(), 1);
 }
+
+/// A codex run that exits without an answer: the log is the banner and
+/// tool output, and a tool printed a saved review. That review must not
+/// pass as this run's result.
+#[test]
+fn codex_transcript_without_answer_header_has_no_answer() {
+    let saved = r#"{"summary":"Old review.","findings":[{"file":"a.rs","line":1,"severity":"high","category":"bug","title":"t","body":"b","confidence":9}]}"#;
+    for raw in [
+        format!("OpenAI Codex v0.50\n--------\nexec\ncat review.json\n{saved}\n"),
+        format!("exec\ncat review.json\n{saved}\n"),
+    ] {
+        assert_eq!(final_answer(&raw), "", "{raw}");
+        assert!(parse_reviewer_log(&raw).is_err(), "{raw}");
+    }
+    // With the header, the answer after it still parses.
+    let answered = format!("OpenAI Codex v0.50\nexec\ncat x\n{saved}\ncodex\n{saved}\n");
+    assert_eq!(
+        parse_reviewer_log(&answered).unwrap().summary,
+        "Old review."
+    );
+    // A non-codex log is still returned whole.
+    assert_eq!(final_answer(saved), saved);
+}

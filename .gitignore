@@ -2,8 +2,7 @@
 *.tape
 *.gif
 .venv/
-rival/rival
-rival/dist/
+/dist/
 .env
 *.key
 credentials.*

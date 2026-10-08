@@ -142,10 +142,15 @@ pub(crate) fn run_claude_docker_with(
     if read_only {
         mount.push_str(":ro");
     }
+    // A known name lets a cancelled run remove its container: killing the
+    // docker client does not stop the container it started.
+    let name = container_name(&sess.id);
     let mut args: Vec<String> = [
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &mount,
         "-w",
@@ -171,5 +176,74 @@ pub(crate) fn run_claude_docker_with(
         drop_env: &[],
         environ: cfg.environ(),
     };
-    spawn(sess, &req)
+    let result = spawn(sess, &req);
+    // Exit 0 means the container ended and `--rm` removed it. Anything else
+    // (a provider error, a timeout, a cancel) may leave it running against
+    // the mounted project, so remove it before the queue slot is released.
+    if !matches!(&result, Ok(r) if r.exit_code == 0) {
+        remove_container(cfg, &name, REMOVE_TIMEOUT);
+    }
+    result
+}
+
+/// The container name for a session's Claude run.
+pub(crate) fn container_name(session_id: &str) -> String {
+    format!("rival-{session_id}")
+}
+
+/// How long `docker rm -f` may take. The caller still holds its queue
+/// slot, so a hung Docker daemon must not hold it forever.
+const REMOVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// `docker rm -f <name>`, killed after `timeout`. A container `--rm`
+/// already removed is not an error worth reporting.
+fn remove_container(cfg: &Config, name: &str, timeout: std::time::Duration) {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    let warn = |e: &str| {
+        logging::warn()
+            .err(e)
+            .str("container", name)
+            .msg("could not remove the Claude container");
+    };
+    let mut cmd = match oscmd::command(cfg, "docker", &["rm", "-f", name]) {
+        Ok((cmd, _)) => cmd,
+        Err(e) => return warn(&e),
+    };
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let mut child = match process::spawn(&mut cmd) {
+        Ok(child) => child,
+        Err(e) => return warn(&io_text(&e)),
+    };
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return warn(&format!("docker rm -f timed out after {timeout:?}"));
+            }
+            Err(e) => return warn(&io_text(&e)),
+        }
+    };
+    if !status.success() {
+        let mut text = String::new();
+        if let Some(mut err) = child.stderr.take() {
+            let _ = err.read_to_string(&mut text);
+        }
+        if !text.contains("No such container") {
+            warn(&format!(
+                "{}: {}",
+                oscmd::exit_status_text(status),
+                text.trim()
+            ));
+        }
+    }
 }

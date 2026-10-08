@@ -6,6 +6,7 @@ mod gitscope_helper;
 mod gocsv;
 mod install;
 mod merge_request;
+mod mirror;
 mod model_command;
 mod model_run;
 mod model_specs;
@@ -13,6 +14,7 @@ mod queue_sessions;
 mod root;
 mod signals;
 mod startup_fds;
+mod ste_fix;
 #[cfg(test)]
 mod testutil;
 mod tree;

@@ -1,17 +1,21 @@
 //! `rival run <model>`: the terminal-facing workflow. Go:
 //! `cmd/model_run.go`.
 
+use std::io::Write;
+
 use rival_core::logging;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::NewSession;
 
 use crate::merge_request::{ReviewTarget, reject_unresolved_mr};
+use crate::mirror::LiveMirror;
 use crate::model_command::{
     CancelOnDrop, OwnedSession, complete_session, fail_session, finish_review, prepare_review,
     read_log,
 };
 use crate::model_specs::{ModelSpec, RunCall};
 use crate::root::{CmdEnv, CmdError};
+use crate::ste_fix;
 use crate::workdir::resolve_workdir;
 
 #[cfg(test)]
@@ -108,7 +112,7 @@ pub fn run_model_run(
         .msg(&format!("starting {}", spec.command_name));
 
     let group_id = sess.group_id.clone();
-    let _release = review::wait_for_group_slot(
+    let release = review::wait_for_group_slot(
         &ctx,
         cfg,
         &GroupSlot {
@@ -126,6 +130,19 @@ pub fn run_model_run(
     let _cancel_run = CancelOnDrop(cancel_run);
 
     // The run surface is terminal-facing, so output mirrors to stdout live.
+    // In production the copy goes through a queue (see crate::mirror), so a
+    // stdout nobody reads cannot hold the run past its context.
+    let live = env
+        .live_stdout
+        .map(|open| LiveMirror::spawn(open(), &run_ctx))
+        .transpose()
+        .map_err(|e| CmdError::plain(format!("start stdout mirror: {e}")))?;
+    let mut sink = live.as_ref().map(LiveMirror::sink);
+    // Provider lines and, for a review, the formatted result after them.
+    let stdout: &mut (dyn Write + Send) = match sink.as_mut() {
+        Some(sink) => sink,
+        None => &mut *env.stdout,
+    };
     let result = (spec.run)(RunCall {
         ctx: &run_ctx,
         cfg,
@@ -135,7 +152,7 @@ pub fn run_model_run(
         workdir: &run_workdir,
         cred_workdir: &workdir,
         review: opts.is_review,
-        out: Some(&mut *env.stdout),
+        out: Some(&mut *stdout),
     });
     let result = match result {
         Ok(result) => result,
@@ -176,6 +193,20 @@ pub fn run_model_run(
     };
     // A zero exit is not a review: quota errors and empty output also exit 0.
     let log_file = sess.log_file.clone();
+    let mut log = log;
+    if let Some(line) = ste_fix::refine(
+        &ste_fix::Rerun {
+            ctx: &ctx,
+            cfg,
+            spec,
+            workdir: &run_workdir,
+            cred_workdir: &workdir,
+        },
+        &mut sess,
+        &log,
+    ) {
+        log.push_str(&line);
+    }
     let out = match finish_review(cfg, spec, &mut sess, &log, &scope, &log_file) {
         Ok(out) => out,
         Err(reason) => {
@@ -184,9 +215,12 @@ pub fn run_model_run(
         }
     };
     complete_session(cfg.paths(), &mut sess, &result);
+    // The provider is done: free the slot before a write that a stalled
+    // stdout could block.
+    drop(release);
     // The live mirror already showed the transcript; the formatted review
-    // follows it.
-    if let Err(e) = env.stdout.write_all(format!("\n{out}").as_bytes()) {
+    // follows it, through the same queue so the run's context bounds it.
+    if let Err(e) = stdout.write_all(format!("\n{out}").as_bytes()) {
         return Err(crate::command_plan::write_stdout_error(&e));
     }
     Ok(())

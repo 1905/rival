@@ -28,6 +28,10 @@
               "run",
               "--rm",
               "-i",
+              "--name",
+              {
+                "$regex": "rival-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+              },
               "-v",
               "<ROOT>/work:/workspace",
               "-w",
@@ -54,6 +58,18 @@
             },
             "stdout": "boom\n",
             "exit": 1
+          },
+          {
+            "argv": [
+              "rm",
+              "-f",
+              {
+                "$regex": "rival-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+              }
+            ],
+            "times": 1,
+            "stdout": "",
+            "exit": 0
           }
         ]
       }
@@ -118,7 +134,7 @@
       }
     ],
     "calls": {
-      "docker": 3
+      "docker": 4
     }
   }
 }

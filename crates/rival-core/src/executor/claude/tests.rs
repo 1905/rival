@@ -101,6 +101,7 @@ fn claude_review_transport_restrictions() {
         let cfg = env.config();
         let repo = env.work_str();
         let mut sess = env.session("claude", mode, config::CLAUDE_MODEL, &repo);
+        let read_only = mode == "review" || crate::session::is_task_mode(mode);
         let mut out = Vec::new();
         let result = retry_busy(
             || {
@@ -112,6 +113,7 @@ fn claude_review_transport_restrictions() {
                     "review",
                     "medium",
                     &repo,
+                    read_only,
                     Some(&mut out),
                 )
             },
@@ -166,6 +168,7 @@ fn claude_docker_review_mount_is_read_only() {
                 "review",
                 "medium",
                 &repo,
+                true,
                 Some(&mut out),
             )
         },
@@ -182,10 +185,13 @@ fn claude_docker_review_mount_is_read_only() {
         text.contains("Read,Glob,Grep"),
         "unsafe Docker review: {text}"
     );
+    let name = crate::executor::claude_docker::container_name(&sess.id);
     let mut want = strings(&[
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &format!("{repo}:/workspace:ro"),
         "-w",
@@ -231,6 +237,7 @@ fn native_request_strips_subscription_credentials_only() {
             "low",
             &work,
             config::CLAUDE_MODEL,
+            false,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap();
@@ -270,6 +277,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         "low",
         &work,
         config::CLAUDE_MODEL,
+        false,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -289,6 +297,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         "low",
         &work,
         config::CLAUDE_MODEL,
+        false,
         recorder(&mut seen, Err(anyhow!("subprocess claude: signal: killed"))),
     )
     .unwrap_err();
@@ -304,6 +313,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         "low",
         &work,
         "claude-opus-5",
+        false,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -327,6 +337,7 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
         "low",
         "rel",
         config::CLAUDE_MODEL,
+        false,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -349,14 +360,18 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
         "low",
         "./rel",
         config::CLAUDE_MODEL,
+        false,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap();
     let seen = seen.unwrap();
+    let name = crate::executor::claude_docker::container_name(&sess.id);
     let mut want = strings(&[
         "run",
         "--rm",
         "-i",
+        "--name",
+        &name,
         "-v",
         &format!("{}/./rel:/workspace", env.work_str()),
         "-w",
@@ -494,5 +509,34 @@ fn set_claude_transport_mode_preserves_task_modes() {
         };
         set_claude_transport_mode(&mut sess, "native");
         assert_eq!(sess.mode, want, "{name}");
+    }
+}
+
+/// The first run replaces the session mode with its transport. A second
+/// read-only run on the same session must stay read-only: the caller's flag
+/// decides, not the mode.
+#[test]
+fn read_only_survives_the_transport_replacing_the_mode() {
+    let mut env = Env::new();
+    env.set("RIVAL_CLAUDE_AUTH", Some("subscription"));
+    env.fake_on_path("claude");
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, &work);
+    for _ in 0..2 {
+        let mut seen = None;
+        run_claude_model(
+            &cfg,
+            &mut sess,
+            "p",
+            "medium",
+            &work,
+            config::CLAUDE_MODEL,
+            true,
+            recorder(&mut seen, Ok(RunResult::default())),
+        )
+        .unwrap();
+        assert_eq!(seen.unwrap().args, read_only_argv("medium"));
+        assert_eq!(sess.mode, "native");
     }
 }

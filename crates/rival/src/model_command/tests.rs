@@ -553,6 +553,7 @@ fn stdout_write_error_is_reported() {
         stdin: &mut stdin,
         stdout: &mut stdout,
         stderr: &mut stderr,
+        live_stdout: None,
         prepare_mr: &*prepare,
         signals: false,
     };

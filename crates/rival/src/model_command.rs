@@ -13,6 +13,7 @@ use crate::gitscope_helper::{build_review_prompt, lens_prompt};
 use crate::merge_request::{ReviewTarget, prepare_review_target_with, reject_unresolved_mr};
 use crate::model_specs::{ModelSpec, RunCall, session_mode};
 use crate::root::{CmdEnv, CmdError};
+use crate::ste_fix;
 use crate::workdir::resolve_workdir_or_exit;
 
 #[cfg(test)]
@@ -166,7 +167,22 @@ pub fn run_model_command(
         // A zero exit is not a review: quota errors and empty output also
         // exit 0.
         let log_file = sess.log_file.clone();
-        match finish_review(cfg, spec, &mut sess, &log_text, &scope, &log_file) {
+        let rewrite = ste_fix::refine(
+            &ste_fix::Rerun {
+                ctx: &ctx,
+                cfg,
+                spec,
+                workdir: &run_workdir,
+                cred_workdir: &workdir,
+            },
+            &mut sess,
+            &log_text,
+        );
+        let review_text = match rewrite {
+            Some(line) => std::borrow::Cow::Owned(format!("{log_text}{line}")),
+            None => std::borrow::Cow::Borrowed(log_text.as_str()),
+        };
+        match finish_review(cfg, spec, &mut sess, &review_text, &scope, &log_file) {
             Err(reason) => {
                 exit_code = 1;
                 exit_msg = reason;

@@ -1,0 +1,73 @@
+name: CLI release tools
+description: >-
+  Pinned Rust, Zig, cargo-zigbuild, cargo-xwin and GoReleaser for the
+  six-target CLI build in .goreleaser.yaml. LLVM comes from Homebrew and its
+  resolved version is logged. Hosted macOS only: darwin needs its Apple SDK.
+
+runs:
+  using: composite
+  steps:
+    - name: Runner
+      shell: bash
+      run: |
+        echo "runner: $RUNNER_OS $RUNNER_ARCH, uname -m: $(uname -m)"
+        sw_vers
+        test "$RUNNER_OS" = macOS
+        # .goreleaser.yaml sets SDKROOT for the darwin targets only.
+        if [ -n "${SDKROOT:-}" ]; then
+          echo "::error::SDKROOT is set for the whole job: $SDKROOT"
+          exit 1
+        fi
+
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: "1.98"
+
+    - uses: mlugg/setup-zig@v2
+      with:
+        version: 0.16.0
+
+    - name: cargo-zigbuild and cargo-xwin
+      shell: bash
+      run: cargo install --locked cargo-zigbuild@0.23.4 cargo-xwin@0.23.1
+
+    # cargo-xwin runs in clang mode (.goreleaser.yaml XWIN_CROSS_COMPILER=clang)
+    # and needs clang, llvm-lib and lld-link. Homebrew ships lld separately
+    # from llvm. The path goes to the Windows build entry only.
+    - name: LLVM for cargo-xwin
+      shell: bash
+      run: |
+        brew install llvm lld
+        echo "RIVAL_LLVM_BIN=$(brew --prefix llvm)/bin:$(brew --prefix lld)/bin" >> "$GITHUB_ENV"
+
+    - name: Apple SDK for the darwin targets
+      shell: bash
+      run: echo "RIVAL_APPLE_SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+
+    - uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: v2.18.2
+        install-only: true
+
+    - name: Tool versions
+      shell: bash
+      run: |
+        rustc --version
+        cargo --version
+        zig version
+        cargo-zigbuild --version
+        cargo-xwin --version
+        # GoReleaser runs `cargo-xwin build --target=<triple> ...` directly,
+        # with XWIN_CROSS_COMPILER=clang for the Windows entry.
+        cargo-xwin build --help > /dev/null
+        (
+          PATH="$RIVAL_LLVM_BIN:$PATH"
+          echo "cargo-xwin cross compiler: clang"
+          command -v clang
+          clang --version
+          command -v llvm-lib
+          lld-link --version
+        )
+        echo "Apple SDK $(xcrun --sdk macosx --show-sdk-version): $RIVAL_APPLE_SDKROOT"
+        goreleaser --version

@@ -1,0 +1,109 @@
+project_name: rival
+version: 2
+
+release:
+  github:
+    owner: "1905"
+    name: rival
+
+# GoReleaser's Rust builder runs `<tool> <command> --target=<triple> <flags>`
+# and maps each triple to the {{ .Os }} / {{ .Arch }} values the Go build used
+# (x86_64 → amd64, aarch64 → arm64). release.yml runs both entries on hosted
+# macOS: the Apple SDK and LLVM come from that host.
+builds:
+  # darwin/linux through cargo-zigbuild. fsevent-sys links the CoreServices
+  # framework, so the darwin targets need the Apple SDK; SDKROOT is set for
+  # them only. The linux glibc baseline is cargo-zigbuild's default for the
+  # pinned Zig version.
+  - id: rival-unix
+    builder: rust
+    binary: rival
+    tool: cargo
+    command: zigbuild
+    flags:
+      - --release
+      - --locked
+      - -p=rival
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+    env:
+      - RIVAL_VERSION={{ .Version }}
+      - '{{ if eq .Os "darwin" }}SDKROOT={{ .Env.RIVAL_APPLE_SDKROOT }}{{ end }}'
+
+  # Windows MSVC through cargo-xwin in its clang cross-compiler mode
+  # (XWIN_CROSS_COMPILER=clang). The default clang-cl mode passes /imsvc
+  # include options that clang rejects when ring builds its C code
+  # (cargo-xwin issue 147). The clang mode uses the windows-msvc-sysroot SDK.
+  # Its LLVM is on PATH for this entry only. crt-static links the C runtime
+  # into rival.exe, so the zip needs no Visual C++ runtime install.
+  - id: rival-windows
+    builder: rust
+    binary: rival
+    tool: cargo-xwin
+    command: build
+    flags:
+      - --release
+      - --locked
+      - -p=rival
+    targets:
+      - x86_64-pc-windows-msvc
+      - aarch64-pc-windows-msvc
+    env:
+      - RIVAL_VERSION={{ .Version }}
+      - PATH={{ .Env.RIVAL_LLVM_BIN }}:{{ .Env.PATH }}
+      - XWIN_CROSS_COMPILER=clang
+      - RUSTFLAGS=-C target-feature=+crt-static
+
+archives:
+  - formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    # LICENSE covers rival; licenses/Go-LICENSE covers the Go Unicode tables
+    # and algorithms vendored into the Rust port.
+    files:
+      - LICENSE
+      - README.md
+      - licenses/Go-LICENSE
+
+# Generates a Homebrew *Formula* (class Rival < Formula) at the tap repo root —
+# matching the existing 1905/homebrew-tap layout (formulae at root, no Formula/
+# or Casks/ subdir). `brews:` is marked deprecated by goreleaser in favor of
+# homebrew_casks:, but a cask is the wrong artifact type for this tap, so we keep
+# the formula generator. CI (release.yml) runs this on tag push with the
+# HOMEBREW_TAP_TOKEN secret, so the formula is updated automatically — no manual
+# rival.rb edits. It takes the four darwin/linux archives; a snapshot run only
+# renders it to dist/homebrew/rival.rb.
+brews:
+  - name: rival
+    homepage: https://github.com/1905/rival
+    description: "Dispatch prompts to AI coding agents with session tracking and a TUI dashboard"
+    license: MIT
+    # directory omitted → formula written to the repo root (rival.rb)
+    repository:
+      owner: "1905"
+      name: homebrew-tap
+      branch: master
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: "bot@goreleaser.com"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    install: |
+      bin.install "rival"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

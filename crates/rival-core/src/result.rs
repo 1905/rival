@@ -369,7 +369,7 @@ fn findings_result(summary: String, rating: Option<u8>, findings: Vec<Finding>) 
 
 /// A codex log: it opens with the "OpenAI Codex" banner, or (a tail that cut
 /// the banner) has an "exec" tool line.
-fn is_codex_transcript(raw: &str) -> bool {
+pub(crate) fn is_codex_transcript(raw: &str) -> bool {
     raw.trim_start().starts_with("OpenAI Codex") || raw.split('\n').any(|l| l == "exec")
 }
 

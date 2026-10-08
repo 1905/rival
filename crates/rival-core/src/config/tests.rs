@@ -1,5 +1,5 @@
 //! Ports of Go `internal/config/{config,codex,kimi,security,antislop}_test.go`
-//! plus golden checks against the Go source. Every test builds its own
+//! plus golden pins of the ported Go texts. Every test builds its own
 //! [`Config`] from an explicit env map; nothing reads or mutates the process
 //! environment or the real `~/.rival`.
 
@@ -1515,66 +1515,7 @@ fn antislop_prompt_templates() {
     );
 }
 
-// ---- golden checks against the Go source ----
-
-const GO_CONFIG: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../rival/internal/config/config.go"
-);
-
-fn go_source() -> String {
-    fs::read_to_string(GO_CONFIG).unwrap_or_else(|e| panic!("read {GO_CONFIG}: {e}"))
-}
-
-/// Evaluates a top-level `const Name = lit + lit + Ident ...` expression of
-/// raw (backtick) and plain (escape-free) string literals.
-fn eval_go_const(src: &str, name: &str, known: &HashMap<String, String>) -> String {
-    let head = format!("\nconst {name} = ");
-    let start = src.find(&head).unwrap_or_else(|| panic!("no const {name}")) + head.len();
-    let mut rest = &src[start..];
-    let mut out = String::new();
-    loop {
-        rest = rest.trim_start();
-        if let Some(r) = rest.strip_prefix('`') {
-            let end = r.find('`').unwrap();
-            out.push_str(&r[..end]);
-            rest = &r[end + 1..];
-        } else if let Some(r) = rest.strip_prefix('"') {
-            let end = r.find('"').unwrap();
-            assert!(!r[..end].contains('\\'), "escapes unsupported in {name}");
-            out.push_str(&r[..end]);
-            rest = &r[end + 1..];
-        } else {
-            let end = rest
-                .find(|c: char| !(c.is_alphanumeric() || c == '_'))
-                .unwrap();
-            out.push_str(&known[&rest[..end]]);
-            rest = &rest[end..];
-        }
-        match rest.trim_start_matches([' ', '\t']).strip_prefix('+') {
-            Some(r) => rest = r,
-            None => return out,
-        }
-    }
-}
-
-fn go_prompts() -> HashMap<String, String> {
-    let src = go_source();
-    let mut known = HashMap::new();
-    for name in [
-        "SystemPrompt",
-        "WorkdirPreamble",
-        "DiffReviewPreamble",
-        "PlanReviewPrompt",
-        "antislopJSONContract",
-        "AntislopCodePrompt",
-        "WholeProject",
-    ] {
-        let value = eval_go_const(&src, name, &known);
-        known.insert(name.to_string(), value);
-    }
-    known
-}
+// ---- golden pins of the texts and constants ported from Go `config.go` ----
 
 fn rust_prompts() -> [(&'static str, &'static str); 7] {
     [
@@ -1588,14 +1529,6 @@ fn rust_prompts() -> [(&'static str, &'static str); 7] {
     ]
 }
 
-#[test]
-fn prompts_match_go_source_bytes() {
-    let go = go_prompts();
-    for (name, rust) in rust_prompts() {
-        assert_eq!(rust, go[name], "{name} differs from {GO_CONFIG}");
-    }
-}
-
 fn sha256_hex(s: &str) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(s.as_bytes())
@@ -1604,8 +1537,8 @@ fn sha256_hex(s: &str) -> String {
         .collect()
 }
 
-/// Pins the prompt bytes independently of the Go tree. Byte length and
-/// SHA-256 of each Go constant as evaluated from `config.go`.
+/// Pins the prompt bytes: byte length and SHA-256 of each Go constant as
+/// evaluated from `config.go` before the Go tree was removed.
 #[test]
 fn prompts_sha256_golden() {
     let want = [
@@ -1655,58 +1588,67 @@ fn prompts_sha256_golden() {
     }
 }
 
+/// The 26 string constants of Go `config.go`, with the values it held
+/// before the Go tree was removed.
 #[test]
-fn string_constants_match_go_source() {
-    let src = go_source();
-    let re = regex::Regex::new(r#"(?m)^\t(\w+)\s+=\s+"([^"\\]*)""#).unwrap();
-    let go: HashMap<&str, &str> = re
-        .captures_iter(&src)
-        .map(|c| (c.get(1).unwrap().as_str(), c.get(2).unwrap().as_str()))
-        .collect();
-    let rust = [
-        ("GPT56SolModel", GPT56_SOL_MODEL),
-        ("CodexModel", CODEX_MODEL),
-        ("CodexLabel", CODEX_LABEL),
-        ("ClaudeModel", CLAUDE_MODEL),
-        ("SolLabel", SOL_LABEL),
-        ("ClaudeLabel", CLAUDE_LABEL),
-        ("K3Label", K3_LABEL),
-        ("K3CommandName", K3_COMMAND_NAME),
-        ("KimiModel", KIMI_MODEL),
-        ("GrokModel", GROK_MODEL),
-        ("GrokLabel", GROK_LABEL),
-        ("ClaudeDockerImage", CLAUDE_DOCKER_IMAGE),
-        ("ClaudeDockerTokenEnv", CLAUDE_DOCKER_TOKEN_ENV),
-        ("DefaultReviewEffort", DEFAULT_REVIEW_EFFORT),
-        ("DefaultPlanEffort", DEFAULT_PLAN_EFFORT),
-        ("DefaultAntislopEffort", DEFAULT_ANTISLOP_EFFORT),
-        ("SessionDir", SESSION_DIR),
-        ("QueueDir", QUEUE_DIR),
-        ("SecurityReviewerK3", SECURITY_REVIEWER_K3),
-        ("SecurityReviewerGrok", SECURITY_REVIEWER_GROK),
-        ("GrokOpenRouterModel", GROK_OPENROUTER_MODEL),
-        ("GrokOpenRouterSelector", GROK_OPENROUTER_SELECTOR),
-        ("GrokOpenRouterLabel", GROK_OPENROUTER_LABEL),
-        ("openRouterBaseURL", OPENROUTER_BASE_URL),
-        ("ClaudeAuthSubscription", CLAUDE_AUTH_SUBSCRIPTION),
-        ("ClaudeAuthAPI", CLAUDE_AUTH_API),
+fn string_constants_golden() {
+    let got = [
+        GPT56_SOL_MODEL,
+        CODEX_MODEL,
+        CODEX_LABEL,
+        CLAUDE_MODEL,
+        SOL_LABEL,
+        CLAUDE_LABEL,
+        K3_LABEL,
+        K3_COMMAND_NAME,
+        KIMI_MODEL,
+        GROK_MODEL,
+        GROK_LABEL,
+        CLAUDE_DOCKER_IMAGE,
+        CLAUDE_DOCKER_TOKEN_ENV,
+        DEFAULT_REVIEW_EFFORT,
+        DEFAULT_PLAN_EFFORT,
+        DEFAULT_ANTISLOP_EFFORT,
+        SESSION_DIR,
+        QUEUE_DIR,
+        SECURITY_REVIEWER_K3,
+        SECURITY_REVIEWER_GROK,
+        GROK_OPENROUTER_MODEL,
+        GROK_OPENROUTER_SELECTOR,
+        GROK_OPENROUTER_LABEL,
+        OPENROUTER_BASE_URL,
+        CLAUDE_AUTH_SUBSCRIPTION,
+        CLAUDE_AUTH_API,
     ];
-    assert_eq!(go.len(), rust.len(), "Go string consts: {go:?}");
-    for (name, value) in rust {
-        assert_eq!(go.get(name), Some(&value), "{name}");
-    }
-    // Numeric and duration constants, as written in the Go const block.
-    for line in [
-        "\tPromptPreviewLen      = 100\n",
-        "\tPromptDetailMaxLines  = 10\n",
-        "\tDefaultMaxConcurrent = 2\n",
-        "\tDefaultQueueTimeout  = 30 * time.Minute\n",
-        "\tDefaultRunTimeout    = 30 * time.Minute\n",
-        "\tQueuePollInterval    = 2 * time.Second\n",
-        "var ValidEfforts = []string{\"low\", \"medium\", \"high\", \"xhigh\", \"ultra\"}\n",
-    ] {
-        assert!(src.contains(line), "Go source changed: {line:?}");
-    }
+    let want = [
+        "gpt-5.6-sol",
+        "gpt-6-astra",
+        "codex",
+        "claude-opus-5-5",
+        "sol",
+        "claude",
+        "kimi-k3",
+        "k3",
+        "moonshotai/kimi-k3",
+        "grok-4.6",
+        "grok",
+        "rival-claude",
+        "RIVAL_CLAUDE_TOKEN",
+        "high",
+        "high",
+        "high",
+        ".rival/sessions",
+        ".rival/queue",
+        "k3",
+        "grok",
+        "x-ai/grok-4.6",
+        "openrouter/x-ai/grok-4.6",
+        "grok-4.6-openrouter",
+        "https://openrouter.ai/api/v1",
+        "subscription",
+        "api",
+    ];
+    assert_eq!(got, want);
     assert_eq!(
         (
             PROMPT_PREVIEW_LEN,
@@ -1779,4 +1721,20 @@ fn auto_fix_critical_high_defaults_off() {
     }
     let (_home, missing) = loaded("");
     assert_eq!(missing.auto_fix_policy(), "off");
+}
+
+#[test]
+fn ste_rewrite_defaults_off() {
+    for (body, want) in [
+        ("efforts:\n  codex: high\n", false),
+        ("ste_rewrite: false\n", false),
+        ("ste_rewrite:\n", false),
+        ("ste_rewrite: true\n", true),
+    ] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.ste_rewrite(), want, "{body:?}");
+    }
+    let (_home, missing) = loaded("");
+    assert!(!missing.ste_rewrite());
 }

@@ -182,11 +182,14 @@ static CODEX_ANSWER_HEADER: LazyLock<Regex> =
 /// Returns the part of a provider log that holds the model's final answer.
 /// For codex that is the text after the last "codex" header line, so
 /// review-shaped JSON a tool printed earlier (a file the model read) can
-/// never be taken for the review. Logs without that header are returned
-/// whole.
+/// never be taken for the review. A codex transcript without that header
+/// has no answer, so it gives "": its JSON is tool output or the echoed
+/// prompt (the TUI's [`crate::result::parse_run_result`] rejects it too).
+/// Other logs are returned whole.
 pub fn final_answer(raw: &str) -> &str {
     match CODEX_ANSWER_HEADER.find_iter(raw).last() {
         Some(m) => &raw[m.end()..],
+        None if crate::result::is_codex_transcript(raw) => "",
         None => raw,
     }
 }

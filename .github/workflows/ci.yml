@@ -1,8 +1,8 @@
 name: CI
 
-# Light CI for the Rust port (plan task 1.8). The Go release workflow
-# (release.yml) is untouched. Nothing here calls a real reviewer CLI, Docker,
-# a provider API or inference: every test isolates HOME / RIVAL_HOME itself.
+# Light CI for the Rust port (plan task 1.8). Releases are release.yml.
+# Nothing here calls a real reviewer CLI, Docker, a provider API or
+# inference: every test isolates HOME / RIVAL_HOME itself.
 on:
   push:
   pull_request:
@@ -13,10 +13,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Release toolchain; Go 1.27 changes encoding/json defaults that the session
-  # contract test pins.
-  GO_VERSION: "1.25.14"
-  GOTOOLCHAIN: go1.25.14
   # The full parity scenario run is on from P3 (every non-TUI command ported).
   # Set it to "false" to skip; the skip is then reported as a warning.
   PARITY_SCENARIOS: "true"
@@ -28,9 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         # Windows runs the whole Rust workspace, including the native
-        # process-tree and cross-process queue tests. The Go baseline, the
-        # Unix fd check and the parity scenarios (fake CLIs are Python
-        # scripts with Unix shebangs) stay macOS/Linux only.
+        # process-tree and cross-process queue tests. The Unix fd check and
+        # the parity scenarios (fake CLIs are Python scripts with Unix
+        # shebangs) stay macOS/Linux only.
         os: [macos-15, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     # Final bound so a hung native process test cannot use the 6 h default.
@@ -44,12 +40,6 @@ jobs:
           components: clippy, rustfmt
 
       - uses: Swatinem/rust-cache@v2
-
-      - uses: actions/setup-go@v5
-        if: runner.os != 'Windows'
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: rival/go.sum
 
       - name: cargo fmt
         run: cargo fmt --all --check
@@ -73,17 +63,22 @@ jobs:
         if: runner.os != 'Windows'
         run: python3 scripts/check-startup-fds.py
 
-      - name: go test (includes the session contract)
-        if: runner.os != 'Windows'
-        working-directory: rival
-        run: |
-          go version
-          go test ./...
+      # Release-archive checker and release-config contracts. The config
+      # tests import PyYAML, pinned in scripts/requirements-test.txt and
+      # installed into a fresh setup-python interpreter.
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Linux'
+        id: scripts-python
+        with:
+          python-version: "3.12"
 
-      - name: Session contract (Go, verbose)
-        if: runner.os != 'Windows'
-        working-directory: rival
-        run: go test ./internal/session/ -run '^TestContract' -count=1 -v
+      - name: Release script tests
+        if: runner.os == 'Linux'
+        env:
+          PY: ${{ steps.scripts-python.outputs.python-path }}
+        run: |
+          "$PY" -m pip install -r scripts/requirements-test.txt
+          "$PY" -m unittest discover -s scripts -p 'test_*.py' -v
 
       # No step may rewrite or add golden files. Git Bash on Windows; a
       # CRLF checkout of a pinned-LF fixture also shows up here.
