@@ -199,10 +199,57 @@ fn built_prompt_is_scope_lens_then_contract() {
     );
 }
 
+/// The reviewer contract and the plan prompt carry the one STE rules block.
+#[test]
+fn every_review_prompt_carries_the_ste_rules() {
+    assert!(WRITING_RULES.contains("ASD-STE100 Simplified Technical English"));
+    let (_home, cfg) = temp_config();
+    let mut prompts = vec![("plan", PLAN_REVIEW_PROMPT.to_string())];
+    for kind in KINDS {
+        prompts.push(("reviewer", build_reviewer_prompt(&cfg, "x", kind)));
+    }
+    for (name, p) in prompts {
+        assert!(
+            p.contains(WRITING_RULES),
+            "{name} prompt lacks the STE rules"
+        );
+    }
+    let rules = PLAN_REVIEW_PROMPT.find(WRITING_RULES).unwrap();
+    let output = PLAN_REVIEW_PROMPT.find("Output: respond").unwrap();
+    assert!(rules < output, "plan rules come after the output format");
+}
+
+/// No prompt holds a word list. A dictionary entry looks like
+/// `MAKE SURE (v)`, an upper-case word and a part of speech.
+#[test]
+fn no_prompt_contains_a_dictionary_entry() {
+    let entry = regex::Regex::new(r"[A-Z]{3,} \((v|n|adj|adv)\)").unwrap();
+    let (_home, cfg) = temp_config();
+    let mut prompts = vec![
+        ("plan", PLAN_REVIEW_PROMPT.to_string()),
+        ("rules", WRITING_RULES.to_string()),
+    ];
+    for kind in KINDS {
+        prompts.push(("reviewer", build_reviewer_prompt(&cfg, "x", kind)));
+    }
+    for (name, p) in prompts {
+        assert!(
+            !entry.is_match(&p),
+            "{name} prompt holds a dictionary entry: {:?}",
+            entry.find(&p).map(|m| m.as_str())
+        );
+    }
+    assert!(
+        entry.is_match("MAKE SURE (v)"),
+        "the pattern misses an entry"
+    );
+}
+
 // ---- byte pins ----
 
-fn rust_prompts() -> [(&'static str, &'static str); 6] {
+fn rust_prompts() -> [(&'static str, &'static str); 7] {
     [
+        ("writingRules", WRITING_RULES),
         ("severityRubric", SEVERITY_RUBRIC),
         ("failureScenarioRule", FAILURE_SCENARIO_RULE),
         ("cleanReviewExampleLine", CLEAN_REVIEW_EXAMPLE_LINE),
@@ -224,6 +271,11 @@ fn sha256_hex(s: &str) -> String {
 #[test]
 fn prompts_sha256_golden() {
     let want = [
+        (
+            "writingRules",
+            1890,
+            "f9aa8fe18f85c84cdd236e4ed3e6e38e4ca75e0206187c9d0c235d9f3630a2b7",
+        ),
         (
             "severityRubric",
             327,
@@ -251,8 +303,8 @@ fn prompts_sha256_golden() {
         ),
         (
             "reviewerJSONContract",
-            1550,
-            "1e280fb0f448687e305b3930adddfd54a9fdec25bd2a134330a3ace95182923f",
+            2626,
+            "73af37cc9687d3d7ff0beb485142ee69a5dbf262a7c9ba01dc0772cba93f02de",
         ),
     ];
     let got: Vec<_> = rust_prompts()
@@ -280,12 +332,12 @@ fn built_prompts_sha256_golden() {
         .collect();
     let want = [
         (
-            3391,
-            "088e42a71aa260abf4123d756d2ac5e9a03232e4d28c84a3724a9db56cca9f5d",
+            4467,
+            "f1872502766c6d201360302619e5bc1d9933cdce79c1e48a59d0b726d7c8393e",
         ),
         (
-            4678,
-            "6e1b1f2c2b692b61cd3b10a501670c631b03e03db448eeda4d11c79915c95531",
+            5754,
+            "2ee76a96b1080745e0e8398c409d77845efb2cd458c5917102d498bd89b619a0",
         ),
     ]
     .map(|(len, hash)| (len, hash.to_string()));

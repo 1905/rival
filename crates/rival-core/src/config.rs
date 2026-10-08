@@ -442,12 +442,49 @@ Changed files:
 {DIFFSTAT}
 "#;
 
+/// The ASD-STE100 writing rules for the free-text fields of a review. The
+/// reviewer JSON contract and the plan prompt both splice them. They name
+/// the standard and its rules only, never a word list: the language check
+/// alone holds the dictionary.
+macro_rules! writing_rules {
+    () => {
+        r#"## Writing rules: ASD-STE100 Simplified Technical English
+
+Write the summary and the text fields of each finding (title, body, failure_scenario, suggestion) in ASD-STE100 Simplified Technical English (STE).
+- Use approved words in their one STE meaning. Use each word as one part of speech only: "test" is a noun, so write "do a test".
+- Do not use phrasal verbs: "install", not "set up". "Find", not "find out".
+- Use a verb, not a noun phrase: "examine the log", not "do an examination of the log".
+- Use the simple present, simple past or simple future. Do not use "has", "have" or "had" with a participle. Do not use "is" or "are" with an -ing verb.
+- Use the active voice. Name who or what does the action.
+- Write 20 words or fewer in a sentence of an instruction (suggestion). Write 25 words or fewer in a sentence of a description (summary, title, body, failure_scenario).
+- Write one instruction in each sentence.
+- Put a condition first, then a comma, then the instruction: "If the list is empty, return an error."
+- Do not use semicolons, contractions or Latin abbreviations ("for example", not "e.g.").
+- Do not use a noun cluster of more than 3 words. Break a longer cluster with "of", "for" or "that".
+- Do not use "he" or "she".
+
+A hedge is a fact. Keep its strength exactly. Never make a hedge stronger or weaker.
+- "may", "might", "could" → "possibly", or "it is possible that ..."
+- "likely", "probably" → "it is very possible that ..."
+- "should" as advice → "we recommend that ..."
+- "should" as an obligation → "must"
+- If you cannot tell advice from obligation, use "we recommend that ...".
+- "The job may have failed" → "It is possible that the job failed". Never write "The job failed".
+
+Keep identifiers, code, paths, file:line references, numbers and quoted errors exactly as written. Do not state a cause, a frequency or a fix that you did not verify.
+
+"#
+    };
+}
+pub(crate) use writing_rules;
+
 /// The plan/spec review template used by `rival command plan`. It targets a
 /// single planning/spec markdown document (NOT source code) and asks codex to
 /// rate it and surface bugs + gaps. `{FILE}` is replaced with the absolute
 /// path at the call site. The model must emit ONE JSON object matching the
 /// contract below so the output can be parsed structurally.
-pub const PLAN_REVIEW_PROMPT: &str = r#"You review an engineering PLAN / SPEC document (not source code). Find the real problems that would make this plan fail, mislead an implementer, or ship the wrong thing. Do not report wording nitpicks.
+pub const PLAN_REVIEW_PROMPT: &str = concat!(
+    r#"You review an engineering PLAN / SPEC document (not source code). Find the real problems that would make this plan fail, mislead an implementer, or ship the wrong thing. Do not report wording nitpicks.
 
 Plan document to review: {FILE}
 
@@ -466,7 +503,9 @@ Rules:
 - If the plan is genuinely solid, say so in the summary and return few or zero findings. Do not invent problems.
 - Rate the plan overall from 1 (unimplementable / dangerously wrong) to 10 (airtight, ready to execute).
 
-Output: respond with EXACTLY ONE JSON object and nothing else (no prose before or after, no markdown fences). Schema:
+"#,
+    writing_rules!(),
+    r#"Output: respond with EXACTLY ONE JSON object and nothing else (no prose before or after, no markdown fences). Schema:
 
 {
   "summary": "1-3 sentence overall assessment of the plan",
@@ -485,7 +524,8 @@ Output: respond with EXACTLY ONE JSON object and nothing else (no prose before o
   ]
 }
 
-Severity guidance: critical = plan is wrong/will cause data loss or a broken build if followed; high = significant gap or flaw that blocks correct implementation; medium = real ambiguity or missing detail an implementer will trip on; low = minor gap or clarification. "line" may be 0 when not applicable. Sort findings by severity, highest first."#;
+Severity guidance: critical = plan is wrong/will cause data loss or a broken build if followed; high = significant gap or flaw that blocks correct implementation; medium = real ambiguity or missing detail an implementer will trip on; low = minor gap or clarification. "line" may be 0 when not applicable. Sort findings by severity, highest first."#
+);
 
 /// The review scope used when none is given and git detects no changed files.
 pub const WHOLE_PROJECT: &str = "the entire project";
