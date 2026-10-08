@@ -1590,11 +1590,18 @@ fn claude_effort_level_map() {
     );
 }
 
+/// A huge `RIVAL_RUN_TIMEOUT` saturates at the maximum, never wraps negative.
 #[test]
-fn overflowing_budgets_keep_signed_wrap() {
+fn overflowing_budgets_saturate() {
     let c = cfg(&[("RIVAL_RUN_TIMEOUT", "2000000h")]);
-    assert_eq!(c.run_timeout_budget(2), Some(-4_046_744_073_709_551_616));
-    assert_eq!(c.max_run_wait(), -4_046_741_973_709_551_616);
+    assert_eq!(c.run_timeout_budget(2), Some(i64::MAX));
+    assert_eq!(c.max_run_wait(), i64::MAX);
+    let c = cfg(&[
+        ("RIVAL_RUN_TIMEOUT", "2000000h"),
+        ("RIVAL_QUEUE_TIMEOUT", "2000000h"),
+    ]);
+    assert_eq!(c.run_timeout_budget(i32::MAX), Some(i64::MAX));
+    assert_eq!(c.max_run_wait(), i64::MAX);
 }
 
 #[test]

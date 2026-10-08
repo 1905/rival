@@ -9,7 +9,6 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 ## Phase boundary
 
 - `tui`: only the parser and `tui --help` are covered here. The interactive dashboard is Task 4.5 and Gate P4. Nothing at Gate P3 is TUI acceptance.
-- Telemetry: the runner always sets `RIVAL_NO_TELEMETRY=1`, so no scenario initializes Sentry. Opt-out rules, client options and the no-automatic-capture rule are unit-tested (`rival_core::telemetry::tests`, `root::tests::only_a_normal_return_reaches_the_telemetry_flush`).
 
 ## Root and help
 

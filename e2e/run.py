@@ -46,12 +46,11 @@ INHERITED_VARS = ("USER", "LOGNAME")
 FIXED_ENV = {
     "TZ": "UTC",
     "CI": "1",
-    "RIVAL_NO_TELEMETRY": "1",
     "RIVAL_NO_UPDATE_CHECK": "1",
     "GIT_CONFIG_NOSYSTEM": "1",
 }
 PROTECTED_VARS = frozenset({
-    "PATH", "HOME", "USERPROFILE", "RIVAL_HOME", "TMPDIR", "RIVAL_NO_TELEMETRY",
+    "PATH", "HOME", "USERPROFILE", "RIVAL_HOME", "TMPDIR",
     "RIVAL_UPDATE_API", "GIT_CONFIG_NOSYSTEM", TOKEN_VAR,
 })
 SYSTEM_SEARCH = "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin"

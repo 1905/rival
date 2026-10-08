@@ -124,11 +124,11 @@ pub(crate) fn run_claude_docker_with(
     }
 
     // The workdir must be absolute for the Docker volume mount. A relative
-    // path is joined with a bare "/" and the result is not cleaned. The test
-    // is for a leading "/" on every OS, so on Windows `C:\repo` becomes
-    // `<cwd>/C:\repo`: a known quirk, kept as is.
+    // path is joined with a bare "/" and the result is not cleaned. A
+    // Windows drive path (`C:\repo`) is absolute; a "/"-rooted path stays
+    // as given on every OS.
     let mut abs_workdir = workdir.to_string();
-    if !abs_workdir.starts_with('/') {
+    if !workdir.starts_with('/') && !Path::new(workdir).is_absolute() {
         let Some(wd) = cfg.cwd() else {
             bail!("get working dir: getwd: no such file or directory");
         };

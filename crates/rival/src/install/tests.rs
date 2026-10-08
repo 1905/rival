@@ -520,9 +520,60 @@ fn write_errors_name_the_path() {
     assert_eq!(
         err,
         format!(
-            "write {0}: open {0}: Is a directory (os error 21)",
+            "write {0}: rename {0}: Is a directory (os error 21)",
             file.display()
         )
+    );
+}
+
+/// A write that fails before the rename keeps the old file and leaves no
+/// temp file behind.
+#[test]
+fn failed_write_keeps_the_old_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("SKILL.md");
+    fs::write(&file, "old").unwrap();
+    let err = write_file_with(&file, |f| {
+        f.write_all(b"partial")?;
+        Err(io::Error::other("disk full"))
+    })
+    .unwrap_err();
+    assert_eq!(err, format!("write {}: disk full", file.display()));
+    assert_eq!(fs::read_to_string(&file).unwrap(), "old");
+    let names: Vec<_> = fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("SKILL.md")]);
+}
+
+/// A successful write replaces the old content.
+#[test]
+fn write_file_replaces_the_old_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("SKILL.md");
+    fs::write(&file, "old content that is longer").unwrap();
+    write_file(&file, b"new").unwrap();
+    assert_eq!(fs::read_to_string(&file).unwrap(), "new");
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+/// A deprecated skill that is a dangling symlink is removed and counted.
+#[cfg(unix)]
+#[test]
+fn cleanup_removes_a_dangling_deprecated_link() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = claude_target(dir.path());
+    fs::create_dir_all(dir.path()).unwrap();
+    let link = dir.path().join("rival-sol");
+    std::os::unix::fs::symlink(dir.path().join("missing"), &link).unwrap();
+    let mut out = Vec::new();
+    install_skills_with(&target, false, &mut reader(""), &mut out, &[]).unwrap();
+    let out = String::from_utf8(out).unwrap();
+    assert!(fs::symlink_metadata(&link).is_err(), "link still there");
+    assert!(
+        out.ends_with("Done: 8 installed, 0 updated, 0 up to date, 1 removed\n"),
+        "{out}"
     );
 }
 

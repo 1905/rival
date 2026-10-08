@@ -146,37 +146,59 @@ fn build_reports_a_temp_file_error() {
     assert!(err.ends_with(&format!(": {not_found}")), "{err}");
 }
 
-/// The volume mount source, as built on every OS: a workdir with a
-/// leading "/" as given, anything else appended to the working directory
-/// with a bare "/" and no cleaning. The quirk shows on Windows: a drive
-/// path `C:\repo` is not "/"-rooted, so it mounts `<cwd>/C:\repo`.
+/// The `-v` mount argument that a read-only run of `workdir` builds.
+fn docker_mount(env: &Env, cfg: &Config, workdir: &str) -> String {
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, workdir);
+    let mut seen = None;
+    run_claude_docker_with(
+        cfg,
+        &mut sess,
+        "p",
+        "high",
+        workdir,
+        config::CLAUDE_MODEL,
+        true,
+        crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    let args = seen.unwrap().args;
+    let i = args.iter().position(|a| a == "-v").unwrap();
+    args[i + 1].clone()
+}
+
+/// The volume mount source: an absolute or "/"-rooted workdir as given,
+/// anything else appended to the working directory with a bare "/" and no
+/// cleaning.
 #[test]
 fn mount_source_keeps_absolute_and_joins_relative_workdirs() {
     let mut env = Env::new();
     env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("tok"));
     let cfg = env.config();
-    let mount = |workdir: &str| {
-        let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, workdir);
-        let mut seen = None;
-        run_claude_docker_with(
-            &cfg,
-            &mut sess,
-            "p",
-            "high",
-            workdir,
-            config::CLAUDE_MODEL,
-            true,
-            crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
-        )
-        .unwrap();
-        let args = seen.unwrap().args;
-        let i = args.iter().position(|a| a == "-v").unwrap();
-        args[i + 1].clone()
-    };
     let work = env.work_str();
-    assert_eq!(mount("/repo"), "/repo:/workspace:ro");
-    assert_eq!(mount("sub/../x"), format!("{work}/sub/../x:/workspace:ro"));
-    assert_eq!(mount(r"C:\repo"), format!(r"{work}/C:\repo:/workspace:ro"));
+    assert_eq!(docker_mount(&env, &cfg, "/repo"), "/repo:/workspace:ro");
+    assert_eq!(
+        docker_mount(&env, &cfg, "sub/../x"),
+        format!("{work}/sub/../x:/workspace:ro")
+    );
+    // Not a drive path off Windows: a relative name.
+    #[cfg(not(windows))]
+    assert_eq!(
+        docker_mount(&env, &cfg, r"C:\repo"),
+        format!(r"{work}/C:\repo:/workspace:ro")
+    );
+}
+
+/// A Windows drive path is absolute and mounts as given.
+#[cfg(windows)]
+#[test]
+fn mount_source_keeps_a_windows_drive_path() {
+    let mut env = Env::new();
+    env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("tok"));
+    let cfg = env.config();
+    assert_eq!(
+        docker_mount(&env, &cfg, r"C:\repo"),
+        r"C:\repo:/workspace:ro"
+    );
 }
 
 /// The token never goes into the docker argv: other local users can read

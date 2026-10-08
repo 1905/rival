@@ -40,7 +40,6 @@ def run(binary, args, close_fd):
             "HOME": home,
             "RIVAL_HOME": os.path.join(home, ".rival"),
             "PATH": "/usr/bin:/bin",
-            "RIVAL_NO_TELEMETRY": "1",
             "RIVAL_NO_UPDATE_CHECK": "1",
         }
         proc = subprocess.run(

@@ -295,7 +295,6 @@ class EnvTest(RunnerCase):
         self.assertEqual(env["HOME"], home)
         self.assertEqual(env["USERPROFILE"], home)
         self.assertEqual(env["RIVAL_HOME"], os.path.join(home, ".rival"))
-        self.assertEqual(env["RIVAL_NO_TELEMETRY"], "1")
         self.assertEqual(env["RIVAL_NO_UPDATE_CHECK"], "1")
         self.assertEqual(env["EXTRA"], home + "/x")
         self.assertRegex(env["RIVAL_UPDATE_API"], r"^http://127\.0\.0\.1:\d+$")
@@ -320,7 +319,7 @@ class FakeTest(RunnerCase):
         return {"responses": [
             {"argv": ["login", "status"], "times": 1, "stdout": "Logged in using ChatGPT\n", "exit": 0},
             {"argv_prefix": ["exec"], "times": 1, "stderr": "You've hit your usage limit.\n", "exit": 1,
-             "expect": {"stdin": "review this", "cwd": "<ROOT>/work", "env": {"RIVAL_NO_TELEMETRY": "1", "CI": "1",
+             "expect": {"stdin": "review this", "cwd": "<ROOT>/work", "env": {"CI": "1",
                                                                              "OPENAI_API_KEY": None}}},
             {"argv_prefix": ["exec"], "times": 1, "stdout": "{\"ok\":true}\n", "exit": 0,
              "expect": {"stdin": {"$regex": "second.*"}}},

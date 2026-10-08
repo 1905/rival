@@ -3,7 +3,7 @@
 //! Skills go under the user's home (`$HOME`), never under `RIVAL_HOME`,
 //! which only moves Rival's own state.
 
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::{self, BufRead, Read, Write};
 use std::path::{Path, PathBuf};
@@ -226,7 +226,8 @@ fn install_skills_with(
     let mut removed = 0;
     for name in skills::DEPRECATED {
         let target_dir = target_base.join(name);
-        if fs::metadata(&target_dir).is_ok() {
+        // symlink_metadata: a dangling link is removed too.
+        if fs::symlink_metadata(&target_dir).is_ok() {
             if remove_all(&target_dir).is_err() {
                 let _ = writeln!(
                     out,
@@ -342,13 +343,35 @@ fn mkdir_all(dir: &Path) -> io::Result<()> {
 
 /// Writes a file (mode 0o644); the error is [`path_error`] text.
 fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
+    write_file_with(path, |file| file.write_all(content))
+}
+
+/// [`write_file`] with the bytes written by `fill` (a test seam).
+///
+/// The bytes go to a temp file in the same directory, which is then
+/// renamed over `path`. A failed or cut-off write keeps the old file.
+/// `fs::rename` replaces an existing file on Unix and on Windows.
+fn write_file_with(
+    path: &Path,
+    fill: impl FnOnce(&mut fs::File) -> io::Result<()>,
+) -> Result<(), String> {
+    let mut tmp_name = OsString::from(".");
+    tmp_name.push(path.file_name().unwrap_or_else(|| OsStr::new("file")));
+    tmp_name.push(format!(".rival-tmp-{}", std::process::id()));
+    let tmp = path.with_file_name(tmp_name);
     let mut opts = OpenOptions::new();
     opts.write(true).create(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o644);
-    let mut file = opts.open(path).map_err(|e| path_error("open", path, &e))?;
-    file.write_all(content)
-        .map_err(|e| path_error("write", path, &e))
+    let mut file = opts.open(&tmp).map_err(|e| path_error("open", path, &e))?;
+    let written = fill(&mut file).map_err(|e| path_error("write", path, &e));
+    drop(file);
+    let renamed =
+        written.and_then(|()| fs::rename(&tmp, path).map_err(|e| path_error("rename", path, &e)));
+    if renamed.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    renamed
 }
 
 /// Error text: `<op> <path>: <errno text>`.

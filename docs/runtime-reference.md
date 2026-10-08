@@ -163,3 +163,13 @@ everywhere. Plan review accepts `codex` and `claude`.
 Invalid model labels or effort values in `~/.rival/config.yaml` stop the command
 before sessions or queue entries are created. An old `efforts.sol` entry is
 ignored.
+
+## Known limits
+
+- Retired-skill cleanup in `rival install`: when one removal fails, the
+  install prints a failure line. The skills that it removed before the error
+  are not added to the `removed` count.
+- The update check compares versions as zero-padded strings, not as numbers.
+  Each of the three parts is padded to 3 digits. A part with more than 3 digits
+  (for example `1.1000.0`) compares incorrectly. A numeric compare would fix
+  this, but it would show update notices to `dev` builds.

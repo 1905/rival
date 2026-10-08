@@ -33,11 +33,10 @@ Each scenario gets its own temp root:
 
 - `PATH` is `bin:sysbin` only. The runner checks that each present fake resolves to `bin/` and each absent fake resolves to nothing. A real `codex` or `docker` on the host can never answer.
 - The environment is built, not inherited. Only `USER` and `LOGNAME` come from the caller.
-- Fixed values: `TZ=UTC`, `CI=1`, `RIVAL_NO_TELEMETRY=1`, `RIVAL_NO_UPDATE_CHECK=1`, `GIT_CONFIG_NOSYSTEM=1`.
-- The telemetry opt-out keys are `DO_NOT_TRACK`, `RIVAL_NO_TELEMETRY` or `CI`.
+- Fixed values: `TZ=UTC`, `CI=1`, `RIVAL_NO_UPDATE_CHECK=1`, `GIT_CONFIG_NOSYSTEM=1`.
 - `RIVAL_UPDATE_API` always points at the runner's server on `127.0.0.1`. The Rust client requests `GET $RIVAL_UPDATE_API/repos/1905/rival/releases/latest`.
 - Each scenario runs its own server. Every request is recorded. An unknown path gets a 404 and fails the scenario unless it is expected.
-- A scenario `env` may set or unset (`null`) any variable except `PATH`, `HOME`, `USERPROFILE`, `RIVAL_HOME`, `TMPDIR`, `RIVAL_NO_TELEMETRY`, `RIVAL_UPDATE_API`, `GIT_CONFIG_NOSYSTEM`, `RIVAL_E2E_TASK` and `FAKE_*`.
+- A scenario `env` may set or unset (`null`) any variable except `PATH`, `HOME`, `USERPROFILE`, `RIVAL_HOME`, `TMPDIR`, `RIVAL_UPDATE_API`, `GIT_CONFIG_NOSYSTEM`, `RIVAL_E2E_TASK` and `FAKE_*`.
 - Process ownership: every process started for a scenario carries `RIVAL_E2E_TASK=<token>` in its environment.
 - The runner finds owned processes through `/proc/*/environ` on Linux or `ps -E` on macOS. It never matches by name.
 - The runner also tracks every step process from the moment it spawns. Cleanup kills the group of any tracked step still running, even one that dropped the token.

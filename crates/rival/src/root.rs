@@ -11,7 +11,6 @@ use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::Config;
 use rival_core::mergerequest::{self, Snapshot};
 use rival_core::paths::{self, Paths};
-use rival_core::telemetry::Telemetry;
 use rival_core::{logging, queue, session, update};
 
 use crate::detach::{self, DetachOutcome};
@@ -382,9 +381,6 @@ pub fn main_entry() -> i32 {
     // Runtime getenv calls see .env additions; the user config stays the
     // one loaded above.
     let cfg = initial.reload_env(Paths::from_env());
-    // Telemetry starts after the logger. Only a successful run flushes it;
-    // an error or an early exit skips the flush.
-    let telemetry = Telemetry::init(rival_core::VERSION, |key| cfg.getenv(key));
 
     let args: Vec<String> = std::env::args_os()
         .skip(1)
@@ -404,27 +400,13 @@ pub fn main_entry() -> i32 {
         prepare_mr: prepare,
         signals: true,
     };
-    let exit = execute_inner(
+    execute_inner(
         &mut env,
         &RootHooks::production(),
         &defaults,
         &args,
         UPDATE_CHECK_WAIT,
-    );
-    // A no-op (see Telemetry::recover_panic).
-    telemetry.recover_panic();
-    if exit.returned {
-        telemetry.flush();
-    }
-    exit.code
-}
-
-/// How the command run ended.
-pub(crate) struct Exit {
-    pub code: i32,
-    /// The run succeeded (no error, no early exit), so the telemetry flush
-    /// runs.
-    pub returned: bool,
+    )
 }
 
 /// Background work the root joins before it exits.
@@ -472,17 +454,17 @@ pub(crate) fn execute_with_wait(
     args: &[String],
     update_wait: Duration,
 ) -> i32 {
-    execute_inner(env, hooks, defaults, args, update_wait).code
+    execute_inner(env, hooks, defaults, args, update_wait)
 }
 
-/// Parses and runs `args` (no program name).
+/// Parses and runs `args` (no program name); returns the exit code.
 fn execute_inner(
     env: &mut CmdEnv<'_>,
     hooks: &RootHooks,
     defaults: &Defaults,
     args: &[String],
     update_wait: Duration,
-) -> Exit {
+) -> i32 {
     let mut root = tree::build(defaults);
     let mut bg = Background::default();
     let result = match tree::parse(&mut root, args) {
@@ -494,12 +476,7 @@ fn execute_inner(
             Ok(())
         }
         Ok(Parsed::Run(inv)) => match pre_run(env, hooks, &inv, &mut bg) {
-            PreRun::Exit(code) => {
-                return Exit {
-                    code,
-                    returned: false,
-                };
-            }
+            PreRun::Exit(code) => return code,
             PreRun::Fail(err) => Err(err),
             PreRun::Continue => dispatch(env, hooks, &mut root, &inv),
         },
@@ -511,16 +488,10 @@ fn execute_inner(
     let notice = bg.wait_for_update_check(update_wait);
     let _ = env.stderr.write_all(&notice);
     match result {
-        Ok(()) => Exit {
-            code: 0,
-            returned: true,
-        },
+        Ok(()) => 0,
         Err(err) => {
             let _ = writeln!(env.stderr, "{}", err.message);
-            Exit {
-                code: err.code,
-                returned: false,
-            }
+            err.code
         }
     }
 }

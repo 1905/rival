@@ -9,12 +9,27 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 ### Removed
 - `rival-antislop`, the code-slop review. `rival install` deletes an installed copy.
 - The Go license file in release archives. No Go code ships.
+- Telemetry: the unused Sentry code and the `sentry` dependency. `RIVAL_NO_TELEMETRY` and `DO_NOT_TRACK` no longer have an effect.
 
 ### Changed
 - Error messages use the operating system's own wording, for example `No such file or directory (os error 2)` and `exit status: 1`.
 - Session, queue and cache files are written as plain JSON: `<`, `>` and `&` are no longer escaped, and unset times are omitted. Files from older versions still load.
 - A duration that overflows (for example in `RIVAL_RUN_TIMEOUT`) is now an error. Before, it wrapped to 0 and turned the run timeout off.
 - The end-to-end scenarios moved from `parity/` to `e2e/`.
+
+### Fixed
+- Claude in Docker: the token is no longer in the `docker` process arguments, where other local users could read it.
+- Kimi reviews: the review tool rules apply in every mode except raw. Before, only `review` got them.
+- The `.env` search stops at `HOME` also when `HOME` has a trailing slash.
+- The CLI and the TUI share one review parser. A log that the old CLI accepted can now show UNPARSED. A plan review with a blank summary is UNPARSED.
+- `rival queue clear --force` keeps the tickets of live running reviews.
+- Git scope detection ignores an inherited `GIT_DIR`.
+- Merge request links with URL-encoded characters are found.
+- Cancelling a merge request review kills the whole `git`/`glab` process group. Before, it killed the direct child only, and a grandchild that held the pipe delayed the return.
+- Queue I/O errors show their error text. Before, they showed as a cancel.
+- `rival install` writes skill files atomically: a failed write keeps the old file. Dangling links of retired skills are removed.
+- Huge `RIVAL_RUN_TIMEOUT` and `RIVAL_QUEUE_TIMEOUT` values saturate at the maximum wait. Before, the wait could wrap to a negative value.
+- Claude in Docker on Windows: a drive path such as `C:\repo` mounts as given. Before, it was joined to the working directory.
 
 ## [v5.0.0] — 2026-10-07
 
