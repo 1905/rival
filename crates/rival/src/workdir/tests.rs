@@ -83,7 +83,7 @@ fn resolve_workdir_nul_is_invalid_argument() {
     let (_root, cwd) = layout();
     let fix = Fixture::with(&[], Some(cwd.clone()));
     let want = if cfg!(windows) {
-        r#"resolve workdir "v3\x00x": invalid argument"#.to_string()
+        r#"resolve workdir "v3\0x": invalid argument"#.to_string()
     } else {
         format!(
             "cannot read workdir {p}: stat {p}: invalid argument",

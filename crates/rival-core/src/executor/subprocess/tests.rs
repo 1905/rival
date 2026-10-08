@@ -941,7 +941,10 @@ fn grace_starts_at_cancel_not_at_leader_exit() {
     if cfg!(target_os = "macos") {
         assert_eq!(
             text.unwrap_err(),
-            "subprocess sh: error sending signal to Cmd: operation not permitted"
+            format!(
+                "subprocess sh: error sending signal to Cmd: {}",
+                std::io::Error::from_raw_os_error(libc::EPERM)
+            )
         );
     } else {
         match text {

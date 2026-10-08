@@ -11,7 +11,7 @@ by behavior:
    (EBADF) and exits 1. Without the constructor, Rust would spawn a detached
    child that prints the usage on stdout.
 2. fd 0 closed, `command codex`: Go fails the stdin read and exits 1 with
-   `read stdin: read /dev/stdin: bad file descriptor`. Without the
+   `read stdin: read /dev/stdin: Bad file descriptor (os error 9)`. Without the
    constructor, Rust would read /dev/null as a terminal and print usage.
 
 Both cases stop before any provider, queue or network work. Each run gets a
@@ -62,7 +62,7 @@ def check(binary):
     if code != 1 or out:
         problems.append(f"fd 2 closed + --detach: exit {code}, stdout {out!r} (want exit 1, no stdout)")
     code, out, err = run(binary, ["command", "codex"], 0)
-    want = b"read stdin: read /dev/stdin: bad file descriptor\n"
+    want = b"read stdin: read /dev/stdin: Bad file descriptor (os error 9)\n"
     if code != 1 or out or err != want:
         problems.append(f"fd 0 closed: exit {code}, stdout {out!r}, stderr {err!r} (want exit 1, {want!r})")
     return problems
