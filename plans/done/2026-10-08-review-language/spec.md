@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08
 **Scope:** /home/kass/dev/rival (it starts after `plans/2026-10-08-rust-only/` and `plans/2026-10-08-inherited-bugs/` land. The file:line citations are from master `2809e58`.)
-**Status:** approved
+**Status:** done
 
 ## TL;DR
 
@@ -253,3 +253,15 @@ Reply with JSON only, in the same shape.
 - **P2** — add `Request.log` and pass it through every adapter. One commit. Gate: the checks above, e2e, three-OS CI.
 - **P3** — put the STE rules in the reviewer, plan and skill prompts. One commit. Gate: the checks above, new SHA-256 pins.
 - **P4** — add the repair pass to code, security and plan reviews. One commit. Gate: the checks above, the new e2e scenarios, the manual Dell runs.
+
+## As-built notes
+
+Delivered on branch `feat/review-language` (2026-10-09). Deviations from the text above:
+
+- P4: a word that is not in the dictionary does not start a repair call on its own. It is most often a technical noun ("plan", "cache", "text"). A definite finding, a non-approved word or a word not approved as a verb starts the call. The report lists the unknown words when a call runs.
+- P4: the entry point `review::repair_language` appends the accepted line itself and returns the session log text after the pass, not the line. The three callers do not repeat the append.
+- P4: the guard facts also include signed numbers ("-1" is not "1"), text in double quotation marks, `~~~` fences, and the `~` and drive prefixes of a path. A real Codex review found the first two, the exit-gate review found the last two.
+- P4: `lang::lookup` is removed. The report already gives the alternatives and one example for each word. The lookup code and `Report::to_json` are test-only.
+- P4: ten existing e2e scenarios now script the second call. Their repair reply is the same review, so their output does not change.
+- Manual Dell checks: one real Codex review ran the repair end to end. The real Claude review did not run: Claude is not logged in on Dell.
+- Seen in the real run: strict mode swaps domain nouns ("review" → "inspection", "evidence" → "indications"). The text reads stiff, and the facts stay the same.
