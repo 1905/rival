@@ -2,11 +2,26 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-07.
+Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-09.
 
 ## [Unreleased]
 
+## [v5.0.0] — 2026-10-09
+
+The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 86 end-to-end scenarios check them on macOS and Linux.
+
+### Changed
+- Releases ship the Rust CLI. Homebrew installs it on macOS and Linux, from the same archive names as before.
+- `rival tui` is rebuilt. It has a Result tab with parsed findings, expandable details and Markdown. Finished runs open on Result. Live runs open on Raw.
+- `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
+- Repository `.env` files can no longer set `RIVAL_HOME`. Set it in the process environment instead.
+- Error messages use the operating system's own wording, for example `No such file or directory (os error 2)` and `exit status: 1`.
+- Session, queue and cache files are written as plain JSON: `<`, `>` and `&` are no longer escaped, and unset times are omitted. Files from older versions still load.
+- A duration that overflows (for example in `RIVAL_RUN_TIMEOUT`) is now an error. Before, it wrapped to 0 and turned the run timeout off.
+- The end-to-end scenarios moved from `parity/` to `e2e/`.
+
 ### Added
+- Windows support: `rival_windows_amd64.zip` and `rival_windows_arm64.zip`. The README has install steps. The binary is not code-signed.
 - Reviews are edited into controlled technical English. After a code, security or plan review, the same model makes at most one extra call, at low effort, to edit the wording. Facts, file references and numbers do not change.
 
 ### Removed
@@ -14,13 +29,11 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 - The Go license file in release archives. No Go code ships.
 - Telemetry: the unused Sentry code and the `sentry` dependency. `RIVAL_NO_TELEMETRY` and `DO_NOT_TRACK` no longer have an effect.
 
-### Changed
-- Error messages use the operating system's own wording, for example `No such file or directory (os error 2)` and `exit status: 1`.
-- Session, queue and cache files are written as plain JSON: `<`, `>` and `&` are no longer escaped, and unset times are omitted. Files from older versions still load.
-- A duration that overflows (for example in `RIVAL_RUN_TIMEOUT`) is now an error. Before, it wrapped to 0 and turned the run timeout off.
-- The end-to-end scenarios moved from `parity/` to `e2e/`.
-
 ### Fixed
+- `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
+- Claude in Docker: a cancelled or timed-out run now removes its container. Before, the container kept running against the mounted project after Rival freed the queue slot.
+- `rival run`: a stdout reader that keeps the pipe open but stops reading no longer holds the run past a cancel or `RIVAL_RUN_TIMEOUT`. The live copy is dropped after the timeout; the session log keeps all output.
+- Codex reviews: a transcript with no final answer no longer counts as a review when a tool printed review-shaped JSON.
 - Claude in Docker: the token is no longer in the `docker` process arguments, where other local users could read it.
 - Kimi reviews: the review tool rules apply in every mode except raw. Before, only `review` got them.
 - The `.env` search stops at `HOME` also when `HOME` has a trailing slash.
@@ -34,29 +47,9 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 - Huge `RIVAL_RUN_TIMEOUT` and `RIVAL_QUEUE_TIMEOUT` values saturate at the maximum wait. Before, the wait could wrap to a negative value.
 - Claude in Docker on Windows: a drive path such as `C:\repo` mounts as given. Before, it was joined to the working directory.
 
-## [v5.0.0] — 2026-10-07
-
-The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 84 end-to-end scenarios check them on macOS and Linux.
-
-### Changed
-- Releases ship the Rust CLI. Homebrew installs it on macOS and Linux, from the same archive names as before.
-- `rival tui` is rebuilt. It has a Result tab with parsed findings, expandable details and Markdown. Finished runs open on Result. Live runs open on Raw.
-- `rival tui` uses the same dim-phosphor palette as Rival.app: a dark-tint cursor bar instead of the neon fill, dim section headers and completed runs; only running (amber) and failed (red) are coloured.
-- Repository `.env` files can no longer set `RIVAL_HOME`. Set it in the process environment instead.
-
-### Added
-- Windows support: `rival_windows_amd64.zip` and `rival_windows_arm64.zip`. The README has install steps. The binary is not code-signed.
-
-### Fixed
-- `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
-- Claude in Docker: a cancelled or timed-out run now removes its container. Before, the container kept running against the mounted project after Rival freed the queue slot.
-- `rival run`: a stdout reader that keeps the pipe open but stops reading no longer holds the run past a cancel or `RIVAL_RUN_TIMEOUT`. The live copy is dropped after the timeout; the session log keeps all output.
-- Codex reviews: a transcript with no final answer no longer counts as a review when a tool printed review-shaped JSON.
-
 ### Known limits
 - The config parser is `serde-saphyr`, not Go's `yaml.v3`. Rare YAML edge cases can parse differently.
 - Windows UNC network paths and TUI terminal restore on native Windows are not verified.
-- Inherited Go bugs listed in `plans/2026-10-01-rust-cli/plan-v2.10.md` are kept on purpose.
 
 ## [v4.2.0] — 2026-10-07
 
