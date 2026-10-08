@@ -21,4 +21,4 @@ app/dist/
 __pycache__/
 
 # rust build output
-target/
+/target

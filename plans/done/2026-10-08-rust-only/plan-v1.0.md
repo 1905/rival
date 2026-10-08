@@ -1,7 +1,7 @@
 # Rust-only rival Implementation Plan v1.0
 
 **Date:** 2026-10-08
-**Status:** in-progress
+**Status:** done
 **Spec:** ./spec.md
 
 **Goal:** remove `rival-antislop`, the first word check, all Go-compat layers and all Go names. Rename the scenario harness. Do not change behavior if the spec does not identify the change.

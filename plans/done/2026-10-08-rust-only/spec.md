@@ -223,3 +223,15 @@ Rival.app decodes both forms. It already maps the zero time to "unset" (`app/Sou
 - **P3c** — Windows paths: `std::path` replaces `winpath.rs`. One commit. Gate: the checks above, Windows CI in particular.
 - **P3d** — Unicode tables and license: delete `gostd_tables.rs` and `Go-LICENSE`, update the archive check. One commit. Gate: the checks above and one unpublished release snapshot.
 - **P4** — rename `parity/` to `e2e/`, remove Go names and comments, add the CI grep gate. One commit. Gate: the checks above.
+
+## As-built notes
+
+Delivered on branch `feat/rust-only` (2026-10-08). Deviations from the text above:
+
+- P1 also removed the review-args parser (`parser/review.rs`). Its only caller was the antislop command.
+- P3a added a `json` module (object-only decode, null as default, optional times) in place of `gojson`. A duplicate key, a top-level `null` and a raw invalid UTF-8 byte in a file are now errors. Files that rival wrote never have them. The 36 real session files on Dell list the same with the old and the new binary.
+- P3b also made `sort_group_members` a strict total order, because the std sort can panic on a cycle.
+- P3c kept a short lexical clean in `paths.rs` (std has none). A cleaned UNC prefix is written with backslashes, and a UNC share cleans to its prefix plus root (`\\a\b\`).
+- P4 renamed `gocsv` to `csvflag` and the Swift identifiers `isGoZero`, `goZero`, `formatGoDuration`, `parseGoDuration`, `goJSON`. The e2e fixture git identity stays "Rival Parity", because scenarios pin commit hashes that depend on it.
+- The Codex review of the branch found one defect: a local `target` symlink was committed. It is untracked, and `.gitignore` now has `/target`.
+- Not changed: Go-derived algorithms rewritten in Rust (duration grammar, environment deduplication) ship without the Go license. The user decided this.
