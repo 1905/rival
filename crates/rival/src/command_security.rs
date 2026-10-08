@@ -8,6 +8,7 @@ use rival_core::config::{
 };
 use rival_core::executor::{self, OpencodeRunOpts, RunResult};
 use rival_core::logging;
+use rival_core::result::PayloadKind;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::{MODE_SECURITY, NewSession, Session};
 
@@ -35,7 +36,8 @@ that silently skips is worse than one that refuses to start.";
 type PreflightFn<'a> = dyn Fn(&Config, &SecurityModel, &str) -> anyhow::Result<()> + 'a;
 
 /// Runs the entry on the session: `(ctx, cfg, sess, prompt, variant,
-/// workdir, entry)`.
+/// workdir, entry, log)`. `log` is the file that gets the output; `None` is
+/// the session log.
 type RunFn<'a> = dyn Fn(
         &Context,
         &Config,
@@ -44,6 +46,7 @@ type RunFn<'a> = dyn Fn(
         &str,
         &str,
         &SecurityModel,
+        Option<&str>,
     ) -> anyhow::Result<RunResult>
     + 'a;
 
@@ -59,7 +62,7 @@ impl SecurityExecutor<'static> {
             preflight: Box::new(|cfg, entry, workdir| {
                 executor::opencode_preflight_entry(cfg, entry, workdir)
             }),
-            run: Box::new(|ctx, cfg, sess, prompt, variant, workdir, entry| {
+            run: Box::new(|ctx, cfg, sess, prompt, variant, workdir, entry, log| {
                 executor::run_opencode_entry(
                     ctx,
                     cfg,
@@ -69,6 +72,7 @@ impl SecurityExecutor<'static> {
                     workdir,
                     entry,
                     &OpencodeRunOpts::default(),
+                    log,
                     None,
                 )
             }),
@@ -269,6 +273,7 @@ pub fn run_command_security(
         entry.variant,
         &workdir,
         &entry,
+        None,
     ) {
         Ok(result) => result,
         Err(e) => {
@@ -298,6 +303,8 @@ pub fn run_command_security(
         return Err(CmdError::exit(result.exit_code as i32, exit_msg));
     }
 
+    let raw =
+        repair_security_language(&ctx, cfg, ex, &mut sess, &entry, &workdir, raw.into_owned());
     let log_file = sess.log_file.clone();
     let (out, valid) = format_security_output(&raw, entry.model, &scope, &log_file);
     env.stdout
@@ -345,6 +352,43 @@ pub fn run_command_security(
         return Err(CmdError::exit(1, format!("save session completion: {e}")));
     }
     Ok(())
+}
+
+/// The language pass on a finished security review: the same model repairs
+/// the wording, read-only, with its own log and its own run timeout from
+/// `parent`. K3 keeps max, its only level; another model runs at low. It
+/// returns the session log text after the pass.
+fn repair_security_language(
+    parent: &Context,
+    cfg: &Config,
+    ex: &SecurityExecutor<'_>,
+    sess: &mut Session,
+    entry: &SecurityModel,
+    workdir: &str,
+    raw: String,
+) -> String {
+    let log = review::repair_log_path(&sess.log_file);
+    let session_log = sess.log_file.clone();
+    let variant = if entry.variant == "max" { "max" } else { "low" };
+    let (run_ctx, cancel_run) = review::with_run_timeout(parent, cfg, 1);
+    let _cancel_run = CancelOnDrop(cancel_run);
+    review::repair_language(&session_log, raw, PayloadKind::Any, |prompt| {
+        let result = (ex.run)(
+            &run_ctx,
+            cfg,
+            sess,
+            prompt,
+            variant,
+            workdir,
+            entry,
+            Some(&log),
+        )?;
+        if result.exit_code != 0 {
+            anyhow::bail!("{} exited with code {}", entry.label, result.exit_code);
+        }
+        let data = read_log(&log).map_err(anyhow::Error::msg)?;
+        Ok(String::from_utf8_lossy(&data).into_owned())
+    })
 }
 
 /// Parses a zero-exit security run and renders

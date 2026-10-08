@@ -1,0 +1,257 @@
+{
+ "findings": [
+  {
+   "rule": "4.2",
+   "kind": "contraction",
+   "message": "Contraction \"doesn't\": write the words in full.",
+   "where": "para 2, sentence 1"
+  },
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"being\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"being recomputed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"robust-looking\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"been\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "27 words (descriptive, max 25): \"Compute the deadline once, store it, and utilize it for every attempt; also consider ad...\"",
+   "where": "para 4, sentence 4"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"Compute the deadline once, store it, and utilize it for every attempt; also consider ad...\"",
+   "where": "para 4, sentence 4"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"adding\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 4, sentence 4"
+  }
+ ],
+ "words": {
+  "pass": {
+   "kind": "non_approved",
+   "alts": "GO (v), THROUGH (prep), GIVE (v)",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "v"
+  },
+  "original": {
+   "kind": "non_approved",
+   "alts": "INITIAL (adj)",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "adj"
+  },
+  "deadline": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": ""
+  },
+  "second": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": ""
+  },
+  "attempt": {
+   "kind": "non_approved",
+   "alts": "TRY (v); TRY (v)",
+   "count": 2,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "n/v"
+  },
+  "so": {
+   "kind": "non_approved",
+   "alts": "UNTIL (prep), PREVENT (v)",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "conj"
+  },
+  "overall": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": ""
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "v"
+  },
+  "exceed": {
+   "kind": "non_approved",
+   "alts": "MORE THAN",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "v"
+  },
+  "significant": {
+   "kind": "non_approved",
+   "alts": "IMPORTANT (adj)",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": "adj"
+  },
+  "margin": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The retry loop in `run_with_retry` doesn't pass the original deadline to the second att...",
+   "pos": ""
+  },
+  "basically": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "recomputed": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "scratch": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "subtle": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "robust-looking": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "present": {
+   "kind": "non_approved",
+   "alts": "BE (v); GIVE (v), SHOW (v)",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": "adj/v"
+  },
+  "refactor": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Basically, the deadline is being recomputed from scratch each time, which is a subtle b...",
+   "pos": ""
+  },
+  "suggestion": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Suggestion:",
+   "pos": ""
+  },
+  "compute": {
+   "kind": "non_approved",
+   "alts": "CALCULATE (v)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "once": {
+   "kind": "non_approved",
+   "alts": "ONE (TN) — TIME; WHEN (conj)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "adv/conj"
+  },
+  "store": {
+   "kind": "maybe_noun",
+   "alts": "KEEP (v), CONTAIN (v), STORAGE (TN)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "utilize": {
+   "kind": "non_approved",
+   "alts": "USE (v)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "adj"
+  },
+  "consider": {
+   "kind": "non_approved",
+   "alts": "THINK (v)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "verify": {
+   "kind": "non_approved",
+   "alts": "MAKE SURE (v)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "elapse": {
+   "kind": "maybe_noun",
+   "alts": "TIME (n), AFTER (prep), INTERVAL (n)",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "v"
+  },
+  "under": {
+   "kind": "non_approved",
+   "alts": "BELOW (prep), IN (prep) — LESS THAN",
+   "count": 1,
+   "example": "Compute the deadline once, store it, and utilize it for every attempt; also consider ad...",
+   "pos": "prep"
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "RIVAL_RUN_TIMEOUT",
+   "kind": "snake_case",
+   "count": 1
+  }
+ ]
+}

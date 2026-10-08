@@ -17,7 +17,7 @@ use crate::review::testutil::config_in;
 use crate::session::{MODE_PLAN, MODE_SECURITY};
 
 /// A minimal valid plan payload `parse_plan_log` accepts.
-const REAL_PLAN_JSON: &str = r#"{"summary":"ok plan","rating":7,"findings":[]}"#;
+const REAL_PLAN_JSON: &str = r#"{"summary":"The plan is correct.","rating":7,"findings":[]}"#;
 
 /// How long a concurrent fake waits for its peer before it gives up. Only a
 /// broken test reaches it; it turns a hang into a failure.
@@ -74,7 +74,9 @@ fn fake<'a>(
 ) -> PlanExecutor<'a> {
     PlanExecutor {
         preflight: Box::new(|_| Ok(())),
-        run: Box::new(run),
+        run: Box::new(move |ctx, sess, cli, prompt, effort, workdir, _log| {
+            run(ctx, sess, cli, prompt, effort, workdir)
+        }),
     }
 }
 
@@ -240,7 +242,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
                 cli: "codex".into(),
                 model: CODEX_MODEL.into(),
                 parsed: Some(PlanOutput {
-                    summary: "ok plan".into(),
+                    summary: "The plan is correct.".into(),
                     rating: 7,
                     findings: vec![],
                 }),
@@ -268,7 +270,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
 
     assert_eq!(
         format_plan_result_for(&result, "plan.md"),
-        "\n═══ RIVAL PLAN REVIEW ═══\n\nFile: plan.md\nRating: 7/10\n\nSummary: ok plan\n\nNo bugs or gaps found.\n"
+        "\n═══ RIVAL PLAN REVIEW ═══\n\nFile: plan.md\nRating: 7/10\n\nSummary: The plan is correct.\n\nNo bugs or gaps found.\n"
     );
 
     let sess = persisted(&cfg, "codex");
@@ -340,7 +342,7 @@ fn assemble_plan_results_one_skipped_one_ok() {
                 cli: "codex".into(),
                 model: GPT56_SOL_MODEL.into(),
                 parsed: Some(PlanOutput {
-                    summary: "ok plan".into(),
+                    summary: "The plan is correct.".into(),
                     rating: 7,
                     findings: vec![],
                 }),
@@ -582,6 +584,7 @@ fn run_plan_cli_restores_plan_mode() {
         ok_plan()
     });
     let out = run_plan_cli(
+        &Context::background(),
         &Context::background(),
         &cfg,
         &ex,
@@ -922,7 +925,7 @@ fn preflight_failure_is_skipped_with_a_public_reason() {
             }
             Ok(())
         }),
-        run: Box::new(|_, _, _, _, _, _| ok_plan()),
+        run: Box::new(|_, _, _, _, _, _, _| ok_plan()),
     };
     let result = run_plan(&cfg, &ex, "", "g", &clis(&["codex", "claude"])).unwrap();
     assert_eq!(
@@ -948,7 +951,7 @@ fn all_preflights_failing_is_an_error() {
     let (_home, cfg) = plan_test_config("");
     let ex = PlanExecutor {
         preflight: Box::new(|cli| bail!("{cli} CLI missing")),
-        run: Box::new(|_, _, _, _, _, _| bail!("must not run")),
+        run: Box::new(|_, _, _, _, _, _, _| bail!("must not run")),
     };
     let err = run_plan(&cfg, &ex, "", "g", &clis(&["codex", "claude"])).unwrap_err();
     assert_eq!(
@@ -1324,6 +1327,7 @@ fn run_plan_cli_fails_the_session_on_unwind() {
     let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         run_plan_cli(
             &Context::background(),
+            &Context::background(),
             &cfg,
             &ex,
             &mut sess,
@@ -1405,4 +1409,93 @@ fn run_context_is_cancelled_after_the_batch() {
     let run_ctx = run_ctx.lock().unwrap().clone().unwrap();
     assert_eq!(run_ctx.err(), Some(ContextError::Canceled));
     assert_eq!(parent.err(), None);
+}
+
+// ---- the language pass ----
+
+/// A plan answer the checker flags: "utilize" is not an approved word.
+fn flagged_plan(cli: &str) -> String {
+    format!(r#"{{"summary":"The {cli} plan can utilize the cache.","rating":6,"findings":[]}}"#)
+}
+
+fn repaired_plan(cli: &str) -> String {
+    format!(r#"{{"summary":"The {cli} plan can use the cache.","rating":6,"findings":[]}}"#)
+}
+
+/// Each CLI writes its flagged plan to the session log, then answers the
+/// repair call in its repair log: claude with a good reply, codex with
+/// `codex_reply`.
+fn repairing_executor<'a>(
+    calls: &'a Mutex<Vec<(String, String, Option<String>)>>,
+    codex_reply: &'a str,
+) -> PlanExecutor<'a> {
+    PlanExecutor {
+        preflight: Box::new(|_| Ok(())),
+        run: Box::new(move |_, sess, cli, _prompt, effort, _, log| {
+            calls.lock().unwrap().push((
+                cli.to_string(),
+                effort.to_string(),
+                log.map(str::to_string),
+            ));
+            let (path, text) = match log {
+                None => (sess.log_file.clone(), flagged_plan(cli)),
+                Some(log) if cli == "codex" => (log.to_string(), codex_reply.to_string()),
+                Some(log) => (log.to_string(), repaired_plan(cli)),
+            };
+            std::fs::write(&path, &text)?;
+            Ok((text.into_bytes(), 0))
+        }),
+    }
+}
+
+#[test]
+fn each_plan_model_repairs_its_own_block() {
+    let (_home, cfg) = plan_test_config("");
+    let calls = Mutex::new(Vec::new());
+    let ex = repairing_executor(&calls, "not json");
+    let out = run_plan(&cfg, &ex, "", "g", &clis(&["codex", "claude"])).unwrap();
+
+    drop(ex);
+    let mut calls = calls.into_inner().unwrap();
+    calls.sort();
+    let repair_calls: Vec<_> = calls.iter().filter(|c| c.2.is_some()).collect();
+    assert_eq!(repair_calls.len(), 2, "{calls:?}");
+    for (cli, effort, log) in repair_calls {
+        assert_eq!(effort, "low");
+        let sess = persisted(&cfg, cli);
+        assert_eq!(
+            log.as_deref(),
+            Some(format!("{}.repair.log", sess.log_file).as_str())
+        );
+        assert_eq!(sess.status, "completed");
+        assert_eq!(sess.mode, MODE_PLAN);
+    }
+
+    // Claude's repair passes; codex's bad reply keeps its review.
+    let summary = |cli: &str| {
+        let r = out.results.iter().find(|r| r.cli == cli).unwrap();
+        r.parsed.as_ref().unwrap().summary.clone()
+    };
+    assert_eq!(summary("claude"), "The claude plan can use the cache.");
+    assert_eq!(summary("codex"), "The codex plan can utilize the cache.");
+
+    let claude_log = std::fs::read_to_string(persisted(&cfg, "claude").log_file).unwrap();
+    assert_eq!(
+        claude_log,
+        format!("{}\n{}\n", flagged_plan("claude"), repaired_plan("claude"))
+    );
+    let codex_log = std::fs::read_to_string(persisted(&cfg, "codex").log_file).unwrap();
+    assert_eq!(codex_log, flagged_plan("codex"));
+}
+
+#[test]
+fn a_plan_repair_that_changes_the_rating_keeps_the_review() {
+    let (_home, cfg) = plan_test_config("");
+    let calls = Mutex::new(Vec::new());
+    let moved = repaired_plan("codex").replace("\"rating\":6", "\"rating\":9");
+    let ex = repairing_executor(&calls, &moved);
+    let out = run_plan(&cfg, &ex, "", "g", &clis(&["codex"])).unwrap();
+    let parsed = out.results[0].parsed.as_ref().unwrap();
+    assert_eq!(parsed.rating, 6);
+    assert_eq!(parsed.summary, "The codex plan can utilize the cache.");
 }

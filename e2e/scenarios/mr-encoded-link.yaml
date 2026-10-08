@@ -44,6 +44,37 @@
             },
             "stdout": "{\"summary\":\"MR patch reviewed.\",\"findings\":[]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              {
+                "$regex": "<ROOT>/tmp/rival-mr-[0-9]+"
+              },
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": {
+                "$regex": "<ROOT>/tmp/rival-mr-[0-9]+"
+              }
+            },
+            "stdout": "{\"summary\":\"MR patch reviewed.\",\"findings\":[]}\n",
+            "exit": 0
           }
         ]
       },
@@ -212,7 +243,8 @@
     "home_files": [
       ".rival/queue/.lock",
       ".rival/sessions/<UUID1>.json",
-      ".rival/sessions/<UUID1>.log"
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
     ],
     "files": [
       {
@@ -246,7 +278,7 @@
       }
     ],
     "calls": {
-      "codex": 2,
+      "codex": 3,
       "glab": 1
     },
     "dirs": [

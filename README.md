@@ -379,6 +379,7 @@ Every single-model code review (`codex`, `claude`, `grok`, `k3` in review mode) 
 - A clean review is `{"summary": "No issues found.", "findings": []}`.
 - Every finding must carry a `failure_scenario`: the input or state that triggers it and the wrong result. The prompt tells the model to drop a finding without one.
 - Severity rubric: `critical` = data loss, a reachable security hole, or a crash on a normal path. `high` = wrong result or broken flow on a realistic path. `medium` = wrong result on an edge case, or a real hot-path performance problem. `low` = minor defect with a cheap workaround.
+- The prompt asks for the review text in ASD-STE100 Simplified Technical English. After a code, security or plan review, Rival checks the text. If the check finds a word or a sentence outside the standard, the same model edits the wording one time, at low effort and read-only. Facts, file references and numbers do not change. The edited review is the result.
 
 Rival formats the JSON for the console:
 
@@ -536,6 +537,7 @@ Every run writes to `~/.rival/sessions/` (`$RIVAL_HOME/sessions/` when `RIVAL_HO
 
 - `<session-id>.json`: the session record. It is written to `<session-id>.json.tmp` first and then renamed.
 - `<session-id>.log`: the full model output.
+- `<session-id>.log.repair.log`: the output of the wording edit, when one runs.
 
 Main JSON fields: `id`, `group_id` (shared by the models of one plan run), `cli`, `mode`, `model`, `effort`, `review_scope`, `prompt_preview`, `status` (`queued`, `running`, `completed`, `failed`), `start_time`, `end_time`, `exit_code`, `duration`, `work_dir`, `log_file`, `error`, `pid`, `pid_start`.
 

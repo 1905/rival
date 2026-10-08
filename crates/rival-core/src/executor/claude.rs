@@ -34,6 +34,7 @@ pub fn run_claude(
     effort: &str,
     workdir: &str,
     read_only: bool,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_claude_model(
@@ -44,6 +45,7 @@ pub fn run_claude(
         workdir,
         config::CLAUDE_MODEL,
         read_only,
+        log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
 }
@@ -65,6 +67,7 @@ pub(crate) fn run_claude_model(
     workdir: &str,
     model: &str,
     read_only: bool,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
@@ -72,10 +75,14 @@ pub(crate) fn run_claude_model(
     }
     let result = if oscmd::look_path(cfg, "claude").is_ok() {
         set_claude_transport_mode(sess, "native");
-        run_claude_native(cfg, sess, prompt, effort, workdir, model, read_only, spawn)
+        run_claude_native(
+            cfg, sess, prompt, effort, workdir, model, read_only, log, spawn,
+        )
     } else {
         set_claude_transport_mode(sess, "docker");
-        run_claude_docker_with(cfg, sess, prompt, effort, workdir, model, read_only, spawn)
+        run_claude_docker_with(
+            cfg, sess, prompt, effort, workdir, model, read_only, log, spawn,
+        )
     };
     result.map_err(|err| {
         let label = config::engine_label("claude", model);
@@ -109,6 +116,7 @@ fn run_claude_native(
     workdir: &str,
     model: &str,
     read_only: bool,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     let auth = cfg.claude_auth()?;
@@ -140,6 +148,7 @@ fn run_claude_native(
         prompt: &full_prompt,
         drop_env: &drop_env,
         environ: cfg.environ(),
+        log,
     };
     spawn(sess, &req)
 }

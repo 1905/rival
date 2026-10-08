@@ -1,0 +1,136 @@
+{
+  "name": "review-language-code",
+  "description": "`rival command codex` with `review src/`. The review text has words the checker flags (\"utilize\", \"ensure\"), so rival makes ONE repair call: the same model at effort low, read-only, with its own log `<session>.log.repair.log`. The guard keeps every fact, so the printed review is the repaired one. The session log ends with the repaired review as one JSON line and never holds the repair transcript.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "OpenAI Codex v0.0.0\n--------\nuser\nreview\ncodex\n{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\ntokens used\n1,234\n{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "OpenAI Codex v0.0.0\n--------\nuser\nrepair\ncodex\n{\"summary\":\"We use the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Make sure that the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\ntokens used\n99\n{\"summary\":\"We use the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Make sure that the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: We use the cache.\n\n1. [high] Cache key is wrong — src/a.go:3\n   The code in `load()` reads 3 entries. Make sure that the key is unique.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting codex (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "review",
+          "work_dir": "<ROOT>/work",
+          "review_scope": "src/"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "OpenAI Codex v0.0.0\n--------\nuser\nreview\ncodex\n{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\ntokens used\n1,234\n{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"We use the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Make sure that the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
+      }
+    ],
+    "calls": {
+      "codex": 3
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/src/a.go",
+      "text": "package a\n"
+    }
+  ]
+}

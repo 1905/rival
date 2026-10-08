@@ -7,6 +7,7 @@
 //! for the answer.
 
 mod format;
+mod language;
 mod parse;
 mod plan;
 mod planrun;
@@ -18,6 +19,7 @@ mod testutil;
 mod types;
 
 pub use format::{DEFAULT_CONFIDENCE_THRESHOLD, format_review_console, format_review_result};
+pub use language::{repair_language, repair_log_path};
 pub use parse::parse_reviewer_log;
 pub use plan::{
     PlanCLIResult, PlanOutput, PlanRunResult, format_plan_console, format_plan_multi_console,

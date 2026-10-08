@@ -158,6 +158,7 @@ fn docker_mount(env: &Env, cfg: &Config, workdir: &str) -> String {
         workdir,
         config::CLAUDE_MODEL,
         true,
+        None,
         crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap();
@@ -219,6 +220,7 @@ fn token_goes_by_name_only_and_value_in_the_child_env() {
         "/repo",
         config::CLAUDE_MODEL,
         true,
+        None,
         crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap();
@@ -258,6 +260,7 @@ fn failed_or_cancelled_runs_remove_their_container() {
             "/repo",
             config::CLAUDE_MODEL,
             true,
+            None,
             crate::executor::testutil::recorder(&mut seen, result),
         );
         let args = seen.unwrap().args;
@@ -292,4 +295,31 @@ fn container_removal_gives_up_at_its_deadline() {
     );
     let took = started.elapsed();
     assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+}
+
+/// The Docker adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_claude_docker_forwards_the_log_file() {
+    let mut env = Env::new();
+    env.set(config::CLAUDE_DOCKER_TOKEN_ENV, Some("tok"));
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, &work);
+    let mut seen = None;
+    run_claude_docker_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        &work,
+        config::CLAUDE_MODEL,
+        true,
+        Some("/home/s/sessions/x.log.repair.log"),
+        crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
+    );
 }

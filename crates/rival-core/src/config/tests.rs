@@ -1477,8 +1477,8 @@ fn prompts_sha256_golden() {
         ),
         (
             "PlanReviewPrompt",
-            2587,
-            "8c532f2b42d55282aee13a1eb216046b5d2ebe3946ab225359ef9e1317ac9fcc",
+            4477,
+            "9cd3d3e21e2fab1920c89e50514d775c088df341efe9ba7d9b6eeaa0e85ebc7b",
         ),
         (
             "WholeProject",

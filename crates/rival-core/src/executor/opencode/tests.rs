@@ -249,6 +249,7 @@ fn run_opencode_resolves_the_model_and_drops_extra_vars() {
         &work,
         "",
         &opts,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap();
@@ -292,6 +293,7 @@ fn run_opencode_resolves_the_model_and_drops_extra_vars() {
         &work,
         "custom/example-model",
         &opts,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -310,6 +312,7 @@ fn run_opencode_resolves_the_model_and_drops_extra_vars() {
         &work,
         &grok(),
         &opts,
+        None,
         |_, _| Err(anyhow::anyhow!("start opencode: boom")),
     )
     .unwrap_err();
@@ -326,4 +329,31 @@ fn run_opts_debug_never_prints_the_key() {
     let text = format!("{opts:?}");
     assert!(!text.contains("sk-secret"), "{text}");
     assert!(text.contains("<redacted>"), "{text}");
+}
+
+/// The adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_opencode_forwards_the_log_file() {
+    let mut env = Env::new();
+    env.set("MOONSHOT_API_KEY", Some("sk-k3"));
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("opencode", "review", config::KIMI_MODEL, &work);
+    let mut seen = None;
+    run_opencode_model_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "high",
+        &work,
+        "",
+        &OpencodeRunOpts::default(),
+        Some("/home/s/sessions/x.log.repair.log"),
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
+    );
 }

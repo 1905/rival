@@ -32,6 +32,34 @@
             },
             "stdout": "{\"summary\":\"One injectable query.\",\"findings\":[{\"file\":\"src/api/users.go\",\"line\":42,\"severity\":\"high\",\"category\":\"injection\",\"title\":\"SQL built from request input\",\"body\":\"the handler concatenates the id parameter into the query\",\"failure_scenario\":\"id=1 OR 1=1 returns every user\",\"suggestion\":\"use a bound parameter\",\"confidence\":9}]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work/sub",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"deny\",\"bash\":\"deny\",\"task\":\"deny\",\"webfetch\":\"deny\",\"websearch\":\"deny\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                }
+              }
+            },
+            "stdout": "{\"summary\":\"One injectable query.\",\"findings\":[{\"file\":\"src/api/users.go\",\"line\":42,\"severity\":\"high\",\"category\":\"injection\",\"title\":\"SQL built from request input\",\"body\":\"the handler concatenates the id parameter into the query\",\"failure_scenario\":\"id=1 OR 1=1 returns every user\",\"suggestion\":\"use a bound parameter\",\"confidence\":9}]}\n",
+            "exit": 0
           }
         ]
       }
@@ -70,7 +98,8 @@
   "expect": {
     "home_files": [
       ".rival/sessions/<UUID1>.json",
-      ".rival/sessions/<UUID1>.log"
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
     ],
     "files": [
       {
@@ -94,7 +123,7 @@
       }
     ],
     "calls": {
-      "opencode": 1
+      "opencode": 2
     }
   },
   "fixtures": [

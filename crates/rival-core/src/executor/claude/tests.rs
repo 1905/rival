@@ -114,6 +114,7 @@ fn claude_review_transport_restrictions() {
                     "medium",
                     &repo,
                     read_only,
+                    None,
                     Some(&mut out),
                 )
             },
@@ -169,6 +170,7 @@ fn claude_docker_review_mount_is_read_only() {
                 "medium",
                 &repo,
                 true,
+                None,
                 Some(&mut out),
             )
         },
@@ -239,6 +241,7 @@ fn native_request_strips_subscription_credentials_only() {
             &work,
             config::CLAUDE_MODEL,
             false,
+            None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap();
@@ -254,6 +257,7 @@ fn native_request_strips_subscription_credentials_only() {
                 environ: cfg.environ().to_vec(),
                 mode: "native".into(),
                 account: want_account.into(),
+                log: None,
             },
             "auth {auth:?}"
         );
@@ -279,6 +283,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         &work,
         config::CLAUDE_MODEL,
         false,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -299,6 +304,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         &work,
         config::CLAUDE_MODEL,
         false,
+        None,
         recorder(&mut seen, Err(anyhow!("subprocess claude: signal: killed"))),
     )
     .unwrap_err();
@@ -315,6 +321,7 @@ fn claude_errors_are_wrapped_with_the_public_label() {
         &work,
         "claude-opus-5",
         false,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -339,6 +346,7 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
         "rel",
         config::CLAUDE_MODEL,
         false,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap_err();
@@ -362,6 +370,7 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
         "./rel",
         config::CLAUDE_MODEL,
         false,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )
     .unwrap();
@@ -532,10 +541,39 @@ fn read_only_survives_the_transport_replacing_the_mode() {
             &work,
             config::CLAUDE_MODEL,
             true,
+            None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap();
         assert_eq!(seen.unwrap().args, read_only_argv("medium"));
         assert_eq!(sess.mode, "native");
     }
+}
+
+/// The native adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_claude_native_forwards_the_log_file() {
+    let env = Env::new();
+    env.fake_on_path("claude");
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, &work);
+    let mut seen = None;
+    run_claude_model(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        &work,
+        config::CLAUDE_MODEL,
+        true,
+        Some("/home/s/sessions/x.log.repair.log"),
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(sess.mode, "native");
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
+    );
 }

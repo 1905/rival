@@ -77,6 +77,8 @@ pub struct RunCall<'a, 'm> {
     pub cred_workdir: &'a str,
     /// Whether the run is a review, so grok can apply its sandbox.
     pub review: bool,
+    /// The file that gets the provider output; `None` is the session log.
+    pub log: Option<&'a str>,
     /// The live stdout mirror; `None` in command mode.
     pub out: Mirror<'m>,
 }
@@ -168,6 +170,7 @@ pub fn codex_spec() -> ModelSpec {
                 c.effort,
                 c.workdir,
                 config::CODEX_MODEL,
+                c.log,
                 c.out,
             )
         }),
@@ -184,7 +187,7 @@ pub fn claude_spec() -> ModelSpec {
         preflight: Box::new(|cfg, _| executor::claude_preflight(cfg)),
         run: Box::new(|c| {
             executor::run_claude(
-                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.out,
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.log, c.out,
             )
         }),
     }
@@ -208,6 +211,7 @@ pub fn k3_spec() -> ModelSpec {
                 c.prompt,
                 c.workdir,
                 c.cred_workdir,
+                c.log,
                 c.out,
             )
         }),
@@ -225,7 +229,7 @@ pub fn grok_spec() -> ModelSpec {
         // Grok sandboxes reviews and only reviews.
         run: Box::new(|c| {
             executor::run_grok(
-                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.out,
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.log, c.out,
             )
         }),
     }

@@ -1,0 +1,270 @@
+{
+ "findings": [
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is called\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 2, sentence 1"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"holding\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 2, sentence 1"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "26 words (descriptive, max 25): \"It's important to note that this may result in lost updates; we should ensure that the ...\"",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"It's important to note that this may result in lost updates; we should ensure that the ...\"",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "4.2",
+   "kind": "contraction",
+   "message": "Contraction \"It's\": write the words in full.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is held\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "32 words (descriptive, max 25): \"Failure scenario: two concurrent requests that update the same key will race, and the s...\"",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "GR-6",
+   "kind": "latin",
+   "message": "Latin abbreviation \"e.g.\": use \"for example\", \"that is\", or rewrite.",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"failure scenario two concurrent requests\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"reading\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 5, sentence 5"
+  },
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"been\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 5, sentence 5"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"been completed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 5, sentence 5"
+  }
+ ],
+ "words": {
+  "call": {
+   "kind": "non_approved",
+   "alts": "TELL (v)",
+   "count": 1,
+   "example": "The `SessionCache::insert` method in `src/cache.rs:42` is called from two threads witho...",
+   "pos": "v"
+  },
+  "potential": {
+   "kind": "non_approved",
+   "alts": "POSSIBLE (adj)",
+   "count": 1,
+   "example": "The `SessionCache::insert` method in `src/cache.rs:42` is called from two threads witho...",
+   "pos": "adj"
+  },
+  "lead": {
+   "kind": "maybe_noun",
+   "alts": "PUT (v)",
+   "count": 1,
+   "example": "The `SessionCache::insert` method in `src/cache.rs:42` is called from two threads witho...",
+   "pos": "v"
+  },
+  "corrupted": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The `SessionCache::insert` method in `src/cache.rs:42` is called from two threads witho...",
+   "pos": ""
+  },
+  "note": {
+   "kind": "non_approved",
+   "alts": "RECORD (v)",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "v"
+  },
+  "may": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "",
+   "hint": "POSSIBLY, or \"IT IS POSSIBLE THAT ...\" (CAN only for ability or permission). Keep it a possibility."
+  },
+  "lost": {
+   "kind": "non_approved",
+   "alts": "DECREASE (v) — NOT FIND",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "adj"
+  },
+  "updates": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": ""
+  },
+  "should": {
+   "kind": "non_approved",
+   "alts": "MUST (v), IF (conj)",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "v",
+   "hint": "JUDGE: advice -> \"WE RECOMMEND THAT ...\"; obligation -> MUST. Do not change advice into an order by accident."
+  },
+  "ensure": {
+   "kind": "non_approved",
+   "alts": "MAKE SURE (v)",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "v"
+  },
+  "entire": {
+   "kind": "non_approved",
+   "alts": "FULL (adj), ALL (adj)",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "adj"
+  },
+  "duration": {
+   "kind": "non_approved",
+   "alts": "DURING (prep)",
+   "count": 1,
+   "example": "It's important to note that this may result in lost updates; we should ensure that the ...",
+   "pos": "n"
+  },
+  "scenario": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "concurrent": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "request": {
+   "kind": "non_approved",
+   "alts": "TELL (v), WRITE (v); TELL (v), WRITE (v)",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": "n/v"
+  },
+  "update": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "race": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "second": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "might": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": "",
+   "hint": "POSSIBLY, or \"IT IS POSSIBLE THAT ...\". Keep it a possibility."
+  },
+  "overwrite": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "reaper": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": ""
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": "v"
+  },
+  "once": {
+   "kind": "non_approved",
+   "alts": "ONE (TN) — TIME; WHEN (conj)",
+   "count": 1,
+   "example": "Failure scenario: two concurrent requests that update the same key will race, and the s...",
+   "pos": "adv/conj"
+  },
+  "suggestion": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Suggestion:",
+   "pos": ""
+  },
+  "take": {
+   "kind": "non_approved",
+   "alts": "REMOVE (v), READ (v), GET (v), NECESSARY (adj)",
+   "count": 1,
+   "example": "Take the lock before reading the map, and release it only after the write has been comp...",
+   "pos": "v"
+  },
+  "reading": {
+   "kind": "non_approved",
+   "alts": "INDICATION (n)",
+   "count": 1,
+   "example": "Take the lock before reading the map, and release it only after the write has been comp...",
+   "pos": "n"
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "TUI",
+   "kind": "acronym",
+   "count": 1
+  }
+ ]
+}

@@ -40,6 +40,33 @@
             },
             "stdout": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\n{\"summary\":\"Plan is mostly sound.\",\"rating\":7,\"findings\":[{\"file\":\"Testing\",\"line\":0,\"severity\":\"medium\",\"category\":\"verification\",\"title\":\"no load test\",\"confidence\":6},{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"failure_scenario\":\"a failed deploy leaves the column in place\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work/sub",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work/sub"
+            },
+            "stdout": "user\nreview the plan\nexec\ncat notes.json\n{\"summary\":\"tool output, not the answer\",\"rating\":10,\"findings\":[]}\ncodex\n{\"summary\":\"Plan is mostly sound.\",\"rating\":7,\"findings\":[{\"file\":\"Testing\",\"line\":0,\"severity\":\"medium\",\"category\":\"verification\",\"title\":\"no load test\",\"confidence\":6},{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"failure_scenario\":\"a failed deploy leaves the column in place\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
+            "exit": 0
           }
         ]
       }
@@ -84,7 +111,8 @@
   "expect": {
     "home_files": [
       ".rival/sessions/<UUID1>.json",
-      ".rival/sessions/<UUID1>.log"
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
     ],
     "files": [
       {
@@ -109,7 +137,7 @@
       }
     ],
     "calls": {
-      "codex": 2
+      "codex": 3
     }
   }
 }

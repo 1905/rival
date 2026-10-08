@@ -1,0 +1,108 @@
+{
+  "name": "review-language-clean",
+  "description": "`rival command codex` with `review src/` and a review whose text passes the check. Rival makes no repair call: codex runs once, no `.repair.log` exists, and the session log is the provider output unchanged.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "OpenAI Codex v0.0.0\n--------\nuser\nreview\ncodex\n{\"summary\":\"The change is correct.\",\"findings\":[]}\ntokens used\n1,234\n{\"summary\":\"The change is correct.\",\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: The change is correct.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting codex (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "mode": "review",
+          "work_dir": "<ROOT>/work",
+          "review_scope": "src/"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "OpenAI Codex v0.0.0\n--------\nuser\nreview\ncodex\n{\"summary\":\"The change is correct.\",\"findings\":[]}\ntokens used\n1,234\n{\"summary\":\"The change is correct.\",\"findings\":[]}\n"
+      }
+    ],
+    "calls": {
+      "codex": 2
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/src/a.go",
+      "text": "package a\n"
+    }
+  ]
+}

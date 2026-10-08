@@ -6,8 +6,8 @@ use super::*;
 use std::path::Path;
 
 use crate::testutil::{
-    FakeStdin, Fixture, SharedRun, TEST_MR_URL, fake_mr, fake_run, fake_spec, json_answer_log,
-    no_mr, with_env,
+    FakeStdin, Fixture, REPAIRED_REVIEW, SharedRun, TEST_MR_URL, fake_mr, fake_run, fake_spec,
+    flagged_answer_log, json_answer_log, no_mr, with_env,
 };
 
 fn s(p: &Path) -> &str {
@@ -291,4 +291,34 @@ fn mr_checkout_is_removed_when_the_run_fails() {
         out.stdout
             .starts_with(&format!("GitLab MR: {TEST_MR_URL}\n\n"))
     );
+}
+
+#[test]
+fn run_review_prints_the_repaired_review_after_the_live_mirror() {
+    let fix = Fixture::new();
+    let wd = tempfile::tempdir().unwrap();
+    let f = fake_run(&flagged_answer_log());
+    f.borrow_mut().mirror_text = "LIVE-MIRROR\n".into();
+    f.borrow_mut().repair_reply = Some(REPAIRED_REVIEW.to_string());
+    let out = run(
+        &fix,
+        &f,
+        &mut FakeStdin::new(""),
+        &*no_mr(),
+        review_opts(wd.path(), "src/"),
+    );
+    out.result.unwrap();
+    let f = f.borrow();
+    assert_eq!(f.repair_calls, 1);
+    assert_eq!(f.repair_effort, "low");
+    assert!(!f.repair_had_mirror, "the repair call is not mirrored");
+    let review = out.stdout.find("═══ RIVAL REVIEW ═══").unwrap();
+    assert!(
+        out.stdout[review..].contains("We use the cache."),
+        "{}",
+        out.stdout
+    );
+    assert!(!out.stdout.contains("utilize"), "{}", out.stdout);
+    let log = std::fs::read_to_string(&fix.sessions()[0].log_file).unwrap();
+    assert!(log.ends_with(&format!("\n{REPAIRED_REVIEW}\n")), "{log}");
 }

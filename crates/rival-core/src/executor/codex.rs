@@ -42,14 +42,23 @@ pub fn run_codex_model(
     effort: &str,
     workdir: &str,
     model: &str,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
-    run_codex_model_with(cfg, sess, prompt, effort, workdir, model, |sess, req| {
-        run_subprocess(ctx, cfg.paths(), sess, req, mirror)
-    })
+    run_codex_model_with(
+        cfg,
+        sess,
+        prompt,
+        effort,
+        workdir,
+        model,
+        log,
+        |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
+    )
 }
 
 /// [`run_codex_model`] with the spawn step injected.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_codex_model_with(
     cfg: &Config,
     sess: &mut Session,
@@ -57,6 +66,7 @@ pub(crate) fn run_codex_model_with(
     effort: &str,
     workdir: &str,
     model: &str,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CODEX_MODEL {
@@ -76,6 +86,7 @@ pub(crate) fn run_codex_model_with(
         prompt: &full_prompt,
         drop_env: &[],
         environ: cfg.environ(),
+        log,
     };
     spawn(sess, &req).map_err(|err| {
         let label = config::engine_label("codex", model);

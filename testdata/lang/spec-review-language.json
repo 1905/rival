@@ -1,0 +1,1682 @@
+{
+ "findings": [
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"old word check used word list\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 4, sentence 5"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is killed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 5, sentence 13"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"writing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 6, sentence 16"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"plan review rival checks\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 7, sentence 23"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"full review text one time\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 7, sentence 23"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"one more provider call\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 7, sentence 28"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 8 words: \"local reviews word check still flagged many words\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 9, sentence 34"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"writing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 9, sentence 37"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"writing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 11, sentence 55"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"plan reviews run one strict check\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 11, sentence 57"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"file source size unchanged\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 17, sentence 74"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "32 words (descriptive, max 25): \"879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....\"",
+   "where": "para 17, sentence 75"
+  },
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"been\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 18, sentence 78"
+  },
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"being\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 18, sentence 78"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"verbs ing forms perfect tenses passive\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 18, sentence 78"
+  },
+  {
+   "rule": "GR-7",
+   "kind": "pronoun",
+   "message": "Gender-specific pronoun \"he\": the rules do not permit he/she. Use \"the operator\", \"you\", \"they\".",
+   "where": "para 18, sentence 79"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 10 words: \"sentences length semicolons contractions latin abbreviations noun clusters he she\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 18, sentence 79"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 11 words: \"auto-glossary code spans paths snake_case camelCase dotted names flags URLs acronyms\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 18, sentence 81"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"whole review the checker runs one time\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 88"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"meaning\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 23, sentence 90"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"wording\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 23, sentence 95"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is clamped\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 23, sentence 96"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"untrusted input the prompt marks\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 100"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"check scope on failure shape\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 25, sentence 103"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "40 words (descriptive, max 25): \"The plan `rating` is unchanged. | whole review | keep the original review | | Facts: th...\"",
+   "where": "para 25, sentence 105"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is unchanged\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 25, sentence 105"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"code spans code fences items paths\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 25, sentence 105"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are accepted\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 26, sentence 107"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 33 has 12 sentences (max 6). Divide it.",
+   "where": "para 33"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"embedded data copied unchanged\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 33, sentence 134"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "27 words (procedural, max 20): \"Open the given log file. | | `crates/rival-core/src/executor/{codex,claude,claude_docke...\"",
+   "where": "para 33, sentence 139"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "38 words (descriptive, max 25): \"Print and record the result. | | `crates/rival/src/command_security.rs` | Call the repa...\"",
+   "where": "para 33, sentence 140"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are edited\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 33, sentence 143"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"go checker one time\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 35, sentence 148"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"one real codex review\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 38, sentence 173"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"one real claude review\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 38, sentence 173"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 40 has 10 sentences (max 6). Divide it.",
+   "where": "para 40"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "30 words (descriptive, max 25): \"| Failure or choice | Behavior | |---|---| | Review output is not JSON. | No check, no ...\"",
+   "where": "para 40, sentence 175"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"choice behavior review output\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 40, sentence 175"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"call repair call fails times\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 40, sentence 175"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is cancelled\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 40, sentence 175"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "27 words (descriptive, max 25): \"Debug log line only. | | Reply is not JSON, or its shape is different. | Original revie...\"",
+   "where": "para 40, sentence 176"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"wording\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 40, sentence 180"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"user chose strict rival\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 40, sentence 181"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is killed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 40, sentence 181"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "30 words (descriptive, max 25): \"The repair log has a partial transcript. | | Provider has no low effort (K3). | The pro...\"",
+   "where": "para 40, sentence 182"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"low effort the provider\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 40, sentence 182"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is used\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 40, sentence 182"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"two models each model\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 40, sentence 182"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"user-facing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 42, sentence 185"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"user-facing checker glossary file\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 42, sentence 185"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"gate fmt clippy workspace tests byte match\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 44, sentence 191"
+  }
+ ],
+ "words": {
+  "land": {
+   "kind": "non_approved",
+   "alts": "LANDING (TN)",
+   "count": 1,
+   "example": "**Date:** 2026-10-08 **Scope:** /home/kass/dev/rival (it starts after `plans/2026-10-08...",
+   "pos": "v"
+  },
+  "line": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "citations": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "master": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "what": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "- What: port `~/.claude/skills/antislop-eng/scripts/check.go` to a hidden Rust module, ...",
+   "pos": ""
+  },
+  "port": {
+   "kind": "non_approved",
+   "alts": "LEFT (adj)",
+   "count": 7,
+   "example": "- What: port `~/.claude/skills/antislop-eng/scripts/check.go` to a hidden Rust module, ...",
+   "pos": "adj"
+  },
+  "hidden": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- What: port `~/.claude/skills/antislop-eng/scripts/check.go` to a hidden Rust module, ...",
+   "pos": ""
+  },
+  "why": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- Why: the old word check used a word list cut to 75 KB.",
+   "pos": ""
+  },
+  "old": {
+   "kind": "non_approved",
+   "alts": "REMAINING (adj), USED (adj), EXPIRED (adj)",
+   "count": 2,
+   "example": "- Why: the old word check used a word list cut to 75 KB.",
+   "pos": "adj"
+  },
+  "word": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 11,
+   "example": "- Why: the old word check used a word list cut to 75 KB.",
+   "pos": ""
+  },
+  "used": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Why: the old word check used a word list cut to 75 KB.",
+   "pos": ""
+  },
+  "list": {
+   "kind": "maybe_noun",
+   "alts": "RECORD (v), SHOW (v), LIST (TN)",
+   "count": 4,
+   "example": "- Why: the old word check used a word list cut to 75 KB.",
+   "pos": "v"
+  },
+  "grammar": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "It had no grammar rules.",
+   "pos": ""
+  },
+  "rules": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 16,
+   "example": "It had no grammar rules.",
+   "pos": ""
+  },
+  "decide": {
+   "kind": "non_approved",
+   "alts": "SELECT (v), DECISION (n)",
+   "count": 4,
+   "example": "- You decide or do: nothing.",
+   "pos": "v"
+  },
+  "nothing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "- You decide or do: nothing.",
+   "pos": ""
+  },
+  "skill": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "- Not done: no command, no skill and no config switch.",
+   "pos": ""
+  },
+  "switch": {
+   "kind": "maybe_noun",
+   "alts": "SET (v)",
+   "count": 3,
+   "example": "- Not done: no command, no skill and no config switch.",
+   "pos": "v"
+  },
+  "call": {
+   "kind": "maybe_noun",
+   "alts": "TELL (v)",
+   "count": 26,
+   "example": "Users cannot call the checker.",
+   "pos": "v"
+  },
+  "separate": {
+   "kind": "non_approved",
+   "alts": "ISOLATED (adj), DIFFERENT (adj) — NOT CONNECTED NOT ATTACHED; DISCONNECT (v), DIVIDE (v)",
+   "count": 1,
+   "example": "**P2 — a separate log for a second provider call.**",
+   "pos": "adj/v"
+  },
+  "second": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "**P2 — a separate log for a second provider call.**",
+   "pos": ""
+  },
+  "never": {
+   "kind": "non_approved",
+   "alts": "DO NOT",
+   "count": 3,
+   "example": "- Why: the repair call must never keep its transcript in the session log.",
+   "pos": "adv"
+  },
+  "transcript": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "- Why: the repair call must never keep its transcript in the session log.",
+   "pos": ""
+  },
+  "true": {
+   "kind": "non_approved",
+   "alts": "CORRECT (adj), AGREE (v)",
+   "count": 1,
+   "example": "This is also true when rival is killed during the call.",
+   "pos": "adj"
+  },
+  "rival": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "This is also true when rival is killed during the call.",
+   "pos": ""
+  },
+  "format": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Not done: no change to the first call or to the session file format.",
+   "pos": ""
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 7,
+   "example": "**P3 — the writing rules in every prompt.**",
+   "pos": "adj"
+  },
+  "prompt": {
+   "kind": "non_approved",
+   "alts": "IMMEDIATELY (adv)",
+   "count": 25,
+   "example": "**P3 — the writing rules in every prompt.**",
+   "pos": "adj"
+  },
+  "dictionary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "No word list goes into a prompt: no dictionary and no glossary.",
+   "pos": ""
+  },
+  "glossary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "No word list goes into a prompt: no dictionary and no glossary.",
+   "pos": ""
+  },
+  "models": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Why: models know the STE name and keep to the rules better.",
+   "pos": ""
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 10,
+   "example": "- Not done: no checker run on what the host agent writes in chat.",
+   "pos": "v"
+  },
+  "host": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- Not done: no checker run on what the host agent writes in chat.",
+   "pos": ""
+  },
+  "chat": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Not done: no checker run on what the host agent writes in chat.",
+   "pos": ""
+  },
+  "review": {
+   "kind": "non_approved",
+   "alts": "INSPECTION (n), EXAMINE (v)",
+   "count": 43,
+   "example": "**P4 — check and one repair after each review.**",
+   "pos": "n"
+  },
+  "security": {
+   "kind": "non_approved",
+   "alts": "CORRECTLY (adv)",
+   "count": 8,
+   "example": "- What: after a code, security or plan review, rival checks the full review text one time.",
+   "pos": "n"
+  },
+  "plan": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 11,
+   "example": "- What: after a code, security or plan review, rival checks the full review text one time.",
+   "pos": ""
+  },
+  "text": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 19,
+   "example": "- What: after a code, security or plan review, rival checks the full review text one time.",
+   "pos": ""
+  },
+  "model": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 10,
+   "example": "If the check finds something, rival makes one repair call with the same model at low ef...",
+   "pos": ""
+  },
+  "effort": {
+   "kind": "non_approved",
+   "alts": "FORCE (TN), TRY (v)",
+   "count": 5,
+   "example": "If the check finds something, rival makes one repair call with the same model at low ef...",
+   "pos": "n"
+  },
+  "alone": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Why: the prompt rules alone do not give compliant text.",
+   "pos": ""
+  },
+  "compliant": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Why: the prompt rules alone do not give compliant text.",
+   "pos": ""
+  },
+  "costs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "That call costs time and quota.",
+   "pos": ""
+  },
+  "quota": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "That call costs time and quota.",
+   "pos": ""
+  },
+  "pass": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 9,
+   "example": "- Not done: no loop, no second repair, nothing shown about the pass.",
+   "pos": ""
+  },
+  "raw": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Raw prompt answers are not checked.",
+   "pos": ""
+  },
+  "answers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Raw prompt answers are not checked.",
+   "pos": ""
+  },
+  "writing-rules": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Since v4.2.0 the reviewer contract has a writing-rules block (`crates/rival-core/src/...",
+   "pos": ""
+  },
+  "block": {
+   "kind": "maybe_noun",
+   "alts": "CAUSE A BLOCKAGE",
+   "count": 11,
+   "example": "- Since v4.2.0 the reviewer contract has a writing-rules block (`crates/rival-core/src/...",
+   "pos": "v"
+  },
+  "finding": {
+   "kind": "non_approved",
+   "alts": "RESULT (n)",
+   "count": 2,
+   "example": "- On 93 findings from 24 local reviews, a word check still flagged many words in each r...",
+   "pos": "n"
+  },
+  "still": {
+   "kind": "non_approved",
+   "alts": "STAY (v), CONTINUE (v)",
+   "count": 1,
+   "example": "- On 93 findings from 24 local reviews, a word check still flagged many words in each r...",
+   "pos": "adv"
+  },
+  "flagged": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- On 93 findings from 24 local reviews, a word check still flagged many words in each r...",
+   "pos": ""
+  },
+  "words": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- On 93 findings from 24 local reviews, a word check still flagged many words in each r...",
+   "pos": ""
+  },
+  "meanings": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- It used a word list cut to 75 KB, with no meanings and no examples (`crates/rival-cor...",
+   "pos": ""
+  },
+  "ran": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- It ran only after bug-hunter reviews (`crates/rival/src/model_command.rs:170`).",
+   "pos": ""
+  },
+  "bug-hunter": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- It ran only after bug-hunter reviews (`crates/rival/src/model_command.rs:170`).",
+   "pos": ""
+  },
+  "rust-only": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- The rust-only spec deletes it.",
+   "pos": ""
+  },
+  "spec": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- The rust-only spec deletes it.",
+   "pos": ""
+  },
+  "delete": {
+   "kind": "maybe_noun",
+   "alts": "ERASE (v), REMOVE (v)",
+   "count": 1,
+   "example": "- The rust-only spec deletes it.",
+   "pos": "v"
+  },
+  "subprocess": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The subprocess opens the session log for every call (`crates/rival-core/src/executor/...",
+   "pos": ""
+  },
+  "exist": {
+   "kind": "maybe_noun",
+   "alts": "BE (v)",
+   "count": 1,
+   "example": "4. **The checker exists only in Go.**",
+   "pos": "v"
+  },
+  "truth": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The source of truth is a 1,368-line Go file with a 493 KB dictionary in the user's sk...",
+   "pos": ""
+  },
+  "skills": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The source of truth is a 1,368-line Go file with a 493 KB dictionary in the user's sk...",
+   "pos": ""
+  },
+  "software": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Port the checker to Rust with the full dictionary, the software glossary and every check.",
+   "pos": ""
+  },
+  "match": {
+   "kind": "non_approved",
+   "alts": "ALIGN (v), AGREE (v)",
+   "count": 3,
+   "example": "Output must match the Go checker on a test corpus (Problems 2, 4).",
+   "pos": "v"
+  },
+  "corpus": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "Output must match the Go checker on a test corpus (Problems 2, 4).",
+   "pos": ""
+  },
+  "strict": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "After code, security and plan reviews, run one strict check.",
+   "pos": ""
+  },
+  "fail": {
+   "kind": "maybe_noun",
+   "alts": "IF … NOT, FAILURE (TN), UNSATISFACTORY (adj)",
+   "count": 3,
+   "example": "A field that fails the guard keeps its original text (Problem 1).",
+   "pos": "v"
+  },
+  "original": {
+   "kind": "non_approved",
+   "alts": "INITIAL (adj)",
+   "count": 9,
+   "example": "A field that fails the guard keeps its original text (Problem 1).",
+   "pos": "adj"
+  },
+  "case": {
+   "kind": "non_approved",
+   "alts": "CONDITION (n); IF (conj)",
+   "count": 1,
+   "example": "Keep the repair transcript out of the session log in all cases (Problem 3).",
+   "pos": "n/conj"
+  },
+  "public": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It is not public outside the crate's review code.",
+   "pos": ""
+  },
+  "outside": {
+   "kind": "non_approved",
+   "alts": "EXTERNAL (adj), OUTER (adj); OUTDOORS (adv); EXTERNAL (adj), OUTER (adj); NEAR (prep)",
+   "count": 1,
+   "example": "It is not public outside the crate's review code.",
+   "pos": "adj/adv/n/prep"
+  },
+  "crate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "It is not public outside the crate's review code.",
+   "pos": ""
+  },
+  "embedded": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Data, all embedded with `include_str!` and never cut:",
+   "pos": ""
+  },
+  "unchanged": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "| File | Source | Size | |---|---|---| | `crates/rival-core/data/lang/dictionary.json` ...",
+   "pos": ""
+  },
+  "terms": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": ""
+  },
+  "term": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": ""
+  },
+  "code-review": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": ""
+  },
+  "languages": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": ""
+  },
+  "platforms": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": ""
+  },
+  "both": {
+   "kind": "non_approved",
+   "alts": "THE TWO (TN)",
+   "count": 1,
+   "example": "879 approved, 1,320 not approved. | | `crates/rival-core/data/lang/software.txt` | `~/....",
+   "pos": "adj"
+  },
+  "speech": {
+   "kind": "non_approved",
+   "alts": "VOICE (n)",
+   "count": 1,
+   "example": "- Words: not approved, not in the dictionary, part of speech, hedge hints.",
+   "pos": "n"
+  },
+  "hedge": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Words: not approved, not in the dictionary, part of speech, hedge hints.",
+   "pos": ""
+  },
+  "hints": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Words: not approved, not in the dictionary, part of speech, hedge hints.",
+   "pos": ""
+  },
+  "verbs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": ""
+  },
+  "ing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": ""
+  },
+  "form": {
+   "kind": "non_approved",
+   "alts": "SHAPE (n); BE (v)",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": "n/v"
+  },
+  "perfect": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": ""
+  },
+  "tenses": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": ""
+  },
+  "passive": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Verbs: -ing forms, perfect tenses, been/being, passive.",
+   "pos": ""
+  },
+  "sentences": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "semicolons": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "contractions": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "abbreviations": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "noun": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "he": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "she": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Sentences: length (20 procedural, 25 descriptive), semicolons, contractions, Latin ab...",
+   "pos": ""
+  },
+  "paragraphs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Paragraphs: more than 6 sentences.",
+   "pos": ""
+  },
+  "auto-glossary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Auto-glossary: code spans, paths, `file:line`, snake_case, camelCase, dotted names, f...",
+   "pos": ""
+  },
+  "spans": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Auto-glossary: code spans, paths, `file:line`, snake_case, camelCase, dotted names, f...",
+   "pos": ""
+  },
+  "dotted": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Auto-glossary: code spans, paths, `file:line`, snake_case, camelCase, dotted names, f...",
+   "pos": ""
+  },
+  "acronyms": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Auto-glossary: code spans, paths, `file:line`, snake_case, camelCase, dotted names, f...",
+   "pos": ""
+  },
+  "carry": {
+   "kind": "non_approved",
+   "alts": "TRANSMIT (v), TRANSPORT (TN)",
+   "count": 1,
+   "example": "A word hit carries its dictionary alternatives and one example, the same as `check.go -...",
+   "pos": "v"
+  },
+  "over": {
+   "kind": "non_approved",
+   "alts": "ABOVE (prep), ALONG (prep), ON (prep) — MORE THAN For movement above land or water use a technical noun.",
+   "count": 1,
+   "example": "- **One check over the whole review.** The checker runs one time, in auto sentence mode...",
+   "pos": "prep"
+  },
+  "whole": {
+   "kind": "non_approved",
+   "alts": "FULL (adj), ALL (adj)",
+   "count": 3,
+   "example": "- **One check over the whole review.** The checker runs one time, in auto sentence mode...",
+   "pos": "adj"
+  },
+  "auto": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **One check over the whole review.** The checker runs one time, in auto sentence mode...",
+   "pos": ""
+  },
+  "sentence": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **One check over the whole review.** The checker runs one time, in auto sentence mode...",
+   "pos": ""
+  },
+  "join": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- **One check over the whole review.** The checker runs one time, in auto sentence mode...",
+   "pos": ""
+  },
+  "non-approved": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "In strict mode, the model replaces each non-approved word when an approved word keeps t...",
+   "pos": ""
+  },
+  "meaning": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "In strict mode, the model replaces each non-approved word when an approved word keeps t...",
+   "pos": ""
+  },
+  "harness": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **Same model, same harness.** Codex repairs a Codex review.",
+   "pos": ""
+  },
+  "claude": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Claude repairs a Claude review.",
+   "pos": ""
+  },
+  "own": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "In a plan review each model repairs its own block, in parallel.",
+   "pos": ""
+  },
+  "wording": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- **Low effort.** The repair is a wording edit.",
+   "pos": ""
+  },
+  "edit": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **Low effort.** The repair is a wording edit.",
+   "pos": ""
+  },
+  "clamp": {
+   "kind": "non_approved",
+   "alts": "ATTACH (v), PUT (v) — (WITH A CLAMP [TN] OR CLAMPS [TN]) (A CLAMP [TN] OR CLAMPS [TN])",
+   "count": 1,
+   "example": "Effort is `low`, clamped to what the provider supports.",
+   "pos": "v"
+  },
+  "support": {
+   "kind": "non_approved",
+   "alts": "SUPPORT (TN), HOLD (v); HOLD (v), SUPPORT (TN)",
+   "count": 1,
+   "example": "Effort is `low`, clamped to what the provider supports.",
+   "pos": "n/v"
+  },
+  "read-only": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- **Read-only.** The repair runs with review permissions: no tools for Claude (`read_on...",
+   "pos": ""
+  },
+  "permissions": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **Read-only.** The repair runs with review permissions: no tools for Claude (`read_on...",
+   "pos": ""
+  },
+  "adapters": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- **Read-only.** The repair runs with review permissions: no tools for Claude (`read_on...",
+   "pos": ""
+  },
+  "budget": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **Timeout.** The repair has its own `RIVAL_RUN_TIMEOUT` budget, inside the same queue...",
+   "pos": ""
+  },
+  "inside": {
+   "kind": "non_approved",
+   "alts": "INNER (adj); INNER (adj); IN (prep), INTO (prep)",
+   "count": 2,
+   "example": "- **Timeout.** The repair has its own `RIVAL_RUN_TIMEOUT` budget, inside the same queue...",
+   "pos": "adj/n/prep"
+  },
+  "untrusted": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **Untrusted input.** The prompt marks the review as data.",
+   "pos": ""
+  },
+  "like": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "If text in the review looks like an instruction, the model edits that text as text.",
+   "pos": ""
+  },
+  "edits": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "If text in the review looks like an instruction, the model edits that text as text.",
+   "pos": ""
+  },
+  "order": {
+   "kind": "non_approved",
+   "alts": "SEQUENCE (n); TELL (v), ORDER (TN)",
+   "count": 1,
+   "example": "| Check | Scope | On failure | |---|---|---| | Shape: the same number of findings, in t...",
+   "pos": "n/v"
+  },
+  "multiset": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan `rating` is unchanged. | whole review | keep the original review | | Facts: th...",
+   "pos": ""
+  },
+  "fences": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan `rating` is unchanged. | whole review | keep the original review | | Facts: th...",
+   "pos": ""
+  },
+  "non-empty": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A non-empty field stays non-empty. | each text field | that field keeps its original te...",
+   "pos": ""
+  },
+  "leftover": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Leftover hits after the repair are accepted.",
+   "pos": ""
+  },
+  "antislop-eng": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The block holds the rules from the antislop-eng `SKILL.md` \"Core rules\" and \"Hedge tabl...",
+   "pos": ""
+  },
+  "pins": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The contract SHA-256 pins change.",
+   "pos": ""
+  },
+  "lines": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- The skill instructions (`crates/rival-core/skills/*/SKILL.md` step 5, `skills/codex.m...",
+   "pos": ""
+  },
+  "glossaries": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The checker alone uses the full dictionary and the glossaries, to check the result.",
+   "pos": ""
+  },
+  "means": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`None` means the session log, as today.",
+   "pos": ""
+  },
+  "today": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`None` means the session log, as today.",
+   "pos": ""
+  },
+  "instead": {
+   "kind": "non_approved",
+   "alts": "ALTERNATIVE (n)",
+   "count": 1,
+   "example": "`Some(path)` makes `run_subprocess` open that file instead (`subprocess.rs:482`).",
+   "pos": "adv"
+  },
+  "codex": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Codex",
+   "pos": ""
+  },
+  "native": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Claude native",
+   "pos": ""
+  },
+  "grok": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Grok",
+   "pos": ""
+  },
+  "opencode": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- opencode",
+   "pos": ""
+  },
+  "kimi": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Kimi",
+   "pos": ""
+  },
+  "copied": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Embedded data, copied unchanged from the skill. | | `crates/rival-core/src/lang/repair....",
+   "pos": ""
+  },
+  "parses": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Joins the text, builds the repair prompt, parses the reply, runs the guard.",
+   "pos": ""
+  },
+  "reply": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Joins the text, builds the repair prompt, parses the reply, runs the guard.",
+   "pos": ""
+  },
+  "take": {
+   "kind": "non_approved",
+   "alts": "REMOVE (v), READ (v), GET (v), NECESSARY (adj)",
+   "count": 1,
+   "example": "Takes a closure for the provider call.",
+   "pos": "v"
+  },
+  "closure": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Takes a closure for the provider call.",
+   "pos": ""
+  },
+  "share": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Thus code, security and plan reviews share it. | | `crates/rival-core/src/review/prompt...",
+   "pos": ""
+  },
+  "update": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Update the SHA-256 pins. | | `crates/rival-core/src/config.rs` | STE rules block in the...",
+   "pos": ""
+  },
+  "print": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Print and record the result. | | `crates/rival/src/command_security.rs` | Call the repa...",
+   "pos": ""
+  },
+  "per-model": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Print and record the result. | | `crates/rival/src/command_security.rs` | Call the repa...",
+   "pos": ""
+  },
+  "host-written": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Print and record the result. | | `crates/rival/src/command_security.rs` | Call the repa...",
+   "pos": ""
+  },
+  "bump": {
+   "kind": "maybe_noun",
+   "alts": "HIT (v)",
+   "count": 1,
+   "example": "Version bump. | | `testdata/lang/` | New.",
+   "pos": "v"
+  },
+  "scenarios": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Test corpus and the Go checker's `--json` output for each file. | | `e2e/scenarios/` | ...",
+   "pos": ""
+  },
+  "whose": {
+   "kind": "non_approved",
+   "alts": "Use a different construction.",
+   "count": 1,
+   "example": "Update the scenarios whose prompts change. | | `README.md`, `CHANGELOG.md` | One line e...",
+   "pos": "pron"
+  },
+  "edited": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Update the scenarios whose prompts change. | | `README.md`, `CHANGELOG.md` | One line e...",
+   "pos": ""
+  },
+  "specs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Corpus `testdata/lang/*.md`: the specs in `plans/`, the `check_test.go` inputs, and r...",
+   "pos": ""
+  },
+  "texts": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Corpus `testdata/lang/*.md`: the specs in `plans/`, the `check_test.go` inputs, and r...",
+   "pos": ""
+  },
+  "private": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The 33 local reviews are not committed: they can hold private code and paths.",
+   "pos": ""
+  },
+  "byte": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The Rust report must match it byte for byte.",
+   "pos": ""
+  },
+  "fixtures": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Go runs only on Dell to make the fixtures.",
+   "pos": ""
+  },
+  "repo": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go is not in the repo or in CI.",
+   "pos": ""
+  },
+  "span": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- One field changes a number, a path or a code span: only that field reverts.",
+   "pos": ""
+  },
+  "parser": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The TUI parser (`result::parse_run_result`) shows it.",
+   "pos": ""
+  },
+  "integration": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**Integration (e2e)**",
+   "pos": ""
+  },
+  "fake": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Code review with a fake Codex that returns a flagged review, then a repaired one.",
+   "pos": ""
+  },
+  "return": {
+   "kind": "non_approved",
+   "alts": "GO (v); GO (v)",
+   "count": 1,
+   "example": "- Code review with a fake Codex that returns a flagged review, then a repaired one.",
+   "pos": "n/v"
+  },
+  "printed": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The printed review is the repaired one.",
+   "pos": ""
+  },
+  "dual": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The same for a security review (fake opencode) and a dual plan review (fake Codex and...",
+   "pos": ""
+  },
+  "real": {
+   "kind": "non_approved",
+   "alts": "AGREE (v)",
+   "count": 2,
+   "example": "- One real Codex review and one real Claude review.",
+   "pos": "adj"
+  },
+  "choice": {
+   "kind": "non_approved",
+   "alts": "SELECTION (n), ALTERNATIVE (adj)",
+   "count": 1,
+   "example": "| Failure or choice | Behavior | |---|---| | Review output is not JSON. | No check, no ...",
+   "pos": "n"
+  },
+  "cancelled": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "| Failure or choice | Behavior | |---|---| | Review output is not JSON. | No check, no ...",
+   "pos": ""
+  },
+  "debug": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Debug log line only. | | Reply is not JSON, or its shape is different. | Original revie...",
+   "pos": ""
+  },
+  "forbids": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The prompt forbids it, with the hedge table.",
+   "pos": ""
+  },
+  "natural": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Accepted risk. | | Strict wording is not natural to read. | Accepted.",
+   "pos": ""
+  },
+  "chose": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The user chose strict. | | Rival is killed during the repair. | The session log has the...",
+   "pos": ""
+  },
+  "partial": {
+   "kind": "non_approved",
+   "alts": "NOT FULLY",
+   "count": 1,
+   "example": "The repair log has a partial transcript. | | Provider has no low effort (K3). | The pro...",
+   "pos": "adj"
+  },
+  "affect": {
+   "kind": "non_approved",
+   "alts": "EFFECT (n) — If it is possible be accurate.",
+   "count": 1,
+   "example": "A failure in one does not affect the other. | | Text in the review looks like an instru...",
+   "pos": "v"
+  },
+  "says": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The prompt says the review is data. |",
+   "pos": ""
+  },
+  "user-facing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- A user-facing checker, glossary file or switch.",
+   "pos": ""
+  },
+  "inherited": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The 22 inherited bugs (`plans/2026-10-08-inherited-bugs/`).",
+   "pos": ""
+  },
+  "gate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "Gate: fmt, clippy, workspace tests, byte match on the whole corpus.",
+   "pos": ""
+  },
+  "fmt": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, byte match on the whole corpus.",
+   "pos": ""
+  },
+  "clippy": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, byte match on the whole corpus.",
+   "pos": ""
+  },
+  "workspace": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, byte match on the whole corpus.",
+   "pos": ""
+  },
+  "three-os": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: the checks above, e2e, three-OS CI.",
+   "pos": ""
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "/home/kass/dev/rival",
+   "kind": "path",
+   "count": 1
+  },
+  {
+   "term": "KB",
+   "kind": "acronym",
+   "count": 4
+  },
+  {
+   "term": "STE",
+   "kind": "acronym",
+   "count": 10
+  },
+  {
+   "term": "TUI",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "Rival.app",
+   "kind": "dotted",
+   "count": 1
+  },
+  {
+   "term": "snake_case",
+   "kind": "snake_case",
+   "count": 1
+  },
+  {
+   "term": "camelCase",
+   "kind": "mixed_case",
+   "count": 1
+  },
+  {
+   "term": "URLs",
+   "kind": "mixed_case",
+   "count": 1
+  },
+  {
+   "term": "API",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "K3",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "JSON",
+   "kind": "acronym",
+   "count": 8
+  },
+  {
+   "term": "CI",
+   "kind": "acronym",
+   "count": 2
+  }
+ ]
+}

@@ -40,6 +40,33 @@
             },
             "stdout": "{\"summary\":\"Codex view.\",\"rating\":7,\"findings\":[{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Codex view.\",\"rating\":7,\"findings\":[{\"file\":\"Rollout\",\"line\":12,\"severity\":\"high\",\"category\":\"gap\",\"title\":\"no rollback step\",\"body\":\"the plan never says how to revert the migration\",\"suggestion\":\"add a down migration\",\"confidence\":9}]}\n",
+            "exit": 0
           }
         ]
       },
@@ -144,6 +171,7 @@
       ".rival/queue/.lock",
       ".rival/sessions/<ID:CODEX>.json",
       ".rival/sessions/<ID:CODEX>.log",
+      ".rival/sessions/<ID:CODEX>.log.repair.log",
       ".rival/sessions/<ID:CLAUDE>.json",
       ".rival/sessions/<ID:CLAUDE>.log"
     ],
@@ -207,7 +235,7 @@
       }
     ],
     "calls": {
-      "codex": 2,
+      "codex": 3,
       "claude": 1
     }
   }

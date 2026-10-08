@@ -69,6 +69,34 @@
             },
             "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                },
+                "MOONSHOT_API_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
           }
         ]
       }
@@ -151,7 +179,8 @@
       ".rival/sessions/<UUID1>.json",
       ".rival/sessions/<UUID1>.log",
       ".rival/sessions/<UUID2>.json",
-      ".rival/sessions/<UUID2>.log"
+      ".rival/sessions/<UUID2>.log",
+      ".rival/sessions/<UUID2>.log.repair.log"
     ],
     "files": [
       {
@@ -179,7 +208,7 @@
       }
     ],
     "calls": {
-      "opencode": 2
+      "opencode": 3
     }
   }
 }

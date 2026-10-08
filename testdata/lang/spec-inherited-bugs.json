@@ -1,0 +1,1994 @@
+{
+ "findings": [
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"every mode except raw\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 4, sentence 5"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 6, sentence 19"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is found\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 6, sentence 21"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"whole git process group\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 6, sentence 22"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are written\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 7, sentence 29"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"dangling\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 7, sentence 30"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are removed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 7, sentence 30"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"windows drive paths work\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 7, sentence 32"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is deleted\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 7, sentence 33"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"two review parsers the\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 48"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"footer removal hook-line removal duplicate answers\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 50"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"rating\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 10, sentence 53"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 10, sentence 54"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"run limit deletes running tickets\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 54"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"git scope inherits repository\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 57"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"git hook scope detection\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 58"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"encoded link missed checks\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 59"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"reports every non-timeout failure\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 63"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is lost\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 10, sentence 64"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"new version header over cut-off text\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 66"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"dangling\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 10, sentence 68"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"claude docker the absolute-path check\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 73"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"bounded timeouts windows docker paths\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 12, sentence 85"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is fixed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 12, sentence 88"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 16 has 10 sentences (max 6). Divide it.",
+   "where": "para 16"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 11 words: \"old table decision problem no codex header whole log scanned fixed\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 93"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"test covers codex log\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 95"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"banner codex double answer\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 95"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "43 words (procedural, max 20): \"Closed by the one parser. | 4 | | 3 | Two parsers | Fix. | 4 | | 4 | Force clear of a r...\"",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"one parser two parsers fix force clear\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 10 words: \"running ticket fix skip live running tickets git scope inherits\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"duplicates inside one input fix\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 96"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "90 words (descriptive, max 25): \"One `seen` line removes the doubt. | — | | 7 | Docker token in process arguments | Fix ...\"",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"claude docker fix kimi tool rule\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"fix empty plan summary\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"fix encoded marker missed fix\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 8 words: \"one process fix codex antislop skill text gone\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"spec dangling deprecated-skill links fix removal\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 98"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "32 words (descriptive, max 25): \"Document in Known limits. | — | | 17 | Cut-off skill write | Fix. | 11 | | 18 | Panic w...\"",
+   "where": "para 16, sentence 99"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"known limits cut-off skill\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 99"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 9 words: \"fix panic wrapper never captures delete telemetry errors skip\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 99"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"delete telemetry padded version\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 99"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "34 words (descriptive, max 25): \"A numeric compare would show update notices to `dev` builds. | — | | 21 | Oversized tim...\"",
+   "where": "para 16, sentence 102"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 9 words: \"builds oversized timeout wraps fix duration parser wrap fixed\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 16, sentence 102"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 18 has 14 sentences (max 6). Divide it.",
+   "where": "para 18"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "29 words (descriptive, max 25): \"This includes task modes. | | 3 | Compare the cleaned directory with the cleaned HOME (...\"",
+   "where": "para 18, sentence 108"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"own formatter blank summary\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 18, sentence 110"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"waiting\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 18, sentence 111"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 18, sentence 112"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "28 words (descriptive, max 25): \"The command prints how many it kept. | | 7 | `git_cmd` uses `gitscope::repository_env(c...\"",
+   "where": "para 18, sentence 113"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "22 words (procedural, max 20): \"Kill the group on cancel, with the bounded drain of the provider executor. | | 10 | Mat...\"",
+   "where": "para 18, sentence 114"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "45 words (descriptive, max 25): \"`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...\"",
+   "where": "para 18, sentence 115"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"saturating\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 18, sentence 115"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 20 has 10 sentences (max 6). Divide it.",
+   "where": "para 20"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"saturating\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 20, sentence 119"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"timeout math one answer\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 20, sentence 119"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "27 words (descriptive, max 25): \"Blank plan summary is invalid. | | `crates/rival/src/model_command.rs`, `command_securi...\"",
+   "where": "para 20, sentence 120"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 20, sentence 120"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"queue error temp file\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 20, sentence 122"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "29 words (descriptive, max 25): \"`symlink_metadata`. | | `crates/rival-core/src/telemetry.rs`, `telemetry/tests.rs`, `cr...\"",
+   "where": "para 20, sentence 123"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"one line per user-visible fix\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 20, sentence 125"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"existing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 22, sentence 134"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"parser every existing case\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 22, sentence 134"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 22, sentence 138"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is found\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 22, sentence 140"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"slots queue error prints\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 22, sentence 142"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"dangling\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 22, sentence 144"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is removed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 22, sentence 144"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "25 words (procedural, max 20): \"Then `clear` removes the dead ticket. | | A log that the old CLI parser accepted and th...\"",
+   "where": "para 26, sentence 157"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "36 words (descriptive, max 25): \"The CHANGELOG lists the change. | | A plan with a rating but a blank summary | Shows UN...\"",
+   "where": "para 26, sentence 158"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"rating\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 26, sentence 158"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "37 words (descriptive, max 25): \"The key must be in the environment or in a `.env` at or below HOME. | | Git scope insid...\"",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"git scope inside hook\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"working\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"working directory repository telemetry removal nothing\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is lost\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"was sent\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 26, sentence 159"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"gate fmt clippy workspace tests three-os\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 30, sentence 165"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"- P2: the shared decoder changes 22 bare-JSON test inputs to the TUI's result; every fi...\"",
+   "where": "para 33, sentence 177"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"result every fixture log\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 33, sentence 177"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "41 words (descriptive, max 25): \"Three of them are judgement calls: in a review run a payload with a `rating` key counts...\"",
+   "where": "para 33, sentence 178"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"Three of them are judgement calls: in a review run a payload with a `rating` key counts...\"",
+   "where": "para 33, sentence 178"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"plan payload plan payload\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 33, sentence 178"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 33, sentence 182"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"- P4: a rewritten skill file gets mode 0644 minus the umask; it no longer keeps its old...\"",
+   "where": "para 33, sentence 187"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are gone\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 33, sentence 188"
+  }
+ ],
+ "words": {
+  "land": {
+   "kind": "maybe_noun",
+   "alts": "LANDING (TN)",
+   "count": 1,
+   "example": "**Date:** 2026-10-08 **Scope:** /home/kass/dev/rival (starts after `plans/2026-10-08-ru...",
+   "pos": "v"
+  },
+  "line": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "citations": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "master": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The file:line citations are from master `2809e58`.) **Status:** approved",
+   "pos": ""
+  },
+  "security": {
+   "kind": "non_approved",
+   "alts": "CORRECTLY (adv)",
+   "count": 5,
+   "example": "**P1 — security fixes.**",
+   "pos": "n"
+  },
+  "fix": {
+   "kind": "maybe_noun",
+   "alts": "ATTACH (v), SET (v), REPAIR (v), INSTALL (v)",
+   "count": 4,
+   "example": "**P1 — security fixes.**",
+   "pos": "v"
+  },
+  "what": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- What: the Claude Docker run no longer puts the auth token in the process arguments.",
+   "pos": ""
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 16,
+   "example": "- What: the Claude Docker run no longer puts the auth token in the process arguments.",
+   "pos": "v"
+  },
+  "auth": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- What: the Claude Docker run no longer puts the auth token in the process arguments.",
+   "pos": ""
+  },
+  "process": {
+   "kind": "non_approved",
+   "alts": "PROCEDURE (n) — This word is a technical noun when it means a sequence of changes that occur and cause a result.; DO (v), PROCEDURE (n) — THE …",
+   "count": 10,
+   "example": "- What: the Claude Docker run no longer puts the auth token in the process arguments.",
+   "pos": "n/v"
+  },
+  "kimi": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Kimi runs with review tools in every mode except raw.",
+   "pos": ""
+  },
+  "review": {
+   "kind": "non_approved",
+   "alts": "INSPECTION (n), EXAMINE (v)",
+   "count": 17,
+   "example": "Kimi runs with review tools in every mode except raw.",
+   "pos": "n"
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 5,
+   "example": "Kimi runs with review tools in every mode except raw.",
+   "pos": "adj"
+  },
+  "except": {
+   "kind": "non_approved",
+   "alts": "To replace this word use a different construction. Be accurate.",
+   "count": 2,
+   "example": "Kimi runs with review tools in every mode except raw.",
+   "pos": "prep"
+  },
+  "raw": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 8,
+   "example": "Kimi runs with review tools in every mode except raw.",
+   "pos": ""
+  },
+  "credential": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The `.env` credential search stops at HOME also when HOME ends in `/`.",
+   "pos": ""
+  },
+  "search": {
+   "kind": "maybe_noun",
+   "alts": "EXAMINE (v)",
+   "count": 3,
+   "example": "The `.env` credential search stops at HOME also when HOME ends in `/`.",
+   "pos": "v"
+  },
+  "why": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- Why: other local users can read process arguments (`ps`).",
+   "pos": ""
+  },
+  "decide": {
+   "kind": "non_approved",
+   "alts": "SELECT (v), DECISION (n)",
+   "count": 4,
+   "example": "- You decide or do: nothing.",
+   "pos": "v"
+  },
+  "nothing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "- You decide or do: nothing.",
+   "pos": ""
+  },
+  "parser": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 11,
+   "example": "**P2 — one review parser.**",
+   "pos": ""
+  },
+  "decode": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- What: the CLI and the TUI use the same code to find and decode the review answer.",
+   "pos": ""
+  },
+  "answer": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- What: the CLI and the TUI use the same code to find and decode the review answer.",
+   "pos": ""
+  },
+  "plan": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 17,
+   "example": "A plan with an empty summary is not shown as a clean plan.",
+   "pos": ""
+  },
+  "summary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 10,
+   "example": "A plan with an empty summary is not shown as a clean plan.",
+   "pos": ""
+  },
+  "today": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "- Why: today the command output and the TUI can show different results for the same log.",
+   "pos": ""
+  },
+  "merge-request": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**P3 — queue, scope and merge-request fixes.**",
+   "pos": ""
+  },
+  "running": {
+   "kind": "non_approved",
+   "alts": "FLUSH (v)",
+   "count": 8,
+   "example": "`rival queue clear --force` keeps live running tickets.",
+   "pos": "adj"
+  },
+  "inherited": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Git scope ignores inherited `GIT_DIR` settings.",
+   "pos": ""
+  },
+  "setting": {
+   "kind": "non_approved",
+   "alts": "ADJUSTMENT (n), POSITION (n), SET (v)",
+   "count": 1,
+   "example": "Git scope ignores inherited `GIT_DIR` settings.",
+   "pos": "n"
+  },
+  "encoded": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "An encoded MR link is found.",
+   "pos": ""
+  },
+  "link": {
+   "kind": "maybe_noun",
+   "alts": "CONNECT (v), ATTACH (v)",
+   "count": 9,
+   "example": "An encoded MR link is found.",
+   "pos": "v"
+  },
+  "whole": {
+   "kind": "non_approved",
+   "alts": "FULL (adj), ALL (adj)",
+   "count": 2,
+   "example": "MR cancel kills the whole git process group.",
+   "pos": "adj"
+  },
+  "real": {
+   "kind": "non_approved",
+   "alts": "AGREE (v)",
+   "count": 4,
+   "example": "A queue I/O error shows its real text.",
+   "pos": "adj"
+  },
+  "text": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 11,
+   "example": "A queue I/O error shows its real text.",
+   "pos": ""
+  },
+  "else": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Not done: nothing else in the queue changes.",
+   "pos": ""
+  },
+  "telemetry": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 13,
+   "example": "**P4 — install, timeout, Windows and telemetry.**",
+   "pos": ""
+  },
+  "skill": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 9,
+   "example": "- What: skill files are written safely.",
+   "pos": ""
+  },
+  "dangling": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Dangling skill links are removed.",
+   "pos": ""
+  },
+  "oversized": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Oversized timeouts saturate.",
+   "pos": ""
+  },
+  "saturate": {
+   "kind": "non_approved",
+   "alts": "SOAK (v)",
+   "count": 3,
+   "example": "Oversized timeouts saturate.",
+   "pos": "v"
+  },
+  "windows": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Windows drive paths work for Claude Docker.",
+   "pos": ""
+  },
+  "drive": {
+   "kind": "maybe_noun",
+   "alts": "MOVE (v), REMOVE (v), OPERATE (v)",
+   "count": 3,
+   "example": "Windows drive paths work for Claude Docker.",
+   "pos": "v"
+  },
+  "unused": {
+   "kind": "non_approved",
+   "alts": "NEW (adj)",
+   "count": 1,
+   "example": "The unused Sentry telemetry is deleted.",
+   "pos": "adj"
+  },
+  "delete": {
+   "kind": "non_approved",
+   "alts": "ERASE (v), REMOVE (v)",
+   "count": 2,
+   "example": "The unused Sentry telemetry is deleted.",
+   "pos": "v"
+  },
+  "cut-off": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Why: a cut-off skill write stays broken until `--force`.",
+   "pos": ""
+  },
+  "update": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Not done: the update check keeps its version compare (documented).",
+   "pos": ""
+  },
+  "port": {
+   "kind": "non_approved",
+   "alts": "LEFT (adj)",
+   "count": 1,
+   "example": "The Rust port kept these Go bugs on purpose, to make its output match Go (`plans/2026-1...",
+   "pos": "adj"
+  },
+  "purpose": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The Rust port kept these Go bugs on purpose, to make its output match Go (`plans/2026-1...",
+   "pos": ""
+  },
+  "match": {
+   "kind": "maybe_noun",
+   "alts": "ALIGN (v), AGREE (v)",
+   "count": 2,
+   "example": "The Rust port kept these Go bugs on purpose, to make its output match Go (`plans/2026-1...",
+   "pos": "v"
+  },
+  "rust-only": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "The rust-only spec removes the reason.",
+   "pos": ""
+  },
+  "spec": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "The rust-only spec removes the reason.",
+   "pos": ""
+  },
+  "reason": {
+   "kind": "non_approved",
+   "alts": "CAUSE (n), BECAUSE OF (prep)",
+   "count": 2,
+   "example": "The rust-only spec removes the reason.",
+   "pos": "n"
+  },
+  "still": {
+   "kind": "non_approved",
+   "alts": "STAY (v), CONTINUE (v)",
+   "count": 1,
+   "example": "Each problem below is still in the code at `2809e58`.",
+   "pos": "adv"
+  },
+  "pass": {
+   "kind": "maybe_noun",
+   "alts": "GO (v), THROUGH (prep), GIVE (v)",
+   "count": 5,
+   "example": "1. **Docker token in process arguments.** `run_claude_docker_with` passes `-e ANTHROPIC...",
+   "pos": "v"
+  },
+  "any": {
+   "kind": "non_approved",
+   "alts": "Frequently an alternative for this word is not necessary.; ONE (TN)",
+   "count": 1,
+   "example": "Any local user can read it in `ps` or `/proc/*/cmdline` for the full run.",
+   "pos": "adj/pron"
+  },
+  "rule": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "2. **Kimi tool rule depends on one mode string.** `kimi_run_opts` gives full-auto permi...",
+   "pos": ""
+  },
+  "depend": {
+   "kind": "non_approved",
+   "alts": "IF (conj)",
+   "count": 2,
+   "example": "2. **Kimi tool rule depends on one mode string.** `kimi_run_opts` gives full-auto permi...",
+   "pos": "v"
+  },
+  "full-auto": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "2. **Kimi tool rule depends on one mode string.** `kimi_run_opts` gives full-auto permi...",
+   "pos": ""
+  },
+  "permission": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "2. **Kimi tool rule depends on one mode string.** `kimi_run_opts` gives full-auto permi...",
+   "pos": ""
+  },
+  "reach": {
+   "kind": "maybe_noun",
+   "alts": "GET (v), TOUCH (v), BE (v)",
+   "count": 1,
+   "example": "Today only raw and review runs reach it.",
+   "pos": "v"
+  },
+  "would": {
+   "kind": "non_approved",
+   "alts": "CAN (v)",
+   "count": 2,
+   "example": "A plan or security run on Kimi would get full-auto tools.",
+   "pos": "v"
+  },
+  "never": {
+   "kind": "non_approved",
+   "alts": "DO NOT",
+   "count": 2,
+   "example": "With `HOME=/home/kass/` the two values never match, so the search reads `.env` files ab...",
+   "pos": "adv"
+  },
+  "so": {
+   "kind": "non_approved",
+   "alts": "UNTIL (prep), PREVENT (v)",
+   "count": 3,
+   "example": "With `HOME=/home/kass/` the two values never match, so the search reads `.env` files ab...",
+   "pos": "conj"
+  },
+  "parsers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "4. **Two review parsers.** The CLI uses `review::parse` and `review::plan` (`crates/riv...",
+   "pos": ""
+  },
+  "differ": {
+   "kind": "maybe_noun",
+   "alts": "DIFFERENT (adj)",
+   "count": 1,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": "v"
+  },
+  "footer": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": ""
+  },
+  "hook-line": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": ""
+  },
+  "duplicate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": ""
+  },
+  "answers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": ""
+  },
+  "prose": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The two parsers differ in footer removal, hook-line removal, duplicate answers and JSON...",
+   "pos": ""
+  },
+  "formatter": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "5. **Empty plan summary looks clean.** `parse_plan_output` accepts a blank summary (`re...",
+   "pos": ""
+  },
+  "skips": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "5. **Empty plan summary looks clean.** `parse_plan_output` accepts a blank summary (`re...",
+   "pos": ""
+  },
+  "finding": {
+   "kind": "non_approved",
+   "alts": "RESULT (n)",
+   "count": 1,
+   "example": "A rating with no findings and no summary shows as a clean plan.",
+   "pos": "n"
+  },
+  "force": {
+   "kind": "non_approved",
+   "alts": "PUSH (v), FORCE (TN)",
+   "count": 2,
+   "example": "6. **Force clear breaks the run limit.** `Manager::clear(true)` deletes running tickets...",
+   "pos": "v"
+  },
+  "create": {
+   "kind": "non_approved",
+   "alts": "MAKE (v), CAUSE (v)",
+   "count": 1,
+   "example": "A live run does not create its ticket again.",
+   "pos": "v"
+  },
+  "second": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Thus a second run can start at the same time as the live run.",
+   "pos": ""
+  },
+  "inherits": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "7. **Git scope inherits repository overrides.** `git_cmd` passes the caller's `GIT_DIR`...",
+   "pos": ""
+  },
+  "call": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "7. **Git scope inherits repository overrides.** `git_cmd` passes the caller's `GIT_DIR`...",
+   "pos": ""
+  },
+  "variable": {
+   "kind": "non_approved",
+   "alts": "CHANGE (v)",
+   "count": 1,
+   "example": "7. **Git scope inherits repository overrides.** `git_cmd` passes the caller's `GIT_DIR`...",
+   "pos": "adj"
+  },
+  "hook": {
+   "kind": "maybe_noun",
+   "alts": "PUT (v)",
+   "count": 2,
+   "example": "In a git hook, scope detection can read the incorrect repository.",
+   "pos": "v"
+  },
+  "detection": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "In a git hook, scope detection can read the incorrect repository.",
+   "pos": ""
+  },
+  "missed": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "8. **Encoded MR link missed.** `mergerequest::contains` checks the raw text (`crates/ri...",
+   "pos": ""
+  },
+  "plain": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`%2F-%2Fmerge_requests%2F42` falls through to a plain review of the checkout.",
+   "pos": ""
+  },
+  "direct": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "9. **MR cancel kills one process only.** `output` and `reap` kill the direct git or gla...",
+   "pos": ""
+  },
+  "glab": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "9. **MR cancel kills one process only.** `output` and `reap` kill the direct git or gla...",
+   "pos": ""
+  },
+  "child": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "9. **MR cancel kills one process only.** `output` and `reap` kill the direct git or gla...",
+   "pos": ""
+  },
+  "grandchild": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A grandchild that holds the pipe delays the return.",
+   "pos": ""
+  },
+  "pipe": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A grandchild that holds the pipe delays the return.",
+   "pos": ""
+  },
+  "delay": {
+   "kind": "non_approved",
+   "alts": "INTERVAL (n), IMMEDIATELY (adv); AFTER (prep)",
+   "count": 1,
+   "example": "A grandchild that holds the pipe delays the return.",
+   "pos": "n/v"
+  },
+  "return": {
+   "kind": "non_approved",
+   "alts": "GO (v); GO (v)",
+   "count": 2,
+   "example": "A grandchild that holds the pipe delays the return.",
+   "pos": "n/v"
+  },
+  "non-timeout": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "10. **Queue I/O error shown as cancel.** `wait_with_manager` reports every non-timeout ...",
+   "pos": ""
+  },
+  "lost": {
+   "kind": "non_approved",
+   "alts": "DECREASE (v) — NOT FIND",
+   "count": 4,
+   "example": "The real error is lost.",
+   "pos": "adj"
+  },
+  "truncates": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "11. **Cut-off skill write.** `write_file` truncates, then writes (`crates/rival/src/ins...",
+   "pos": ""
+  },
+  "leave": {
+   "kind": "maybe_noun",
+   "alts": "KEEP (v), STAY (v), GO (v) — LET ….",
+   "count": 2,
+   "example": "A crash leaves the new version header over cut-off text.",
+   "pos": "v"
+  },
+  "over": {
+   "kind": "non_approved",
+   "alts": "ABOVE (prep), ALONG (prep), ON (prep) — MORE THAN For movement above land or water use a technical noun.",
+   "count": 1,
+   "example": "A crash leaves the new version header over cut-off text.",
+   "pos": "prep"
+  },
+  "later": {
+   "kind": "non_approved",
+   "alts": "SUBSEQUENT (adj), THEN (adv); SUBSEQUENTLY (adv), WHEN (conj), AFTER (prep) — If it is possible give the condition or time.",
+   "count": 1,
+   "example": "Later installs skip that file as current.",
+   "pos": "adj/adv"
+  },
+  "skip": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Later installs skip that file as current.",
+   "pos": ""
+  },
+  "current": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Later installs skip that file as current.",
+   "pos": ""
+  },
+  "cleanup": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "12. **Dangling skill links stay.** Deprecated-skill cleanup uses `fs::metadata`, which ...",
+   "pos": ""
+  },
+  "fail": {
+   "kind": "non_approved",
+   "alts": "IF … NOT, FAILURE (TN), UNSATISFACTORY (adj)",
+   "count": 2,
+   "example": "12. **Dangling skill links stay.** Deprecated-skill cleanup uses `fs::metadata`, which ...",
+   "pos": "v"
+  },
+  "deprecated": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The rust-only spec adds `rival-antislop` to the deprecated list, so this path gets real...",
+   "pos": ""
+  },
+  "list": {
+   "kind": "maybe_noun",
+   "alts": "RECORD (v), SHOW (v), LIST (TN)",
+   "count": 4,
+   "example": "The rust-only spec adds `rival-antislop` to the deprecated list, so this path gets real...",
+   "pos": "v"
+  },
+  "wrap": {
+   "kind": "maybe_noun",
+   "alts": "PUT (v), WIND (v)",
+   "count": 3,
+   "example": "13. **Oversized timeouts wrap.** `max_run_wait` multiplies without a limit (`crates/riv...",
+   "pos": "v"
+  },
+  "negative": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A very large `RIVAL_RUN_TIMEOUT` gives a negative wait.",
+   "pos": ""
+  },
+  "absolute-path": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "14. **Windows drive path in Claude Docker.** The absolute-path check is `starts_with('/...",
+   "pos": ""
+  },
+  "dead": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "15. **Dead telemetry.** `recover_panic` does nothing (`crates/rival-core/src/telemetry....",
+   "pos": ""
+  },
+  "capture": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "No code calls the Sentry capture (`telemetry.rs:119`).",
+   "pos": ""
+  },
+  "bounded": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Safe skill install, bounded timeouts, Windows Docker paths, no dead telemetry (Problems...",
+   "pos": ""
+  },
+  "dropped": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Each row is fixed, dropped with a reason, or moved to a short \"Known limits\" list in `d...",
+   "pos": ""
+  },
+  "feature": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- New features in the queue, the MR flow or the installer.",
+   "pos": ""
+  },
+  "review-language": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- The review-language pass.",
+   "pos": ""
+  },
+  "old": {
+   "kind": "non_approved",
+   "alts": "REMAINING (adj), USED (adj), EXPIRED (adj)",
+   "count": 4,
+   "example": "| # | Row in the old table | Decision | Problem | |---|---|---|---| | 1 | No codex head...",
+   "pos": "adj"
+  },
+  "codex": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "| # | Row in the old table | Decision | Problem | |---|---|---|---| | 1 | No codex head...",
+   "pos": ""
+  },
+  "scanned": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "| # | Row in the old table | Decision | Problem | |---|---|---|---| | 1 | No codex head...",
+   "pos": ""
+  },
+  "cover": {
+   "kind": "maybe_noun",
+   "alts": "INCLUDE (v), HAVE (v), COVER (TN)",
+   "count": 2,
+   "example": "A test covers a codex log with no banner. | 4 | | 2 | Codex double answer not deduped |...",
+   "pos": "v"
+  },
+  "banner": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A test covers a codex log with no banner. | 4 | | 2 | Codex double answer not deduped |...",
+   "pos": ""
+  },
+  "double": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A test covers a codex log with no banner. | 4 | | 2 | Codex double answer not deduped |...",
+   "pos": ""
+  },
+  "deduped": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A test covers a codex log with no banner. | 4 | | 2 | Codex double answer not deduped |...",
+   "pos": ""
+  },
+  "duplicates": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Closed by the one parser. | 4 | | 3 | Two parsers | Fix. | 4 | | 4 | Force clear of a r...",
+   "pos": ""
+  },
+  "inside": {
+   "kind": "non_approved",
+   "alts": "INNER (adj); INNER (adj); IN (prep), INTO (prep)",
+   "count": 2,
+   "example": "Closed by the one parser. | 4 | | 3 | Two parsers | Fix. | 4 | | 4 | Force clear of a r...",
+   "pos": "adj/n/prep"
+  },
+  "prints": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Today git prints each path once.",
+   "pos": ""
+  },
+  "once": {
+   "kind": "non_approved",
+   "alts": "ONE (TN) — TIME; WHEN (conj)",
+   "count": 2,
+   "example": "Today git prints each path once.",
+   "pos": "adv/conj"
+  },
+  "doubt": {
+   "kind": "non_approved",
+   "alts": "NOT SURE THINK (v)",
+   "count": 1,
+   "example": "One `seen` line removes the doubt. | — | | 7 | Docker token in process arguments | Fix ...",
+   "pos": "n"
+  },
+  "antislop": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "One `seen` line removes the doubt. | — | | 7 | Docker token in process arguments | Fix ...",
+   "pos": ""
+  },
+  "deprecated-skill": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "One `seen` line removes the doubt. | — | | 7 | Docker token in process arguments | Fix ...",
+   "pos": ""
+  },
+  "partial": {
+   "kind": "non_approved",
+   "alts": "NOT FULLY",
+   "count": 1,
+   "example": "One `seen` line removes the doubt. | — | | 7 | Docker token in process arguments | Fix ...",
+   "pos": "adj"
+  },
+  "document": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Document in Known limits. | — | | 17 | Cut-off skill write | Fix. | 11 | | 18 | Panic w...",
+   "pos": ""
+  },
+  "wrapper": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Document in Known limits. | — | | 17 | Cut-off skill write | Fix. | 11 | | 18 | Panic w...",
+   "pos": ""
+  },
+  "captures": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Document in Known limits. | — | | 17 | Cut-off skill write | Fix. | 11 | | 18 | Panic w...",
+   "pos": ""
+  },
+  "digits": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A part of more than 3 digits compares incorrectly.",
+   "pos": ""
+  },
+  "numeric": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A numeric compare would show update notices to `dev` builds. | — | | 21 | Oversized tim...",
+   "pos": ""
+  },
+  "notices": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A numeric compare would show update notices to `dev` builds. | — | | 21 | Oversized tim...",
+   "pos": ""
+  },
+  "vs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A numeric compare would show update notices to `dev` builds. | — | | 21 | Oversized tim...",
+   "pos": ""
+  },
+  "option": {
+   "kind": "non_approved",
+   "alts": "ALTERNATIVE (n), POSSIBLE (adj), CAN (v)",
+   "count": 2,
+   "example": "All other modes get the review options.",
+   "pos": "n"
+  },
+  "shared": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "This includes task modes. | | 3 | Compare the cleaned directory with the cleaned HOME (...",
+   "pos": ""
+  },
+  "decoder": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "This includes task modes. | | 3 | Compare the cleaned directory with the cleaned HOME (...",
+   "pos": ""
+  },
+  "away": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`review::parse::final_answer` and the second decoder go away.",
+   "pos": ""
+  },
+  "own": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The CLI keeps its own formatter. | | 5 | A blank summary makes a plan payload invalid, ...",
+   "pos": ""
+  },
+  "invalid": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "The CLI keeps its own formatter. | | 5 | A blank summary makes a plan payload invalid, ...",
+   "pos": ""
+  },
+  "alive": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It keeps a running ticket if the process of that ticket is alive.",
+   "pos": ""
+  },
+  "executor": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Kill the group on cancel, with the bounded drain of the provider executor. | | 10 | Mat...",
+   "pos": ""
+  },
+  "print": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Kill the group on cancel, with the bounded drain of the provider executor. | | 10 | Mat...",
+   "pos": ""
+  },
+  "temp": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...",
+   "pos": ""
+  },
+  "rename": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...",
+   "pos": ""
+  },
+  "arithmetic": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...",
+   "pos": ""
+  },
+  "mount": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...",
+   "pos": ""
+  },
+  "sites": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`queue wait failed: <error>`. | | 11 | Write to a temp file in the same directory, then...",
+   "pos": ""
+  },
+  "math": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Saturating timeout math. | | `crates/rival-core/src/result.rs`, `review/{parse,plan,typ...",
+   "pos": ""
+  },
+  "blank": {
+   "kind": "non_approved",
+   "alts": "SEAL (v), CAP (TN), COVER (TN)",
+   "count": 1,
+   "example": "Blank plan summary is invalid. | | `crates/rival/src/model_command.rs`, `command_securi...",
+   "pos": "v"
+  },
+  "process-group": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Process-group kill and bounded drain. | | `crates/rival-core/src/review/slots.rs` | Pri...",
+   "pos": ""
+  },
+  "edit": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`symlink_metadata`. | | `crates/rival-core/src/telemetry.rs`, `telemetry/tests.rs`, `cr...",
+   "pos": ""
+  },
+  "scenarios": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The \"Known Go bugs\" table stays as history. | | `e2e/scenarios/` | New scenarios for fo...",
+   "pos": ""
+  },
+  "affect": {
+   "kind": "maybe_noun",
+   "alts": "EFFECT (n) — If it is possible be accurate.",
+   "count": 1,
+   "example": "Record new output where the parser change affects it. | | `README.md`, `CHANGELOG.md` |...",
+   "pos": "v"
+  },
+  "per": {
+   "kind": "non_approved",
+   "alts": "FOR EACH REFER (v)",
+   "count": 1,
+   "example": "Record new output where the parser change affects it. | | `README.md`, `CHANGELOG.md` |...",
+   "pos": "prep"
+  },
+  "user-visible": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Record new output where the parser change affects it. | | `README.md`, `CHANGELOG.md` |...",
+   "pos": ""
+  },
+  "argv": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Docker: the argv has `-e ANTHROPIC_AUTH_TOKEN` and no token value.",
+   "pos": ""
+  },
+  "both": {
+   "kind": "non_approved",
+   "alts": "THE TWO (TN)",
+   "count": 3,
+   "example": "`HOME=/x/` and `HOME=/x` both stop at `/x`.",
+   "pos": "adj"
+  },
+  "exist": {
+   "kind": "maybe_noun",
+   "alts": "BE (v)",
+   "count": 1,
+   "example": "- Parser: every existing case in `result/tests.rs` and `review/parse/tests.rs` gives th...",
+   "pos": "v"
+  },
+  "case": {
+   "kind": "non_approved",
+   "alts": "CONDITION (n); IF (conj)",
+   "count": 2,
+   "example": "- Parser: every existing case in `result/tests.rs` and `review/parse/tests.rs` gives th...",
+   "pos": "n/conj"
+  },
+  "documented": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Parser: every existing case in `result/tests.rs` and `review/parse/tests.rs` gives th...",
+   "pos": ""
+  },
+  "within": {
+   "kind": "non_approved",
+   "alts": "IN (prep) — IN ... OR LESS IN LESS THAN",
+   "count": 1,
+   "example": "Cancel kills a grandchild that holds the pipe, within the drain bound.",
+   "pos": "prep"
+  },
+  "bound": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Cancel kills a grandchild that holds the pipe, within the drain bound.",
+   "pos": ""
+  },
+  "integration": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**Integration**",
+   "pos": ""
+  },
+  "three-os": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Three-OS CI.",
+   "pos": ""
+  },
+  "choice": {
+   "kind": "non_approved",
+   "alts": "SELECTION (n), ALTERNATIVE (adj)",
+   "count": 1,
+   "example": "| Failure or choice | Behavior | |---|---| | A hung live run blocks the queue | `--forc...",
+   "pos": "n"
+  },
+  "block": {
+   "kind": "maybe_noun",
+   "alts": "CAUSE A BLOCKAGE",
+   "count": 1,
+   "example": "| Failure or choice | Behavior | |---|---| | A hung live run blocks the queue | `--forc...",
+   "pos": "v"
+  },
+  "someone": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The CHANGELOG lists the change. | | A plan with a rating but a blank summary | Shows UN...",
+   "pos": ""
+  },
+  "used": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The CHANGELOG lists the change. | | A plan with a rating but a blank summary | Shows UN...",
+   "pos": ""
+  },
+  "redesign": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- A queue redesign.",
+   "pos": ""
+  },
+  "gate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "Gate: fmt, clippy, workspace tests, e2e, three-OS CI, the manual Docker check.",
+   "pos": ""
+  },
+  "fmt": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, e2e, three-OS CI, the manual Docker check.",
+   "pos": ""
+  },
+  "clippy": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, e2e, three-OS CI, the manual Docker check.",
+   "pos": ""
+  },
+  "workspace": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: fmt, clippy, workspace tests, e2e, three-OS CI, the manual Docker check.",
+   "pos": ""
+  },
+  "force-clear": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: the checks above, the manual force-clear check.",
+   "pos": ""
+  },
+  "deliver": {
+   "kind": "non_approved",
+   "alts": "SUPPLY (v)",
+   "count": 1,
+   "example": "Delivered on branch `feat/inherited-bugs` (2026-10-08).",
+   "pos": "v"
+  },
+  "deviations": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Deviations from the text above:",
+   "pos": ""
+  },
+  "bare-json": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P2: the shared decoder changes 22 bare-JSON test inputs to the TUI's result; every fi...",
+   "pos": ""
+  },
+  "fixture": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P2: the shared decoder changes 22 bare-JSON test inputs to the TUI's result; every fi...",
+   "pos": ""
+  },
+  "judgement": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Three of them are judgement calls: in a review run a payload with a `rating` key counts...",
+   "pos": ""
+  },
+  "wins": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Three of them are judgement calls: in a review run a payload with a `rating` key counts...",
+   "pos": ""
+  },
+  "unrelated": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Three of them are judgement calls: in a review run a payload with a `rating` key counts...",
+   "pos": ""
+  },
+  "blank-summary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P2: the blank-summary rule lives in the shared decoder, so the TUI and the CLI both r...",
+   "pos": ""
+  },
+  "say": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`queue clear --force` help text changed to say that live running tickets stay.",
+   "pos": ""
+  },
+  "early": {
+   "kind": "non_approved",
+   "alts": "SHORT (adj)",
+   "count": 1,
+   "example": "`merge_file_lists` lost its early returns to trim and dedupe a single list the same way.",
+   "pos": "adj"
+  },
+  "trim": {
+   "kind": "non_approved",
+   "alts": "CUT (v)",
+   "count": 1,
+   "example": "`merge_file_lists` lost its early returns to trim and dedupe a single list the same way.",
+   "pos": "v"
+  },
+  "dedupe": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`merge_file_lists` lost its early returns to trim and dedupe a single list the same way.",
+   "pos": ""
+  },
+  "single": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`merge_file_lists` lost its early returns to trim and dedupe a single list the same way.",
+   "pos": ""
+  },
+  "way": {
+   "kind": "non_approved",
+   "alts": "PROCEDURE (n)",
+   "count": 1,
+   "example": "`merge_file_lists` lost its early returns to trim and dedupe a single list the same way.",
+   "pos": "n"
+  },
+  "now": {
+   "kind": "non_approved",
+   "alts": "AT THIS TIME",
+   "count": 1,
+   "example": "MR git and glab now start through the provider executor.",
+   "pos": "adv"
+  },
+  "failed": {
+   "kind": "non_approved",
+   "alts": "DEFECTIVE (adj), UNSERVICEABLE (adj)",
+   "count": 1,
+   "example": "A failed kill reports `error sending signal to Cmd: …`.",
+   "pos": "adj"
+  },
+  "rewritten": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P4: a rewritten skill file gets mode 0644 minus the umask; it no longer keeps its old...",
+   "pos": ""
+  },
+  "umask": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P4: a rewritten skill file gets mode 0644 minus the umask; it no longer keeps its old...",
+   "pos": ""
+  },
+  "gone": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "`RIVAL_NO_TELEMETRY` and `DO_NOT_TRACK` are gone with telemetry.",
+   "pos": ""
+  },
+  "claude": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Claude Docker keeps the leading-`/` check, because `/repo` is not absolute on Windows.",
+   "pos": ""
+  },
+  "leading-codespanafx": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Claude Docker keeps the leading-`/` check, because `/repo` is not absolute on Windows.",
+   "pos": ""
+  },
+  "absolute": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Claude Docker keeps the leading-`/` check, because `/repo` is not absolute on Windows.",
+   "pos": ""
+  },
+  "scenario": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e scenario `queue-clear-force-keeps-live` and the argv tests cover the two behavi...",
+   "pos": ""
+  },
+  "behaviours": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e scenario `queue-clear-force-keeps-live` and the argv tests cover the two behavi...",
+   "pos": ""
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "/home/kass/dev/rival",
+   "kind": "path",
+   "count": 1
+  },
+  {
+   "term": "HOME",
+   "kind": "acronym",
+   "count": 10
+  },
+  {
+   "term": "CLI",
+   "kind": "acronym",
+   "count": 8
+  },
+  {
+   "term": "TUI",
+   "kind": "acronym",
+   "count": 8
+  },
+  {
+   "term": "JSON",
+   "kind": "acronym",
+   "count": 4
+  },
+  {
+   "term": "MR",
+   "kind": "acronym",
+   "count": 10
+  },
+  {
+   "term": "Rival.app",
+   "kind": "dotted",
+   "count": 2
+  },
+  {
+   "term": "P1",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "README",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "CI",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "P2",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "P3",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "P4",
+   "kind": "acronym",
+   "count": 1
+  }
+ ]
+}

@@ -7,6 +7,7 @@ mod envname;
 pub mod executor;
 pub mod gitscope;
 pub mod json;
+pub(crate) mod lang;
 pub mod logfmt;
 pub mod logging;
 pub mod mergerequest;

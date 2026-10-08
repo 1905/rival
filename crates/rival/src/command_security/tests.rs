@@ -163,6 +163,12 @@ struct Fake {
     workdir: String,
     entry_name: String,
     status_during_run: String,
+    /// What the repair call writes to its log; `None` writes nothing.
+    repair_reply: Option<String>,
+    repair_calls: usize,
+    repair_prompt: String,
+    repair_variant: String,
+    status_during_repair: String,
 }
 
 fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
@@ -175,43 +181,59 @@ fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
                 None => Ok(()),
             }
         }),
-        run: Box::new(move |ctx, cfg, sess, prompt, variant, workdir, entry| {
-            let mut f = f.borrow_mut();
-            f.run_calls += 1;
-            f.prompt = prompt.to_string();
-            f.variant = variant.to_string();
-            f.workdir = workdir.to_string();
-            f.entry_name = entry.name.to_string();
-            f.status_during_run = sess.status.clone();
-            if f.wait_for_cancel {
-                let deadline = Instant::now() + Duration::from_secs(10);
-                while ctx.err().is_none() && Instant::now() < deadline {
-                    std::thread::sleep(Duration::from_millis(5));
+        run: Box::new(
+            move |ctx, cfg, sess, prompt, variant, workdir, entry, log| {
+                let mut f = f.borrow_mut();
+                if let Some(log) = log {
+                    f.repair_calls += 1;
+                    f.repair_prompt = prompt.to_string();
+                    f.repair_variant = variant.to_string();
+                    f.status_during_repair = sess.status.clone();
+                    if let Some(reply) = &f.repair_reply {
+                        std::fs::write(log, reply)?;
+                    }
+                    return Ok(RunResult {
+                        exit_code: 0,
+                        output_bytes: 0,
+                        output_lines: 0,
+                    });
                 }
-            }
-            if let Some(e) = &f.run_error {
-                anyhow::bail!("{e}");
-            }
-            if let Some(log) = &f.log {
-                std::fs::write(&sess.log_file, log)?;
-            }
-            // Only the Unix-only save-failure test sets it.
-            #[cfg(unix)]
-            if f.lock_sessions {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(
-                    cfg.paths().sessions_dir(),
-                    std::fs::Permissions::from_mode(0o500),
-                )?;
-            }
-            #[cfg(not(unix))]
-            let _ = (f.lock_sessions, cfg);
-            Ok(RunResult {
-                exit_code: f.exit_code,
-                output_bytes: f.log.as_ref().map_or(0, |l| l.len() as i64),
-                output_lines: 1,
-            })
-        }),
+                f.run_calls += 1;
+                f.prompt = prompt.to_string();
+                f.variant = variant.to_string();
+                f.workdir = workdir.to_string();
+                f.entry_name = entry.name.to_string();
+                f.status_during_run = sess.status.clone();
+                if f.wait_for_cancel {
+                    let deadline = Instant::now() + Duration::from_secs(10);
+                    while ctx.err().is_none() && Instant::now() < deadline {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                }
+                if let Some(e) = &f.run_error {
+                    anyhow::bail!("{e}");
+                }
+                if let Some(log) = &f.log {
+                    std::fs::write(&sess.log_file, log)?;
+                }
+                // Only the Unix-only save-failure test sets it.
+                #[cfg(unix)]
+                if f.lock_sessions {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(
+                        cfg.paths().sessions_dir(),
+                        std::fs::Permissions::from_mode(0o500),
+                    )?;
+                }
+                #[cfg(not(unix))]
+                let _ = (f.lock_sessions, cfg);
+                Ok(RunResult {
+                    exit_code: f.exit_code,
+                    output_bytes: f.log.as_ref().map_or(0, |l| l.len() as i64),
+                    output_lines: 1,
+                })
+            },
+        ),
     }
 }
 
@@ -811,4 +833,65 @@ fn root_invalid_reviewer_is_caught_by_the_pre_run_first() {
     assert_eq!(code, 1);
     assert_eq!(stdout, "");
     assert_eq!(stderr, format!("{pre_run}\n"));
+}
+
+// ---- the language pass ----
+
+fn flagged_fake(reply: Option<&str>) -> RefCell<Fake> {
+    RefCell::new(Fake {
+        log: Some(format!("{}\n", crate::testutil::FLAGGED_REVIEW)),
+        repair_reply: reply.map(str::to_string),
+        ..Fake::default()
+    })
+}
+
+#[test]
+fn a_flagged_security_review_is_repaired_by_the_same_model() {
+    use crate::testutil::{FLAGGED_REVIEW, REPAIRED_REVIEW};
+    let fix = Fixture::new();
+    let dir = tempfile::tempdir().unwrap();
+    let f = flagged_fake(Some(REPAIRED_REVIEW));
+    let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
+    assert_eq!(r.result, Ok(()));
+    assert!(r.stdout.contains("We use the cache."), "{}", r.stdout);
+    assert!(!r.stdout.contains("utilize"), "{}", r.stdout);
+
+    let f = f.borrow();
+    assert_eq!(f.run_calls, 1);
+    assert_eq!(f.repair_calls, 1);
+    // K3 has one level only.
+    assert_eq!(f.repair_variant, "max");
+    assert_eq!(f.status_during_repair, "running");
+    assert!(f.repair_prompt.contains(FLAGGED_REVIEW));
+    let sess = &fix.sessions()[0];
+    assert_eq!(sess.status, "completed");
+    let log = std::fs::read_to_string(&sess.log_file).unwrap();
+    assert!(log.ends_with(&format!("\n{REPAIRED_REVIEW}\n")), "{log}");
+    assert!(!log.contains("## Task: Edit the wording"), "{log}");
+}
+
+#[test]
+fn grok_repairs_at_low_effort() {
+    use crate::testutil::REPAIRED_REVIEW;
+    let fix = Fixture::with_config_yaml("security:\n  reviewer: grok\n");
+    let dir = tempfile::tempdir().unwrap();
+    let f = flagged_fake(Some(REPAIRED_REVIEW));
+    let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
+    assert_eq!(r.result, Ok(()));
+    let f = f.borrow();
+    assert_eq!(f.variant, "xhigh");
+    assert_eq!(f.repair_variant, "low");
+}
+
+#[test]
+fn a_failed_security_repair_keeps_the_review() {
+    let fix = Fixture::new();
+    let dir = tempfile::tempdir().unwrap();
+    let f = flagged_fake(Some("no json here"));
+    let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
+    assert_eq!(r.result, Ok(()));
+    assert!(r.stdout.contains("We utilize the cache."), "{}", r.stdout);
+    assert_eq!(f.borrow().repair_calls, 1);
+    let log = std::fs::read_to_string(&fix.sessions()[0].log_file).unwrap();
+    assert_eq!(log, format!("{}\n", crate::testutil::FLAGGED_REVIEW));
 }

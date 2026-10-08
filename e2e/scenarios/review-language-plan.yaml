@@ -1,0 +1,289 @@
+{
+  "name": "review-language-plan",
+  "description": "`rival command plan -m codex,claude --effort high`. Each model's plan review has flagged words, so each model makes ONE repair call on its own block, at effort low with its own log. The printed multi-model review shows both repaired blocks; each session log ends with its repaired review.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=high",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer\\ the\\ user's\\ question\\ directly\\.\\ Do\\ not\\ offer\\ follow\\-up\\ options,\\ menus,\\ walkthroughs,\\ or\\ ask\\ if\\ they\\ want\\ more\\.\\ No\\ filler,\\ no\\ sign\\-offs\\.\\ Just\\ deliver\\ the\\ answer\\ and\\ stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou review an engineering PLAN / SPEC document \\(not source code\\)\\.[^\n]*\n\nPlan document to review: <ROOT>/work/plan\\.md\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"The codex view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"The codex view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      },
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "max",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nYou review an engineering PLAN / SPEC document \\(not source code\\)\\.[^\n]*\n\nPlan document to review: <ROOT>/work/plan\\.md\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"The claude view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"The claude view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n\nAdd a column, then ship.\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan",
+        "-m",
+        "codex,claude",
+        "--effort",
+        "high"
+      ],
+      "stdin": "plan.md",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL PLAN REVIEW (codex + claude) ═══\n\nFile: <ROOT>/work/plan.md\n\n── codex ──\n\nRating: 7/10\n\nSummary: The codex view can use the cache.\n\n1. [high] No rollback step — src/a.go:3\n   The plan in step 3 does not say how to revert. Make sure that a down migration exists.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n\n\n── claude ──\n\nRating: 7/10\n\nSummary: The claude view can use the cache.\n\n1. [high] No rollback step — src/a.go:3\n   The plan in step 3 does not say how to revert. Make sure that a down migration exists.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<ID:CODEX>",
+              "reviewer": "codex"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "reviewer": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<ID:CODEX>.json",
+      ".rival/sessions/<ID:CODEX>.log",
+      ".rival/sessions/<ID:CODEX>.log.repair.log",
+      ".rival/sessions/<ID:CLAUDE>.json",
+      ".rival/sessions/<ID:CLAUDE>.log",
+      ".rival/sessions/<ID:CLAUDE>.log.repair.log"
+    ],
+    "files": [
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "cli": "codex"
+        },
+        "bind": {
+          "CODEX": "id",
+          "GROUP": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "mode": "plan",
+          "review_scope": "<ROOT>/work/plan.md",
+          "work_dir": "<ROOT>/work",
+          "group_id": "<ID:GROUP>",
+          "output_lines": 0,
+          "id": "<ID:CODEX>",
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "effort": "high"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "cli": "claude"
+        },
+        "bind": {
+          "CLAUDE": "id",
+          "GROUP": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "mode": "plan",
+          "review_scope": "<ROOT>/work/plan.md",
+          "work_dir": "<ROOT>/work",
+          "group_id": "<ID:GROUP>",
+          "output_lines": 0,
+          "id": "<ID:CLAUDE>",
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "high",
+          "account": "subscription"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<ID:CODEX>.log",
+        "text": "{\"summary\":\"The codex view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"The codex view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<ID:CLAUDE>.log",
+        "text": "{\"summary\":\"The claude view can utilize the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 never says how to revert. Ensure a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"The claude view can use the cache.\",\"rating\":7,\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"No rollback step\",\"body\":\"The plan in step 3 does not say how to revert. Make sure that a down migration exists.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
+      }
+    ],
+    "calls": {
+      "codex": 3,
+      "claude": 2
+    }
+  }
+}

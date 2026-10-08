@@ -8,6 +8,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, bail};
 
+use super::language::{repair_language, repair_log_path};
 use super::plan::{PlanCLIResult, PlanRunResult, parse_plan_log};
 use super::slots::{GroupSlot, SkippedCLI, format_skipped, wait_for_group_slot};
 use crate::cancel::{CancelFunc, Context, ContextError};
@@ -16,6 +17,7 @@ use crate::duration;
 use crate::executor;
 use crate::logging;
 use crate::paths::Paths;
+use crate::result::PayloadKind;
 use crate::session::{self, NewSession, Session};
 
 #[cfg(test)]
@@ -112,8 +114,17 @@ struct PlanCLIRun {
 type PreflightFn<'a> = dyn Fn(&str) -> anyhow::Result<()> + Sync + 'a;
 
 /// Runs one CLI's plan review on the session: `(ctx, sess, cli, prompt,
-/// effort, workdir)` → the raw log bytes and the exit code.
-type RunFn<'a> = dyn Fn(&Context, &mut Session, &str, &str, &str, &str) -> anyhow::Result<(Vec<u8>, i64)>
+/// effort, workdir, log)` → the raw log bytes and the exit code. `log` is the
+/// file that gets the output; `None` is the session log.
+type RunFn<'a> = dyn Fn(
+        &Context,
+        &mut Session,
+        &str,
+        &str,
+        &str,
+        &str,
+        Option<&str>,
+    ) -> anyhow::Result<(Vec<u8>, i64)>
     + Sync
     + 'a;
 
@@ -130,7 +141,7 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
             "claude" => executor::claude_preflight(cfg),
             _ => Err(anyhow!("unsupported plan cli: {cli}")),
         }),
-        run: Box::new(move |ctx, sess, cli, prompt, effort, workdir| {
+        run: Box::new(move |ctx, sess, cli, prompt, effort, workdir, log| {
             let result = match cli {
                 "codex" => executor::run_codex_model(
                     ctx,
@@ -140,15 +151,16 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
                     effort,
                     workdir,
                     plan_model_for_cli(cli),
+                    log,
                     None,
                 )?,
                 "claude" => {
-                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, None)?
+                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, log, None)?
                 }
                 _ => bail!("unsupported plan cli: {cli}"),
             };
             // `{e}`, not `{e:#}`: the error already prints as `op path: reason`.
-            let raw = session::read_file(Path::new(&sess.log_file))
+            let raw = session::read_file(Path::new(log.unwrap_or(&sess.log_file)))
                 .map_err(|e| anyhow!("read log: {e}"))?;
             Ok((raw, result.exit_code))
         }),
@@ -375,6 +387,7 @@ fn run_doc_review_with(
                 let run_ctx = &run_ctx;
                 scope.spawn(move || {
                     run_plan_cli(
+                        ctx,
                         run_ctx,
                         cfg,
                         ex,
@@ -424,6 +437,7 @@ impl Drop for FailUnfinished<'_> {
 /// raw outcome for [`assemble_plan_results`] to interpret.
 #[allow(clippy::too_many_arguments)]
 fn run_plan_cli(
+    parent: &Context,
     ctx: &Context,
     cfg: &Config,
     ex: &PlanExecutor<'_>,
@@ -438,11 +452,24 @@ fn run_plan_cli(
         paths: cfg.paths(),
         sess,
     };
-    run_plan_cli_inner(ctx, cfg, ex, &mut *guard.sess, cli, prompt, workdir, mode)
+    run_plan_cli_inner(
+        parent,
+        ctx,
+        cfg,
+        ex,
+        &mut *guard.sess,
+        cli,
+        prompt,
+        workdir,
+        mode,
+    )
 }
 
+/// `parent` is the context before the run timeout: the repair call gets its
+/// own timeout from it.
 #[allow(clippy::too_many_arguments)]
 fn run_plan_cli_inner(
+    parent: &Context,
     ctx: &Context,
     cfg: &Config,
     ex: &PlanExecutor<'_>,
@@ -462,7 +489,7 @@ fn run_plan_cli_inner(
         .msg("starting plan reviewer");
 
     let effort = sess.effort.clone();
-    let ran = (ex.run)(ctx, sess, cli, prompt, &effort, workdir);
+    let ran = (ex.run)(ctx, sess, cli, prompt, &effort, workdir, None);
 
     // Keep this defensive restoration for injected/custom executors. The
     // built-in Claude executor preserves the session mode throughout the
@@ -487,7 +514,7 @@ fn run_plan_cli_inner(
     };
     // The output size counts the log's bytes; the text is decoded lossily for parsing.
     let output_bytes = i64::try_from(raw.len()).unwrap_or(i64::MAX);
-    let raw = String::from_utf8(raw)
+    let mut raw = String::from_utf8(raw)
         .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
 
     // Parse only the final answer: a plan payload printed earlier by a tool
@@ -506,6 +533,7 @@ fn run_plan_cli_inner(
             // review that formats to an empty string while the command exits 0.
             let _ = sess.fail(paths, 1, &reason);
         } else {
+            raw = repair_plan_language(parent, cfg, ex, sess, cli, workdir, mode, raw);
             let _ = sess.complete(paths, exit_code, output_bytes, 0);
         }
     }
@@ -517,6 +545,35 @@ fn run_plan_cli_inner(
         exit_code,
         ..PlanCLIRun::default()
     }
+}
+
+/// The language pass on one model's plan review: the same model repairs its
+/// own block, with its own run timeout. It returns `raw` with the repaired
+/// line, or `raw` unchanged.
+#[allow(clippy::too_many_arguments)]
+fn repair_plan_language(
+    parent: &Context,
+    cfg: &Config,
+    ex: &PlanExecutor<'_>,
+    sess: &mut Session,
+    cli: &str,
+    workdir: &str,
+    mode: &str,
+    raw: String,
+) -> String {
+    let log = repair_log_path(&sess.log_file);
+    let session_log = sess.log_file.clone();
+    let (run_ctx, cancel_run) = with_run_timeout(parent, cfg, 1);
+    let _cancel_run = CancelOnDrop(cancel_run);
+    repair_language(&session_log, raw, PayloadKind::Plan, |prompt| {
+        let ran = (ex.run)(&run_ctx, sess, cli, prompt, "low", workdir, Some(&log));
+        sess.mode = mode.to_string();
+        let (out, exit_code) = ran?;
+        if exit_code != 0 {
+            bail!("exited with code {exit_code}");
+        }
+        Ok(String::from_utf8_lossy(&out).into_owned())
+    })
 }
 
 /// Turns raw CLI runs (plus the pre-run skipped list) into the final

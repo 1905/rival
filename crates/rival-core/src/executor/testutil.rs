@@ -145,6 +145,7 @@ pub(crate) struct Spawned {
     pub environ: Vec<OsString>,
     pub mode: String,
     pub account: String,
+    pub log: Option<String>,
 }
 
 impl Spawned {
@@ -158,6 +159,7 @@ impl Spawned {
             environ: req.environ.to_vec(),
             mode: sess.mode.clone(),
             account: sess.account.clone(),
+            log: req.log.map(str::to_string),
         }
     }
 }

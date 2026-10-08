@@ -117,10 +117,13 @@ partial results while you work — they belong in the final message.
      plan edit for every CONFIRMED finding still open. If any are open, end with
      one line: say "fix" to apply them;
    - then the **full contents verbatim** in a fenced code block.
-   - write every line you add (evidence, fix plans, summary) in plain English:
-     one fact per sentence, 20 words or fewer per instruction, active voice, no
-     stacked hedges, no filler. Keep a reviewer's "may" as "may". Add no cause or
-     fix you did not verify. Never edit the verbatim block.
+   - write every line you add (evidence, fix plans, summary) in ASD-STE100
+     Simplified Technical English (STE): approved words in one meaning, no
+     phrasal verbs, simple tenses, active voice, one instruction per sentence,
+     20 words or fewer per instruction and 25 per description, condition first,
+     no semicolons or contractions. Keep each hedge at its strength: "may" →
+     "possibly", "should" as advice → "we recommend that". Add no cause or fix
+     you did not verify. Never edit the verbatim block.
 6. If the output has no findings (a plain prompt answer or a clean review),
    skip steps 2-4 and present the stats summary plus the verbatim output.
 7. If `rival_out` is empty: the run failed before producing output — read

@@ -1,0 +1,126 @@
+{
+  "name": "review-language-security",
+  "description": "`rival command security` (k3). The security review text has flagged words, so the same model (opencode, k3 at max, its only level) makes ONE repair call with the read-only permission profile and its own log. The printed security review is the repaired one; the session log ends with the repaired review.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer the user's question directly\\. Do not offer follow-up options, menus, walkthroughs, or ask if they want more\\. No filler, no sign-offs\\. Just deliver the answer and stop\\.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nReview scope: src/api/\n\n## Role: Security Reviewer\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"deny\",\"bash\":\"deny\",\"task\":\"deny\",\"webfetch\":\"deny\",\"websearch\":\"deny\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                }
+              }
+            },
+            "stdout": "{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"deny\",\"bash\":\"deny\",\"task\":\"deny\",\"webfetch\":\"deny\",\"websearch\":\"deny\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                }
+              }
+            },
+            "stdout": "{\"summary\":\"We use the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Make sure that the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security"
+      ],
+      "stdin": "src/api/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL SECURITY REVIEW ═══\n\nModel: kimi-k3\nScope: src/api/\n\nSummary: We use the cache.\n\n1. [high] Cache key is wrong — src/a.go:3\n   The code in `load()` reads 3 entries. Make sure that the key is unique.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting security reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "model": "kimi-k3"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "opencode",
+          "model": "moonshotai/kimi-k3",
+          "effort": "max",
+          "mode": "security",
+          "review_scope": "src/api/",
+          "work_dir": "<ROOT>/work",
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "{\"summary\":\"We utilize the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Ensure the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n\n{\"summary\":\"We use the cache.\",\"findings\":[{\"file\":\"src/a.go\",\"line\":3,\"severity\":\"high\",\"category\":\"bug\",\"title\":\"Cache key is wrong\",\"body\":\"The code in `load()` reads 3 entries. Make sure that the key is unique.\",\"suggestion\":\"Return an error.\",\"confidence\":9}]}\n"
+      }
+    ],
+    "calls": {
+      "opencode": 2
+    }
+  }
+}

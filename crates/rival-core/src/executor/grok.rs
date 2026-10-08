@@ -62,6 +62,7 @@ pub fn run_grok(
     effort: &str,
     workdir: &str,
     review: bool,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_grok_model(
@@ -73,6 +74,7 @@ pub fn run_grok(
         workdir,
         config::GROK_MODEL,
         review,
+        log,
         mirror,
     )
 }
@@ -94,6 +96,7 @@ pub fn run_grok_model(
     workdir: &str,
     model: &str,
     review: bool,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_grok_model_with(
@@ -104,6 +107,7 @@ pub fn run_grok_model(
         workdir,
         model,
         review,
+        log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
 }
@@ -119,6 +123,7 @@ pub(crate) fn run_grok_model_with(
     workdir: &str,
     model: &str,
     review: bool,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     let label = config::GROK_LABEL;
@@ -151,6 +156,7 @@ pub(crate) fn run_grok_model_with(
         prompt: "",
         drop_env: &[],
         environ: cfg.environ(),
+        log,
     };
     spawn(sess, &req).map_err(|err| anyhow!("{label} runtime: {err:#}"))
 }

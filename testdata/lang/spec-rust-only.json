@@ -1,0 +1,1943 @@
+{
+ "findings": [
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"date scope /home/kass/dev/rival status approved\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 2, sentence 1"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"code-slop review command skill prompts five scenarios\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"plain-writing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 5, sentence 14"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"encoding\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 6, sentence 17"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 11 words: \"encoding go error text go unicode tables go windows path rules\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 6, sentence 17"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"old session files still load\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 6, sentence 21"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is fixed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 6, sentence 24"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is left\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 7, sentence 27"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is copied\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 9, sentence 38"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"purpose about lines exist\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 9, sentence 38"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"copied unicode tables force\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 10, sentence 49"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"every mention outside prompts\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 12, sentence 57"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"every go-only behavior except\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 12, sentence 59"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"user-facing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 14, sentence 72"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 17 has 9 sentences (max 6). Divide it.",
+   "where": "para 17"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"effort lookup session mode\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 17, sentence 78"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"sessionview group kind label\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 17, sentence 79"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"Rival.app doc review path the antislop branch\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 17, sentence 79"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 7 words: \"so deletes old copies scenarios five files\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 17, sentence 81"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"reviewer prompt writing-rules block\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 20, sentence 91"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 23 has 11 sentences (max 6). Divide it.",
+   "where": "para 23"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "22 words (procedural, max 20): \"| Go-compat item | Replacement | Visible change | |---|---|---| | `gojson::marshal_inde...\"",
+   "where": "para 23, sentence 99"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"go-compat item replacement visible\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 99"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are written\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 23, sentence 99"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"codespanadq-style escapes decode helpers serde\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 100"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"field aliases keys match\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 100"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is removed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 23, sentence 101"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are omitted\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 23, sentence 102"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"both forms rust output\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 103"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"rust escapes go error forms such\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 104"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "31 words (descriptive, max 25): \"This is true on every OS. | | `gostd::to_lower`, `equal_fold` | `str::to_lowercase`, `e...\"",
+   "where": "para 23, sentence 105"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"every unicode edge cases\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 105"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is kept\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 23, sentence 105"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "31 words (descriptive, max 25): \"Today two maximum parts wrap to 0, and `RIVAL_RUN_TIMEOUT=0` turns the run timeout off....\"",
+   "where": "para 23, sentence 107"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"today two maximum parts wrap\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 107"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"windows windows lexical path edge cases\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 23, sentence 108"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"Rival.app decodes both forms\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 25, sentence 111"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 31 has 19 sentences (max 6). Divide it.",
+   "where": "para 31"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"file change delete remove\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 31, sentence 126"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"old zero-time form use serde instead\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 31, sentence 130"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "24 words (procedural, max 20): \"Continue to read old files. | | `crates/rival-core/src/sessionview/group.rs`, `crates/r...\"",
+   "where": "para 31, sentence 131"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"decoding\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 31, sentence 132"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"serde decoding delete delete\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 31, sentence 132"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"record new golden files\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 31, sentence 136"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"five antislop scenarios update paths\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 31, sentence 142"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"dell run one real codex review\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 36, sentence 164"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"match outside prompts history\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 37, sentence 169"
+  },
+  {
+   "rule": "6.6",
+   "kind": "paragraph",
+   "message": "Paragraph 39 has 12 sentences (max 6). Divide it.",
+   "where": "para 39"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"choice behavior old session file\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 171"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"new form old session file\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 172"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"plain finished run old file\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 173"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"different letter case the key\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 173"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is ignored\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 39, sentence 173"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"such keys old skill\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 175"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"error message the text\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 176"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"windows path edge case\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 39, sentence 178"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is fixed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 39, sentence 179"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"new golden files swift decode tests\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 43, sentence 194"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"folding\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 43, sentence 197"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 8 words: \"lower case std error text quotes std case\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 43, sentence 197"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is written\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 46, sentence 220"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"scenarios pin commit hashes\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 46, sentence 222"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"one defect local symlink\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 46, sentence 223"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"was committed\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 46, sentence 223"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is untracked\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 46, sentence 224"
+  }
+ ],
+ "words": {
+  "what": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": ""
+  },
+  "delete": {
+   "kind": "maybe_noun",
+   "alts": "ERASE (v), REMOVE (v)",
+   "count": 12,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": "v"
+  },
+  "code-slop": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": ""
+  },
+  "review": {
+   "kind": "non_approved",
+   "alts": "INSPECTION (n), EXAMINE (v)",
+   "count": 9,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": "n"
+  },
+  "skill": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": ""
+  },
+  "prompt": {
+   "kind": "non_approved",
+   "alts": "IMMEDIATELY (adv)",
+   "count": 7,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": "adj"
+  },
+  "scenarios": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "- What: delete the code-slop review: command, skill, prompts, five scenarios and the `a...",
+   "pos": ""
+  },
+  "why": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": ""
+  },
+  "language": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": ""
+  },
+  "pass": {
+   "kind": "maybe_noun",
+   "alts": "GO (v), THROUGH (prep), GIVE (v)",
+   "count": 6,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": "v"
+  },
+  "spec": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 8,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": ""
+  },
+  "would": {
+   "kind": "non_approved",
+   "alts": "CAN (v)",
+   "count": 1,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": "v"
+  },
+  "confuse": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Why: the language pass in the next spec replaces it, and two \"antislop\" names would c...",
+   "pos": ""
+  },
+  "decide": {
+   "kind": "non_approved",
+   "alts": "SELECT (v), DECISION (n)",
+   "count": 5,
+   "example": "- You decide or do: nothing.",
+   "pos": "v"
+  },
+  "nothing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- You decide or do: nothing.",
+   "pos": ""
+  },
+  "old": {
+   "kind": "non_approved",
+   "alts": "REMAINING (adj), USED (adj), EXPIRED (adj)",
+   "count": 13,
+   "example": "Old `antislop` sessions show as plain runs.",
+   "pos": "adj"
+  },
+  "plain": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "Old `antislop` sessions show as plain runs.",
+   "pos": ""
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 6,
+   "example": "Old `antislop` sessions show as plain runs.",
+   "pos": "v"
+  },
+  "word": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 9,
+   "example": "**P2 — remove the first word check.**",
+   "pos": ""
+  },
+  "list": {
+   "kind": "maybe_noun",
+   "alts": "RECORD (v), SHOW (v), LIST (TN)",
+   "count": 3,
+   "example": "- What: delete `ste_rewrite`, the word list `ste.json`, `review/ste.rs` and `ste_fix.rs`.",
+   "pos": "v"
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 9,
+   "example": "Remove every STE mention from code and docs.",
+   "pos": "adj"
+  },
+  "mention": {
+   "kind": "maybe_noun",
+   "alts": "GIVE (v)",
+   "count": 2,
+   "example": "Remove every STE mention from code and docs.",
+   "pos": "v"
+  },
+  "docs": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Remove every STE mention from code and docs.",
+   "pos": ""
+  },
+  "port": {
+   "kind": "non_approved",
+   "alts": "LEFT (adj)",
+   "count": 4,
+   "example": "- Why: the next spec replaces it with a full port of the antislop-eng checker.",
+   "pos": "adj"
+  },
+  "antislop-eng": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Why: the next spec replaces it with a full port of the antislop-eng checker.",
+   "pos": ""
+  },
+  "ships": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Not done: reviews get no word check until the next spec ships.",
+   "pos": ""
+  },
+  "plain-writing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The reviewer prompt keeps its plain-writing rules.",
+   "pos": ""
+  },
+  "rules": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The reviewer prompt keeps its plain-writing rules.",
+   "pos": ""
+  },
+  "compatibility": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "**P3 — drop Go compatibility.**",
+   "pos": ""
+  },
+  "encoding": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go JSON encoding, Go error text, Go Unicode tables, Go Windows path rules.",
+   "pos": ""
+  },
+  "text": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 14,
+   "example": "Go JSON encoding, Go error text, Go Unicode tables, Go Windows path rules.",
+   "pos": ""
+  },
+  "rival": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "- Why: rival is Rust-only, and the Go layers cost about 2,400 lines plus 212 call sites.",
+   "pos": ""
+  },
+  "cost": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Why: rival is Rust-only, and the Go layers cost about 2,400 lines plus 212 call sites.",
+   "pos": ""
+  },
+  "lines": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "- Why: rival is Rust-only, and the Go layers cost about 2,400 lines plus 212 call sites.",
+   "pos": ""
+  },
+  "call": {
+   "kind": "non_approved",
+   "alts": "TELL (v)",
+   "count": 8,
+   "example": "- Why: rival is Rust-only, and the Go layers cost about 2,400 lines plus 212 call sites.",
+   "pos": "v"
+  },
+  "sites": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Why: rival is Rust-only, and the Go layers cost about 2,400 lines plus 212 call sites.",
+   "pos": ""
+  },
+  "messages": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- You decide or do: accept that error messages and session-file bytes change.",
+   "pos": ""
+  },
+  "session-file": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- You decide or do: accept that error messages and session-file bytes change.",
+   "pos": ""
+  },
+  "bytes": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- You decide or do: accept that error messages and session-file bytes change.",
+   "pos": ""
+  },
+  "still": {
+   "kind": "non_approved",
+   "alts": "STAY (v), CONTINUE (v)",
+   "count": 3,
+   "example": "Old session files still load.",
+   "pos": "adv"
+  },
+  "load": {
+   "kind": "maybe_noun",
+   "alts": "INSTALL (v), LOAD (TN)",
+   "count": 4,
+   "example": "Old session files still load.",
+   "pos": "v"
+  },
+  "preserve": {
+   "kind": "maybe_noun",
+   "alts": "PRESERVATION (TN)",
+   "count": 1,
+   "example": "- Not done: the other preserved Go bugs stay.",
+   "pos": "v"
+  },
+  "own": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "They get their own spec.",
+   "pos": ""
+  },
+  "fix": {
+   "kind": "non_approved",
+   "alts": "ATTACH (v), SET (v), REPAIR (v), INSTALL (v)",
+   "count": 5,
+   "example": "One is fixed here: a duration overflow is now an error.",
+   "pos": "v"
+  },
+  "duration": {
+   "kind": "non_approved",
+   "alts": "DURING (prep)",
+   "count": 4,
+   "example": "One is fixed here: a duration overflow is now an error.",
+   "pos": "n"
+  },
+  "overflow": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "One is fixed here: a duration overflow is now an error.",
+   "pos": ""
+  },
+  "now": {
+   "kind": "non_approved",
+   "alts": "AT THIS TIME",
+   "count": 4,
+   "example": "One is fixed here: a duration overflow is now an error.",
+   "pos": "adv"
+  },
+  "rename": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 7,
+   "example": "**P4 — rename the scenario harness.**",
+   "pos": ""
+  },
+  "scenario": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "**P4 — rename the scenario harness.**",
+   "pos": ""
+  },
+  "harness": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "**P4 — rename the scenario harness.**",
+   "pos": ""
+  },
+  "expect": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "- What: rename `parity/` to `e2e/`, remove the Go-parity text, and record new expected ...",
+   "pos": ""
+  },
+  "second": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "1. **A second \"antislop\" feature blocks the language work.**",
+   "pos": ""
+  },
+  "feature": {
+   "kind": "maybe_noun",
+   "alts": "HAVE (v)",
+   "count": 1,
+   "example": "1. **A second \"antislop\" feature blocks the language work.**",
+   "pos": "v"
+  },
+  "block": {
+   "kind": "maybe_noun",
+   "alts": "CAUSE A BLOCKAGE",
+   "count": 2,
+   "example": "1. **A second \"antislop\" feature blocks the language work.**",
+   "pos": "v"
+  },
+  "sessionview": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- It also has its own session mode (`crates/rival-core/src/session/mod.rs:35`) with bra...",
+   "pos": ""
+  },
+  "dead": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "2. **The first word check is a dead end.**",
+   "pos": ""
+  },
+  "drive": {
+   "kind": "non_approved",
+   "alts": "MOVE (v), REMOVE (v), OPERATE (v)",
+   "count": 1,
+   "example": "- `ste_rewrite` (`crates/rival-core/src/config.rs:745`) drives `ste_fix::refine` (`crat...",
+   "pos": "v"
+  },
+  "instead": {
+   "kind": "non_approved",
+   "alts": "ALTERNATIVE (n)",
+   "count": 3,
+   "example": "- The user wants a full port of the antislop-eng checker instead, and no STE names in c...",
+   "pos": "adv"
+  },
+  "behavior": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "3. **Go behavior is copied on purpose.** About 2,400 lines exist only to match Go:",
+   "pos": ""
+  },
+  "copied": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "3. **Go behavior is copied on purpose.** About 2,400 lines exist only to match Go:",
+   "pos": ""
+  },
+  "purpose": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "3. **Go behavior is copied on purpose.** About 2,400 lines exist only to match Go:",
+   "pos": ""
+  },
+  "exist": {
+   "kind": "maybe_noun",
+   "alts": "BE (v)",
+   "count": 1,
+   "example": "3. **Go behavior is copied on purpose.** About 2,400 lines exist only to match Go:",
+   "pos": "v"
+  },
+  "match": {
+   "kind": "non_approved",
+   "alts": "ALIGN (v), AGREE (v)",
+   "count": 4,
+   "example": "3. **Go behavior is copied on purpose.** About 2,400 lines exist only to match Go:",
+   "pos": "v"
+  },
+  "escape": {
+   "kind": "maybe_noun",
+   "alts": "DEFLATE (v), RELEASE (v)",
+   "count": 4,
+   "example": "Session files use Go's HTML-safe JSON escapes (`crates/rival-core/src/gojson.rs:19`).",
+   "pos": "v"
+  },
+  "force": {
+   "kind": "maybe_noun",
+   "alts": "PUSH (v), FORCE (TN)",
+   "count": 1,
+   "example": "The copied Unicode tables force `licenses/Go-LICENSE` into every release archive (`.gor...",
+   "pos": "v"
+  },
+  "archive": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "The copied Unicode tables force `licenses/Go-LICENSE` into every release archive (`.gor...",
+   "pos": ""
+  },
+  "everywhere": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "4. **Go names are everywhere.**",
+   "pos": ""
+  },
+  "doc": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- 1,617 \"Go `x`\" doc references and 288 \"as Go does\" comments in `crates/`.",
+   "pos": ""
+  },
+  "reference": {
+   "kind": "non_approved",
+   "alts": "REFER (v)",
+   "count": 3,
+   "example": "- 1,617 \"Go `x`\" doc references and 288 \"as Go does\" comments in `crates/`.",
+   "pos": "n"
+  },
+  "says": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- A scenario harness that says its expected output \"is written from the Go source and G...",
+   "pos": ""
+  },
+  "outside": {
+   "kind": "non_approved",
+   "alts": "EXTERNAL (adj), OUTER (adj); OUTDOORS (adv); EXTERNAL (adj), OUTER (adj); NEAR (prep)",
+   "count": 2,
+   "example": "Remove the first word check and every STE mention outside prompts (Problem 2).",
+   "pos": "adj/adv/n/prep"
+  },
+  "except": {
+   "kind": "non_approved",
+   "alts": "To replace this word use a different construction. Be accurate.",
+   "count": 1,
+   "example": "Remove every Go-compat module and every Go-only behavior, except the preserved Go bugs ...",
+   "pos": "prep"
+  },
+  "current": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Remove every Go reference from code, tests, scripts, CI, release config and current doc...",
+   "pos": ""
+  },
+  "end-to-end": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Keep all 84 end-to-end scenarios, renamed, with expected output from the new binary (Pr...",
+   "pos": ""
+  },
+  "renamed": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Keep all 84 end-to-end scenarios, renamed, with expected output from the new binary (Pr...",
+   "pos": ""
+  },
+  "rewrite": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Rewrite history: released CHANGELOG entries for v4.x and older keep the word \"Go\" whe...",
+   "pos": ""
+  },
+  "describe": {
+   "kind": "non_approved",
+   "alts": "GIVE (v)",
+   "count": 1,
+   "example": "- Rewrite history: released CHANGELOG entries for v4.x and older keep the word \"Go\" whe...",
+   "pos": "v"
+  },
+  "shipped": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Rewrite history: released CHANGELOG entries for v4.x and older keep the word \"Go\" whe...",
+   "pos": ""
+  },
+  "user-facing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Change the user-facing duration syntax (`30m`, `1h30m`, `500ms`) of `RIVAL_RUN_TIMEOU...",
+   "pos": ""
+  },
+  "syntax": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Change the user-facing duration syntax (`30m`, `1h30m`, `500ms`) of `RIVAL_RUN_TIMEOU...",
+   "pos": ""
+  },
+  "dispatch": {
+   "kind": "non_approved",
+   "alts": "SEND (v)",
+   "count": 2,
+   "example": "Dispatch in `root.rs`. | | Prompt and effort | `ANTISLOP_CODE_PROMPT` (`config.rs:527`).",
+   "pos": "v"
+  },
+  "effort": {
+   "kind": "non_approved",
+   "alts": "FORCE (TN), TRY (v)",
+   "count": 3,
+   "example": "Dispatch in `root.rs`. | | Prompt and effort | `ANTISLOP_CODE_PROMPT` (`config.rs:527`).",
+   "pos": "n"
+  },
+  "antislop": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 9,
+   "example": "The antislop arm of the effort lookup (`config.rs:1124`). | | Session mode | `MODE_ANTI...",
+   "pos": ""
+  },
+  "lookup": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The antislop arm of the effort lookup (`config.rs:1124`). | | Session mode | `MODE_ANTI...",
+   "pos": ""
+  },
+  "kind": {
+   "kind": "non_approved",
+   "alts": "TYPE (n)",
+   "count": 2,
+   "example": "The sessionview group kind, TUI label `slop` (`tui/session_list.rs:110`) and Rival.app ...",
+   "pos": "n"
+  },
+  "label": {
+   "kind": "maybe_noun",
+   "alts": "IDENTIFY (v), LABEL (TN)",
+   "count": 3,
+   "example": "The sessionview group kind, TUI label `slop` (`tui/session_list.rs:110`) and Rival.app ...",
+   "pos": "v"
+  },
+  "so": {
+   "kind": "non_approved",
+   "alts": "UNTIL (prep), PREVENT (v)",
+   "count": 1,
+   "example": "`rival-antislop` moves from `NAMES` to `DEPRECATED` (`skills.rs:19,34`), so `rival inst...",
+   "pos": "conj"
+  },
+  "getter": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Delete the `ste_rewrite` config key and its getter and test (`config.rs:745`).",
+   "pos": ""
+  },
+  "exports": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- Delete the `ste_*` exports in `review/mod.rs`.",
+   "pos": ""
+  },
+  "line": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "- Remove the README lines 507 and 518 and CHANGELOG line 21.",
+   "pos": ""
+  },
+  "writing-rules": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Keep the reviewer prompt's writing-rules block (`review/prompt.rs:56`) and its SHA-25...",
+   "pos": ""
+  },
+  "pins": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Keep the reviewer prompt's writing-rules block (`review/prompt.rs:56`) and its SHA-25...",
+   "pos": ""
+  },
+  "rewrites": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The next spec rewrites that text.",
+   "pos": ""
+  },
+  "word-check": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Keep the fixes that came with the word check, because they are not word-check code:",
+   "pos": ""
+  },
+  "claude": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Claude takes `read_only` from its caller (`executor/claude.rs:39`).",
+   "pos": ""
+  },
+  "take": {
+   "kind": "non_approved",
+   "alts": "REMOVE (v), READ (v), GET (v), NECESSARY (adj)",
+   "count": 1,
+   "example": "- Claude takes `read_only` from its caller (`executor/claude.rs:39`).",
+   "pos": "v"
+  },
+  "stdout": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The `rival run` stdout mirror (`crates/rival/src/mirror.rs`).",
+   "pos": ""
+  },
+  "mirror": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The `rival run` stdout mirror (`crates/rival/src/mirror.rs`).",
+   "pos": ""
+  },
+  "cleanup": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Docker container cleanup.",
+   "pos": ""
+  },
+  "rule": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The rule that a codex transcript with no answer has no review (`review/parse.rs:192`).",
+   "pos": ""
+  },
+  "codex": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The rule that a codex transcript with no answer has no review (`review/parse.rs:192`).",
+   "pos": ""
+  },
+  "transcript": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The rule that a codex transcript with no answer has no review (`review/parse.rs:192`).",
+   "pos": ""
+  },
+  "answer": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The rule that a codex transcript with no answer has no review (`review/parse.rs:192`).",
+   "pos": ""
+  },
+  "go-compat": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "| Go-compat item | Replacement | Visible change | |---|---|---| | `gojson::marshal_inde...",
+   "pos": ""
+  },
+  "raw": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "| Go-compat item | Replacement | Visible change | |---|---|---| | `gojson::marshal_inde...",
+   "pos": ""
+  },
+  "characters": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "| Go-compat item | Replacement | Visible change | |---|---|---| | `gojson::marshal_inde...",
+   "pos": ""
+  },
+  "decode": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "They are not `\\u003c`-style escapes. | | `gojson` decode helpers (`decode_object`, `mat...",
+   "pos": ""
+  },
+  "helpers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "They are not `\\u003c`-style escapes. | | `gojson` decode helpers (`decode_object`, `mat...",
+   "pos": ""
+  },
+  "serde": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "They are not `\\u003c`-style escapes. | | `gojson` decode helpers (`decode_object`, `mat...",
+   "pos": ""
+  },
+  "aliases": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "They are not `\\u003c`-style escapes. | | `gojson` decode helpers (`decode_object`, `mat...",
+   "pos": ""
+  },
+  "exactly": {
+   "kind": "non_approved",
+   "alts": "ACCURATELY (adv), FULLY (adv), CORRECT (adj)",
+   "count": 1,
+   "example": "They are not `\\u003c`-style escapes. | | `gojson` decode helpers (`decode_object`, `mat...",
+   "pos": "adv"
+  },
+  "case-insensitive": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go's case-insensitive key match is removed. | | Go zero time `0001-01-01T00:00:00Z` (`g...",
+   "pos": ""
+  },
+  "unset": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "omitted": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 6,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "zero-time": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "chrono": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "seconds": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "print": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Unset times are omitted on write. | The reader still maps the zero-time string to \"unse...",
+   "pos": ""
+  },
+  "readers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Readers accept both forms. | | `gostd::quote` (41 call sites) | Rust `{:?}` | Output ch...",
+   "pos": ""
+  },
+  "both": {
+   "kind": "non_approved",
+   "alts": "THE TWO (TN)",
+   "count": 3,
+   "example": "Readers accept both forms. | | `gostd::quote` (41 call sites) | Rust `{:?}` | Output ch...",
+   "pos": "adj"
+  },
+  "form": {
+   "kind": "non_approved",
+   "alts": "SHAPE (n); BE (v)",
+   "count": 5,
+   "example": "Readers accept both forms. | | `gostd::quote` (41 call sites) | Rust `{:?}` | Output ch...",
+   "pos": "n/v"
+  },
+  "non-ascii": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Non-ASCII and control characters get Rust escapes. | | `gostd::os_error_text` (37 call ...",
+   "pos": ""
+  },
+  "true": {
+   "kind": "non_approved",
+   "alts": "CORRECT (adj), AGREE (v)",
+   "count": 1,
+   "example": "This is true on every OS. | | `gostd::to_lower`, `equal_fold` | `str::to_lowercase`, `e...",
+   "pos": "adj"
+  },
+  "case": {
+   "kind": "non_approved",
+   "alts": "CONDITION (n); IF (conj)",
+   "count": 7,
+   "example": "This is true on every OS. | | `gostd::to_lower`, `equal_fold` | `str::to_lowercase`, `e...",
+   "pos": "n/conj"
+  },
+  "grammar": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "This is true on every OS. | | `gostd::to_lower`, `equal_fold` | `str::to_lowercase`, `e...",
+   "pos": ""
+  },
+  "invalid": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "One fix: an overflow is an invalid duration.",
+   "pos": ""
+  },
+  "today": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Today two maximum parts wrap to 0, and `RIVAL_RUN_TIMEOUT=0` turns the run timeout off....",
+   "pos": ""
+  },
+  "wrap": {
+   "kind": "maybe_noun",
+   "alts": "PUT (v), WIND (v)",
+   "count": 2,
+   "example": "Today two maximum parts wrap to 0, and `RIVAL_RUN_TIMEOUT=0` turns the run timeout off....",
+   "pos": "v"
+  },
+  "std": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 5,
+   "example": "Today two maximum parts wrap to 0, and `RIVAL_RUN_TIMEOUT=0` turns the run timeout off....",
+   "pos": ""
+  },
+  "lexical": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Some of them print differently. | | `winpath.rs` (21 call sites) | `std::path::Path` on...",
+   "pos": ""
+  },
+  "windows": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Windows CI is the gate. | | `licenses/Go-LICENSE` | deleted, with its entries in `.gore...",
+   "pos": ""
+  },
+  "gate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 9,
+   "example": "Windows CI is the gate. | | `licenses/Go-LICENSE` | deleted, with its entries in `.gore...",
+   "pos": ""
+  },
+  "ship": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Windows CI is the gate. | | `licenses/Go-LICENSE` | deleted, with its entries in `.gore...",
+   "pos": ""
+  },
+  "decodes": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Rival.app decodes both forms.",
+   "pos": ""
+  },
+  "already": {
+   "kind": "non_approved",
+   "alts": "IN PROGRESS (adv) — NO OTHER Frequently an alternative for this word is not necessary.",
+   "count": 1,
+   "example": "It already maps the zero time to \"unset\" (`app/Sources/RivalKit/Session.swift:25`).",
+   "pos": "adv"
+  },
+  "need": {
+   "kind": "non_approved",
+   "alts": "NECESSARY (adj)",
+   "count": 1,
+   "example": "It needs a test for a file with the time keys omitted.",
+   "pos": "v"
+  },
+  "explain": {
+   "kind": "maybe_noun",
+   "alts": "TELL (v)",
+   "count": 2,
+   "example": "Where a comment explains a behavior, keep the reason in plain words.",
+   "pos": "v"
+  },
+  "reason": {
+   "kind": "non_approved",
+   "alts": "CAUSE (n), BECAUSE OF (prep)",
+   "count": 1,
+   "example": "Where a comment explains a behavior, keep the reason in plain words.",
+   "pos": "n"
+  },
+  "words": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Where a comment explains a behavior, keep the reason in plain words.",
+   "pos": ""
+  },
+  "survives": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "If a helper survives, give it a name for what it does, for example `duration`.",
+   "pos": ""
+  },
+  "update": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Update the CI step names in `.github/workflows/ci.yml` and the README.",
+   "pos": ""
+  },
+  "hand": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Review each change of expected output by hand in the P3 commit.",
+   "pos": ""
+  },
+  "trace": {
+   "kind": "non_approved",
+   "alts": "SIGN (n); FIND (v)",
+   "count": 1,
+   "example": "A change must trace to a row of the replacement table.",
+   "pos": "n/v"
+  },
+  "id": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "| File | Change | |---|---| | `crates/rival/src/command_antislop.rs`, `command_antislop...",
+   "pos": ""
+  },
+  "store": {
+   "kind": "non_approved",
+   "alts": "KEEP (v), CONTAIN (v), STORAGE (TN)",
+   "count": 1,
+   "example": "Store times as `Option`.",
+   "pos": "v"
+  },
+  "decoding": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Use serde decoding. | | `crates/rival-core/src/review/ste.rs`, `ste/tests.rs`, `crates/...",
+   "pos": ""
+  },
+  "callers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Callers use std, serde, chrono and the new `duration` module. | | `crates/rival-core/sr...",
+   "pos": ""
+  },
+  "parse": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Parse and format the duration syntax, moved from `gostd.rs`. | | 55 files that call `go...",
+   "pos": ""
+  },
+  "format": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "Parse and format the duration syntax, moved from `gostd.rs`. | | 55 files that call `go...",
+   "pos": ""
+  },
+  "golden": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 4,
+   "example": "Add `rival-antislop` to `DEPRECATED` in `skills.rs`. | | `crates/rival-core/tests/contr...",
+   "pos": ""
+  },
+  "read-compatibility": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Keep `testdata/sessions/*` (old format) as read-compatibility input. | | `app/Sources/R...",
+   "pos": ""
+  },
+  "license": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 3,
+   "example": "Add a decode test for omitted time keys and raw `<`. | | `licenses/Go-LICENSE`, `.gorel...",
+   "pos": ""
+  },
+  "save": {
+   "kind": "non_approved",
+   "alts": "KEEP (v)",
+   "count": 3,
+   "example": "- `session`: save, load and save again.",
+   "pos": "v"
+  },
+  "invalid-duration": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Change the wrap regression test: an overflow now gives an invalid-duration error.",
+   "pos": ""
+  },
+  "place": {
+   "kind": "non_approved",
+   "alts": "POSITION (n), AREA (n); PUT (v)",
+   "count": 2,
+   "example": "- Error text: each place that used `os_error_text` has one test for the new `io::Error`...",
+   "pos": "n/v"
+  },
+  "used": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Error text: each place that used `os_error_text` has one test for the new `io::Error`...",
+   "pos": ""
+  },
+  "integration": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**Integration**",
+   "pos": ""
+  },
+  "over": {
+   "kind": "non_approved",
+   "alts": "ABOVE (prep), ALONG (prep), ON (prep) — MORE THAN For movement above land or water use a technical noun.",
+   "count": 1,
+   "example": "- On Dell, run `rival tui` over the real `~/.rival/sessions` (old files) without errors.",
+   "pos": "prep"
+  },
+  "real": {
+   "kind": "non_approved",
+   "alts": "AGREE (v)",
+   "count": 3,
+   "example": "- On Dell, run `rival tui` over the real `~/.rival/sessions` (old files) without errors.",
+   "pos": "adj"
+  },
+  "gates": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**Gates on every phase**",
+   "pos": ""
+  },
+  "phase": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "**Gates on every phase**",
+   "pos": ""
+  },
+  "release-script": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- e2e scenarios, release-script tests.",
+   "pos": ""
+  },
+  "three-os": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- Three-OS CI.",
+   "pos": ""
+  },
+  "choice": {
+   "kind": "non_approved",
+   "alts": "SELECTION (n), ALTERNATIVE (adj)",
+   "count": 1,
+   "example": "| Failure or choice | Behavior | |---|---| | Old session file with Go escapes or zero t...",
+   "pos": "n"
+  },
+  "letter": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It shows as a plain finished run. | | Old file with a key in a different letter case (G...",
+   "pos": ""
+  },
+  "default": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Its field gets the default.",
+   "pos": ""
+  },
+  "never": {
+   "kind": "non_approved",
+   "alts": "DO NOT",
+   "count": 2,
+   "example": "Accepted: rival never wrote such keys. | | Old `rival-antislop` skill installed on a ma...",
+   "pos": "adv"
+  },
+  "machine": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Accepted: rival never wrote such keys. | | Old `rival-antislop` skill installed on a ma...",
+   "pos": ""
+  },
+  "parses": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It is in `DEPRECATED`. | | A user script parses an error message | The text changes.",
+   "pos": ""
+  },
+  "message": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It is in `DEPRECATED`. | | A user script parses an error message | The text changes.",
+   "pos": ""
+  },
+  "hidden": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A regression is fixed in P3, not hidden. | | Rival.app is older than the CLI and reads ...",
+   "pos": ""
+  },
+  "ordinary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "It decodes omitted keys as nil, and raw `<` is ordinary JSON.",
+   "pos": ""
+  },
+  "cover": {
+   "kind": "maybe_noun",
+   "alts": "INCLUDE (v), HAVE (v), COVER (TN)",
+   "count": 1,
+   "example": "A test covers this. | | An expected-output change in e2e that the replacement table doe...",
+   "pos": "v"
+  },
+  "expected-output": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A test covers this. | | An expected-output change in e2e that the replacement table doe...",
+   "pos": ""
+  },
+  "treat": {
+   "kind": "non_approved",
+   "alts": "APPLY (v), TOUCH (v)",
+   "count": 1,
+   "example": "Do not treat it as a new baseline. |",
+   "pos": "v"
+  },
+  "baseline": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Do not treat it as a new baseline. |",
+   "pos": ""
+  },
+  "review-language": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The review-language pass (antislop-eng port, repair call, prompt rewrite).",
+   "pos": ""
+  },
+  "rival-antislop": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **P1** — remove rival-antislop.",
+   "pos": ""
+  },
+  "formats": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **P3a** — JSON and file formats: serde for session, ticket and cache files, old-file ...",
+   "pos": ""
+  },
+  "old-file": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **P3a** — JSON and file formats: serde for session, ticket and cache files, old-file ...",
+   "pos": ""
+  },
+  "quote": {
+   "kind": "maybe_noun",
+   "alts": "GIVE (v)",
+   "count": 2,
+   "example": "- **P3b** — errors, quotes and lower case: std error text, `{:?}` quotes, std case fold...",
+   "pos": "v"
+  },
+  "particular": {
+   "kind": "non_approved",
+   "alts": "ONLY APPLICABLE VERY (adv)",
+   "count": 1,
+   "example": "Gate: the checks above, Windows CI in particular.",
+   "pos": "adj"
+  },
+  "unpublished": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Gate: the checks above and one unpublished release snapshot.",
+   "pos": ""
+  },
+  "grep": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- **P4** — rename `parity/` to `e2e/`, remove Go names and comments, add the CI grep gate.",
+   "pos": ""
+  },
+  "deliver": {
+   "kind": "non_approved",
+   "alts": "SUPPLY (v)",
+   "count": 1,
+   "example": "Delivered on branch `feat/rust-only` (2026-10-08).",
+   "pos": "v"
+  },
+  "review-args": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P1 also removed the review-args parser (`parser/review.rs`).",
+   "pos": ""
+  },
+  "parser": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P1 also removed the review-args parser (`parser/review.rs`).",
+   "pos": ""
+  },
+  "duplicate": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A duplicate key, a top-level `null` and a raw invalid UTF-8 byte in a file are now errors.",
+   "pos": ""
+  },
+  "top-level": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A duplicate key, a top-level `null` and a raw invalid UTF-8 byte in a file are now errors.",
+   "pos": ""
+  },
+  "byte": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A duplicate key, a top-level `null` and a raw invalid UTF-8 byte in a file are now errors.",
+   "pos": ""
+  },
+  "strict": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P3b also made `sort_group_members` a strict total order, because the std sort can pan...",
+   "pos": ""
+  },
+  "order": {
+   "kind": "non_approved",
+   "alts": "SEQUENCE (n); TELL (v), ORDER (TN)",
+   "count": 1,
+   "example": "- P3b also made `sort_group_members` a strict total order, because the std sort can pan...",
+   "pos": "n/v"
+  },
+  "sort": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P3b also made `sort_group_members` a strict total order, because the std sort can pan...",
+   "pos": ""
+  },
+  "panic": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P3b also made `sort_group_members` a strict total order, because the std sort can pan...",
+   "pos": ""
+  },
+  "prefix": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "A cleaned UNC prefix is written with backslashes, and a UNC share cleans to its prefix ...",
+   "pos": ""
+  },
+  "backslashes": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A cleaned UNC prefix is written with backslashes, and a UNC share cleans to its prefix ...",
+   "pos": ""
+  },
+  "share": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A cleaned UNC prefix is written with backslashes, and a UNC share cleans to its prefix ...",
+   "pos": ""
+  },
+  "root": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "A cleaned UNC prefix is written with backslashes, and a UNC share cleans to its prefix ...",
+   "pos": ""
+  },
+  "identifiers": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- P4 renamed `gocsv` to `csvflag` and the Swift identifiers `isGoZero`, `goZero`, `form...",
+   "pos": ""
+  },
+  "fixture": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e fixture git identity stays \"Rival Parity\", because scenarios pin commit hashes ...",
+   "pos": ""
+  },
+  "identity": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e fixture git identity stays \"Rival Parity\", because scenarios pin commit hashes ...",
+   "pos": ""
+  },
+  "pin": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e fixture git identity stays \"Rival Parity\", because scenarios pin commit hashes ...",
+   "pos": ""
+  },
+  "hashes": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The e2e fixture git identity stays \"Rival Parity\", because scenarios pin commit hashes ...",
+   "pos": ""
+  },
+  "depend": {
+   "kind": "non_approved",
+   "alts": "IF (conj)",
+   "count": 1,
+   "example": "The e2e fixture git identity stays \"Rival Parity\", because scenarios pin commit hashes ...",
+   "pos": "v"
+  },
+  "defect": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "- The Codex review of the branch found one defect: a local `target` symlink was committed.",
+   "pos": ""
+  },
+  "symlink": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "- The Codex review of the branch found one defect: a local `target` symlink was committed.",
+   "pos": ""
+  },
+  "untracked": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The symlink is untracked, and `.gitignore` now has `/target`.",
+   "pos": ""
+  },
+  "go-derived": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go-derived algorithms rewritten in Rust (duration grammar, environment deduplication) s...",
+   "pos": ""
+  },
+  "algorithms": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go-derived algorithms rewritten in Rust (duration grammar, environment deduplication) s...",
+   "pos": ""
+  },
+  "rewritten": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Go-derived algorithms rewritten in Rust (duration grammar, environment deduplication) s...",
+   "pos": ""
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "/home/kass/dev/rival",
+   "kind": "path",
+   "count": 1
+  },
+  {
+   "term": "STE",
+   "kind": "acronym",
+   "count": 5
+  },
+  {
+   "term": "JSON",
+   "kind": "acronym",
+   "count": 4
+  },
+  {
+   "term": "TUI",
+   "kind": "acronym",
+   "count": 3
+  },
+  {
+   "term": "Rival.app",
+   "kind": "dotted",
+   "count": 5
+  },
+  {
+   "term": "KB",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "CI",
+   "kind": "acronym",
+   "count": 8
+  },
+  {
+   "term": "README",
+   "kind": "acronym",
+   "count": 5
+  },
+  {
+   "term": "RFC",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "OS",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "P3",
+   "kind": "acronym",
+   "count": 2
+  },
+  {
+   "term": "macOS",
+   "kind": "mixed_case",
+   "count": 1
+  },
+  {
+   "term": "CLI",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "P1",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "UNC",
+   "kind": "acronym",
+   "count": 2
+  }
+ ]
+}
