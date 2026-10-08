@@ -1,0 +1,258 @@
+{
+ "findings": [
+  {
+   "rule": "3.4",
+   "kind": "tense",
+   "message": "\"been\": not an approved form of BE (only be, is, are, was, were). Rewrite without it.",
+   "where": "para 2, sentence 2"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"checking\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 2, sentence 2"
+  },
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...\"",
+   "where": "para 2, sentence 4"
+  },
+  {
+   "rule": "4.2",
+   "kind": "contraction",
+   "message": "Contraction \"isn't\": write the words in full.",
+   "where": "para 2, sentence 4"
+  },
+  {
+   "rule": "GR-7",
+   "kind": "pronoun",
+   "message": "Gender-specific pronoun \"He\": the rules do not permit he/she. Use \"the operator\", \"you\", \"they\".",
+   "where": "para 2, sentence 4"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"whole command fails instead\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 2, sentence 4"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"falling\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 2, sentence 4"
+  },
+  {
+   "rule": "GR-6",
+   "kind": "latin",
+   "message": "Latin abbreviation \"etc.\": use \"for example\", \"that is\", or rewrite.",
+   "where": "para 2, sentence 6"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"installing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 3, sentence 7"
+  },
+  {
+   "rule": "4.2",
+   "kind": "contraction",
+   "message": "Contraction \"We'd\": write the words in full.",
+   "where": "para 3, sentence 8"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"doing\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 3, sentence 8"
+  }
+ ],
+ "words": {
+  "updater": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": ""
+  },
+  "latest": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": ""
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": "adj"
+  },
+  "leverages": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": ""
+  },
+  "unnecessarily": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": ""
+  },
+  "might": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The updater has been checking the latest release on every start, which leverages the Gi...",
+   "pos": "",
+   "hint": "POSSIBLY, or \"IT IS POSSIBLE THAT ...\". Keep it a possibility."
+  },
+  "he": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": ""
+  },
+  "assume": {
+   "kind": "maybe_noun",
+   "alts": "THINK (v)",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": "v"
+  },
+  "valid": {
+   "kind": "non_approved",
+   "alts": "CORRECT (adj), APPLICABLE (adj) — This word becomes part of a technical noun when it refers to an official document.",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": "adj"
+  },
+  "whole": {
+   "kind": "non_approved",
+   "alts": "FULL (adj), ALL (adj)",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": "adj"
+  },
+  "fail": {
+   "kind": "maybe_noun",
+   "alts": "IF … NOT, FAILURE (TN), UNSATISFACTORY (adj)",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": "v"
+  },
+  "instead": {
+   "kind": "non_approved",
+   "alts": "ALTERNATIVE (n)",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": "adv"
+  },
+  "gracefully": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "He who reads the cache file assumes it is always valid JSON; if it isn't, the whole com...",
+   "pos": ""
+  },
+  "download": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The download is not verified against `checksums.txt`, etc.",
+   "pos": ""
+  },
+  "verified": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The download is not verified against `checksums.txt`, etc.",
+   "pos": ""
+  },
+  "etc": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The download is not verified against `checksums.txt`, etc.",
+   "pos": ""
+  },
+  "overall": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": ""
+  },
+  "wins": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": ""
+  },
+  "hours": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": ""
+  },
+  "treat": {
+   "kind": "maybe_noun",
+   "alts": "APPLY (v), TOUCH (v)",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": "v"
+  },
+  "verify": {
+   "kind": "non_approved",
+   "alts": "MAKE SURE (v)",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": "v"
+  },
+  "checksum": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": ""
+  },
+  "anything": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Overall, these are easy wins: cache the check for 24 hours, treat a broken cache as mis...",
+   "pos": ""
+  },
+  "doing": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "We'd recommend doing all three in one change.",
+   "pos": ""
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "GitHub",
+   "kind": "mixed_case",
+   "count": 1
+  },
+  {
+   "term": "API",
+   "kind": "acronym",
+   "count": 1
+  },
+  {
+   "term": "JSON",
+   "kind": "acronym",
+   "count": 1
+  }
+ ]
+}

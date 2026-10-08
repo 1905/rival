@@ -1,0 +1,232 @@
+# Starter glossary: software English.
+# Technical nouns (Rule 1.5) and technical verbs (Rule 1.12) for: --glossary glossary/software.txt
+# The category number after each block name names its technical-noun category.
+# One term per line. Plurals are accepted automatically. Other verb forms are listed explicitly.
+#
+# A glossary term switches off every check on that word. For a word with a non-approved
+# verb sense (log, branch, build, job, file, key, service), the checker cannot see a verb use.
+# Write the approved verb yourself: log (v) -> RECORD, branch (v) -> DIVIDE, build (v) -> ASSEMBLE.
+#
+# Not here because the dictionary already approves them: test (n), deploy (v), error, change,
+# code (n), function (n), method, type, interface, value, unit, row, container, incident, approval.
+# Not here because the general word is non-approved: request, option, fix, process, approve.
+# Use the multi-word terms below (merge request, HTTP request) or an approved word.
+
+# version control: documents and records (category 15, revisions)
+repository
+commit
+diff
+branch
+merge request
+pull request
+MR
+PR
+changelog
+version
+release
+hotfix
+code review
+comment
+ticket
+issue
+
+# version control: computer processes (technical verb category 2)
+merge
+merges
+merged
+commits
+committed
+rebase
+rebases
+rebased
+revert
+reverts
+reverted
+
+# CI/CD and operations (category 20, operations; category 6, system parts)
+CI
+CD
+pipeline
+job
+build
+deployment
+staging
+production
+rollback
+environment
+environment variable
+secret
+token
+cluster
+pod
+namespace
+
+# test (category 15, test procedure)
+test suite
+unit test
+integration test
+test case
+regression
+linter
+compiler
+
+# software components (category 19, computer science)
+API
+endpoint
+HTTP
+HTTP request
+status code
+response
+payload
+header
+server
+client
+service
+worker
+queue
+cache
+database
+migration
+schema
+index
+query
+transaction
+table
+column
+handler
+middleware
+runtime
+config
+configuration
+feature flag
+flag
+command
+script
+binary
+library
+module
+package
+dependency
+file
+directory
+path
+log
+log line
+stack trace
+exception
+bug
+crash
+crashes
+crashed
+memory
+network
+metric
+dashboard
+
+# programming terms (category 19, computer science)
+parameter
+argument
+field
+struct
+pointer
+null
+nil
+string
+integer
+boolean
+array
+map
+key
+goroutine
+thread
+mutex
+deadlock
+race condition
+
+# engineering terms (category 7)
+timeout
+latency
+retry
+retries
+retried
+status
+
+# roles (category 11)
+user
+author
+reviewer
+maintainer
+
+# code review (category 19, computer science; category 15, documents)
+# Terms that code reviews use and that the dictionary does not approve as nouns.
+# route and state also have a non-approved verb sense: route (v) -> SEND, state (v) -> TELL.
+route
+state
+failure
+cancellation
+coverage
+offset
+image
+page
+ownership
+redirect
+owner
+target
+history
+authorization
+snapshot
+provider
+parent
+fallback
+contract
+audit
+scope
+policy
+peer
+checkout
+sandbox
+session
+cursor
+buffer
+timestamp
+webhook
+
+# languages, runtimes, tools and platforms (category 1, product names; category 19, computer science)
+# Not here: go. GO (v) is an approved verb; write "Golang" or "the Go language" for the language.
+ci/cd
+golang
+rust
+python
+javascript
+typescript
+java
+kotlin
+swift
+bash
+shell
+zsh
+node
+nodejs
+npm
+pip
+cargo
+makefile
+docker
+kubernetes
+helm
+terraform
+git
+github
+gitlab
+goreleaser
+linux
+macos
+ubuntu
+json
+yaml
+toml
+sql
+url
+https
+cli
+sdk

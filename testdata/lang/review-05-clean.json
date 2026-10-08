@@ -1,0 +1,62 @@
+{
+ "findings": [],
+ "words": {
+  "disk": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "If the disk is full, the ticket file can be empty after a crash.",
+   "pos": ""
+  },
+  "scenario": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: the disk is full, `fsync` fails, the process stops, and the next run ...",
+   "pos": ""
+  },
+  "fail": {
+   "kind": "maybe_noun",
+   "alts": "IF … NOT, FAILURE (TN), UNSATISFACTORY (adj)",
+   "count": 1,
+   "example": "Failure scenario: the disk is full, `fsync` fails, the process stops, and the next run ...",
+   "pos": "v"
+  },
+  "process": {
+   "kind": "non_approved",
+   "alts": "PROCEDURE (n) — This word is a technical noun when it means a sequence of changes that occur and cause a result.; DO (v), PROCEDURE (n) — THE …",
+   "count": 1,
+   "example": "Failure scenario: the disk is full, `fsync` fails, the process stops, and the next run ...",
+   "pos": "n/v"
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 1,
+   "example": "Failure scenario: the disk is full, `fsync` fails, the process stops, and the next run ...",
+   "pos": "v"
+  },
+  "suggestion": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Suggestion:",
+   "pos": ""
+  },
+  "return": {
+   "kind": "non_approved",
+   "alts": "GO (v); GO (v)",
+   "count": 1,
+   "example": "Return the `fsync` error to the caller.",
+   "pos": "n/v"
+  },
+  "call": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Return the `fsync` error to the caller.",
+   "pos": ""
+  }
+ },
+ "auto_glossary": []
+}

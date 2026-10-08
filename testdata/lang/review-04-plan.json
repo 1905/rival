@@ -1,0 +1,278 @@
+{
+ "findings": [
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "30 words (descriptive, max 25): \"The plan is generally solid and well-structured, but it seamlessly glosses over the mig...\"",
+   "where": "para 2, sentence 2"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"existing\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 2, sentence 2"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 3, sentence 4"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"are handled\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 3, sentence 4"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 4 words: \"two versions run side\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 3, sentence 4"
+  },
+  {
+   "rule": "5.1",
+   "kind": "length",
+   "message": "21 words (procedural, max 20): \"Add a migration section that defines the order of operations, i.e. stop new enqueues, d...\"",
+   "where": "para 4, sentence 6"
+  },
+  {
+   "rule": "GR-6",
+   "kind": "latin",
+   "message": "Latin abbreviation \"i.e.\": use \"for example\", \"that is\", or rewrite.",
+   "where": "para 4, sentence 6"
+  },
+  {
+   "rule": "3.5?",
+   "kind": "ing",
+   "message": "\"-ing\" word \"running\": permitted only if it is a technical noun or a modifier in one (\"wiring diagram\"). Confirm, else rewrite.",
+   "where": "para 4, sentence 6"
+  }
+ ],
+ "words": {
+  "summary": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Summary:",
+   "pos": ""
+  },
+  "plan": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "generally": {
+   "kind": "non_approved",
+   "alts": "USUALLY (adv)",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": "adv"
+  },
+  "well-structured": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "seamlessly": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "gloss": {
+   "kind": "non_approved",
+   "alts": "SHINY (adj)",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": "n"
+  },
+  "over": {
+   "kind": "non_approved",
+   "alts": "ABOVE (prep), ALONG (prep), ON (prep) — MORE THAN For movement above land or water use a technical noun.",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": "prep"
+  },
+  "exist": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "showstopper": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "mid-run": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "upgrade": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan is generally solid and well-structured, but it seamlessly glosses over the mig...",
+   "pos": ""
+  },
+  "proposes": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan proposes to replace the file-per-ticket layout with a single SQLite database.",
+   "pos": ""
+  },
+  "file-per-ticket": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan proposes to replace the file-per-ticket layout with a single SQLite database.",
+   "pos": ""
+  },
+  "layout": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan proposes to replace the file-per-ticket layout with a single SQLite database.",
+   "pos": ""
+  },
+  "single": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The plan proposes to replace the file-per-ticket layout with a single SQLite database.",
+   "pos": ""
+  },
+  "however": {
+   "kind": "non_approved",
+   "alts": "BUT (conj)",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "adv"
+  },
+  "specify": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": ""
+  },
+  "running": {
+   "kind": "non_approved",
+   "alts": "FLUSH (v)",
+   "count": 2,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "adj"
+  },
+  "old": {
+   "kind": "non_approved",
+   "alts": "REMAINING (adj), USED (adj), EXPIRED (adj)",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "adj"
+  },
+  "handle": {
+   "kind": "non_approved",
+   "alts": "MOVE (v), TOUCH (v), USE (v), CAREFUL (adj) — This word can be part of a safety sign (rule 8.6).",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "v"
+  },
+  "nor": {
+   "kind": "non_approved",
+   "alts": "NOT (adv)",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "conj"
+  },
+  "what": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": ""
+  },
+  "happen": {
+   "kind": "non_approved",
+   "alts": "OCCUR (v)",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "v"
+  },
+  "run": {
+   "kind": "maybe_noun",
+   "alts": "OPERATE (v)",
+   "count": 1,
+   "example": "However, it does not specify how running tickets written by the old version are handled...",
+   "pos": "v"
+  },
+  "recommendation": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Recommendation:",
+   "pos": ""
+  },
+  "section": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Add a migration section that defines the order of operations, i.e. stop new enqueues, d...",
+   "pos": ""
+  },
+  "define": {
+   "kind": "non_approved",
+   "alts": "CALCULATE (v), GIVE (v), SPECIFIED (adj)",
+   "count": 1,
+   "example": "Add a migration section that defines the order of operations, i.e. stop new enqueues, d...",
+   "pos": "v"
+  },
+  "order": {
+   "kind": "non_approved",
+   "alts": "SEQUENCE (n); TELL (v), ORDER (TN)",
+   "count": 1,
+   "example": "Add a migration section that defines the order of operations, i.e. stop new enqueues, d...",
+   "pos": "n/v"
+  },
+  "enqueues": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Add a migration section that defines the order of operations, i.e. stop new enqueues, d...",
+   "pos": ""
+  },
+  "switch": {
+   "kind": "non_approved",
+   "alts": "SET (v)",
+   "count": 1,
+   "example": "Add a migration section that defines the order of operations, i.e. stop new enqueues, d...",
+   "pos": "v"
+  },
+  "downgrade": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Make sure that a downgrade path exists.",
+   "pos": ""
+  }
+ },
+ "auto_glossary": [
+  {
+   "term": "SQLite",
+   "kind": "mixed_case",
+   "count": 1
+  }
+ ]
+}

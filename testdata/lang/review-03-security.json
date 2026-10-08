@@ -1,0 +1,210 @@
+{
+ "findings": [
+  {
+   "rule": "8.1",
+   "kind": "punctuation",
+   "message": "Semicolon: \"The code in `extract.rs:118` joins the entry name with the destination without validati...\"",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "3.5",
+   "kind": "ing",
+   "message": "\"-ing\" verb form \"validating\": not permitted. Rewrite with a simple tense (\"when you do\", not \"when doing\").",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 6 words: \"therefore any relative component like escapes\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 3, sentence 2"
+  },
+  {
+   "rule": "6.3",
+   "kind": "length",
+   "message": "26 words (descriptive, max 25): \"Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...\"",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "3.6",
+   "kind": "passive",
+   "message": "Passive voice \"is downloaded by\": make the agent the subject.",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "3.6?",
+   "kind": "passive",
+   "message": "\"is extracted\": passive voice, or a past participle used as an adjective (permitted, 3.3)? Confirm. In procedures, use the imperative.",
+   "where": "para 4, sentence 3"
+  },
+  {
+   "rule": "2.1",
+   "kind": "noun-cluster",
+   "message": "Possible multi-word noun of 5 words: \"every entry whose normalized path\". Max 3 — use prepositions or hyphens (2.2).",
+   "where": "para 5, sentence 5"
+  }
+ ],
+ "words": {
+  "attacker": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "An attacker who controls the archive can include an entry named `../../etc/cron.d/x`, a...",
+   "pos": ""
+  },
+  "archive": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "An attacker who controls the archive can include an entry named `../../etc/cron.d/x`, a...",
+   "pos": ""
+  },
+  "extractor": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "An attacker who controls the archive can include an entry named `../../etc/cron.d/x`, a...",
+   "pos": ""
+  },
+  "happily": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "An attacker who controls the archive can include an entry named `../../etc/cron.d/x`, a...",
+   "pos": ""
+  },
+  "outside": {
+   "kind": "non_approved",
+   "alts": "EXTERNAL (adj), OUTER (adj); OUTDOORS (adv); EXTERNAL (adj), OUTER (adj); NEAR (prep)",
+   "count": 1,
+   "example": "An attacker who controls the archive can include an entry named `../../etc/cron.d/x`, a...",
+   "pos": "adj/adv/n/prep"
+  },
+  "join": {
+   "kind": "non_approved",
+   "alts": "BOND (v), ATTACH (v), CONNECT (v)",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": "v"
+  },
+  "destination": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 2,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": ""
+  },
+  "validating": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": ""
+  },
+  "therefore": {
+   "kind": "non_approved",
+   "alts": "THUS (adv) — AS A RESULT",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": "adv"
+  },
+  "any": {
+   "kind": "non_approved",
+   "alts": "Frequently an alternative for this word is not necessary.; ONE (TN)",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": "adj/pron"
+  },
+  "relative": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": ""
+  },
+  "like": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": ""
+  },
+  "escape": {
+   "kind": "maybe_noun",
+   "alts": "DEFLATE (v), RELEASE (v)",
+   "count": 1,
+   "example": "The code in `extract.rs:118` joins the entry name with the destination without validati...",
+   "pos": "v"
+  },
+  "scenario": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": ""
+  },
+  "malicious": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": ""
+  },
+  "downloaded": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": ""
+  },
+  "extract": {
+   "kind": "non_approved",
+   "alts": "REMOVE (v)",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": "v"
+  },
+  "overwritten": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": ""
+  },
+  "home": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Failure scenario: a malicious release archive is downloaded by `rival update`, an entry...",
+   "pos": ""
+  },
+  "suggestion": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Suggestion:",
+   "pos": ""
+  },
+  "every": {
+   "kind": "non_approved",
+   "alts": "ALL (adj), EACH (adj), INTERVAL (n)",
+   "count": 1,
+   "example": "Reject every entry whose normalized path does not start with the destination directory.",
+   "pos": "adj"
+  },
+  "whose": {
+   "kind": "non_approved",
+   "alts": "Use a different construction.",
+   "count": 1,
+   "example": "Reject every entry whose normalized path does not start with the destination directory.",
+   "pos": "pron"
+  },
+  "normalized": {
+   "kind": "unknown",
+   "alts": "",
+   "count": 1,
+   "example": "Reject every entry whose normalized path does not start with the destination directory.",
+   "pos": ""
+  }
+ },
+ "auto_glossary": []
+}
