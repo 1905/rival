@@ -1,5 +1,5 @@
-//! Go: `cmd/review_output_test.go` (run surface) plus `runModelRun` order
-//! and failure cases.
+//! Review output of the run surface, plus model run order and failure
+//! cases.
 
 use super::*;
 
@@ -34,8 +34,6 @@ fn review_opts(workdir: &Path, scope: &str) -> RunOptions {
         ..RunOptions::default()
     }
 }
-
-// ---- Go TestRunMRReviewRunsInSnapshot ----
 
 #[test]
 fn run_mr_review_runs_in_snapshot() {
@@ -81,8 +79,6 @@ fn run_mr_review_runs_in_snapshot() {
     );
     assert_eq!(mr.calls.get(), 1);
 }
-
-// ---- Go TestRunReviewEmptyScopeAutoDetects ----
 
 /// `rival run <model> --review` with no scope auto-detects like command
 /// mode; outside a git repo that falls back to the whole project.
@@ -253,7 +249,7 @@ fn nonzero_exit_records_the_code_and_returns_it() {
     assert_eq!(sess.error_msg, "codex exited with code 7");
 }
 
-/// Go prints the no-review reason on stderr and returns it, so the root
+/// The run prints the no-review reason on stderr and returns it, so the root
 /// prints it a second time.
 #[test]
 fn quota_review_prints_reason_on_stderr() {

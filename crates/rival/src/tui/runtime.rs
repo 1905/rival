@@ -1,5 +1,4 @@
-//! The terminal runtime: `rival tui`. Go: `cmd/tui.go` plus bubbletea's
-//! `Program.Run`.
+//! The terminal runtime: `rival tui`.
 //!
 //! [`run`] owns everything the [`Model`] must not touch: the terminal, the
 //! signals, the session watcher, the timers, the job workers and the opened
@@ -51,8 +50,8 @@ const INPUT_POLL: Duration = Duration::from_millis(50);
 /// The most events handled before the next frame is drawn.
 const BATCH: usize = 64;
 
-/// Where the frame goes when stdout is not a terminal. Go then has no size
-/// (0×0), so the model shows "Initializing..."; one row holds it.
+/// Where the frame goes when stdout is not a terminal. The model then has no
+/// size (0×0), so it shows "Initializing..."; one row holds it.
 const NO_TTY_AREA: Rect = Rect::new(0, 0, 80, 1);
 
 /// Everything that reaches the loop.
@@ -70,8 +69,7 @@ pub enum Event {
     Signal(Signal),
 }
 
-/// Go `tea.NewProgram(dashboard.New()).Run()`. Returns the error text
-/// after "tui: ".
+/// Runs the dashboard until it quits. Returns the error text after "tui: ".
 pub fn run(cfg: &Config) -> Result<(), String> {
     check_input()?;
     let (tx, rx) = mpsc::channel();
@@ -189,11 +187,11 @@ impl<S: Screen> Drop for Owners<S> {
     }
 }
 
-/// Go `Program.Run`: when stdin is not a terminal, bubbletea reads keys
-/// from `/dev/tty` instead, and fails only when that cannot be opened.
+/// When stdin is not a terminal, keys come from `/dev/tty` instead; the run
+/// fails only when that cannot be opened.
 /// Crossterm's `use-dev-tty` reader falls back to `/dev/tty` the same way
 /// (its default mio reader cannot register that fd on macOS); this only
-/// gives the failure Go's text.
+/// sets the failure text.
 #[cfg(unix)]
 fn check_input() -> Result<(), String> {
     if io::stdin().is_terminal() {
@@ -207,7 +205,7 @@ fn check_input() -> Result<(), String> {
         .map_err(|e| {
             format!(
                 "bubbletea: error opening TTY: bubbletea: could not open TTY: open /dev/tty: {}",
-                rival_core::gostd::os_error_text(&e)
+                e
             )
         })
 }
@@ -241,7 +239,7 @@ fn finish_jobs(jobs: &mut JobPool, events: &Receiver<Event>, views: &mut LogView
 /// What the loop needs besides its inputs.
 pub struct LoopOpts {
     /// Whether terminal resizes reach the model. False when stdout is not a
-    /// terminal: Go then never learns a size.
+    /// terminal: the model then never learns a size.
     pub resize: bool,
     /// How often [`LogViews::sweep`] runs.
     pub sweep_every: Duration,
@@ -249,8 +247,8 @@ pub struct LoopOpts {
     pub clock: fn() -> Instant,
 }
 
-/// Runs the model until it quits (`Ok`), a SIGTERM arrives (`Ok`, as Go's
-/// `QuitMsg`), a SIGINT arrives (`Err(INTERRUPTED)`) or the input fails.
+/// Runs the model until it quits (`Ok`), a SIGTERM arrives (`Ok`, as a
+/// quit), a SIGINT arrives (`Err(INTERRUPTED)`) or the input fails.
 /// It draws after every batch of events, starts the model's tick and
 /// spinner timers, sends its jobs to `jobs`, and gives opened log copies to
 /// `views`, which it sweeps every `opts.sweep_every`.
@@ -315,7 +313,7 @@ pub fn event_loop<B: Backend>(
 }
 
 /// What the model hears when the job queue cannot take a stop or a log
-/// open. Rust-only: Go ran both inside its update.
+/// open.
 pub const BUSY_NOTICE: &str = "busy: earlier stops or log opens still queued, try again";
 
 /// Feeds `msg` to the model and carries out its commands. A job the pool
@@ -573,8 +571,8 @@ impl JobPool {
 
     /// Lets the workers finish the waiting stops and log opens, then joins
     /// them. Waiting reads, parses and prompt loads are dropped: no screen
-    /// is left to show them. Stops and log opens still run, as Go ran them
-    /// inside the update before the quit key was read.
+    /// is left to show them. Stops and log opens still run: they
+    /// were queued before the quit key was read.
     pub fn shutdown(&mut self) {
         {
             let mut pending = self.shared.lock();
@@ -622,7 +620,7 @@ fn work(env: &JobEnv, shared: &Shared, out: &Sender<Event>) {
 
 // --- session watch --------------------------------------------------------------
 
-/// Go `Init`'s watch command. The initial scan runs off the UI thread; its
+/// The session watch. The initial scan runs off the UI thread; its
 /// progress, every snapshot and a start failure reach the loop as
 /// messages. The runtime owns the cancel and every thread: [`Watch::stop`]
 /// (also run on drop) cancels the watch, stops the watcher and joins them.
@@ -657,7 +655,7 @@ impl Watch {
     /// joined.
     pub fn start_with(paths: Paths, out: Sender<Event>, spawn: Spawn) -> io::Result<Watch> {
         let (ctx, cancel) = Context::background().with_cancel();
-        // Go: make(chan SessionEvent, 10) and make(chan LoadProgress, 1).
+        // Bounded queues: 10 session events, 1 load progress.
         let (events_tx, events) = mpsc::sync_channel(10);
         let (progress_tx, progress) = mpsc::sync_channel(1);
         let mut watch = Watch {
@@ -678,7 +676,7 @@ impl Watch {
                             *found.lock().unwrap_or_else(PoisonError::into_inner) = Some(watcher);
                         }
                         Err(err) => {
-                            // Go `errMsg{err}`. A start cut short by the
+                            // Report the error. A start cut short by the
                             // exit has nobody to show it to.
                             if !ctx.is_done() {
                                 let msg = Msg::Error(err.to_string());
@@ -858,15 +856,10 @@ pub struct TerminalScreen {
 
 impl Screen for TerminalScreen {
     fn enter(&mut self) -> Result<(), String> {
-        terminal::enable_raw_mode().map_err(|e| {
-            format!(
-                "error entering raw mode: {}",
-                rival_core::gostd::os_error_text(&e)
-            )
-        })?;
+        terminal::enable_raw_mode().map_err(|e| format!("error entering raw mode: {}", e))?;
         self.raw = true;
         self.alt = true;
-        // Go ignores renderer write errors too.
+        // Renderer write errors are ignored.
         let _ = execute!(
             io::stdout(),
             terminal::EnterAlternateScreen,

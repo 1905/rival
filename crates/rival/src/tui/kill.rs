@@ -1,5 +1,4 @@
-//! Stopping runs from the detail screen. Go: `internal/dashboard/kill.go`
-//! and the stop half of `detail_view.go` / `model.go`.
+//! Stopping runs from the detail screen.
 //!
 //! A stop never trusts a bare PID. A session's `pid` is the provider child
 //! while it runs and the waiting rival process (its owner) while it is
@@ -34,7 +33,7 @@ use super::session_list::is_live;
 /// ns). It authorizes signals, so it must never pass an unrecorded start.
 pub type AliveFn = fn(pid: i64, start: i64) -> bool;
 
-/// Go: `procinfo.SameProcess` behind the TUI's `alive` seam.
+/// [`procinfo::same_process`] behind the TUI's `alive` seam.
 pub fn same_process(pid: i64, start: i64) -> bool {
     i32::try_from(pid).is_ok_and(|pid| procinfo::same_process(pid, start))
 }
@@ -63,7 +62,7 @@ impl ProcessOps {
     };
 }
 
-/// Go `procinfo.Alive` behind the stop's death wait: the process exists and
+/// The stop's death wait check: the process exists and
 /// has not exited (Windows: its handle is not signaled), and a recorded
 /// start still matches, so a reused PID reads as dead.
 pub fn running(pid: i64, start: i64) -> bool {
@@ -122,7 +121,7 @@ pub fn terminate(pid: i64, start: i64) -> io::Result<()> {
             "process identity changed",
         ));
     }
-    // SAFETY: a valid handle with PROCESS_TERMINATE; exit code 1 like Go's Kill.
+    // SAFETY: a valid handle with PROCESS_TERMINATE; the exit code is 1.
     if unsafe { TerminateProcess(process.as_raw_handle(), 1) } != 0 {
         Ok(())
     } else {
@@ -130,10 +129,10 @@ pub fn terminate(pid: i64, start: i64) -> io::Result<()> {
     }
 }
 
-/// Go: `unverifiedNotice`. Why a live-looking run got no signal.
+/// Why a live-looking run got no signal.
 pub const UNVERIFIED_NOTICE: &str = "cannot verify process identity";
 
-/// Go: `mayStop`. A recorded non-zero PID start that `alive` confirms still
+/// A recorded non-zero PID start that `alive` confirms still
 /// matches the process. Without a start time the PID could belong to any
 /// process that reused it, so it is never signalled.
 pub fn may_stop(s: &Session, alive: AliveFn) -> bool {
@@ -141,7 +140,7 @@ pub fn may_stop(s: &Session, alive: AliveFn) -> bool {
     pid > 0 && start != 0 && alive(pid, start)
 }
 
-/// Go: `liveTargets`. The members of `item` a stop would signal: running or
+/// The members of `item` a stop would signal: running or
 /// queued, with a known PID whose process `alive` confirms is still this
 /// run's. A stale "running" record whose process is gone is left out.
 pub fn live_targets(item: Option<&DisplayItem>, alive: AliveFn) -> Vec<Arc<Session>> {
@@ -155,7 +154,7 @@ pub fn live_targets(item: Option<&DisplayItem>, alive: AliveFn) -> Vec<Arc<Sessi
         .collect()
 }
 
-/// Go: `hasUnverified`. Whether `item` has a live member with a PID but no
+/// Whether `item` has a live member with a PID but no
 /// recorded start time: one a stop refuses to signal.
 pub fn has_unverified(item: Option<&DisplayItem>) -> bool {
     item.is_some_and(|item| {
@@ -166,7 +165,7 @@ pub fn has_unverified(item: Option<&DisplayItem>) -> bool {
     })
 }
 
-/// Go: the re-check in `updateConfirmKey`. The confirmed targets that the
+/// The re-check after the stop is confirmed. The confirmed targets that the
 /// current snapshot of the selected item still shows live with a PID. A run
 /// that finished while the bar was open is dropped (its PID may be reused);
 /// one still "running" whose process died goes through, so the stop can fail
@@ -219,7 +218,7 @@ impl KillUpdate {
     }
 }
 
-/// Go: `failSessionForKill`. Marks `s` failed after the user killed it.
+/// Marks `s` failed after the user killed it.
 ///
 /// The list holds summaries, which never carry the full prompt, and `fail`
 /// saves the whole record, so failing a summary directly would write an
@@ -267,17 +266,17 @@ pub struct StopResult {
     pub updates: Vec<(String, KillUpdate)>,
 }
 
-/// Go: `stopSessions`. Sends SIGTERM to each target and marks it failed so
+/// Sends SIGTERM to each target and marks it failed so
 /// the TUI updates at once. Only a target [`may_stop`] confirms, right before
 /// the signal, gets it; any other (dead, PID reused) is failed as already
 /// dead. A target without a recorded start is neither signalled nor
 /// rewritten: a dead run and a live one look the same, so its owner or the
 /// reaper finalizes it.
 ///
-/// Rust only: the job runs after a queue wait, so the stored record is read
+/// The job runs after a queue wait, so the stored record is read
 /// again first. A run that finished while the job waited is left alone: no
 /// signal, no "failed" over its real end. When the record cannot be read,
-/// the confirmed snapshot decides, as in Go.
+/// the confirmed snapshot decides.
 ///
 /// The owning rival process also finalizes a signalled session on SIGTERM.
 /// Both writers go through `Session::save`'s unique temp file and rename, so

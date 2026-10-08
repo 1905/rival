@@ -76,10 +76,10 @@ public func runEndTime(_ item: RunItem) -> Date {
     var latest: Date?
     for s in item.sessions {
         var end = s.endTime
-        if end == nil || end!.isGoZero, !s.startTime.isGoZero, let d = s.duration, let secs = parseGoDuration(d) {
+        if end == nil || end!.isZeroTime, !s.startTime.isZeroTime, let d = s.duration, let secs = parseDuration(d) {
             end = s.startTime.addingTimeInterval(secs)
         }
-        if let e = end, !e.isGoZero, latest == nil || e > latest! { latest = e }
+        if let e = end, !e.isZeroTime, latest == nil || e > latest! { latest = e }
     }
     return latest ?? runTime(item)
 }

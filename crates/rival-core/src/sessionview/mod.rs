@@ -2,8 +2,7 @@
 //! labelled, and timed, plus the incremental cache and directory watcher the
 //! dashboard reads through.
 //!
-//! Go: `internal/sessionview` and the watcher from `internal/dashboard`. It
-//! sits between [`crate::session`] (file parsing) and the front end, and
+//! It sits between [`crate::session`] (file parsing) and the front end, and
 //! never mutates the sessions it receives.
 
 pub mod cache;

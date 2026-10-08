@@ -1,5 +1,5 @@
-//! Go: `internal/executor/subprocess_test.go` and `subprocess_unix_test.go`,
-//! plus Rust-only checks of the drain bound, output accounting, env and
+//! Subprocess runner tests (env filtering, timeouts, kill of process groups),
+//! plus checks of the drain bound, output accounting, env and
 //! start errors.
 //!
 //! Every test uses a temp home, an injected `environ` (no process env is read
@@ -403,9 +403,6 @@ fn write_script(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
-// ---- subprocess_test.go ----
-
-/// Go: `TestSafeEnv_BlocksOpencodePermission`.
 #[test]
 fn safe_env_blocks_opencode_permission() {
     let env = safe_env(&environ(&[
@@ -429,14 +426,12 @@ fn safe_env_blocks_opencode_permission() {
     assert!(joined.contains("RIVAL_SAFEENV_KEEP=keepme"));
 }
 
-/// Go: `TestSafeEnv_BlocksGrokRuntimeVars`.
 #[test]
 fn safe_env_blocks_grok_runtime_vars() {
     let env = safe_env(&environ(&[PATH_ENTRY, "GROK_ANYTHING=x", "XAI_API_KEY=x"]));
     assert_eq!(env, environ(&[PATH_ENTRY]));
 }
 
-/// Go: `TestSafeEnvKeepsReviewerInItsOwnRepository`.
 #[test]
 fn safe_env_keeps_reviewer_in_its_own_repository() {
     let mut items: Vec<String> = [
@@ -470,7 +465,7 @@ fn safe_env_blocks_every_prefix_as_a_raw_prefix() {
         .map(|p| format!("{p}SUFFIX=1"))
         .collect();
     let mut items: Vec<&str> = blocked.iter().map(String::as_str).collect();
-    // Go matches the raw "KEY=VALUE" prefix, so these go too.
+    // The filter matches the raw "KEY=VALUE" prefix, so these go too.
     items.extend(["HTTP_PROXY=x", "LD_PRELOAD_X=1", "DYLD_INSERT_LIBRARIES=x"]);
     items.extend(["HTTP_PROXI=kept", "ld_preload=kept", "OPENCODE=kept"]);
     assert_eq!(
@@ -489,7 +484,7 @@ fn drop_matches_prefix_and_exact_rules() {
         ("AWS_REGION=x", true),
         ("AWS_=x", true),
         ("AWSX=x", false),
-        // Go's HasPrefix(kv, ""+"="): an empty name drops "=…" entries.
+        // A prefix match on `""` plus `=`: an empty name drops "=…" entries.
         ("=C:=C:\\", true),
     ];
     for (kv, want) in cases {
@@ -543,7 +538,7 @@ fn child_env_filters_drops_then_appends_and_dedup_keeps_last() {
 }
 
 #[test]
-fn dedup_env_follows_go() {
+fn dedup_env_last_value_wins_and_nul_is_rejected() {
     let got = dedup_env(&environ(&[
         "A=1", "noequals", "", "=X=1", "=X=2", "=lone", "A=2",
     ]))
@@ -553,7 +548,6 @@ fn dedup_env_follows_go() {
     assert_eq!(err, "exec: environment variable contains NUL");
 }
 
-/// Go: `TestRunSubprocess_ContextTimeoutKillsChild`.
 #[test]
 fn context_timeout_kills_child() {
     let mut fx = Fixture::new();
@@ -575,29 +569,26 @@ fn context_timeout_kills_child() {
 
     assert!(elapsed < Duration::from_secs(2), "child ran {elapsed:?}");
     assert_eq!(ctx.err(), Some(ContextError::DeadlineExceeded));
-    // Go accepts an error or a nonzero code; SIGKILL gives Go's -1.
+    // An error or a nonzero code would be accepted; SIGKILL gives -1.
     assert_eq!(result.unwrap().exit_code, -1);
 }
 
-// ---- subprocess_unix_test.go ----
-
-/// Go: `TestRunSubprocess_TimeoutKillsLauncherGrandchild`. The npm `codex`
+/// The npm `codex`
 /// launcher shape: a wrapper spawns the real binary with inherited stdio and
 /// cannot forward SIGKILL. The grandchild ignores SIGTERM and keeps the
 /// pipes open. A context deadline must still return promptly and leave the
 /// grandchild dead.
 ///
-/// Go's deadline is 500ms and Go reads the grandchild PID after the run.
-/// Here the deadline is 3s so a loaded machine still records the
-/// grandchild's identity (PID + start time) before it expires; Go's 3.5s of
-/// slack past the deadline is kept.
+/// The deadline is 3s so a loaded machine still records the
+/// grandchild's identity (PID + start time) before it expires, and the
+/// return has 3.5s of slack past the deadline.
 #[test]
 fn timeout_kills_launcher_grandchild() {
     launcher_grandchild_case(Some(Duration::from_secs(3)));
 }
 
 /// The same launcher, cancelled by hand right after the grandchild is
-/// recorded: the return is bounded by Go's 3.5s from the cancel.
+/// recorded: the return is bounded by 3.5s from the cancel.
 #[test]
 fn cancel_kills_launcher_grandchild() {
     launcher_grandchild_case(None);
@@ -606,7 +597,7 @@ fn cancel_kills_launcher_grandchild() {
 /// `deadline`: a context deadline from the start; `None`: a manual cancel
 /// once the grandchild is recorded.
 fn launcher_grandchild_case(deadline: Option<Duration>) {
-    /// Go's bound from the cancel to the return.
+    /// Bound from the cancel to the return.
     const LIMIT: Duration = Duration::from_millis(3500);
     let mut fx = Fixture::new();
     let dir = fx.work.path().to_path_buf();
@@ -892,7 +883,7 @@ fn escaped_pipe_holder_bounds_drain_to_grace() {
 
 /// The grace starts at the cancel, not when the direct child exits: the
 /// launcher exits 0 at once, the holder keeps the pipes, and the run keeps
-/// draining (Go waits for the pipes before cmd.Wait) until the cancel plus
+/// draining (the run waits for the pipes before it reaps the child) until the cancel plus
 /// the grace.
 #[test]
 fn grace_starts_at_cancel_not_at_leader_exit() {
@@ -933,15 +924,18 @@ fn grace_starts_at_cancel_not_at_leader_exit() {
     );
     assert!(holder.proc.alive());
     // The leader exited 0 before the cancel, so the group holds only its
-    // unreaped zombie. Go's Wait then reports the Cancel result: macOS
+    // unreaped zombie. The wait then reports the cancel result: macOS
     // kill(-pgid) answers EPERM (seen here); Linux delivers to the zombie and
-    // Go reports ctx.Err() (from the kernel source, not run here); ESRCH
-    // would be a clean exit.
+    // the run reports the context error (from the kernel source, not run
+    // here); ESRCH would be a clean exit.
     let text = res.as_ref().map_err(|e| e.to_string());
     if cfg!(target_os = "macos") {
         assert_eq!(
             text.unwrap_err(),
-            "subprocess sh: error sending signal to Cmd: operation not permitted"
+            format!(
+                "subprocess sh: error sending signal to Cmd: {}",
+                std::io::Error::from_raw_os_error(libc::EPERM)
+            )
         );
     } else {
         match text {
@@ -980,8 +974,7 @@ fn cancel_unblocks_prompt_writer_without_grace() {
 }
 
 /// The leader closes every pipe but keeps running: the drain ends at once,
-/// and the reap (Go's cmd.Wait) still waits for it until the cancel kills
-/// the group.
+/// and the reap still waits for it until the cancel kills the group.
 #[test]
 fn leader_outliving_its_pipes_is_killed_on_cancel() {
     let mut fx = Fixture::new();
@@ -1012,7 +1005,7 @@ fn leader_outliving_its_pipes_is_killed_on_cancel() {
 }
 
 #[test]
-fn grace_log_event_matches_go_fields() {
+fn grace_log_event_fields() {
     use chrono::TimeZone;
     let t = chrono::FixedOffset::east_opt(0)
         .unwrap()
@@ -1077,8 +1070,8 @@ fn stdout_counts_lines_and_bytes_stderr_goes_to_log_only() {
     }
 }
 
-/// Go's `ReadBytes('\n')` emits whole lines however the reads split them,
-/// and emits each line as soon as it is complete.
+/// The reader emits whole lines however the reads split them, and emits each
+/// line as soon as it is complete.
 #[test]
 fn partial_lines_join_across_reads_and_stream_in_time() {
     let mut fx = Fixture::new();
@@ -1162,7 +1155,7 @@ fn no_mirror_still_counts_and_logs() {
 fn exit_codes_and_signals() {
     let mut fx = Fixture::new();
     assert_eq!(run_sh(&mut fx, "exit 3", "", None).unwrap().exit_code, 3);
-    // Go's ExitCode() is -1 for a signal, not 128+n.
+    // A signal gives exit code -1, not 128+n.
     assert_eq!(
         run_sh(&mut fx, "kill -TERM $$", "", None)
             .unwrap()
@@ -1186,7 +1179,7 @@ fn stdin_error_is_returned_only_when_child_exits_zero() {
     let err = run_sh(&mut fx, "exec 0<&-; exit 0", &prompt, None).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "write prompt to stdin: write |1: broken pipe"
+        "write prompt to stdin: write |1: Broken pipe (os error 32)"
     );
     let res = run_sh(&mut fx, "exec 0<&-; exit 4", &prompt, None).unwrap();
     assert_eq!(res.exit_code, 4);
@@ -1248,7 +1241,7 @@ fn short_mirror_write_counts_its_n_once_per_line() {
 }
 
 #[test]
-fn tee_line_returns_go_multiwriter_count_and_error() {
+fn tee_line_returns_multiwriter_count_and_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("log");
     let open = |read_only: bool| SyncLog {
@@ -1278,7 +1271,7 @@ fn tee_line_returns_go_multiwriter_count_and_error() {
     }
     assert_eq!(
         tee_line(b"one\n", &log, Some(&mut Failing)),
-        (0, Some("broken pipe".into()))
+        (0, Some("Broken pipe (os error 32)".into()))
     );
     assert_eq!(tee_line::<Short>(b"one\n", &log, None), (4, None));
     assert_eq!(fs::read(&path).unwrap(), b"one\none\none\n");
@@ -1290,7 +1283,7 @@ fn tee_line_returns_go_multiwriter_count_and_error() {
     assert_eq!(n, 0);
     assert_eq!(
         err.unwrap(),
-        format!("write {}: bad file descriptor", path.display())
+        format!("write {}: Bad file descriptor (os error 9)", path.display())
     );
     assert!(short.0.is_empty());
 }
@@ -1374,8 +1367,8 @@ fn child_gets_exactly_the_filtered_env() {
     );
 }
 
-/// Unix env names are case-sensitive, as in Go: mixed-case variants of the
-/// blocked prefixes and dropped names reach the child unchanged.
+/// Unix env names are case-sensitive: mixed-case variants of the blocked
+/// prefixes and dropped names reach the child unchanged.
 #[test]
 fn unix_child_keeps_mixed_case_names() {
     let mut fx = Fixture::new();
@@ -1466,7 +1459,7 @@ fn start_error(fx: &mut Fixture, ctx: &Context, binary: &str, base: &[OsString])
 }
 
 #[test]
-fn start_errors_match_go() {
+fn start_errors_have_exec_style_text() {
     let mut fx = Fixture::new();
     let bg = Context::background();
     let base = environ(&[PATH_ENTRY]);
@@ -1501,23 +1494,23 @@ fn start_errors_match_go() {
     let plain = plain.to_str().unwrap();
     assert_eq!(
         start_error(&mut fx, &bg, plain, &base),
-        format!("start {plain}: fork/exec {plain}: permission denied")
+        format!("start {plain}: start {plain}: Permission denied (os error 13)")
     );
     let missing = fx.work.path().join("missing");
     let missing = missing.to_str().unwrap();
     assert_eq!(
         start_error(&mut fx, &bg, missing, &base),
-        format!("start {missing}: fork/exec {missing}: no such file or directory")
+        format!("start {missing}: start {missing}: No such file or directory (os error 2)")
     );
 
-    // A missing workdir fails inside the child, as with Go's Setpgid start.
+    // A missing workdir fails inside the child, as with a Setpgid start.
     fx.sess.work_dir = fx.work.path().join("gone").to_str().unwrap().to_string();
     assert_eq!(
         start_error(&mut fx, &bg, "/bin/sh", &base),
-        "start /bin/sh: fork/exec /bin/sh: no such file or directory"
+        "start /bin/sh: start /bin/sh: No such file or directory (os error 2)"
     );
 
-    // Go's dedupEnv rejects a NUL.
+    // An env entry with a NUL is rejected.
     let mut fx = Fixture::new();
     let env = strings(&["A=\0"]);
     let req = Request {
@@ -1556,14 +1549,14 @@ fn open_log_error_comes_before_start() {
             &base
         ),
         format!(
-            "open log: open {}: no such file or directory",
+            "open log: open {}: No such file or directory (os error 2)",
             fx.sess.log_file
         )
     );
 }
 
-/// Go's argv: argv[0] is the bare name the caller gave, not the resolved
-/// path, and empty arguments stay. A NUL in an argument is EINVAL.
+/// argv[0] is the bare name the caller gave, not the resolved path, and empty
+/// arguments stay. A NUL in an argument is EINVAL.
 #[test]
 fn argv0_is_the_bare_name_and_empty_args_stay() {
     let mut fx = Fixture::new();
@@ -1606,12 +1599,15 @@ fn argv0_is_the_bare_name_and_empty_args_stay() {
         fx.run(&Context::background(), &req, None)
             .unwrap_err()
             .to_string(),
-        format!("start sh: fork/exec {}: invalid argument", sh.display())
+        format!(
+            "start sh: start {}: Invalid argument (os error 22)",
+            sh.display()
+        )
     );
 }
 
 /// Controller finding (Task 2.4): an executable text file without a shebang
-/// is Go's `fork/exec <path>: exec format error`, never a `/bin/sh`
+/// is `start <path>: Exec format error (os error 8)`, never a `/bin/sh`
 /// fallback. The provider spawn sets a process group and a workdir, so it
 /// may take a different std spawn path than a plain `Command`.
 #[test]
@@ -1642,7 +1638,7 @@ fn executable_without_shebang_is_exec_format_error() {
     assert_eq!(
         format!("{err:#}"),
         format!(
-            "start noshebang: fork/exec {}: exec format error",
+            "start noshebang: start {}: Exec format error (os error 8)",
             script.display()
         )
     );

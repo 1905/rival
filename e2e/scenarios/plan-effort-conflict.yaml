@@ -1,0 +1,32 @@
+{
+  "name": "plan-effort-conflict",
+  "description": "`rival command plan --effort high` with `-re xhigh plan.md` on stdin. The flag value and the stdin effort differ, so rival prints 'reasoning effort conflicts: command uses \"high\" but plan arguments request \"xhigh\"' on stdout and again on stderr, exit code 1. The plan file exists, but the conflict fires before the plan path is resolved. No session, no queue ticket, no reviewer.",
+  "fixtures": [
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan",
+        "--effort",
+        "high"
+      ],
+      "stdin": "-re xhigh plan.md",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "reasoning effort conflicts: command uses \"high\" but plan arguments request \"xhigh\"\n",
+        "stderr_lines": [
+          "reasoning effort conflicts: command uses \"high\" but plan arguments request \"xhigh\""
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

@@ -166,9 +166,9 @@ private func kindCell(_ sessions: [Session], isGroup: Bool) -> String {
     return kind
 }
 
-/// `sessionview.Kind`: security, then antislop, then plan, else megareview.
+/// `sessionview.Kind`: security, then plan, else megareview.
 func groupKind(_ sessions: [Session]) -> String {
-    for mode in ["security", "antislop", "plan"] where sessions.contains(where: { $0.mode == mode }) {
+    for mode in ["security", "plan"] where sessions.contains(where: { $0.mode == mode }) {
         return mode
     }
     return "megareview"
@@ -178,7 +178,6 @@ func shortKind(_ mode: String) -> String {
     switch mode {
     case "megareview", "consilium": return "mega"
     case "security": return "sec"
-    case "antislop": return "slop"
     case "plan": return "plan"
     case "raw": return "raw"
     case "", "review", "native", "docker": return "review"
@@ -207,7 +206,7 @@ public func runEffort(_ item: RunItem) -> String {
     return item.sessions.dropFirst().allSatisfy({ $0.effort == first.effort }) ? first.effort : "mixed"
 }
 
-/// The last element of the work dir (Go `filepath.Base`), or "-" when empty.
+/// The last element of the work dir (trailing slashes ignored), or "-" when empty.
 public func projectName(_ workDir: String) -> String {
     if workDir.isEmpty { return "-" }
     var trimmed = Substring(workDir)
@@ -219,15 +218,15 @@ public func projectName(_ workDir: String) -> String {
 
 /// When a run appeared: its start, or its queue time when it has not started.
 public func runTime(_ item: RunItem) -> Date {
-    guard let s = item.primary else { return .goZero }
-    if s.startTime.isGoZero, let q = s.queuedAt { return q }
+    guard let s = item.primary else { return .zeroTime }
+    if s.startTime.isZeroTime, let q = s.queuedAt { return q }
     return s.startTime
 }
 
 // MARK: - Elapsed (sessionview.Elapsed)
 
 /// The wall-clock span of the run: earliest member start to latest member end,
-/// rounded to the second and formatted like Go's `time.Duration.String`. A
+/// rounded to the second and formatted as the CLI prints durations ("1m23s"). A
 /// running or queued member extends to `now`; a queued member counts from its
 /// queue time. "-" when nothing has started.
 public func runElapsed(_ item: RunItem, now: Date) -> String {
@@ -244,15 +243,15 @@ private func elapsed(_ sessions: [Session], now: Date) -> String {
     var latest: Date?
     for s in sessions {
         var start = s.startTime
-        if let q = s.queuedAt, start.isGoZero || q < start { start = q }
-        if start.isGoZero { continue }
+        if let q = s.queuedAt, start.isZeroTime || q < start { start = q }
+        if start.isZeroTime { continue }
 
         var end = start
         if isLive(s.status) {
             end = now
         } else if let e = s.endTime {
             end = e
-        } else if let d = s.duration, let secs = parseGoDuration(d) {
+        } else if let d = s.duration, let secs = parseDuration(d) {
             end = start.addingTimeInterval(secs)
         }
         if end < start { end = start }
@@ -261,7 +260,7 @@ private func elapsed(_ sessions: [Session], now: Date) -> String {
     }
     guard let e = earliest, let l = latest, l > e else { return "-" }
     let seconds = Int(l.timeIntervalSince(e).rounded(.toNearestOrAwayFromZero))
-    return formatGoDuration(seconds: seconds)
+    return formatDuration(seconds: seconds)
 }
 
 /// The TIME cell: `runElapsed`, prefixed with "#N " for a queued solo run.
@@ -273,9 +272,9 @@ public func runTimeLabel(_ item: RunItem, now: Date) -> String {
     return elapsed
 }
 
-/// Go `time.Duration.String` for a whole number of seconds: "0s", "45s",
+/// A whole number of seconds as the CLI prints durations: "0s", "45s",
 /// "7m0s", "1h2m3s".
-public func formatGoDuration(seconds: Int) -> String {
+public func formatDuration(seconds: Int) -> String {
     if seconds == 0 { return "0s" }
     let sign = seconds < 0 ? "-" : ""
     let n = abs(seconds)
@@ -285,9 +284,9 @@ public func formatGoDuration(seconds: Int) -> String {
     return "\(sign)\(s)s"
 }
 
-/// Parses Go's `time.ParseDuration` syntax ("1m23s", "1.5h", "300ms") into
+/// Parses the CLI's duration syntax ("1m23s", "1.5h", "300ms") into
 /// seconds. Returns nil on malformed input.
-public func parseGoDuration(_ text: String) -> TimeInterval? {
+public func parseDuration(_ text: String) -> TimeInterval? {
     var s = Substring(text)
     var sign = 1.0
     if let f = s.first, f == "-" || f == "+" {

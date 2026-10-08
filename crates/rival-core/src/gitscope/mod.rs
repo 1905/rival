@@ -1,8 +1,8 @@
-//! Git scope helpers. Go: `internal/gitscope`.
+//! Git scope helpers.
 //!
-//! Task 2.3 ported `env.go` for the provider subprocess env. This module is
-//! `gitscope.go`. Its git commands inherit the caller's env unfiltered (Go
-//! `exec.Command` with a nil `Env`), not [`repository_env`].
+//! The `env` submodule builds the provider subprocess env. The git commands
+//! in this module inherit the caller's env unfiltered, not
+//! [`repository_env`].
 
 mod env;
 #[cfg(test)]
@@ -15,9 +15,9 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::config::Config;
-use crate::executor::oscmd::{exit_status_text, look_path};
+use crate::executor::oscmd::{fork_error, look_path};
 use crate::executor::process::{self, set_exec};
-use crate::executor::subprocess::{dedup_env, spawn_error_text};
+use crate::executor::subprocess::dedup_env;
 use crate::paths;
 
 /// Detects which files to review based on git state.
@@ -53,7 +53,7 @@ pub fn resolve(cfg: &Config, workdir: &str) -> String {
 
 /// Combines two newline-separated file lists, deduplicating.
 ///
-/// As in Go, only `b` items are checked against the set, and `b` items are
+/// Only `b` items are checked against the set, and `b` items are
 /// never added to it: duplicates inside `a`, and duplicates inside `b` that
 /// are not in `a`, are kept.
 fn merge_file_lists(a: &str, b: &str) -> String {
@@ -105,14 +105,14 @@ pub fn diff_stat(cfg: &Config, workdir: &str) -> String {
     }
 }
 
-/// Go `exec.Command("git", args...)` with `Dir = workdir` and `Output()`.
+/// Runs `git` with `args` in `workdir` and returns its stdout.
 ///
 /// - `git` is looked up in `cfg`'s `$PATH`.
 /// - The env is `cfg.environ()`, unfiltered, plus `PWD=<abs workdir>` when
-///   `workdir` is set (Go's `Cmd.environ`; not on Windows, which has no
-///   `PWD`), then Go `dedupEnv`.
-/// - stdin is the null device; stderr is captured and dropped (Go keeps it in
-///   the `ExitError`, which nobody reads).
+///   `workdir` is set (not on Windows, which has no `PWD`), then
+///   duplicate names are removed.
+/// - stdin is the null device; stderr is captured and dropped (the error text never
+///   includes it).
 ///
 /// stdout is decoded as lossy UTF-8. The error text is for diagnostics only;
 /// every caller drops it.
@@ -120,7 +120,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
     let path = look_path(cfg, "git").map_err(|e| e.to_string())?;
     let mut env: Vec<OsString> = cfg.environ().to_vec();
     if !workdir.is_empty() && !cfg!(windows) {
-        // Go: filepath.Abs(c.Dir); its error fails Start.
+        // Make the workdir absolute; a failure fails the spawn.
         let pwd = paths::abs(cfg.cwd(), Path::new(workdir))
             .ok_or_else(|| "getwd: no such file or directory".to_string())?;
         let mut kv = OsString::from("PWD=");
@@ -128,8 +128,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
         env.push(kv);
     }
     let env = dedup_env(&env)?;
-    let fork_error =
-        |e: &std::io::Error| format!("fork/exec {}: {}", path.display(), spawn_error_text(e));
+    let fork_error = |e: &std::io::Error| fork_error(&path, e);
 
     let program = process::program_in_dir(&path, Path::new(workdir)).map_err(|e| fork_error(&e))?;
     let mut cmd = Command::new(program);
@@ -145,7 +144,7 @@ fn git_cmd(cfg: &Config, workdir: &str, args: &[&str]) -> Result<String, String>
         .and_then(std::process::Child::wait_with_output)
         .map_err(|e| fork_error(&e))?;
     if !out.status.success() {
-        return Err(exit_status_text(out.status));
+        return Err(out.status.to_string());
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }

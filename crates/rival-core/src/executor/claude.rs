@@ -1,5 +1,3 @@
-//! Go: `internal/executor/claude.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -13,11 +11,10 @@ use super::oscmd;
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::logging;
 use crate::session::{self, Session};
 
-/// Go `ClaudePreflight`: checks that claude is available (native or docker).
+/// Checks that claude is available (native or docker).
 pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     if oscmd::look_path(cfg, "claude").is_ok() {
         return Ok(());
@@ -25,7 +22,7 @@ pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     claude_docker_preflight(cfg)
 }
 
-/// Go `RunClaude`: executes a prompt through the Claude Code CLI on Opus 5.5,
+/// Executes a prompt through the Claude Code CLI on Opus 5.5,
 /// the only model on this path. `read_only` restricts tools and mounts the
 /// workdir read-only: reviews and task runs.
 #[allow(clippy::too_many_arguments)]
@@ -51,13 +48,14 @@ pub fn run_claude(
     )
 }
 
-/// Go `runClaudeModel`: runs Claude through the Claude Code CLI,
+/// Runs Claude through the Claude Code CLI,
 /// auto-selecting native (claude on `PATH`) vs docker. `spawn` is the
 /// subprocess step.
 ///
-/// Go derived `read_only` from the session mode. The caller passes it here
-/// instead, because this function replaces the mode with the transport
-/// ("native" or "docker"): a second call on the same session would lose it.
+/// The caller passes `read_only` rather than this function deriving it
+/// from the session mode, because this function replaces the mode with the
+/// transport ("native" or "docker"): a second call on the same session
+/// would lose it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_claude_model(
     cfg: &Config,
@@ -70,7 +68,7 @@ pub(crate) fn run_claude_model(
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
-        bail!("unsupported Claude Code model {}", quote(model));
+        bail!("unsupported Claude Code model {:?}", model);
     }
     let result = if oscmd::look_path(cfg, "claude").is_ok() {
         set_claude_transport_mode(sess, "native");
@@ -88,11 +86,11 @@ pub(crate) fn run_claude_model(
     })
 }
 
-/// Go `setClaudeTransportMode`: records the transport for ordinary model
+/// Records the transport for ordinary model
 /// runs while preserving a task session's identity throughout its live
 /// execution.
 ///
-/// Plan and antislop runs are named by their mode in both dashboards.
+/// Plan and security runs are named by their mode in both dashboards.
 /// Writing the transport over that mode would label them for the whole live
 /// run, so only ordinary runs record it.
 pub(crate) fn set_claude_transport_mode(sess: &mut Session, transport: &str) {
@@ -146,7 +144,7 @@ fn run_claude_native(
     spawn(sess, &req)
 }
 
-/// Go `claudeArgs`: restricts the available tools, not just auto-approved
+/// Restricts the available tools, not just auto-approved
 /// tools. Safe mode prevents repository/user hooks and plugins from
 /// executing around those tools while preserving the CLI's subscription
 /// authentication.
@@ -189,7 +187,7 @@ pub(crate) fn claude_args(model: &str, effort: &str, read_only: bool) -> Vec<Str
     args.into_iter().map(str::to_string).collect()
 }
 
-/// Go `claudeAuthMarkers`: CLI output fragments that indicate an
+/// CLI output fragments that indicate an
 /// auth/billing failure rather than a model failure.
 const CLAUDE_AUTH_MARKERS: [&str; 6] = [
     "Credit balance is too low",
@@ -200,15 +198,15 @@ const CLAUDE_AUTH_MARKERS: [&str; 6] = [
     "authentication_error",
 ];
 
-/// Go `ClaudeAuthHint`: inspects a failed native run's log for auth/billing
+/// Inspects a failed native run's log for auth/billing
 /// errors and returns an actionable, auth-mode-specific explanation ("" if
 /// none).
 pub fn claude_auth_hint(cfg: &Config, log_file: &Path) -> String {
     let Ok(data) = std::fs::read(log_file) else {
         return String::new();
     };
-    // Go's strings.Contains on raw bytes: the ASCII markers match the same
-    // way in the lossy text.
+    // A byte search on the raw log: the ASCII markers match the same way in
+    // the lossy text.
     let text = String::from_utf8_lossy(&data);
     if !CLAUDE_AUTH_MARKERS.iter().any(|m| text.contains(m)) {
         return String::new();

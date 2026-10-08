@@ -108,7 +108,7 @@ high-confidence findings:
 
 Every finding must also carry a `failure_scenario`: the input or state that
 triggers it and the wrong result. Security patterns (pattern 3) have their own
-lens, `/rival-security`, and over-abstraction (pattern 4) has `/rival-antislop`.
+lens, `/rival-security`.
 
 ### Diff context in review preamble
 

@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write
 
 # Grok runner
 
-Run Grok (`grok-4.6`) through the `rival` Go binary. `review` runs are
+Run Grok (`grok-4.6`) through the `rival` binary. `review` runs are
 **mechanically sandboxed read-only**; raw prompts run **full auto** — the agent
 can read, edit files, and run commands in the workdir. The run is detached and
 watched in the background, so this skill does not block your session.

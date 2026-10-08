@@ -42,7 +42,6 @@ fn claude_target(base: &Path) -> SkillTarget {
     }
 }
 
-// Go: TestSkillTargets.
 #[test]
 fn skill_targets_by_host() {
     for (target, codex, want) in [
@@ -85,7 +84,7 @@ fn skill_targets_clean_the_home() {
     assert_eq!(targets[1].base, Path::new("/h/x/.agents/skills"));
 }
 
-// Go: TestDetectCodex. PATH and CODEX_HOME are passed in, not set.
+// PATH and CODEX_HOME are passed in, not set.
 #[test]
 fn detect_codex_signals() {
     for signal in [
@@ -104,7 +103,7 @@ fn detect_codex_signals() {
         let mut codex_home = String::new();
         let dir = match signal {
             "cli" => {
-                // Go's Windows LookPath needs a PATHEXT extension: npm
+                // A Windows PATH lookup needs a PATHEXT extension: npm
                 // installs codex as codex.cmd. The fake never runs.
                 let name = if cfg!(windows) { "codex.cmd" } else { "codex" };
                 let path = bin.path().join(name);
@@ -160,7 +159,6 @@ fn detect_codex_ignores_plain_files() {
     ));
 }
 
-// Go: TestInstallBothHostsAndPreserveUnrelatedSkills.
 #[test]
 fn install_both_hosts_and_preserve_unrelated_skills() {
     let home = tempfile::tempdir().unwrap();
@@ -185,7 +183,6 @@ fn install_both_hosts_and_preserve_unrelated_skills() {
     }
 }
 
-// Go: TestInstallOverwriteAndBufferedAnswers.
 #[test]
 fn install_overwrite_and_buffered_answers() {
     let dir = tempfile::tempdir().unwrap();
@@ -236,7 +233,6 @@ fn install_overwrite_and_buffered_answers() {
     );
 }
 
-// Go: TestRemoveSkillDirsByHashRemovesOnlyExactMatches.
 #[test]
 fn remove_skill_dirs_by_hash_removes_only_exact_matches() {
     let base = tempfile::tempdir().unwrap();
@@ -271,7 +267,6 @@ fn remove_skill_dirs_by_hash_missing_base_removes_nothing() {
     assert!(remove_skill_dirs_by_hash(&file, &RETIRED_SKILL_NAME_HASHES).is_err());
 }
 
-// Go: TestRetiredSkillCleanupHashesStayConfigured.
 #[test]
 fn retired_skill_cleanup_hashes_stay_configured() {
     assert_eq!(RETIRED_SKILL_NAME_HASHES.len(), 2);
@@ -291,8 +286,8 @@ fn retired_skill_cleanup_hashes_stay_configured() {
     );
 }
 
-// Go: TestInstallRemovesRetiredReviewSkill. An installed rival-review
-// (megareview, removed 2026-09-26) is cleaned up on both hosts.
+// An installed rival-review (megareview, removed 2026-09-26) is cleaned up on
+// both hosts.
 #[test]
 fn install_removes_retired_review_skill() {
     let home = tempfile::tempdir().unwrap();
@@ -324,7 +319,7 @@ fn fresh_install_transcript() {
     for name in skills::NAMES {
         want.push_str(&format!("  ✓ {name} — installed (v{})\n", version(name)));
     }
-    want.push_str("\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\n");
+    want.push_str("\nDone: 8 installed, 0 updated, 0 up to date, 0 removed\n");
     assert_eq!(install(&target, false, ""), want);
 
     // Same version again: every skill is up to date and the reader is not
@@ -336,7 +331,7 @@ fn fresh_install_transcript() {
             version(name)
         ));
     }
-    want.push_str("\nDone: 0 installed, 0 updated, 9 up to date, 0 removed\n");
+    want.push_str("\nDone: 0 installed, 0 updated, 8 up to date, 0 removed\n");
     let mut answers = reader("y\n");
     let mut out = Vec::new();
     install_skills(&target, false, &mut answers, &mut out).unwrap();
@@ -376,7 +371,7 @@ fn update_prompt_transcript() {
     );
     assert_eq!(
         out.lines().last().unwrap(),
-        "Done: 0 installed, 1 updated, 8 up to date, 0 removed"
+        "Done: 0 installed, 1 updated, 7 up to date, 0 removed"
     );
     assert_eq!(
         fs::read(skill_file(&target, first)).unwrap(),
@@ -395,13 +390,13 @@ fn update_prompt_transcript() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 9 updated, 0 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 8 updated, 0 up to date, 0 removed\n"),
         "{out}"
     );
 }
 
-/// Go keeps one `bufio.Reader` for every target: answers buffered while
-/// prompting for Claude still reach the Codex prompts.
+/// One buffered reader serves every target: answers buffered while prompting
+/// for Claude still reach the Codex prompts.
 #[test]
 fn one_reader_serves_every_target() {
     let home = tempfile::tempdir().unwrap();
@@ -450,7 +445,7 @@ fn cleanup_counts_deprecated_and_retired() {
         3,
         "{out}"
     );
-    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 9 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
+    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 8 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
     for gone in ["rival-sol", "rival-astra", "rival-kimi", "rival-hashed"] {
         assert!(!dir.path().join(gone).exists(), "{gone}");
     }
@@ -482,16 +477,16 @@ fn cleanup_failure_is_reported_and_not_counted() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 0 updated, 9 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 0 updated, 8 up to date, 0 removed\n"),
         "{out}"
     );
 }
 
-/// Go's `os.IsNotExist` is false for ENOTDIR, so a skills path under a
-/// file fails on the read, with Go's error text.
+/// ENOTDIR is not "not found", so a skills path under a file fails on the
+/// read, with the read error text.
 #[cfg(unix)]
 #[test]
-fn base_under_a_file_fails_like_go() {
+fn base_under_a_file_fails_on_read() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().join("skills");
     fs::write(&base, "").unwrap();
@@ -500,7 +495,10 @@ fn base_under_a_file_fails_like_go() {
     let file = base.join(skills::NAMES[0]).join("SKILL.md");
     assert_eq!(
         err,
-        format!("read {0}: open {0}: not a directory", file.display())
+        format!(
+            "read {0}: open {0}: Not a directory (os error 20)",
+            file.display()
+        )
     );
 }
 
@@ -521,11 +519,14 @@ fn write_errors_name_the_path() {
     let err = write_skill(&skill_dir, &file, b"x").unwrap_err();
     assert_eq!(
         err,
-        format!("write {0}: open {0}: is a directory", file.display())
+        format!(
+            "write {0}: open {0}: Is a directory (os error 21)",
+            file.display()
+        )
     );
 }
 
-/// A SKILL.md that is a directory fails Go's read, not its open.
+/// A SKILL.md that is a directory fails the read, not the open.
 #[cfg(unix)]
 #[test]
 fn skill_file_that_is_a_directory_fails_on_read() {
@@ -537,7 +538,10 @@ fn skill_file_that_is_a_directory_fails_on_read() {
     let err = install_skills(&target, false, &mut reader(""), &mut out).unwrap_err();
     assert_eq!(
         err,
-        format!("read {0}: read {0}: is a directory", file.display())
+        format!(
+            "read {0}: read {0}: Is a directory (os error 21)",
+            file.display()
+        )
     );
 }
 
@@ -578,7 +582,7 @@ fn install_command_writes_under_home_not_rival_home() {
         "{stdout}"
     );
     assert!(
-        stdout.ends_with("Done: 9 installed, 0 updated, 0 up to date, 0 removed\n"),
+        stdout.ends_with("Done: 8 installed, 0 updated, 0 up to date, 0 removed\n"),
         "{stdout}"
     );
     for name in skills::NAMES {

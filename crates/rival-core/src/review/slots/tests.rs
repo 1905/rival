@@ -1,5 +1,5 @@
-//! Go: `internal/review/slots_test.go`, plus Rust-only queue-path pins with
-//! an injected manager and stderr writer.
+//! Slot tests, plus queue-path pins with an injected manager and stderr
+//! writer.
 
 use std::time::Duration;
 
@@ -32,8 +32,8 @@ const SLOT: GroupSlot<'static> = GroupSlot {
     mode: "review",
 };
 
-/// Go: TestWaitForGroupSlotRollsBackPartialStart. A partial mark-running
-/// failure must not strand earlier sessions "running" with no process.
+/// A partial mark-running failure must not strand earlier sessions
+/// "running" with no process.
 #[test]
 fn rolls_back_partial_start() {
     let (_home, cfg) = temp_config();
@@ -71,7 +71,6 @@ fn rolls_back_partial_start() {
     assert!(stderr.is_empty());
 }
 
-/// Go: TestFormatSkipped_DistinguishesModels.
 #[test]
 fn format_skipped_distinguishes_models() {
     assert_eq!(format_skipped(&[]), "none");
@@ -90,7 +89,7 @@ fn format_skipped_distinguishes_models() {
     assert_eq!(got, "kimi-k3: failed; grok: unavailable");
 }
 
-/// Rust-only: `RIVAL_NO_QUEUE` skips the queue; nothing is written to the
+/// `RIVAL_NO_QUEUE` skips the queue; nothing is written to the
 /// queue dir.
 #[test]
 fn queue_disabled_by_env_marks_running_without_a_ticket() {
@@ -131,7 +130,7 @@ fn ticket_count(cfg: &Config) -> usize {
     })
 }
 
-/// Rust-only: a free slot marks the sessions running and holds a ticket
+/// A free slot marks the sessions running and holds a ticket
 /// until the guard drops.
 #[test]
 fn free_slot_holds_ticket_until_guard_drops() {
@@ -156,7 +155,7 @@ fn free_slot_holds_ticket_until_guard_drops() {
     assert!(stderr.is_empty(), "{}", String::from_utf8_lossy(&stderr));
 }
 
-/// Rust-only: a cancelled wait reports its position on stderr, frees the
+/// A cancelled wait reports its position on stderr, frees the
 /// ticket and fails every session.
 #[test]
 fn cancelled_while_queued() {
@@ -186,7 +185,7 @@ fn cancelled_while_queued() {
     assert_eq!(reloaded.queue_position, 1);
 }
 
-/// Rust-only: a queue timeout names the timeout and the recovery commands.
+/// A queue timeout names the timeout and the recovery commands.
 #[test]
 fn queue_timeout_message() {
     let (_home, cfg) = temp_config();
@@ -208,7 +207,7 @@ fn queue_timeout_message() {
     assert_eq!(ticket_count(&cfg), 0);
 }
 
-/// Rust-only: an unusable queue dir logs a warning and runs unqueued.
+/// An unusable queue dir logs a warning and runs unqueued.
 #[test]
 fn enqueue_failure_runs_without_queueing() {
     let (_home, cfg) = temp_config();
@@ -232,7 +231,7 @@ fn enqueue_failure_runs_without_queueing() {
     drop(guard);
 }
 
-/// Rust-only: when marking running fails after the slot was won, the guard
+/// When marking running fails after the slot was won, the guard
 /// still frees the ticket.
 #[test]
 fn mark_running_failure_after_slot_frees_the_ticket() {

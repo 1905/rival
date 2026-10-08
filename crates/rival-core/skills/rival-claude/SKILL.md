@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write
 
 # Claude reviewer (rival binary)
 
-Bug-hunting code review with Claude (Opus 5.5) via the `rival` Go binary. Reviews the changed
+Bug-hunting code review with Claude (Opus 5.5) via the `rival` binary. Reviews the changed
 files (git auto-detected) or an explicit scope. Omitted effort uses the `claude`
 default in `~/.rival/config.yaml`, with a built-in medium fallback. The run is
 detached and watched in the background — this skill does not block your session.

@@ -55,7 +55,7 @@ fn windows_opener_passes_the_path_as_data() {
 
 #[cfg(unix)]
 #[test]
-fn viewer_command_is_the_go_opener() {
+fn viewer_command_is_the_platform_opener() {
     let cmd = viewer_command(Path::new("/tmp/rival-log-x.txt"));
     assert_eq!(cmd.get_program(), VIEWER);
     let want = if cfg!(target_os = "macos") {
@@ -110,7 +110,7 @@ fn open_log_without_a_log_file_does_nothing() {
     assert!(launched().is_empty());
 }
 
-/// Go `openLogPath`: a copy the viewer cannot be started for is removed.
+/// A copy the viewer cannot be started for is removed.
 #[test]
 fn a_failed_launch_removes_the_copy() {
     let h = harness();
@@ -267,8 +267,8 @@ fn a_dropped_outcome_follows_the_exit_policy() {
     assert!(path.exists(), "a dropped fresh outcome lost its copy");
 }
 
-/// Past the TTL the copy goes even while the launcher runs (Go's timer did
-/// the same); the entry stays until the launcher is reaped.
+/// Past the TTL the copy goes even while the launcher runs; the entry
+/// stays until the launcher is reaped.
 #[cfg(unix)]
 #[test]
 fn sweep_expires_a_copy_but_holds_a_running_launcher() {

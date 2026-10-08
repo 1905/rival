@@ -1,5 +1,5 @@
 //! The Windows backend of [`super`]: provider containment with Job Objects,
-//! pipes whose IO a cancellation can interrupt, and Go's Windows `LookPath`.
+//! pipes whose IO a cancellation can interrupt, and the Windows executable lookup (`LookPath` rules).
 //!
 //! Containment has two layers:
 //!
@@ -30,7 +30,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle, OwnedHandle};
 use std::os::windows::process::CommandExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
@@ -62,8 +62,6 @@ use windows_sys::Win32::System::Threading::{
 };
 
 use super::{Abort, ExitState, Io, KillOutcome, LookPathError};
-use crate::gostd;
-use crate::winpath;
 
 /// Takes ownership of a handle a Win32 call returned; NULL and
 /// `INVALID_HANDLE_VALUE` are the call's failure, reported from
@@ -85,9 +83,9 @@ fn check(ok: i32) -> io::Result<()> {
     }
 }
 
-/// `<op>: <Go errno text>`, keeping the error kind.
+/// `<op>: <io error>`, keeping the error kind.
 fn context(op: &str, err: io::Error) -> io::Error {
-    io::Error::new(err.kind(), format!("{op}: {}", gostd::os_error_text(&err)))
+    io::Error::new(err.kind(), format!("{op}: {err}"))
 }
 
 /// An unnamed Job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no other
@@ -180,7 +178,7 @@ pub(crate) mod hooks {
     }
 }
 
-/// Go `exec.Cmd.Start` for a provider: spawns `cmd` suspended inside the
+/// Starts a provider: spawns `cmd` suspended inside the
 /// owner Job, assigns it to its own new kill-on-close Job, then resumes it.
 /// A failure after the spawn terminates and reaps the child before the
 /// error returns; its Job handle closes with it.
@@ -219,7 +217,7 @@ pub fn has_console() -> bool {
 /// `CREATE_NO_WINDOW` when the owner has no console. A console program
 /// started by a process without a console otherwise gets a new visible
 /// console window; a fully redirected detached owner (`DETACHED_PROCESS`)
-/// is such a process. With a console the provider shares it, as in Go.
+/// is such a process. With a console the provider shares it.
 /// Its stdio is the provider pipes either way.
 pub fn provider_creation_flags(owner_has_console: bool) -> u32 {
     use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
@@ -302,8 +300,8 @@ impl ProcessHandle {
         self.child.id() as i32
     }
 
-    /// Ends the provider's whole Job with exit code 1, the code Go's
-    /// `Process.Kill` (`TerminateProcess(h, 1)`) leaves on Windows.
+    /// Ends the provider's whole Job with exit code 1, the code
+    /// `TerminateProcess(h, 1)` leaves on Windows.
     pub(crate) fn kill_group(&mut self) -> KillOutcome {
         if self.reaped {
             return KillOutcome::Done;
@@ -312,12 +310,12 @@ impl ProcessHandle {
         if unsafe { TerminateJobObject(self.job.as_raw_handle(), 1) } != 0 {
             KillOutcome::Sent
         } else {
-            KillOutcome::Failed(gostd::os_error_text(&io::Error::last_os_error()))
+            KillOutcome::Failed(io::Error::last_os_error().to_string())
         }
     }
 
-    /// One non-blocking wait. Go's Windows `ExitCode` is the `uint32` exit
-    /// code as an `int`, so `0xC0000005` stays positive.
+    /// One non-blocking wait. The exit code is the `uint32` exit
+    /// code as an `i32`, so `0xC0000005` stays positive.
     pub(crate) fn try_reap(&mut self) -> io::Result<Option<ExitState>> {
         let Some(status) = self.child.try_wait()? else {
             return Ok(None);
@@ -476,7 +474,7 @@ fn overlapped_io(handle: HANDLE, buf: *mut u8, len: usize, write: bool, abort: &
     io_error(err, write)
 }
 
-/// A failed pipe call. A read at the closed write end is EOF, as in Go.
+/// A failed pipe call. A read at the closed write end is EOF.
 fn io_error(err: u32, write: bool) -> Io {
     if !write && (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF) {
         return Io::Done(0);
@@ -501,78 +499,42 @@ pub(crate) fn write_some(w: &PipeWriter, buf: &[u8], abort: &Abort) -> Io {
     )
 }
 
-/// Go `(*os.File).Close` on Windows: `CloseHandle` with its error.
+/// Closes a file with `CloseHandle` and returns its error.
 pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
     let handle = file.into_raw_handle();
     // SAFETY: we own the handle and close it exactly once.
     check(unsafe { CloseHandle(handle) })
 }
 
-/// Go `syscall.FullPath`: `GetFullPathNameW`, which reads this process's
-/// current directory (and another drive's own directory for `D:x`). A NUL
-/// in `name` is `EINVAL`, as Go's `UTF16PtrFromString`.
-pub fn full_path(name: &OsStr) -> io::Result<std::ffi::OsString> {
-    use std::os::windows::ffi::OsStringExt;
-    use windows_sys::Win32::Storage::FileSystem::GetFullPathNameW;
-
-    let mut wide: Vec<u16> = name.encode_wide().collect();
-    if wide.contains(&0) {
-        return Err(io::ErrorKind::InvalidInput.into());
-    }
-    wide.push(0);
-    let mut buf = vec![0u16; 100];
-    loop {
-        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
-        // SAFETY: wide is NUL-terminated; buf has len writable u16s.
-        let n =
-            unsafe { GetFullPathNameW(wide.as_ptr(), len, buf.as_mut_ptr(), std::ptr::null_mut()) };
-        if n == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        if n as usize <= buf.len() {
-            // Fits: n excludes the NUL. Too small: n is the size needed.
-            buf.truncate(n as usize);
-            return Ok(std::ffi::OsString::from_wide(&buf));
-        }
-        buf.resize(n as usize, 0);
-    }
-}
-
-/// The program path std must start when the child runs in `dir`: Go's
-/// `StartProcess` rule ([`winpath::join_exe_dir_and_fname`]) with the OS
-/// [`full_path`]. An empty `dir` keeps `program`. The error is Go's
-/// `StartProcess` error (`InvalidInput` reads `invalid argument`).
+/// The program path std must start when the child runs in `dir`.
+/// `CreateProcessW` resolves a relative program against this process's
+/// directory, so a relative program joins `dir` first, and
+/// [`std::path::absolute`] resolves the result. An absolute program and an
+/// empty `dir` keep `program`. An empty program is an `InvalidInput` error.
 pub fn program_in_dir(program: &Path, dir: &Path) -> io::Result<PathBuf> {
-    if dir.as_os_str().is_empty() {
+    if dir.as_os_str().is_empty() || program.is_absolute() {
         return Ok(program.to_path_buf());
     }
-    let full = |b: &[u8]| -> io::Result<Vec<u8>> {
-        // SAFETY: winpath passes pieces of the two valid encoded paths below,
-        // split and joined only at ASCII bytes.
-        let name = unsafe { OsStr::from_encoded_bytes_unchecked(b) };
-        full_path(name).map(std::ffi::OsString::into_encoded_bytes)
-    };
-    let joined = winpath::join_exe_dir_and_fname(
-        dir.as_os_str().as_encoded_bytes(),
-        program.as_os_str().as_encoded_bytes(),
-        &full,
-    )?;
-    // SAFETY: valid encoded bytes from full_path or the input.
-    Ok(PathBuf::from(unsafe {
-        std::ffi::OsString::from_encoded_bytes_unchecked(joined)
-    }))
+    if program.as_os_str().is_empty() {
+        return Err(io::ErrorKind::InvalidInput.into());
+    }
+    std::path::absolute(dir.join(program))
 }
 
-/// Go `exec.ErrNotFound` on Windows.
+/// A name with no directory and no drive: [`Path::file_name`] is the whole
+/// name.
+pub(crate) fn is_bare_name(name: &str) -> bool {
+    Path::new(name).file_name() == Some(OsStr::new(name))
+}
+
+/// Error text for an executable that is not found.
 pub(crate) const ERR_NOT_FOUND: &str = "executable file not found in %PATH%";
-/// Go `fs.ErrNotExist`.
 const ERR_NOT_EXIST: &str = "file does not exist";
-/// Go `fs.ErrPermission`.
 const ERR_PERMISSION: &str = "permission denied";
 
-/// The process-level inputs of Go's Windows `LookPath`, besides `PATH`:
+/// The process-level inputs of the Windows executable lookup, besides `PATH`:
 /// `PATHEXT` and whether `NoDefaultCurrentDirectoryInExePath` is set (any
-/// value). Go reads both from the process environment.
+/// value). Both come from the process environment.
 #[derive(Debug, Clone, Default)]
 pub struct LookEnv {
     pub path_ext: Option<std::ffi::OsString>,
@@ -580,7 +542,7 @@ pub struct LookEnv {
 }
 
 impl LookEnv {
-    /// This process's values, as Go's `os.Getenv` reads them.
+    /// This process's values, as `std::env::var_os` reads them.
     pub fn process() -> LookEnv {
         LookEnv {
             path_ext: std::env::var_os("PATHEXT"),
@@ -589,14 +551,15 @@ impl LookEnv {
     }
 }
 
-/// Go `exec.pathExt`: lower-cased `PATHEXT` entries with a leading dot, or
+/// Lower-cased `PATHEXT` entries with a leading dot, or
 /// `.com .exe .bat .cmd` when unset or empty.
 pub fn path_ext(value: Option<&OsStr>) -> Vec<String> {
     let value = value.map(|v| v.to_string_lossy()).unwrap_or_default();
     if value.is_empty() {
         return [".com", ".exe", ".bat", ".cmd"].map(String::from).to_vec();
     }
-    gostd::to_lower(&value)
+    value
+        .to_lowercase()
         .split(';')
         .filter(|e| !e.is_empty())
         .map(|e| {
@@ -609,20 +572,16 @@ pub fn path_ext(value: Option<&OsStr>) -> Vec<String> {
         .collect()
 }
 
-/// Go `exec.chkStat`: exists (following links) and is not a directory.
+/// Exists (following links) and is not a directory.
 fn chk_stat(file: &Path) -> Result<(), String> {
     match std::fs::metadata(file) {
         Ok(meta) if meta.is_dir() => Err(ERR_PERMISSION.to_string()),
         Ok(_) => Ok(()),
-        Err(e) => Err(format!(
-            "GetFileAttributesEx {}: {}",
-            file.display(),
-            gostd::os_error_text(&e)
-        )),
+        Err(e) => Err(format!("GetFileAttributesEx {}: {e}", file.display())),
     }
 }
 
-/// Go `exec.hasExt`: a `.` after the last separator or colon.
+/// A `.` after the last separator or colon.
 fn has_ext(file: &[u8]) -> bool {
     let Some(dot) = file.iter().rposition(|&c| c == b'.') else {
         return false;
@@ -638,7 +597,7 @@ fn with_suffix(file: &Path, ext: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Go `exec.findExecutable` (Windows).
+/// Finds an executable by name, trying each extension in `exts`.
 fn find_executable(file: &Path, exts: &[String]) -> Result<PathBuf, String> {
     if exts.is_empty() {
         return chk_stat(file).map(|()| file.to_path_buf());
@@ -661,7 +620,7 @@ fn find_executable(file: &Path, exts: &[String]) -> Result<PathBuf, String> {
     }
 }
 
-/// Go `exec.lookPath` (Windows) for one `PATHEXT` list.
+/// Looks up `file` for one `PATHEXT` list.
 pub fn look_path_exts(
     file: &str,
     exts: &[String],
@@ -679,21 +638,20 @@ pub fn look_path_exts(
     }
     let mut dot: Option<PathBuf> = None;
     if !no_dot {
-        let joined = winpath::join_paths(Path::new("."), Path::new(file));
+        let joined = crate::paths::join(Path::new("."), Path::new(file));
         if let Ok(f) = find_executable(&joined, exts) {
             dot = Some(f);
         }
     }
     let path_env = path_env.unwrap_or_default();
-    for dir in winpath::split_list(path_env.as_encoded_bytes()) {
-        if dir.is_empty() {
+    // `split_paths` splits at `;` and removes quotes; a quoted part may
+    // contain `;`.
+    for dir in std::env::split_paths(path_env) {
+        if dir.as_os_str().is_empty() {
             // Skipped, as PowerShell does.
             continue;
         }
-        // SAFETY: pieces of a valid encoding split at ASCII bytes.
-        let dir = unsafe { OsStr::from_encoded_bytes_unchecked(&dir) };
-        let Ok(f) = find_executable(&winpath::join_paths(Path::new(dir), Path::new(file)), exts)
-        else {
+        let Ok(f) = find_executable(&crate::paths::join(&dir, Path::new(file)), exts) else {
             continue;
         };
         if let Some(dotf) = &dot {
@@ -703,7 +661,7 @@ pub fn look_path_exts(
                 return Err(error(super::ERR_DOT.to_string(), dot));
             }
         }
-        if !winpath::is_abs_path(&f) {
+        if !f.is_absolute() {
             if dot.is_none() {
                 dot = Some(f);
             }
@@ -717,7 +675,7 @@ pub fn look_path_exts(
     }
 }
 
-/// Go `os.SameFile` after two `os.Lstat`s: the same volume and file index,
+/// Compares two paths by identity: the same volume and file index,
 /// without following a final link. False when either cannot be read.
 pub fn same_file(a: &Path, b: &Path) -> bool {
     use std::os::windows::fs::OpenOptionsExt as _;
@@ -746,7 +704,7 @@ pub fn same_file(a: &Path, b: &Path) -> bool {
     matches!((id(a), id(b)), (Some(x), Some(y)) if x == y)
 }
 
-/// Go `exec.lookExtensions(path, dir)`: resolves the extension of a name
+/// Resolves the extension of a name
 /// that has a separator, without a `%PATH%` search.
 pub fn look_extensions(path: &str, dir: &str, env: &LookEnv) -> Result<PathBuf, LookPathError> {
     if matches!(path, "" | "." | "..") {
@@ -757,26 +715,30 @@ pub fn look_extensions(path: &str, dir: &str, env: &LookEnv) -> Result<PathBuf, 
         });
     }
     let mut path = path.to_string();
-    if winpath::base(path.as_bytes()) == path.as_bytes() {
+    if is_bare_name(&path) {
         path = format!(".\\{path}");
     }
     let exts = path_ext(env.path_ext.as_deref());
-    let ext = winpath::ext(path.as_bytes());
-    if !ext.is_empty() && exts.iter().any(|e| e.as_bytes().eq_ignore_ascii_case(ext)) {
+    let ext = Path::new(&path).extension();
+    if let Some(ext) = ext
+        && exts
+            .iter()
+            .any(|e| e.as_bytes()[1..].eq_ignore_ascii_case(ext.as_encoded_bytes()))
+    {
         // Assume the path was already resolved.
         return Ok(PathBuf::from(path));
     }
     let look = |p: &str| look_path_exts(p, &exts, None, env.no_dot, same_file);
-    let bytes = path.as_bytes();
-    if dir.is_empty()
-        || winpath::volume_name_len(bytes) != 0
-        || (bytes.len() > 1 && winpath::is_sep(bytes[0]))
-    {
+    // A drive or a root: `dir` does not apply.
+    let rooted = matches!(
+        Path::new(&path).components().next(),
+        Some(Component::Prefix(_) | Component::RootDir)
+    );
+    if dir.is_empty() || rooted {
         return look(&path);
     }
-    let joined = winpath::join(&[dir.as_bytes(), bytes]);
-    // SAFETY: built from two valid strings joined at ASCII bytes.
-    let joined = unsafe { String::from_utf8_unchecked(joined) };
+    let joined = crate::paths::join(Path::new(dir), Path::new(&path));
+    let joined = joined.to_string_lossy().into_owned();
     let lp = look(&joined)?;
     let lp = lp.to_string_lossy();
     let ext = lp.strip_prefix(&joined).unwrap_or_default();

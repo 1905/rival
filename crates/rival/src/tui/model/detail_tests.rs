@@ -1,5 +1,4 @@
-//! Go `viewport_test.go` and `detail_view_test.go` at the model level, the
-//! stop flow, and the detail and preview golden frames. Every log read,
+//! Viewport and detail view tests at the model level, the stop flow, and the detail and preview golden frames. Every log read,
 //! prompt load and stop runs through `testkit::drive`, the way the runtime's
 //! workers will; processes are always the testkit fakes.
 
@@ -72,7 +71,7 @@ fn frame_rows(m: &Model) -> Vec<String> {
     frame_text(m).split('\n').map(str::to_string).collect()
 }
 
-/// Go `visible`: whether content line `line` is on screen.
+/// Whether content line `line` is on screen.
 fn visible(m: &Model, line: usize) -> bool {
     let off = m.detail.vp.y_offset();
     line >= off && line < off + m.detail.vp.height()
@@ -84,7 +83,7 @@ fn append(path: &str, line: &str) {
     writeln!(f, "{line}").unwrap();
 }
 
-/// Go `newTestModel`: one running run with a long prompt and `log`.
+/// One running run with a long prompt and `log`.
 fn width_test_run(h: &Harness, log: &str) -> Vec<Arc<Session>> {
     vec![Arc::new(Session {
         prompt: "review this repository carefully ".repeat(40),
@@ -102,12 +101,12 @@ fn width_test_run(h: &Harness, log: &str) -> Vec<Arc<Session>> {
     })]
 }
 
-/// Go `nastyLog`: tabs, CJK and ANSI escapes.
+/// A log with tabs, CJK and ANSI escapes.
 const NASTY_LOG: &str = "\tfunc main() {\n\t\tfmt.Println(\"日本語のテキストはとても幅が広いですね、これは長い行です\")\n\x1b[31m\terror: something went terribly wrong in a very long line that must wrap\x1b[0m\n\t}\n";
 
-// --- Go viewport_test.go --------------------------------------------------------
+// --- viewport --------------------------------------------------------------------
 
-// Go: TestViewNeverExceedsWidth. Rust tab keys: 3 Prompt, 4 Info, 2 Raw.
+// Rust tab keys: 3 Prompt, 4 Info, 2 Raw.
 #[test]
 fn view_never_exceeds_width() {
     let h = harness();
@@ -145,7 +144,6 @@ fn view_never_exceeds_width() {
     }
 }
 
-// Go: TestDetailFrameFitsTheTerminal.
 #[test]
 fn detail_frame_fits_the_terminal() {
     let h = harness();
@@ -170,7 +168,6 @@ fn detail_frame_fits_the_terminal() {
     }
 }
 
-// Go: TestEnterEscKeepsTheCursor.
 #[test]
 fn enter_esc_keeps_the_cursor() {
     let h = harness();
@@ -183,7 +180,6 @@ fn enter_esc_keeps_the_cursor() {
     assert_eq!((m.mode, selected_id(&m)), (Mode::List, want));
 }
 
-// Go: TestDetailScrollKeysReachTheViewport.
 #[test]
 fn detail_scroll_keys_reach_the_viewport() {
     let h = harness();
@@ -211,7 +207,7 @@ fn detail_scroll_keys_reach_the_viewport() {
     assert!(frame_rows(&m)[m.lay.header_h + 3].starts_with("scrollable line"));
 }
 
-// Go: TestDetailSelectionSurvivesReorder. A queued run starting while a
+// A queued run starting while a
 // detail view is open re-sorts the list; the view follows the session, not
 // the index.
 #[test]
@@ -254,7 +250,7 @@ fn detail_selection_survives_reorder() {
     );
     assert_eq!(selected_id(&m), watched.id);
     other.status = "running".into();
-    other.start_time = now;
+    other.start_time = Some(now);
     drive(
         &mut m,
         &h.env,
@@ -274,7 +270,6 @@ fn detail_selection_survives_reorder() {
     assert!(frame_text(&m).contains("watched output"));
 }
 
-// Go: TestDetailExitsWhenSelectionDisappears.
 #[test]
 fn detail_exits_when_selection_disappears() {
     let h = harness();
@@ -314,7 +309,6 @@ fn detail_exits_when_selection_disappears() {
     );
 }
 
-// Go: TestWideFrameShowsListAndPreviewSideBySide.
 #[test]
 fn wide_frame_shows_list_and_preview_side_by_side() {
     let h = harness();
@@ -359,7 +353,6 @@ fn wide_frame_shows_list_and_preview_side_by_side() {
     assert!(preview[4].starts_with("LIVE-RUN-OUTPUT"), "{preview:?}");
 }
 
-// Go: TestNarrowFrameHasNoPreview.
 #[test]
 fn narrow_frame_has_no_preview() {
     let h = harness();
@@ -374,7 +367,6 @@ fn narrow_frame_has_no_preview() {
     assert_eq!(reads(), 0, "no preview, no read");
 }
 
-// Go: TestTooSmallFrameIsTheNoticeOnly.
 #[test]
 fn too_small_frame_is_the_notice_only() {
     let h = harness();
@@ -385,7 +377,6 @@ fn too_small_frame_is_the_notice_only() {
     assert_eq!(reads(), 0);
 }
 
-// Go: TestMovingTheCursorRefreshesThePreview.
 #[test]
 fn moving_the_cursor_refreshes_the_preview() {
     let h = harness();
@@ -401,7 +392,6 @@ fn moving_the_cursor_refreshes_the_preview() {
     assert!(frame_text(&m).contains("FAIL-RUN-OUTPUT"));
 }
 
-// Go: TestTickRereadsThePreviewOnlyWhenTheLogChanged.
 #[test]
 fn tick_rereads_the_preview_only_when_the_log_changed() {
     let h = harness();
@@ -427,7 +417,6 @@ fn tick_rereads_the_preview_only_when_the_log_changed() {
     assert_eq!(reads(), before);
 }
 
-// Go: TestSessionEventRefreshesAFinishedPreview.
 #[test]
 fn session_event_refreshes_a_finished_preview() {
     let h = harness();
@@ -439,9 +428,8 @@ fn session_event_refreshes_a_finished_preview() {
     assert!(frame_text(&m).contains("REWRITTEN"));
 }
 
-// --- Go detail_view_test.go -------------------------------------------------------
+// --- detail view -----------------------------------------------------------------
 
-// Go: TestDetailOpenDefaults.
 #[test]
 fn detail_open_defaults() {
     let h = harness();
@@ -452,7 +440,7 @@ fn detail_open_defaults() {
     assert!(m.detail.follow);
 }
 
-// Go: TestDetailTabKeys, with Rust's numbers and the Result tab.
+// The tab number keys, the Result tab included.
 #[test]
 fn detail_tab_keys() {
     let h = harness();
@@ -484,7 +472,6 @@ fn detail_tab_keys() {
     );
 }
 
-// Go: TestDetailMembersFollowSortGroupMembersAndWrap.
 #[test]
 fn detail_members_follow_sort_group_members_and_wrap() {
     let h = harness();
@@ -527,7 +514,7 @@ fn detail_members_follow_sort_group_members_and_wrap() {
     assert!(frame_text(&m).contains("JUDGE-OUTPUT"));
 }
 
-// Go: TestDetailPromptTab. The list holds summaries; the Prompt tab loads
+// The list holds summaries; the Prompt tab loads
 // the full stored prompt, and falls back to the preview when it cannot.
 #[test]
 fn detail_prompt_tab() {
@@ -549,7 +536,7 @@ fn detail_prompt_tab() {
     let summary = Session {
         prompt: String::new(),
         pid: 0,
-        start_time: fixed_now() - TimeDelta::minutes(1),
+        start_time: Some(fixed_now() - TimeDelta::minutes(1)),
         ..stored
     };
     let missing = Session {
@@ -624,7 +611,6 @@ fn a_late_prompt_load_is_dropped() {
     assert!(m.detail.prompts.is_empty());
 }
 
-// Go: TestDetailFollowPausesAndResumes.
 #[test]
 fn detail_follow_pauses_and_resumes() {
     let h = harness();
@@ -708,7 +694,6 @@ fn detail_follow_pauses_and_resumes() {
     );
 }
 
-// Go: TestDetailBreadcrumb.
 #[test]
 fn detail_breadcrumb() {
     let h = harness();
@@ -725,7 +710,6 @@ fn detail_breadcrumb() {
     assert!(crumb.contains("✓ completed 2m36s"), "{crumb:?}");
 }
 
-// Go: TestDetailTooSmallTerminal.
 #[test]
 fn detail_too_small_terminal() {
     let h = harness();
@@ -738,7 +722,7 @@ fn detail_too_small_terminal() {
     assert!(m.detail.vp.height() >= 1);
 }
 
-/// Go `searchFixture`: 120 lines, "Fingerprint" on lines 10, 50 and 90.
+/// 120 lines, "Fingerprint" on lines 10, 50 and 90.
 fn search_fixture(h: &Harness) -> Vec<Arc<Session>> {
     let mut b = String::new();
     for i in 0..120 {
@@ -765,7 +749,7 @@ fn search_fixture(h: &Harness) -> Vec<Arc<Session>> {
 }
 
 /// Opens `list`'s first run on the Raw tab. A finished run opens on
-/// Result; Go's search cases run on its Output tab, which is Raw here.
+/// Result; the search cases run on Raw.
 fn open_raw(h: &Harness, list: Vec<Arc<Session>>, width: u16, height: u16) -> Model {
     let mut m = open_detail(&h.env, list, width, height);
     drive(&mut m, &h.env, [key("2")]);
@@ -788,7 +772,6 @@ fn painted(m: &Model) -> String {
     out
 }
 
-// Go: TestDetailSearch.
 #[test]
 fn detail_search() {
     let h = harness();
@@ -839,7 +822,6 @@ fn detail_search() {
     assert_eq!(m.mode, Mode::List, "second esc returns to the list");
 }
 
-// Go: TestDetailSearchNoMatches.
 #[test]
 fn detail_search_no_matches() {
     let h = harness();
@@ -850,7 +832,6 @@ fn detail_search_no_matches() {
     assert!(frame_text(&m).contains("/zzz  no matches · esc clear"));
 }
 
-// Go: TestSearchInputTypesQ.
 #[test]
 fn search_input_types_q() {
     let h = harness();
@@ -862,7 +843,6 @@ fn search_input_types_q() {
     assert!(m.mode == Mode::Detail && m.detail.search.value().is_empty());
 }
 
-// Go: TestSearchNearTailKeepsFollowOff.
 #[test]
 fn search_near_tail_keeps_follow_off() {
     let h = harness();
@@ -889,7 +869,6 @@ fn search_near_tail_keeps_follow_off() {
     assert!(!m.detail.follow, "a search near the tail turned follow on");
 }
 
-// Go: TestDetailMemberSurvivesMembershipChange.
 #[test]
 fn detail_member_survives_membership_change() {
     let h = harness();
@@ -906,7 +885,6 @@ fn detail_member_survives_membership_change() {
     assert!(frame_text(&m).contains("GEMINI-OUTPUT"));
 }
 
-// Go: TestDetailViewportResizesOnModeChange.
 #[test]
 fn detail_viewport_resizes_on_mode_change() {
     let h = harness();
@@ -957,7 +935,7 @@ fn late_detail_reads_are_dropped() {
 
 // --- stop -------------------------------------------------------------------------
 
-/// Go `runningGroup`: two running members stored in the temp home with fake
+/// Two running members stored in the temp home with fake
 /// PIDs and real recorded start times. Only the testkit fake ever sees the
 /// PIDs.
 fn running_group(h: &Harness) -> Vec<Arc<Session>> {
@@ -1011,7 +989,6 @@ fn stored(env: &JobEnv, s: &Session) -> Session {
     Session::load(&env.paths, &s.id).unwrap()
 }
 
-// Go: TestStopAsksBeforeSignalling.
 #[test]
 fn stop_asks_before_signalling() {
     let h = harness();
@@ -1025,7 +1002,6 @@ fn stop_asks_before_signalling() {
     assert_eq!(m.help_view()[0].to_string().trim_end(), "y yes · n/esc no");
 }
 
-// Go: TestStopCancelSendsNothing.
 #[test]
 fn stop_cancel_sends_nothing() {
     for k in ["n", "esc", "j", "q"] {
@@ -1042,7 +1018,7 @@ fn stop_cancel_sends_nothing() {
     }
 }
 
-// Go: TestStopYesSignalsAndFails. The signal leaves as a job: the update
+// The signal leaves as a job: the update
 // itself never signals.
 #[test]
 fn stop_yes_signals_and_fails() {
@@ -1094,7 +1070,6 @@ fn stop_yes_signals_and_fails() {
     assert!(frame_rows(&m)[m.lay.header_h].contains("✗ failed"));
 }
 
-// Go: TestStopYesOnDeadProcessFailsWithExit1.
 #[test]
 fn stop_yes_on_dead_process_fails_with_exit_1() {
     let h = harness();
@@ -1109,7 +1084,6 @@ fn stop_yes_on_dead_process_fails_with_exit_1() {
     );
 }
 
-// Go: TestStopOnFinishedRunSaysNothingRunning.
 #[test]
 fn stop_on_finished_run_says_nothing_running() {
     let h = harness();
@@ -1141,7 +1115,6 @@ fn stop_on_finished_run_says_nothing_running() {
     );
 }
 
-// Go: TestStopYesSkipsARunThatFinishedMeanwhile.
 #[test]
 fn stop_yes_skips_a_run_that_finished_meanwhile() {
     let h = harness();
@@ -1170,7 +1143,7 @@ fn stop_yes_skips_a_run_that_finished_meanwhile() {
     }
 }
 
-// Go: TestStopNeverSignalsAReusedPID. The process dies and its PID is reused
+// The process dies and its PID is reused
 // while the bar is open: the job's identity check refuses the signal.
 #[test]
 fn stop_never_signals_a_reused_pid() {
@@ -1186,7 +1159,6 @@ fn stop_never_signals_a_reused_pid() {
     assert_eq!((st.status.as_str(), st.exit_code), ("failed", Some(1)));
 }
 
-// Go: TestStopOnDeadRunningRecordSaysNothingRunning.
 #[test]
 fn stop_on_dead_running_record_says_nothing_running() {
     let h = harness();
@@ -1198,7 +1170,6 @@ fn stop_on_dead_running_record_says_nothing_running() {
     assert!(signals().is_empty());
 }
 
-// Go: TestStopRefusesARunWithoutRecordedStart.
 #[test]
 fn stop_refuses_a_run_without_recorded_start() {
     let h = harness();

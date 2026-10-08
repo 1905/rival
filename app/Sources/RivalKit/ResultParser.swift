@@ -1,12 +1,12 @@
 import Foundation
 
-// A port of the Go answer extraction (`rival/internal/review/parse.go`,
-// `plan.go`, `review_format.go`), so the app and `rival` agree on what a run's
+// A port of the rival CLI's answer extraction (review parsing, plan parsing
+// and review formatting), so the app and `rival` agree on what a run's
 // answer is.
 
 /// One finding of a reviewer or plan payload (`review.ReviewerFinding`).
 /// Missing or null strings decode as "", missing or null ints as 0. A value of
-/// the wrong type is a decode error, as in Go.
+/// the wrong type is a decode error, as in the rival CLI.
 public struct Finding: Decodable, Equatable, Sendable {
     public var file: String
     public var line: Int
@@ -61,7 +61,7 @@ public struct Finding: Decodable, Equatable, Sendable {
 
 /// What the Result tab shows for a finished run.
 public enum RunResult: Equatable, Sendable {
-    /// A JSON payload. `rating` is set for plan and antislop payloads, nil for
+    /// A JSON payload. `rating` is set for plan payloads, nil for
     /// a code review. `findings` are placeholder-free and sorted.
     case findings(summary: String, rating: Int?, findings: [Finding])
     /// A prose answer, sanitized for display.
@@ -263,7 +263,7 @@ public func parseRunResult(raw: String) -> RunResult {
     // the answer, so this check comes before the JSON scan.
     if answer == raw && isCodexTranscript(raw) { return .failed("no answer in the log") }
 
-    // Key presence is real presence, as Go `hasJSONKey`.
+    // Key presence is real presence, as in the rival CLI.
     var candidates: [(text: Substring, hasRating: Bool)] = []
     for obj in jsonObjects(answer) {
         guard let dict = try? JSONSerialization.jsonObject(with: Data(obj.utf8)) as? [String: Any],

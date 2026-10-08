@@ -1,5 +1,4 @@
-//! Security review validation and rendering. Go:
-//! `internal/review/security.go`.
+//! Security review validation and rendering.
 
 use anyhow::anyhow;
 
@@ -11,7 +10,6 @@ use super::parse::parse_reviewer_output;
 use super::prompt::CLEAN_REVIEW_EXAMPLE_LINE;
 use super::types::ReviewerOutput;
 use crate::config;
-use crate::gostd;
 
 #[cfg(test)]
 mod tests;
@@ -34,8 +32,8 @@ pub fn validate_security_result(out: Option<&ReviewerOutput>, raw: &str) -> anyh
         }
         if !known_severity(&f.severity) {
             return Err(anyhow!(
-                "finding {n} has an unknown severity {}",
-                gostd::quote(&f.severity)
+                "finding {n} has an unknown severity {:?}",
+                f.severity
             ));
         }
     }
@@ -62,9 +60,9 @@ fn security_echo(out: &ReviewerOutput, raw: &str) -> bool {
 }
 
 /// The echo check for bug-hunter reviews. Codex writes the whole prompt into
-/// its log, and a reviewer may quote prompt.go (security markers included)
-/// in tool output, so no marker is evidence. The output is an echo only
-/// when no reviewer payload follows the last copy of the prompt's clean
+/// its log, and a reviewer may quote the prompt source (security markers
+/// included) in tool output, so no marker is evidence. The output is an echo
+/// only when no reviewer payload follows the last copy of the prompt's clean
 /// example.
 pub(crate) fn bug_hunter_echo(out: &ReviewerOutput, raw: &str) -> bool {
     if !is_clean_example(out) {

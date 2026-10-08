@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write
 
 # Kimi K3 runner
 
-Run Kimi K3 through the `rival` Go binary (served by the opencode CLI's
+Run Kimi K3 through the `rival` binary (served by the opencode CLI's
 Moonshot provider, 1M context). K3 is a thinking-only model pinned to **max
 reasoning** — there is no lighter level. `review` runs are **mechanically
 sandboxed read-only** (same permission profile as the megareview reviewers);

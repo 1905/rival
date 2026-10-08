@@ -55,7 +55,7 @@ fn summary_of(paths: &Paths, s: &Session) -> Session {
     summary
 }
 
-// Go: TestKillReloadsBeforeFail. The TUI list is built from summaries,
+// The TUI list is built from summaries,
 // which never carry the full prompt. Killing a session must reload the
 // stored record before it writes, or the save destroys the prompt on disk.
 #[test]
@@ -88,7 +88,7 @@ fn kill_reloads_before_fail() {
     assert_eq!(row.prompt, "", "apply copies the status fields only");
 }
 
-// Go fallback: a record that cannot be reloaded is failed from the
+// Fallback: a record that cannot be reloaded is failed from the
 // in-memory copy. Its prompt is lost, but the session does not stay stuck in
 // "running".
 #[test]
@@ -105,10 +105,7 @@ fn kill_fails_the_in_memory_copy_when_the_reload_fails() {
     let stored = Session::load(h.paths(), &full.id).unwrap();
     assert_eq!(stored.status, "failed");
     assert_eq!(stored.exit_code, Some(1));
-    assert_eq!(
-        stored.prompt, "",
-        "the fallback writes the summary, as in Go"
-    );
+    assert_eq!(stored.prompt, "", "the fallback writes the summary");
 }
 
 // A save that fails is reported as no update, so the row keeps its status.
@@ -334,8 +331,8 @@ fn stop_job_leaves_a_run_that_completed_while_it_waited() {
     assert!(signals().is_empty());
 }
 
-/// When the record cannot be read, the confirmed snapshot decides, as in
-/// Go: the live target is signalled and failed from the in-memory copy.
+/// When the record cannot be read, the confirmed snapshot decides: the
+/// live target is signalled and failed from the in-memory copy.
 #[test]
 fn stop_job_falls_back_to_the_snapshot_when_the_record_is_unreadable() {
     let h = harness();

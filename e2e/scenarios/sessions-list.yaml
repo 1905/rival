@@ -1,0 +1,231 @@
+{
+  "name": "sessions-list",
+  "description": "`rival sessions` lists sessions newest first. A live `run claude --prompt-stdin --no-queue` holds a running session (its owner is alive, so the pre-run reap keeps it). Rows show the 8-char id, engine label (codex, kimi-k3, claude), status and duration, with 'running...' for an empty running duration. --recent N keeps the first N only when 0 < N < number of sessions; --active keeps only running sessions. After the live run completes, --active finds nothing. The live id prefix is normalised to <ID8>.",
+  "timeout": 120,
+  "fixtures": [
+    {
+      "write": "home/.rival/sessions/sess-new-completed.json",
+      "json": {
+        "id": "sess-new-completed",
+        "cli": "codex",
+        "model": "gpt-6-astra",
+        "effort": "xhigh",
+        "status": "completed",
+        "duration": "1m2s",
+        "start_time": "2026-01-02T00:00:00Z"
+      }
+    },
+    {
+      "write": "home/.rival/sessions/sess-old-failed.json",
+      "json": {
+        "id": "sess-old-failed",
+        "cli": "opencode",
+        "model": "moonshotai/kimi-k3",
+        "effort": "max",
+        "status": "failed",
+        "duration": "3s",
+        "start_time": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "mkdir": "sync"
+    }
+  ],
+  "normalise": [
+    {
+      "regex": "(?m)^([0-9a-f]{8})  claude ",
+      "kind": "replace",
+      "replace": "<ID8>"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv_prefix": [
+              "-p"
+            ],
+            "times": 1,
+            "touch": "<ROOT>/sync/running",
+            "wait_for": "<ROOT>/sync/go",
+            "wait_timeout": 60,
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "start": "a",
+      "run": [
+        "run",
+        "claude",
+        "--prompt-stdin",
+        "--no-queue"
+      ],
+      "stdin": "first"
+    },
+    {
+      "wait_file": "sync/running",
+      "timeout": 30
+    },
+    {
+      "run": [
+        "sessions"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--recent",
+        "2"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--recent",
+        "3"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--recent",
+        "0"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--active"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--active",
+        "--recent",
+        "5"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<ID8>  claude                running     medium  running...\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--recent",
+        "x"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "invalid argument \"x\" for \"--recent\" flag: strconv.ParseInt: parsing \"x\": invalid syntax"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "touch": "sync/go"
+    },
+    {
+      "wait": "a",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "sessions",
+        "--active"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "No sessions found.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/sess-new-completed.json",
+      ".rival/sessions/sess-old-failed.json"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "cli": "claude",
+          "mode": "native"
+        }
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  }
+}

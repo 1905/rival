@@ -1,5 +1,5 @@
-//! Ports of Go `internal/config/{config,codex,kimi,security,antislop}_test.go`
-//! plus golden pins of the ported Go texts. Every test builds its own
+//! Config, codex, kimi and security tests, plus golden pins of the prompt
+//! texts. Every test builds its own
 //! [`Config`] from an explicit env map; nothing reads or mutates the process
 //! environment or the real `~/.rival`.
 
@@ -52,8 +52,8 @@ fn loaded(body: &str) -> (tempfile::TempDir, Config) {
     (home, config)
 }
 
-/// `<home>/.rival/config.yaml` with host separators, as Go's
-/// `filepath.Join` writes it.
+/// `<home>/.rival/config.yaml` with host separators, as
+/// `Path::join` writes it.
 fn config_path(home: &Path) -> PathBuf {
     home.join(".rival").join("config.yaml")
 }
@@ -114,11 +114,10 @@ fn runtime_env_refresh_keeps_the_initial_user_config_and_error() {
     assert_eq!(refreshed.user_config_error(), Some(&err));
 }
 
-// ---- config_test.go ----
+// ---- config tests ----
 
 #[test]
 fn max_concurrent() {
-    // Go TestMaxConcurrent.
     let cases = [
         ("unset uses two", "", 2),
         ("explicit override", "3", 3),
@@ -136,7 +135,6 @@ fn max_concurrent() {
 
 #[test]
 fn run_timeout() {
-    // Go TestRunTimeout.
     let cases = [
         ("unset → default", "", DEFAULT_RUN_TIMEOUT),
         ("explicit duration", "10m", 10 * MIN),
@@ -170,7 +168,7 @@ fn queue_timeout() {
 
 #[test]
 fn max_run_wait() {
-    // Go TestMaxRunWait: queue 30m + 2*run 30m + 5m margin = 95m by default.
+    // Queue 30m + 2*run 30m + 5m margin = 95m by default.
     let got = cfg(&[("RIVAL_QUEUE_TIMEOUT", ""), ("RIVAL_RUN_TIMEOUT", "")]).max_run_wait();
     assert_eq!(got, (95 * MIN).as_nanos() as i64, "default");
     // 10 + 2*20 + 5 = 55m
@@ -186,12 +184,12 @@ fn max_run_wait() {
         (35 * MIN).as_nanos() as i64,
         "run timeout disabled → queue + margin only"
     );
-    assert_eq!(gostd::format_duration(95 * 60 * 1_000_000_000), "1h35m0s");
+    assert_eq!(duration::format(95 * 60 * 1_000_000_000), "1h35m0s");
 }
 
 #[test]
 fn with_run_timeout_budget() {
-    // Go TestWithRunTimeout: the context deadline is the returned budget.
+    // The context deadline is the returned budget.
     assert_eq!(
         cfg(&[("RIVAL_RUN_TIMEOUT", "0")]).run_timeout_budget(1),
         None,
@@ -237,7 +235,6 @@ fn queue_disabled() {
 
 #[test]
 fn claude_auth() {
-    // Go TestClaudeAuth.
     let cases: [(&str, &str, &str, Result<&str, &str>); 6] = [
         (
             "default is subscription",
@@ -274,7 +271,7 @@ fn claude_auth() {
             (got, want) => panic!("{name}: got {got:?}, want {want:?}"),
         }
     }
-    // Exact Go messages.
+    // Exact messages.
     let err = cfg(&[("RIVAL_CLAUDE_AUTH", "api")])
         .claude_auth()
         .unwrap_err();
@@ -293,7 +290,6 @@ fn claude_auth() {
 
 #[test]
 fn engine_label_table() {
-    // Go TestEngineLabel.
     let cases = [
         ("codex", GPT56_SOL_MODEL, SOL_LABEL),
         ("codex", "retired-sol-id", SOL_LABEL),
@@ -309,7 +305,7 @@ fn engine_label_table() {
         ("opencode", "", "retired-model"),
         ("grok", GROK_MODEL, GROK_LABEL),
         ("grok", "", GROK_LABEL),
-        // Beyond the Go table: the remaining branches.
+        // The remaining branches.
         ("opencode", GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         ("fable", "", "retired-model"),
         ("astra", "", "astra"),
@@ -328,7 +324,6 @@ fn engine_label_table() {
 
 #[test]
 fn model_label_only_exposes_supported_models() {
-    // Go TestModelLabelOnlyExposesSupportedModels.
     let cases = [
         (GPT56_SOL_MODEL, SOL_LABEL),
         (SOL_LABEL, SOL_LABEL),
@@ -352,7 +347,6 @@ fn model_label_only_exposes_supported_models() {
 
 #[test]
 fn public_runtime_log_normalizes_only_runtime_metadata() {
-    // Go TestPublicRuntimeLogNormalizesOnlyRuntimeMetadata.
     let raw = "OpenAI Codex v0.130.0\n--------\nmodel: retired-sol-id\nprovider: openai\n--------\nuser\n\
                inspect rival/cmd/command_codex.go\n\
                === REVIEW FROM codex (retired-sol-id) [role: bug_hunter] ===\n";
@@ -371,7 +365,7 @@ fn public_runtime_log_normalizes_only_runtime_metadata() {
             "public log exposes {forbidden:?}:\n{got}"
         );
     }
-    // Exact output, traced through the Go algorithm.
+    // Exact output.
     assert_eq!(
         got,
         "Sol runtime v0.130.0\n--------\nmodel: sol\nprovider: openai\n--------\nuser\n\
@@ -382,7 +376,6 @@ fn public_runtime_log_normalizes_only_runtime_metadata() {
 
 #[test]
 fn public_runtime_log_hides_retired_runtime_identities() {
-    // Go TestPublicRuntimeLogHidesRetiredRuntimeIdentities.
     let cases = [
         (
             "claude",
@@ -416,7 +409,6 @@ fn public_runtime_log_hides_retired_runtime_identities() {
 
 #[test]
 fn public_runtime_log_labels_k3_review_header() {
-    // Go TestPublicRuntimeLogLabelsK3ReviewHeader.
     let raw = format!("=== REVIEW FROM opencode ({KIMI_MODEL}) [role: bug_hunter] ===\n");
     let got = public_runtime_log("opencode", KIMI_MODEL, &raw);
     let want = format!("=== REVIEW FROM {K3_LABEL} [role: bug_hunter] ===");
@@ -428,7 +420,6 @@ fn public_runtime_log_labels_k3_review_header() {
 
 #[test]
 fn public_runtime_error_uses_public_model_name() {
-    // Go TestPublicRuntimeErrorUsesPublicModelName.
     let got = public_runtime_error(
         "codex",
         GPT56_SOL_MODEL,
@@ -477,7 +468,7 @@ fn public_runtime_error_rewrites_every_runtime_phrase() {
 }
 
 #[test]
-fn replace_ordered_follows_go_replacer_priority() {
+fn replace_ordered_follows_replacer_priority() {
     // Earlier patterns win at a position even when a later one is longer.
     let pairs = [
         ("ab", "1".to_string()),
@@ -492,7 +483,6 @@ fn replace_ordered_follows_go_replacer_priority() {
 
 #[test]
 fn resolve_effort_precedence_and_model_defaults() {
-    // Go TestResolveEffortPrecedenceAndModelDefaults.
     let config = cfg(&[]);
     for (model, want) in [
         (CODEX_MODEL, "xhigh"),
@@ -540,7 +530,7 @@ fn resolve_effort_precedence_and_model_defaults() {
 }
 
 #[test]
-fn resolve_effort_normalizes_and_reports_go_errors() {
+fn resolve_effort_normalizes_and_reports_errors() {
     let config = cfg(&[]);
     assert_eq!(
         config.resolve_effort(GROK_MODEL, "  HIGH ", "").unwrap(),
@@ -573,38 +563,7 @@ fn resolve_effort_normalizes_and_reports_go_errors() {
 }
 
 #[test]
-fn resolve_antislop_effort_skips_only_the_codex_pin() {
-    let config = cfg(&[]);
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "").unwrap(),
-        "high"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "low").unwrap(),
-        "low"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(CLAUDE_MODEL, "").unwrap(),
-        "medium"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(KIMI_MODEL, "").unwrap(),
-        "max"
-    );
-    assert_eq!(
-        config.resolve_antislop_effort(GROK_MODEL, "").unwrap(),
-        "high"
-    );
-    let config = config.with_user_config(Some(efforts(&[(CODEX_LABEL, "ultra")])));
-    assert_eq!(
-        config.resolve_antislop_effort(CODEX_MODEL, "").unwrap(),
-        "ultra"
-    );
-}
-
-#[test]
 fn grok_effort_defaults_and_configured_override() {
-    // Go TestGrokEffortDefaultsAndConfiguredOverride.
     let config = cfg(&[]);
     assert_eq!(config.default_effort_for_model(GROK_MODEL), "high");
     assert_eq!(
@@ -634,7 +593,6 @@ fn grok_effort_defaults_and_configured_override() {
 
 #[test]
 fn grok_is_a_valid_configured_effort_model() {
-    // Go TestGrokIsAValidConfiguredEffortModel.
     let (_home, config) = loaded("efforts:\n  grok: low\n");
     assert_eq!(config.user_config_error(), None);
     assert_eq!(config.default_effort_for_model(GROK_MODEL), "low");
@@ -642,7 +600,6 @@ fn grok_is_a_valid_configured_effort_model() {
 
 #[test]
 fn grok_is_enumerated_in_effort_model_errors() {
-    // Go TestGrokIsEnumeratedInEffortModelErrors.
     let (home, config) = loaded("efforts:\n  mystery: high\n");
     let err = config
         .user_config_error()
@@ -659,13 +616,12 @@ fn grok_is_enumerated_in_effort_model_errors() {
     assert_eq!(
         config.user_config(),
         None,
-        "Go leaves userConfig nil on error"
+        "user config stays unset on error"
     );
 }
 
 #[test]
 fn grok_concrete_model_id_is_never_exposed() {
-    // Go TestGrokConcreteModelIDIsNeverExposed.
     let raw = format!(
         "=== REVIEW FROM grok ({GROK_MODEL}) [role: bug_hunter] ===\nchecked {GROK_MODEL}\n"
     );
@@ -683,7 +639,6 @@ fn grok_concrete_model_id_is_never_exposed() {
 
 #[test]
 fn load_user_config_validates_effort_map() {
-    // Go TestLoadUserConfigValidatesEffortMap.
     let cases = [
         // sol is a removed model: its old entry is dropped, not an error.
         (
@@ -733,7 +688,7 @@ fn load_user_config_validates_effort_map() {
 }
 
 #[test]
-fn load_user_config_reports_go_messages() {
+fn load_user_config_reports_error_messages() {
     let (home, config) = loaded("efforts:\n  claude: Huge\n");
     let path = config_path(home.path());
     assert_eq!(
@@ -771,7 +726,7 @@ fn load_user_config_reports_go_messages() {
 }
 
 #[test]
-fn load_user_config_normalizes_like_go() {
+fn load_user_config_normalizes_values() {
     let (_home, config) = loaded(
         "claude:\n  subscription: team\nsecurity:\n  reviewer: ' Grok '\nefforts:\n  codex: ' XHigh '\n  grok: LOW\nroles:\n  bug_hunter: hunt\n  empty:\n",
     );
@@ -783,7 +738,7 @@ fn load_user_config_normalizes_like_go() {
     assert_eq!(config.claude_subscription(), "team");
     assert_eq!(config.configured_security_reviewer(), "grok");
     assert_eq!(config.role_prompt_override("bug_hunter"), Some("hunt"));
-    // yaml.v3 decodes a null map value into a Go string as "".
+    // A null map value decodes into a string as "".
     assert_eq!(config.role_prompt_override("empty"), Some(""));
     assert_eq!(config.role_prompt_override("missing"), None);
     assert_eq!(
@@ -846,8 +801,8 @@ fn load_user_config_missing_file_is_silent() {
 
 #[test]
 fn load_user_config_needs_a_known_root() {
-    // Go skips the file when os.UserHomeDir fails; RIVAL_HOME (a Rust-port
-    // addition) is a known root by itself.
+    // The file is skipped when the home directory is unknown; RIVAL_HOME
+    // (an extra root) is a known root by itself.
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("config.yaml"), "efforts:\n  grok: low\n").unwrap();
     let paths = Paths {
@@ -865,7 +820,6 @@ fn load_user_config_needs_a_known_root() {
 
 #[test]
 fn load_user_config_reports_unreadable_config_path() {
-    // Go TestLoadUserConfigReportsUnreadableConfigPath.
     let home = tempfile::tempdir().unwrap();
     let path = home.path().join(".rival").join("config.yaml");
     fs::create_dir_all(&path).unwrap();
@@ -875,20 +829,17 @@ fn load_user_config_reports_unreadable_config_path() {
         .expect("directory at config path was silently ignored");
     let shown = path.display().to_string();
     assert!(err.to_string().contains(&format!("read {shown}")), "{err}");
-    // Go: os.ReadFile wraps the read(2) failure in a *PathError. On Windows
-    // Go's syscall.Open opens the directory too; ReadFile then fails.
+    // On Unix the directory opens and the read fails. On Windows the open
+    // fails.
+    let (op, text) = crate::errtext::DIR_AS_FILE;
     assert_eq!(
         err.to_string(),
-        format!(
-            "read {shown}: read {shown}: {}",
-            crate::gostd::errtext::IS_A_DIRECTORY
-        )
+        format!("read {shown}: {op} {shown}: {text}")
     );
 }
 
 #[test]
 fn load_user_config_ignores_obsolete_megareview_keys() {
-    // Go TestLoadUserConfigIgnoresObsoleteMegareviewKeys.
     let (_home, config) = loaded(
         "review:\n  models: [codex, k3]\nroles:\n  consilium: judge prompt\n  bug_hunter: custom hunter\n",
     );
@@ -911,11 +862,10 @@ fn config_debug_hides_env_values() {
     assert!(shown.contains("<1 vars>"), "{shown}");
 }
 
-// ---- codex_test.go ----
+// ---- codex tests ----
 
 #[test]
 fn codex_is_not_labelled_sol() {
-    // Go TestCodexIsNotLabelledSol.
     assert_eq!(engine_label("codex", CODEX_MODEL), CODEX_LABEL);
     assert_eq!(engine_label("codex", GPT56_SOL_MODEL), SOL_LABEL);
     assert_eq!(model_label(CODEX_MODEL), CODEX_LABEL);
@@ -923,7 +873,6 @@ fn codex_is_not_labelled_sol() {
 
 #[test]
 fn codex_id_normalizes_to_its_label() {
-    // Go TestCodexIDNormalizesToItsLabel.
     let raw = format!("banner from {CODEX_MODEL} done");
     let once = public_runtime_log("codex", CODEX_MODEL, &raw);
     assert!(
@@ -940,7 +889,6 @@ fn codex_id_normalizes_to_its_label() {
 
 #[test]
 fn codex_defaults_to_xhigh() {
-    // Go TestCodexDefaultsToXhigh.
     assert_eq!(cfg(&[]).default_effort_for_model(CODEX_MODEL), "xhigh");
     assert!(
         known_effort_model(CODEX_LABEL),
@@ -950,7 +898,6 @@ fn codex_defaults_to_xhigh() {
 
 #[test]
 fn codex_command_path_keeps_xhigh() {
-    // Go TestCodexCommandPathKeepsXhigh.
     assert_eq!(
         cfg(&[]).resolve_effort(CODEX_MODEL, "", "").unwrap(),
         "xhigh"
@@ -959,7 +906,6 @@ fn codex_command_path_keeps_xhigh() {
 
 #[test]
 fn codex_pin_does_not_override_user_intent() {
-    // Go TestCodexPinDoesNotOverrideUserIntent.
     let config = cfg(&[]);
     assert_eq!(
         config
@@ -976,7 +922,6 @@ fn codex_pin_does_not_override_user_intent() {
 
 #[test]
 fn codex_xhigh_on_every_surface() {
-    // Go TestCodexXhighOnEverySurface.
     let config = cfg(&[]);
     for fallback in ["", DEFAULT_REVIEW_EFFORT, DEFAULT_PLAN_EFFORT] {
         assert_eq!(
@@ -989,7 +934,6 @@ fn codex_xhigh_on_every_surface() {
 
 #[test]
 fn codex_banner_names_the_running_model() {
-    // Go TestCodexBannerNamesTheRunningModel.
     const RAW: &str = "OpenAI Codex v1.0\nready";
     let sol = public_runtime_log("codex", GPT56_SOL_MODEL, RAW);
     assert!(sol.contains("Sol runtime"), "sol banner regressed: {sol:?}");
@@ -1078,11 +1022,10 @@ fn public_review_header_cases() {
     }
 }
 
-// ---- kimi_test.go ----
+// ---- kimi tests ----
 
 #[test]
 fn kimi_api_key_from_prefers_env() {
-    // Go TestKimiAPIKeyFromPrefersEnv.
     let home = tempfile::tempdir().unwrap();
     fs::write(home.path().join(".env"), "MOONSHOT_API_KEY=file-key\n").unwrap();
     let config = home_config(
@@ -1098,7 +1041,7 @@ fn kimi_api_key_from_prefers_env() {
 
 #[test]
 fn kimi_api_key_from_falls_back_to_workdir_env_file() {
-    // Go TestKimiAPIKeyFromFallsBackToWorkdirEnvFile. HOME bounds the walk so
+    // HOME bounds the walk so
     // no real directory above the temp tree is read.
     let home = tempfile::tempdir().unwrap();
     let dir = home.path().join("project");
@@ -1113,7 +1056,6 @@ fn kimi_api_key_from_falls_back_to_workdir_env_file() {
 
 #[test]
 fn kimi_api_key_from_supports_legacy_env_alias() {
-    // Go TestKimiAPIKeyFromSupportsLegacyEnvAlias.
     let home = tempfile::tempdir().unwrap();
     let config = home_config(
         home.path(),
@@ -1124,7 +1066,6 @@ fn kimi_api_key_from_supports_legacy_env_alias() {
 
 #[test]
 fn opencode_variant_kimi_k3_pins_max() {
-    // Go TestOpencodeVariantKimiK3PinsMax.
     for effort in ["low", "medium", "high", "xhigh", "ultra", "max", ""] {
         assert_eq!(opencode_variant(KIMI_MODEL, effort), "max", "{effort:?}");
     }
@@ -1133,7 +1074,6 @@ fn opencode_variant_kimi_k3_pins_max() {
 
 #[test]
 fn kimi_api_key_from_walks_up_to_parent_env_file() {
-    // Go TestKimiAPIKeyFromWalksUpToParentEnvFile.
     let home = tempfile::tempdir().unwrap();
     let root = home.path().join("root");
     let sub = root.join("rival").join("internal");
@@ -1144,7 +1084,7 @@ fn kimi_api_key_from_walks_up_to_parent_env_file() {
 }
 
 #[test]
-fn dotenv_walk_bounds_match_go() {
+fn dotenv_walk_respects_home_and_root_bounds() {
     let top = tempfile::tempdir().unwrap();
     let home = top.path().join("home");
     let project = home.join("p");
@@ -1237,7 +1177,7 @@ fn getenv_case_rule_follows_the_platform() {
         ("zz", "1"),
         ("ZZ", "2"),
     ]);
-    // Windows (Go os.Getenv via GetEnvironmentVariableW): case-insensitive.
+    // Windows (GetEnvironmentVariableW): case-insensitive.
     assert_eq!(getenv_in(true, &env, "PATH"), r"C:\bin");
     assert_eq!(getenv_in(true, &env, "path"), r"C:\bin");
     assert_eq!(getenv_in(true, &env, "Home"), "/h");
@@ -1260,8 +1200,8 @@ fn getenv_case_rule_follows_the_platform() {
 
 /// A fresh home has no `.rival` directory at all. Opening
 /// `<home>/.rival/config.yaml` then fails on its missing parent
-/// (Windows `ERROR_PATH_NOT_FOUND`, Unix `ENOENT`); Go's `ErrNotExist`
-/// covers both, so there is no config and no error.
+/// (Windows `ERROR_PATH_NOT_FOUND`, Unix `ENOENT`); both count as
+/// "not found", so there is no config and no error.
 #[test]
 fn fresh_home_without_rival_dir_has_no_config_error() {
     let home = tempfile::tempdir().unwrap();
@@ -1285,11 +1225,10 @@ fn fresh_home_without_rival_dir_has_no_config_error() {
     assert!(load_user_config(&home.path().join("dir.yaml")).is_err());
 }
 
-// ---- security_test.go ----
+// ---- security tests ----
 
 #[test]
 fn resolve_security_model_defaults_to_k3() {
-    // Go TestResolveSecurityModelDefaultsToK3.
     let entry = cfg(&[]).resolve_security_model().unwrap();
     assert_eq!(entry.name, SECURITY_REVIEWER_K3);
     assert_eq!(entry.model, KIMI_MODEL);
@@ -1311,7 +1250,6 @@ fn resolve_security_model_defaults_to_k3() {
 
 #[test]
 fn resolve_security_model_grok() {
-    // Go TestResolveSecurityModelGrok.
     let entry = cfg(&[])
         .with_user_config(Some(reviewer(SECURITY_REVIEWER_GROK)))
         .resolve_security_model()
@@ -1329,7 +1267,6 @@ fn resolve_security_model_grok() {
 
 #[test]
 fn resolve_security_model_rejects_unknown() {
-    // Go TestResolveSecurityModelRejectsUnknown.
     let err = cfg(&[])
         .with_user_config(Some(reviewer("gpt5")))
         .resolve_security_model()
@@ -1344,7 +1281,7 @@ fn resolve_security_model_rejects_unknown() {
         err.to_string(),
         r#"invalid security.reviewer "gpt5", must be one of: k3, grok"#
     );
-    // Trimmed and lowered, like Go.
+    // Trimmed and lowered.
     let entry = cfg(&[])
         .with_user_config(Some(reviewer("  GROK ")))
         .resolve_security_model()
@@ -1354,14 +1291,13 @@ fn resolve_security_model_rejects_unknown() {
 
 #[test]
 fn grok_labels_do_not_collide() {
-    // Go TestGrokLabelsDoNotCollide.
     assert_ne!(GROK_OPENROUTER_LABEL, GROK_LABEL);
     assert_ne!(GROK_OPENROUTER_LABEL, GROK_MODEL);
 }
 
 #[test]
 fn open_code_entry_for_ignores_config() {
-    // Go TestOpenCodeEntryForIgnoresConfig: a free function cannot consult
+    // A free function cannot consult
     // the security config at all.
     let entry = open_code_entry_for(KIMI_MODEL).expect("K3 model not found in the registry");
     assert_eq!(entry.key_env, "MOONSHOT_API_KEY");
@@ -1374,7 +1310,6 @@ fn open_code_entry_for_ignores_config() {
 
 #[test]
 fn both_groks_normalize_to_their_own_label() {
-    // Go TestBothGroksNormalizeToTheirOwnLabel.
     let xai_log = format!("runtime banner from {GROK_MODEL} finished");
     let got = public_runtime_log(GROK_LABEL, GROK_MODEL, &xai_log);
     assert!(got.contains(GROK_LABEL), "xAI log did not normalize: {got}");
@@ -1390,7 +1325,6 @@ fn both_groks_normalize_to_their_own_label() {
 
 #[test]
 fn k3_key_still_reads_the_legacy_env_alias() {
-    // Go TestK3KeyStillReadsTheLegacyEnvAlias.
     let home = tempfile::tempdir().unwrap();
     fs::write(home.path().join(".env"), "KIMI_API=from-dotenv\n").unwrap();
     let config = home_config(home.path(), &[("MOONSHOT_API_KEY", ""), ("KIMI_API", "")]);
@@ -1419,7 +1353,6 @@ fn security_api_key_from_reads_the_entry_key() {
 
 #[test]
 fn runtime_log_normalization_is_idempotent() {
-    // Go TestRuntimeLogNormalizationIsIdempotent.
     let cases = [
         (
             "openrouter id becomes its label",
@@ -1449,7 +1382,6 @@ fn runtime_log_normalization_is_idempotent() {
 
 #[test]
 fn claude_id_normalizes_to_its_label() {
-    // Go TestClaudeIDNormalizesToItsLabel.
     let raw = format!("banner from {CLAUDE_MODEL} done");
     let once = public_runtime_log("claude", CLAUDE_MODEL, &raw);
     assert!(
@@ -1486,45 +1418,14 @@ fn replace_concrete_model_ids_protects_labels() {
     );
 }
 
-// ---- antislop_test.go ----
+// ---- golden pins of the texts and constants ----
 
-#[test]
-fn antislop_prompt_templates() {
-    // Go TestAntislopPromptTemplates.
-    const EXAMPLE_SUMMARY: &str = r#""summary": "1-3 sentence overall assessment of the plan""#;
-    const CATEGORY_ENUM: &str = "reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni";
-    let prompt = ANTISLOP_CODE_PROMPT;
-    assert!(prompt.contains("{SCOPE}"), "missing placeholder {{SCOPE}}");
-    assert!(
-        !prompt.contains("{FILE}"),
-        "contains foreign placeholder {{FILE}}"
-    );
-    for key in [
-        r#""summary""#,
-        r#""rating""#,
-        r#""findings""#,
-        EXAMPLE_SUMMARY,
-        CATEGORY_ENUM,
-    ] {
-        assert!(prompt.contains(key), "missing {key:?}");
-    }
-    // The echo-skip only works if the example summary matches the plan prompt's.
-    assert!(
-        PLAN_REVIEW_PROMPT.contains(EXAMPLE_SUMMARY),
-        "PLAN_REVIEW_PROMPT example summary diverged from the antislop contract"
-    );
-}
-
-// ---- golden pins of the texts and constants ported from Go `config.go` ----
-
-fn rust_prompts() -> [(&'static str, &'static str); 7] {
+fn rust_prompts() -> [(&'static str, &'static str); 5] {
     [
         ("SystemPrompt", SYSTEM_PROMPT),
         ("WorkdirPreamble", WORKDIR_PREAMBLE),
         ("DiffReviewPreamble", DIFF_REVIEW_PREAMBLE),
         ("PlanReviewPrompt", PLAN_REVIEW_PROMPT),
-        ("antislopJSONContract", antislop_json_contract!()),
-        ("AntislopCodePrompt", ANTISLOP_CODE_PROMPT),
         ("WholeProject", WHOLE_PROJECT),
     ]
 }
@@ -1537,8 +1438,7 @@ fn sha256_hex(s: &str) -> String {
         .collect()
 }
 
-/// Pins the prompt bytes: byte length and SHA-256 of each Go constant as
-/// evaluated from `config.go` before the Go tree was removed.
+/// Pins the prompt bytes: byte length and SHA-256 of each prompt constant.
 #[test]
 fn prompts_sha256_golden() {
     let want = [
@@ -1563,16 +1463,6 @@ fn prompts_sha256_golden() {
             "8c532f2b42d55282aee13a1eb216046b5d2ebe3946ab225359ef9e1317ac9fcc",
         ),
         (
-            "antislopJSONContract",
-            1020,
-            "812ac30dcd653182def8a2cc78eb24c40bb3b38b6a12d4b3bff21a05287c2969",
-        ),
-        (
-            "AntislopCodePrompt",
-            4476,
-            "032e130637a1d5448da3c67544f61a96466b7e055615067655e2e8f86e9ef553",
-        ),
-        (
             "WholeProject",
             18,
             "0e30295534e780eada78822c170a57c0ac174fae0f86ca76b41bcf811e0b95ea",
@@ -1588,8 +1478,7 @@ fn prompts_sha256_golden() {
     }
 }
 
-/// The 26 string constants of Go `config.go`, with the values it held
-/// before the Go tree was removed.
+/// The 25 string constants of the config module, with their pinned values.
 #[test]
 fn string_constants_golden() {
     let got = [
@@ -1608,7 +1497,6 @@ fn string_constants_golden() {
         CLAUDE_DOCKER_TOKEN_ENV,
         DEFAULT_REVIEW_EFFORT,
         DEFAULT_PLAN_EFFORT,
-        DEFAULT_ANTISLOP_EFFORT,
         SESSION_DIR,
         QUEUE_DIR,
         SECURITY_REVIEWER_K3,
@@ -1634,7 +1522,6 @@ fn string_constants_golden() {
         "grok",
         "rival-claude",
         "RIVAL_CLAUDE_TOKEN",
-        "high",
         "high",
         "high",
         ".rival/sessions",
@@ -1664,7 +1551,7 @@ fn string_constants_golden() {
 }
 
 #[test]
-fn claude_effort_level_matches_go_map() {
+fn claude_effort_level_map() {
     let cases = [
         ("low", Some("low")),
         ("medium", Some("medium")),
@@ -1686,7 +1573,7 @@ fn claude_effort_level_matches_go_map() {
 }
 
 #[test]
-fn overflowing_budgets_keep_go_signed_wrap() {
+fn overflowing_budgets_keep_signed_wrap() {
     let c = cfg(&[("RIVAL_RUN_TIMEOUT", "2000000h")]);
     assert_eq!(c.run_timeout_budget(2), Some(-4_046_744_073_709_551_616));
     assert_eq!(c.max_run_wait(), -4_046_741_973_709_551_616);
@@ -1721,20 +1608,4 @@ fn auto_fix_critical_high_defaults_off() {
     }
     let (_home, missing) = loaded("");
     assert_eq!(missing.auto_fix_policy(), "off");
-}
-
-#[test]
-fn ste_rewrite_defaults_off() {
-    for (body, want) in [
-        ("efforts:\n  codex: high\n", false),
-        ("ste_rewrite: false\n", false),
-        ("ste_rewrite:\n", false),
-        ("ste_rewrite: true\n", true),
-    ] {
-        let (_home, config) = loaded(body);
-        assert!(config.user_config_error().is_none(), "{body:?}");
-        assert_eq!(config.ste_rewrite(), want, "{body:?}");
-    }
-    let (_home, missing) = loaded("");
-    assert!(!missing.ste_rewrite());
 }

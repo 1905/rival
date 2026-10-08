@@ -1,29 +1,27 @@
-//! The part of Go `net/url` (Go 1.25.14 `url.go`, plus `netip.ParseAddr`
-//! for IP literals) that decides which MR targets and remote URLs parse,
-//! and what `parseTarget` rebuilds. Every caller discards Go's error text,
-//! so a parse error is `None`.
+//! URL parsing for MR targets and remote URLs: which inputs parse, and
+//! what `parse_target` rebuilds. IP literals follow the strict address
+//! grammar. No caller reads the error text, so a parse error is `None`.
 //!
-//! Go is not WHATWG here: the host keeps its spelling and port, only the
+//! This is not WHATWG parsing: the host keeps its spelling and port, only the
 //! scheme is lowercased, `%XX` in the path decodes without resolving `.` or
-//! `..`, and a bare trailing `?` sets `ForceQuery`. Decoded bytes can be
+//! `..`, and a bare trailing `?` sets `force_query`. Decoded bytes can be
 //! invalid UTF-8, so the host and path are `Vec<u8>`.
 
 #[cfg(test)]
 mod tests;
 
-/// The `url.URL` fields MR parsing reads.
+/// The URL fields MR parsing reads.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct Url {
     pub scheme: String,
-    /// Go `u.User != nil`.
     pub has_user: bool,
     pub host: Vec<u8>,
     pub path: Vec<u8>,
     pub force_query: bool,
 }
 
-/// Go's `encoding` modes that change behavior for these inputs. The path,
-/// user and fragment modes unescape alike once query `+` is out of play.
+/// The escape modes that change behavior for these inputs. The path, user and
+/// fragment modes unescape alike once query `+` is out of play.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Path,
@@ -43,7 +41,7 @@ fn unhex(c: u8) -> u8 {
     }
 }
 
-/// Go `shouldEscape` for the path, path-segment and host modes.
+/// Whether `c` must be escaped in the path, path-segment and host modes.
 fn should_escape(c: u8, mode: Mode) -> bool {
     if c.is_ascii_alphanumeric() {
         return false;
@@ -63,7 +61,7 @@ fn should_escape(c: u8, mode: Mode) -> bool {
     }
 }
 
-/// Go `unescape`; `None` is its `EscapeError` or `InvalidHostError`.
+/// Decodes `%XX` escapes; `None` is a bad escape or an invalid host byte.
 fn unescape(s: &[u8], mode: Mode) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len());
     let mut i = 0;
@@ -96,7 +94,7 @@ fn unescape(s: &[u8], mode: Mode) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Go `escape` for the path, path-segment and host modes.
+/// Escapes `s` for the path, path-segment and host modes.
 fn escape(s: &[u8], mode: Mode) -> String {
     let mut out = String::with_capacity(s.len());
     for &c in s {
@@ -111,14 +109,13 @@ fn escape(s: &[u8], mode: Mode) -> String {
     out
 }
 
-/// Go `url.PathEscape`.
 pub(super) fn path_escape(s: &[u8]) -> String {
     escape(s, Mode::PathSegment)
 }
 
-/// Go `URL.String()` of an `https` URL with no user, query or fragment and
-/// a path that starts with `/`: what `parseTarget` leaves after clearing
-/// `RawPath`, `RawQuery` and `Fragment`. `ForceQuery` still adds `?`.
+/// The text form of an `https` URL with no user, query or fragment and
+/// a path that starts with `/`: what `parse_target` leaves after clearing
+/// the raw path, query and fragment. `force_query` still adds `?`.
 pub(super) fn https_string(host: &[u8], path: &[u8], force_query: bool) -> String {
     let mut out = format!(
         "https://{}{}",
@@ -138,7 +135,7 @@ fn cut(s: &[u8], sep: u8) -> (&[u8], &[u8]) {
     }
 }
 
-/// Go `getScheme`. `None` is "missing protocol scheme".
+/// `None` is "missing protocol scheme".
 fn get_scheme(raw: &[u8]) -> Option<(&[u8], &[u8])> {
     for (i, &c) in raw.iter().enumerate() {
         match c {
@@ -152,7 +149,7 @@ fn get_scheme(raw: &[u8]) -> Option<(&[u8], &[u8])> {
     Some((&[], raw))
 }
 
-/// Go `url.Parse`: `None` wherever Go returns an error.
+/// Parses a URL reference; `None` is a parse error.
 pub(super) fn parse(raw: &[u8]) -> Option<Url> {
     let (raw, frag) = cut(raw, b'#');
     if raw.iter().any(|&b| b < b' ' || b == 0x7f) {
@@ -208,7 +205,7 @@ pub(super) fn parse(raw: &[u8]) -> Option<Url> {
     Some(url)
 }
 
-/// Go `parseHost`: `host[:port]`, IP literals with RFC 6874 zones.
+/// Parses `host[:port]`, IP literals with RFC 6874 zones.
 fn parse_host(host: &[u8]) -> Option<Vec<u8>> {
     match host.iter().rposition(|&b| b == b'[') {
         Some(0) => {
@@ -246,7 +243,7 @@ fn parse_host(host: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
-/// Go `validOptionalPort`: empty or `:` followed by digits.
+/// Whether the port part is empty or `:` followed by digits.
 fn valid_optional_port(port: &[u8]) -> bool {
     match port.split_first() {
         None => true,
@@ -255,7 +252,7 @@ fn valid_optional_port(port: &[u8]) -> bool {
     }
 }
 
-/// Go `validUserinfo`. It ranges over runes and allows no non-ASCII rune
+/// It ranges over runes and allows no non-ASCII rune
 /// (an invalid byte is U+FFFD), so checking bytes is the same.
 fn valid_userinfo(s: &[u8]) -> bool {
     s.iter()
@@ -263,7 +260,7 @@ fn valid_userinfo(s: &[u8]) -> bool {
 }
 
 impl Url {
-    /// Go `URL.Hostname`: no valid numeric port, no IP-literal brackets.
+    /// The host without a valid numeric port and without IP-literal brackets.
     pub(super) fn hostname(&self) -> &[u8] {
         let mut host = &self.host[..];
         if let Some(colon) = host.iter().rposition(|&b| b == b':')
@@ -284,7 +281,7 @@ enum Addr {
     V6,
 }
 
-/// Go `netip.ParseAddr`, reporting only the family; `None` is an error.
+/// Parses an IP address, reporting only the family; `None` is an error.
 fn parse_addr(s: &[u8]) -> Option<Addr> {
     match s.iter().find(|&&c| matches!(c, b'.' | b':' | b'%'))? {
         b'.' => ipv4_fields(s).then_some(Addr::V4),
@@ -293,7 +290,7 @@ fn parse_addr(s: &[u8]) -> Option<Addr> {
     }
 }
 
-/// Go `netip.parseIPv4Fields`: four decimal octets, no leading zeros.
+/// Whether `s` is four decimal octets with no leading zeros.
 fn ipv4_fields(s: &[u8]) -> bool {
     let mut val = 0u32;
     let mut pos = 0;
@@ -322,7 +319,6 @@ fn ipv4_fields(s: &[u8]) -> bool {
     pos == 3
 }
 
-/// Go `netip.parseIPv6`.
 fn parse_ipv6(input: &[u8]) -> Option<Addr> {
     let mut s = input;
     if let Some(i) = s.iter().position(|&b| b == b'%') {

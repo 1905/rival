@@ -1,14 +1,11 @@
-//! Go: `internal/queue/crossproc_test.go`.
-//!
 //! Three real OS processes (A, B, C) compete for a single queue slot and must
 //! hold it one at a time, in enqueue order. Each child is this test binary
 //! re-run on the same test in helper mode (the standard subprocess-test
 //! idiom), so this exercises the file lock across processes, not threads.
 //!
-//! Unlike Go, which staggers the starts by 60ms and holds the slot for 400ms,
-//! readiness is observed: the parent starts the next helper only once the
-//! previous helper's ticket file exists, and the first holder keeps the slot
-//! until every helper has enqueued. Each helper appends `ACQUIRED` and
+//! No fixed delays: readiness is observed. The parent starts the next helper
+//! only once the previous helper's ticket file exists, and the first holder
+//! keeps the slot until every helper has enqueued. Each helper appends `ACQUIRED` and
 //! `RELEASED` lines (one `O_APPEND` write each) to a shared events file while
 //! it holds the slot, so the file order is the real order.
 
@@ -179,7 +176,7 @@ fn append(events: &Path, line: &str) {
     f.write_all(line.as_bytes()).expect("write event");
 }
 
-/// Go: `runQueueHelper`. Exits the process; never returns.
+/// The helper child's body. Exits the process; never returns.
 fn run_queue_helper() -> ! {
     let var = |k: &str| std::env::var_os(k).unwrap_or_else(|| panic!("{k} unset"));
     let dir = PathBuf::from(var("RIVAL_QUEUE_DIR"));
@@ -203,7 +200,7 @@ fn run_queue_helper() -> ! {
     let end = Instant::now() + BOUND;
     while !go.exists() {
         if Instant::now() > end {
-            println!("{label} GO_TIMEOUT");
+            println!("{label} TIMEOUT");
             std::process::exit(1);
         }
         std::thread::sleep(Duration::from_millis(5));

@@ -1,4 +1,4 @@
-//! The macOS fork lock (Go `syscall.ForkLock`). std's `io::pipe` there
+//! The macOS fork lock. std's `io::pipe` there
 //! runs `pipe(2)` and then sets close-on-exec on each end, so a fork in
 //! between gives the child both ends. That window is a few instructions
 //! wide; these tests hold it open with a raw `pipe(2)` that sets the flags

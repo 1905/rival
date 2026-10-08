@@ -1,6 +1,5 @@
-//! Go: `internal/review/parse_test.go` (reviewer cases) and
-//! `TestParseReviewerOutputFailureScenario` from `prompt_test.go`, plus
-//! Rust-only pins of Go's decoder rules.
+//! Reviewer output parsing tests, the failure-scenario round trip, and pins
+//! of the decoder rules.
 
 use super::*;
 use crate::review::format_review_result;
@@ -36,7 +35,6 @@ codex
 tokens used 1234
 "#;
 
-/// Go: TestParseReviewerOutput_IgnoresEchoedSchemaExample.
 #[test]
 fn ignores_echoed_schema_example() {
     let out = parse_reviewer_output(CODEX_STYLE_REVIEWER_LOG).unwrap();
@@ -45,7 +43,6 @@ fn ignores_echoed_schema_example() {
     assert_eq!(out.findings[0].file, "rival/main.go");
 }
 
-/// Go: TestParseReviewerOutput_BareObjectWithProse.
 #[test]
 fn bare_object_with_prose() {
     let out =
@@ -54,21 +51,19 @@ fn bare_object_with_prose() {
     assert!(out.findings.is_empty());
 }
 
-/// Go: TestParseReviewerOutput_NoPayload.
 #[test]
 fn no_payload() {
     let err = parse_reviewer_output("no json here at all").unwrap_err();
     assert_eq!(err.to_string(), "no reviewer JSON payload found in output");
 }
 
-/// Go: TestParseReviewerOutput_RejectsUnrelatedJSON. A tool/telemetry event
+/// A tool/telemetry event
 /// must not be accepted as an empty successful parse.
 #[test]
 fn rejects_unrelated_json() {
     assert!(parse_reviewer_output(r#"{"event":"done","ok":true}"#).is_err());
 }
 
-/// Go: TestParseReviewerOutput_RejectsOnlySchemaExample.
 #[test]
 fn rejects_only_schema_example() {
     let schema_only = concat!(
@@ -79,7 +74,6 @@ fn rejects_only_schema_example() {
     assert!(parse_reviewer_output(schema_only).is_err());
 }
 
-/// Go: TestParseReviewerOutput_AcceptsCleanReview.
 #[test]
 fn accepts_clean_review() {
     let out =
@@ -89,7 +83,6 @@ fn accepts_clean_review() {
     assert!(out.findings.is_empty());
 }
 
-/// Go: TestParseReviewerOutput_DropsOnlyPlaceholderFindings.
 #[test]
 fn drops_only_placeholder_findings() {
     let raw = concat!(
@@ -102,14 +95,12 @@ fn drops_only_placeholder_findings() {
     assert_eq!(out.findings[0].file, "real.go");
 }
 
-/// Go: TestParseReviewerOutput_NestedInsideInvalidRegion.
 #[test]
 fn nested_inside_invalid_region() {
     let raw = r#"wrapper { not valid json but balanced: {"summary":"nested real","findings":[{"file":"a.go","line":1,"severity":"high","confidence":8}]} }"#;
     assert_eq!(parse_reviewer_output(raw).unwrap().summary, "nested real");
 }
 
-/// Go: TestParseReviewerOutput_AcceptsRealFindingDiscussingEnum.
 #[test]
 fn accepts_real_finding_discussing_enum() {
     let raw = r#"{"summary":"real review","findings":[{"file":"rival/internal/review/parse.go","line":84,"severity":"high","category":"bug","title":"placeholder check","body":"isPlaceholderFinding compares against critical|high|medium|low which is fine","confidence":9}]}"#;
@@ -119,7 +110,6 @@ fn accepts_real_finding_discussing_enum() {
     assert_eq!(out.findings[0].severity, "high");
 }
 
-/// Go: TestExtractJSON_UnbalancedBraceBeforeAnswer.
 #[test]
 fn unbalanced_brace_before_answer() {
     let raw = r#"{"summary":"schema","findings":[{"file":"path/to/file","line":42}]}
@@ -134,7 +124,7 @@ codex
     assert_eq!(out.findings[0].file, "real.go");
 }
 
-/// Go: TestParseReviewerOutput_RealCapturedLog. A real Codex log: the CLI
+/// A real Codex log: the CLI
 /// echoed the prompt and cat'd source files (braces, JSON fixtures), then
 /// emitted the real answer last.
 #[test]
@@ -151,7 +141,7 @@ fn real_captured_log() {
     assert!(!is_example_summary(&out.summary), "{:?}", out.summary);
 }
 
-/// Go: TestToolOutputJSONIsNotTheReview. Review-shaped JSON printed by a
+/// Review-shaped JSON printed by a
 /// tool must not become the review when the final codex answer is prose.
 #[test]
 fn tool_output_json_is_not_the_review() {
@@ -165,7 +155,7 @@ fn tool_output_json_is_not_the_review() {
         "tool-output JSON accepted as the review"
     );
     assert!(parse_reviewer_log(raw).is_err());
-    // Without final_answer the tool's JSON would win (the Go gap this guards).
+    // Without final_answer the tool's JSON would win (the gap this guards).
     assert_eq!(
         parse_reviewer_output(raw).unwrap().summary,
         "Saved: nothing wrong."
@@ -192,7 +182,7 @@ fn final_answer_header_is_an_exact_line() {
     assert_eq!(final_answer("codex\r\nb"), "codex\r\nb");
 }
 
-/// Known Go gap 1: a log with no codex header (claude, opencode) is
+/// Known gap 1: a log with no codex header (claude, opencode) is
 /// scanned whole, so tool-printed JSON there can still win.
 #[test]
 fn known_gap_no_header_scans_whole_log() {
@@ -208,7 +198,7 @@ fn known_gap_no_header_scans_whole_log() {
     );
 }
 
-/// Known Go gap 2: a final answer that prints the same payload twice is not
+/// Known gap 2: a final answer that prints the same payload twice is not
 /// deduplicated; the last copy wins and nothing flags the repeat.
 #[test]
 fn known_gap_duplicate_answer_not_deduped() {
@@ -219,7 +209,8 @@ fn known_gap_duplicate_answer_not_deduped() {
     assert_eq!(json_objects(final_answer(&raw)).len(), 4);
 }
 
-/// Go: TestParseReviewerOutputFailureScenario (prompt_test.go).
+/// `failure_scenario` survives a JSON round trip; an old payload without it
+/// still parses.
 #[test]
 fn failure_scenario_round_trip() {
     let raw = r#"{"summary":"one bug","findings":[{"file":"a.go","line":3,"severity":"high","category":"bug","title":"t","body":"b","failure_scenario":"empty list → index panic","suggestion":"s","confidence":8}]}"#;
@@ -240,33 +231,28 @@ fn failure_scenario_round_trip() {
     );
 }
 
-// ---- Rust-only: Go encoding/json rules ----
+// ---- Rust-only: payload decoding rules ----
 
-/// `hasJSONKey` is exact; field decoding is case-insensitive, and duplicate
-/// keys assign in document order.
+/// `has_json_key` and the field decoding both match keys exactly.
 #[test]
-fn key_presence_is_exact_but_fields_fold() {
+fn keys_match_exactly() {
     assert!(parse_reviewer_output(r#"{"Summary":"x","findings":[]}"#).is_err());
     let out = parse_reviewer_output(
-        r#"{"summary":"a","SUMMARY":"b","findings":[],"FINDINGS":[{"FILE":"f.go","Line":2}]}"#,
+        r#"{"summary":"a","SUMMARY":"b","findings":[{"file":"f.go","Line":2}],"FINDINGS":[]}"#,
     )
     .unwrap();
-    assert_eq!(out.summary, "b");
+    assert_eq!(out.summary, "a");
     assert_eq!(out.findings.len(), 1);
     assert_eq!(
         (out.findings[0].file.as_str(), out.findings[0].line),
-        ("f.go", 2)
+        ("f.go", 0)
     );
-    // U+017F (long s) folds to "s" under Go's EqualFold.
-    let out = parse_reviewer_output("{\"summary\":\"a\",\"\u{17F}ummary\":\"b\",\"findings\":[]}")
-        .unwrap();
-    assert_eq!(out.summary, "b");
     // An escaped key is the same key.
     assert!(parse_reviewer_output(r#"{"summ\u0061ry":"x","findings":[]}"#).is_ok());
 }
 
-/// `null` keeps a field; unknown fields are ignored, even a number no Go
-/// type can hold.
+/// `null` reads as the default; unknown fields are ignored, even a number
+/// no integer type can hold.
 #[test]
 fn nulls_and_unknown_fields() {
     let out = parse_reviewer_output(
@@ -285,51 +271,55 @@ fn nulls_and_unknown_fields() {
     assert_eq!(out.findings[1].title, "t");
 }
 
-/// A type mismatch rejects the candidate with Go's first-error text; an
-/// earlier valid payload is then used.
+/// A type mismatch or a duplicate key rejects the candidate with
+/// serde_json's text; an earlier valid payload is then used.
 #[test]
-fn type_mismatch_texts_follow_go() {
+fn type_mismatch_and_duplicate_key_texts() {
     let cases = [
         (
             r#"{"summary":1,"findings":[]}"#,
-            "json: cannot unmarshal number into Go struct field ReviewerOutput.summary of type string",
+            "invalid type: integer `1`, expected a string at line 1 column 12",
         ),
         (
             r#"{"summary":"s","findings":"x"}"#,
-            "json: cannot unmarshal string into Go struct field ReviewerOutput.findings of type []review.ReviewerFinding",
+            "invalid type: string \"x\", expected a sequence at line 1 column 29",
         ),
         (
             r#"{"summary":"s","findings":{}}"#,
-            "json: cannot unmarshal object into Go struct field ReviewerOutput.findings of type []review.ReviewerFinding",
+            "invalid type: map, expected a sequence at line 1 column 26",
         ),
         (
             r#"{"summary":"s","findings":[7]}"#,
-            "json: cannot unmarshal number into Go struct field ReviewerOutput.findings of type review.ReviewerFinding",
+            "invalid type: integer `7`, expected a JSON object at line 1 column 28",
         ),
         (
             r#"{"summary":"s","findings":[[]]}"#,
-            "json: cannot unmarshal array into Go struct field ReviewerOutput.findings of type review.ReviewerFinding",
+            "invalid type: sequence, expected a JSON object at line 1 column 27",
         ),
         (
             r#"{"summary":"s","findings":[{"line":"3"}]}"#,
-            "json: cannot unmarshal string into Go struct field ReviewerFinding.findings.line of type int",
+            "invalid type: string \"3\", expected i64 at line 1 column 38",
         ),
         (
             r#"{"summary":"s","findings":[{"confidence":1.5}]}"#,
-            "json: cannot unmarshal number 1.5 into Go struct field ReviewerFinding.findings.confidence of type int",
+            "invalid type: floating point `1.5`, expected i64 at line 1 column 44",
         ),
         (
             r#"{"summary":"s","findings":[{"line":1e999999}]}"#,
-            "json: cannot unmarshal number 1e999999 into Go struct field ReviewerFinding.findings.line of type int",
+            "number out of range at line 1 column 43",
         ),
         (
             r#"{"summary":"s","findings":[{"title":true}]}"#,
-            "json: cannot unmarshal bool into Go struct field ReviewerFinding.findings.title of type string",
+            "invalid type: boolean `true`, expected a string at line 1 column 40",
         ),
-        // The first error in document order wins; decoding goes on.
+        // The first error in document order wins.
         (
             r#"{"findings":[{"body":[]}],"summary":{}}"#,
-            "json: cannot unmarshal array into Go struct field ReviewerFinding.findings.body of type string",
+            "invalid type: sequence, expected a string at line 1 column 21",
+        ),
+        (
+            r#"{"summary":"s","findings":[{"file":"a"}],"findings":[{"title":"t2"}]}"#,
+            "duplicate field `findings` at line 1 column 51",
         ),
     ];
     for (raw, want) in cases {
@@ -343,42 +333,6 @@ fn type_mismatch_texts_follow_go() {
     // The scan goes on to an earlier valid payload.
     let raw = r#"{"summary":"good","findings":[]} {"summary":2,"findings":[]}"#;
     assert_eq!(parse_reviewer_output(raw).unwrap().summary, "good");
-}
-
-/// A duplicate `findings` key decodes into the elements the first array
-/// left, and a later longer array re-exposes elements a shorter one cut.
-#[test]
-fn duplicate_findings_reuse_the_slice() {
-    let out = parse_reviewer_output(
-        r#"{"summary":"s","findings":[{"file":"a","line":1,"title":"t1"},{"file":"b"}],"findings":[{"title":"t2"}]}"#,
-    )
-    .unwrap();
-    assert_eq!(out.findings.len(), 1);
-    assert_eq!(
-        (
-            out.findings[0].file.as_str(),
-            out.findings[0].line,
-            out.findings[0].title.as_str()
-        ),
-        ("a", 1, "t2")
-    );
-
-    let out = parse_reviewer_output(
-        r#"{"summary":"s","findings":[{"file":"a"},{"file":"b"}],"findings":[{"line":5}],"findings":[{},{},{}]}"#,
-    )
-    .unwrap();
-    let files: Vec<_> = out.findings.iter().map(|f| f.file.as_str()).collect();
-    assert_eq!(files, ["a", "b", ""]);
-    assert_eq!(out.findings[0].line, 5);
-
-    // [] and null drop the old elements.
-    for reset in ["[]", "null"] {
-        let raw = format!(
-            r#"{{"summary":"s","findings":[{{"file":"a"}}],"findings":{reset},"findings":[{{}}]}}"#
-        );
-        let out = parse_reviewer_output(&raw).unwrap();
-        assert_eq!(out.findings, [ReviewerFinding::default()], "{reset}");
-    }
 }
 
 /// `json_objects` reports every valid object in closing order, nested ones

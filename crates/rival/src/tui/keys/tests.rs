@@ -2,7 +2,7 @@ use super::*;
 use crate::tui::styles::STYLES;
 use crate::tui::testkit::press;
 
-/// Go compares bindings by keys + help key, since bindings hold slices.
+/// Compares bindings by keys + help key only.
 fn has_binding(list: &[Binding], want: Binding) -> bool {
     list.iter()
         .any(|b| b.keys == want.keys && b.help_key == want.help_key)
@@ -160,7 +160,7 @@ fn help_lines_fit_the_width() {
 }
 
 #[test]
-fn short_help_reads_like_go() {
+fn short_help_is_one_line_cut_with_an_ellipsis() {
     let k = KeyMap::default();
     let line = &help_lines(&k.help(Mode::List), false, 200, &STYLES)[0];
     assert_eq!(

@@ -6,6 +6,16 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 
 ## [Unreleased]
 
+### Removed
+- `rival-antislop`, the code-slop review. `rival install` deletes an installed copy.
+- The Go license file in release archives. No Go code ships.
+
+### Changed
+- Error messages use the operating system's own wording, for example `No such file or directory (os error 2)` and `exit status: 1`.
+- Session, queue and cache files are written as plain JSON: `<`, `>` and `&` are no longer escaped, and unset times are omitted. Files from older versions still load.
+- A duration that overflows (for example in `RIVAL_RUN_TIMEOUT`) is now an error. Before, it wrapped to 0 and turned the run timeout off.
+- The end-to-end scenarios moved from `parity/` to `e2e/`.
+
 ## [v5.0.0] — 2026-10-07
 
 The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 84 end-to-end scenarios check them on macOS and Linux.
@@ -18,7 +28,6 @@ The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session fil
 
 ### Added
 - Windows support: `rival_windows_amd64.zip` and `rival_windows_arm64.zip`. The README has install steps. The binary is not code-signed.
-- `ste_rewrite` in `~/.rival/config.yaml` (off by default). After a review with 3 or more words from the Simplified Technical English not-approved list, rival calls the provider once more to rewrite the text fields. It keeps the rewrite only if the findings and their non-text fields are unchanged and the flagged-word count drops. The word lists ship as `crates/rival-core/data/ste.json`. On 93 findings from 24 local reviews the check flags many ordinary code words, such as `request` and `state`, so expect false positives.
 
 ### Fixed
 - `rival tui`: the background orphan reaper no longer prints JSON log lines over the TUI screen.
@@ -35,7 +44,7 @@ The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session fil
 
 ### Added
 - `auto_fix_critical_high` in `~/.rival/config.yaml` (off by default). Skills now verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking. Medium and low findings are verified and proposed, never auto-fixed. `rival wait --log` prints the policy as `auto-fix: off|critical+high`, and the watcher reminds the agent to verify.
-- Review findings follow plain-English writing rules based on ASD-STE100 structure: one fact per sentence, active voice, no stacked hedges, no filler. The reviewer prompt carries the rules for `summary`, `title`, `body`, `failure_scenario` and `suggestion`. Skills apply them to the lines the host agent adds, and never edit the verbatim reviewer output. Reviewer prompts set through `roles.bug_hunter` and `roles.security` keep the rules, because they sit in the output contract.
+- Review findings follow plain-English writing rules based on controlled technical English: one fact per sentence, active voice, no stacked hedges, no filler. The reviewer prompt carries the rules for `summary`, `title`, `body`, `failure_scenario` and `suggestion`. Skills apply them to the lines the host agent adds, and never edit the verbatim reviewer output. Reviewer prompts set through `roles.bug_hunter` and `roles.security` keep the rules, because they sit in the output contract.
 
 ## [v4.1.1] — 2026-09-29
 

@@ -1,5 +1,4 @@
-//! Go: `TestBuildAntislopCodePrompt*` from `cmd/command_antislop_test.go`,
-//! plus Rust-only pins of the auto-detect branch against temp git repos.
+//! Pins of the scope and auto-detect branches against temp git repos.
 //! The child env is explicit (process `PATH`, temp `HOME`); no test touches
 //! this worktree's repo.
 
@@ -74,24 +73,23 @@ fn s(p: &Path) -> String {
     p.to_str().unwrap().to_string()
 }
 
+fn scope_template(scope: &str) -> String {
+    "Review scope: {SCOPE}\n\nRules:\n- be brief\n".replace("{SCOPE}", scope)
+}
+
 #[test]
-fn build_antislop_code_prompt_explicit_scope() {
+fn build_review_prompt_explicit_scope() {
     let fx = Fixture::new();
     let dir = tempfile::tempdir().unwrap();
     let (prompt, target, display) = build_review_prompt(
-        antislop_code_prompt,
+        scope_template,
         "src/api/",
         false,
         &fx.config(),
         &s(dir.path()),
     );
-    assert!(
-        prompt.contains("Review scope: src/api/"),
-        "{}",
-        &prompt[..200]
-    );
+    assert!(prompt.contains("Review scope: src/api/"), "{prompt}");
     assert!(!prompt.contains("{SCOPE}"), "placeholder left in prompt");
-    assert_eq!(prompt, ANTISLOP_CODE_PROMPT.replace("{SCOPE}", "src/api/"));
     assert_eq!(
         (target.as_str(), display.as_str()),
         ("src/api/", "src/api/")
@@ -99,12 +97,12 @@ fn build_antislop_code_prompt_explicit_scope() {
 }
 
 #[test]
-fn build_antislop_code_prompt_no_changes_falls_back_to_project() {
+fn build_review_prompt_no_changes_falls_back_to_project() {
     // A fresh temp dir is not a git repo, so auto-detect finds nothing.
     let fx = Fixture::new();
     let dir = tempfile::tempdir().unwrap();
     let (prompt, target, display) = build_review_prompt(
-        antislop_code_prompt,
+        scope_template,
         "the entire project",
         true,
         &fx.config(),
@@ -112,18 +110,13 @@ fn build_antislop_code_prompt_no_changes_falls_back_to_project() {
     );
     assert!(
         prompt.contains("Review scope: the entire project"),
-        "{}",
-        &prompt[..200]
+        "{prompt}"
     );
     assert_eq!(
         (target.as_str(), display.as_str()),
         ("the entire project", "the entire project")
     );
-    let rules = &ANTISLOP_CODE_PROMPT[ANTISLOP_CODE_PROMPT.find("Rules:").unwrap()..][..20];
-    assert!(
-        prompt.contains(rules),
-        "prompt does not end with the antislop template"
-    );
+    assert!(prompt.ends_with("Rules:\n- be brief\n"), "{prompt}");
 }
 
 // Rust-only pins.
@@ -197,9 +190,8 @@ fn no_changes_gives_an_empty_preamble() {
     );
 }
 
-/// Go: cmd TestSecurityPromptIsAlwaysTheSecurityLens and
-/// TestSecurityAutoScopeFallsBackToWholeProject, through `lens_prompt` (the
-/// `securityScopeAndPrompt` wrapper lands with the command in P3).
+/// The security prompt is always the security lens, and an empty scope
+/// falls back to the whole project, through `lens_prompt`.
 #[test]
 fn lens_prompt_renders_the_selected_lens() {
     let fx = Fixture::new();

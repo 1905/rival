@@ -1,5 +1,4 @@
 //! `rival command plan`: review a plan/spec file with Codex and/or Claude.
-//! Go: `cmd/command_plan.go`.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -8,8 +7,8 @@ use rival_core::cancel::Context;
 use rival_core::config::{
     self, CLAUDE_LABEL, CLAUDE_MODEL, CODEX_LABEL, CODEX_MODEL, Config, VALID_EFFORTS,
 };
+use rival_core::paths;
 use rival_core::review::{self, PlanRunResult, ReviewBatch};
-use rival_core::{gostd, paths};
 
 use crate::root::{CmdEnv, CmdError};
 use crate::tree::Invocation;
@@ -29,7 +28,7 @@ Input is a single path to a markdown plan/spec file. The /rival-plan and
 and Claude to medium, unless overridden per model in ~/.rival/config.yaml.
 --model accepts codex and claude. An unavailable model is skipped, not fatal.";
 
-/// Go `review.RunPlanReview`; tests inject a fake.
+/// Runs the plan review; tests inject a fake.
 pub type PlanRunner<'a> = dyn Fn(&Context, &Config, &str, &ReviewBatch<'_>, &mut dyn Write) -> anyhow::Result<PlanRunResult>
     + 'a;
 
@@ -57,7 +56,7 @@ impl PlanOptions {
     }
 }
 
-/// Go `commandPlanAction` with the real plan runner.
+/// `rival plan` with the real plan runner.
 pub fn command_plan_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     run_command_plan(
         env,
@@ -66,7 +65,6 @@ pub fn command_plan_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(),
     )
 }
 
-/// Go `commandPlanAction`.
 pub fn run_command_plan(
     env: &mut CmdEnv<'_>,
     opts: &PlanOptions,
@@ -139,46 +137,42 @@ pub(crate) fn fail_on_stdout(stdout: &mut dyn Write, msg: String) -> CmdError {
     CmdError::exit(1, msg)
 }
 
-/// Go `fmt.Errorf("write stdout: %w", err)` for a failed `os.Stdout` write.
-/// A nil Windows `os.Stdout` fails with the bare `os.ErrInvalid`, without
-/// the `*PathError` op and path.
+/// The error for a failed stdout write, prefixed `write stdout: `. A missing
+/// Windows stdout fails with the bare invalid-argument error, without the
+/// op and path.
 pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
     if crate::root::is_nil_file(e) {
         return CmdError::plain(format!("write stdout: {e}"));
     }
-    CmdError::plain(format!(
-        "write stdout: write /dev/stdout: {}",
-        gostd::os_error_text(e)
-    ))
+    CmdError::plain(format!("write stdout: write /dev/stdout: {}", e))
 }
 
-/// Go `fmt.Errorf("invalid effort %q, must be one of: %v", effort,
-/// config.ValidEfforts)` for the `--effort` flag; `%v` prints the slice as
+/// The error for a bad `--effort` flag. The valid efforts print as
 /// `[low medium …]`.
 pub(crate) fn invalid_flag_effort(effort: &str) -> String {
     format!(
-        "invalid effort {}, must be one of: [{}]",
-        gostd::quote(effort),
+        "invalid effort {:?}, must be one of: [{}]",
+        effort,
         VALID_EFFORTS.join(" ")
     )
 }
 
-/// Go `parsePlanModels`: validates model-facing selectors and maps them to
+/// Validates model-facing selectors and maps them to
 /// the internal adapters the plan runner uses. It de-duplicates by concrete
 /// model while preserving the user's order.
 pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = Vec::new();
     for value in raw {
         for part in value.split(',') {
-            let model = gostd::to_lower(part.trim());
+            let model = part.trim().to_lowercase();
             let cli = match model.as_str() {
                 CODEX_LABEL | CODEX_MODEL => "codex",
                 CLAUDE_LABEL | CLAUDE_MODEL => "claude",
                 "" => return Err("model selector cannot be empty".to_string()),
                 _ => {
                     return Err(format!(
-                        "unknown plan model {}; use one of: codex, claude",
-                        gostd::quote(part)
+                        "unknown plan model {:?}; use one of: codex, claude",
+                        part
                     ));
                 }
             };
@@ -193,7 +187,7 @@ pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// Go `mergePlanEffort`: an effort from stdin wins unless the flag was set
+/// An effort from stdin wins unless the flag was set
 /// to a different value.
 pub(crate) fn merge_plan_effort(
     flag_effort: &str,
@@ -205,15 +199,14 @@ pub(crate) fn merge_plan_effort(
     }
     if flag_set && input_effort != flag_effort {
         return Err(format!(
-            "reasoning effort conflicts: command uses {} but plan arguments request {}",
-            gostd::quote(flag_effort),
-            gostd::quote(input_effort)
+            "reasoning effort conflicts: command uses {:?} but plan arguments request {:?}",
+            flag_effort, input_effort
         ));
     }
     Ok(input_effort.to_string())
 }
 
-/// Go `parsePlanInput`: extracts an optional skill-facing `-re`/`--effort`
+/// Extracts an optional skill-facing `-re`/`--effort`
 /// prefix while leaving the rest of the input intact as the path (spaces
 /// included). A leading `-- ` escapes a path beginning with a dash.
 /// Returns `(path, effort)`.
@@ -231,8 +224,8 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     if name != "-re" && name != "--effort" {
         if option.starts_with('-') {
             return Err(format!(
-                "unknown plan option {}; use -re/--effort or -- before a path beginning with '-'",
-                gostd::quote(option)
+                "unknown plan option {:?}; use -re/--effort or -- before a path beginning with '-'",
+                option
             ));
         }
         return Ok((s.to_string(), String::new()));
@@ -252,8 +245,8 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     }
     if !config::is_valid_effort(effort) {
         return Err(format!(
-            "invalid effort {}, must be one of: {}",
-            gostd::quote(effort),
+            "invalid effort {:?}, must be one of: {}",
+            effort,
             VALID_EFFORTS.join(", ")
         ));
     }
@@ -264,10 +257,9 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     Ok((path.to_string(), effort.to_string()))
 }
 
-/// The separators of Go's `popPlanToken` (`TrimLeft`/`IndexAny`).
+/// The separators [`pop_plan_token`] splits on.
 const TOKEN_SPACE: [char; 4] = [' ', '\t', '\r', '\n'];
 
-/// Go `popPlanToken`.
 fn pop_plan_token(s: &str) -> (&str, &str) {
     let s = s.trim_start_matches(TOKEN_SPACE);
     match s.find(TOKEN_SPACE) {
@@ -276,7 +268,7 @@ fn pop_plan_token(s: &str) -> (&str, &str) {
     }
 }
 
-/// Go `splitPlanOption`: `name=value` → `(name, Some(value))`.
+/// `name=value` → `(name, Some(value))`.
 fn split_plan_option(token: &str) -> (&str, Option<&str>) {
     match token.split_once('=') {
         Some((name, value)) => (name, Some(value)),
@@ -284,16 +276,16 @@ fn split_plan_option(token: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Go `filepath.Join(a, b)` for the host ([`paths::join`]): empty elements
+/// A lexical join for the host ([`paths::join`]): empty elements
 /// are dropped, the rest joined and cleaned; Windows keeps drive and UNC
 /// volumes. Unlike [`Path::join`], an absolute `b` does not replace `a`.
-fn go_join(a: &str, b: &str) -> String {
+fn lexical_join(a: &str, b: &str) -> String {
     paths::join(Path::new(a), Path::new(b))
         .to_string_lossy()
         .into_owned()
 }
 
-/// Go `os.Stat`'s `*PathError` op: `GetFileAttributesEx` is Windows' first
+/// The op in a failed stat's error: `GetFileAttributesEx` is Windows' first
 /// stat call.
 const STAT_OP: &str = if cfg!(windows) {
     "GetFileAttributesEx"
@@ -301,12 +293,13 @@ const STAT_OP: &str = if cfg!(windows) {
     "stat"
 };
 
-/// Go `resolvePlanPath`: turns the raw user-supplied path into a validated
+/// Turns the raw user-supplied path into a validated
 /// absolute path to an existing regular file. Relative paths are resolved
 /// against `workdir`. Any file name is accepted; `.md` is not required.
-/// `home` is Go's `os.UserHomeDir()` (`$HOME`, `%USERPROFILE%` on Windows;
-/// empty = unavailable) and `cwd` the `os.Getwd()` snapshot `filepath.Abs`
-/// would use. `filepath.IsAbs`, `Join` and `Abs` follow the host's rules.
+/// `home` is the home directory (`$HOME`, `%USERPROFILE%` on Windows;
+/// empty = unavailable) and `cwd` the current directory snapshot used to
+/// make paths absolute. The absolute check, join and absolutize follow the
+/// host's rules.
 pub(crate) fn resolve_plan_path(
     raw_path: &str,
     workdir: &str,
@@ -316,10 +309,10 @@ pub(crate) fn resolve_plan_path(
     let mut p = raw_path.trim().to_string();
     // Expand a leading ~ to the home directory.
     if (p == "~" || p.starts_with("~/")) && !home.is_empty() {
-        p = go_join(home, &p[1..]);
+        p = lexical_join(home, &p[1..]);
     }
     if !paths::is_abs(Path::new(&p)) {
-        p = go_join(workdir, &p);
+        p = lexical_join(workdir, &p);
     }
     // Reject control characters (e.g. a newline in the file name): the path
     // is interpolated into the model prompt, so a control char could inject
@@ -335,22 +328,22 @@ pub(crate) fn resolve_plan_path(
 
     let Some(abs) = paths::abs(cwd, Path::new(&p)) else {
         return Err(format!(
-            "resolve plan path {}: {}",
-            gostd::quote(raw_path),
+            "resolve plan path {:?}: {}",
+            raw_path,
             getwd_error()
         ));
     };
     let abs = abs.to_string_lossy().into_owned();
 
     let meta = match std::fs::metadata(&abs) {
-        // Go os.IsNotExist: ENOENT only.
+        // Not found: ENOENT only.
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
             return Err(format!("plan file not found: {abs}"));
         }
         Err(e) => {
             return Err(format!(
                 "cannot read plan file {abs}: {STAT_OP} {abs}: {}",
-                gostd::os_error_text(&e)
+                e
             ));
         }
         Ok(meta) => meta,
@@ -364,10 +357,7 @@ pub(crate) fn resolve_plan_path(
     // Confirm the file is readable now, so an unreadable file fails here
     // with a clear message rather than later inside a model runner.
     if let Err(e) = std::fs::File::open(&abs) {
-        return Err(format!(
-            "cannot read plan file {abs}: open {abs}: {}",
-            gostd::os_error_text(&e)
-        ));
+        return Err(format!("cannot read plan file {abs}: open {abs}: {}", e));
     }
     Ok(abs)
 }

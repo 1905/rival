@@ -1,6 +1,6 @@
 //! The tree against `cli-surface.md`, cobra lookup and pflag behavior, and
-//! the Go tree-metadata tests (`model_commands_test.go`,
-//! `grok_command_test.go`, `review_output_test.go`).
+//! the command metadata: which commands are public, model command flags
+//! and removed commands.
 
 use super::*;
 
@@ -112,9 +112,7 @@ fn command_subtree_matches_cli_surface() {
     let command = node(&r, &["command"]);
     assert_eq!(
         names(command),
-        [
-            "antislop", "claude", "codex", "grok", "k3", "plan", "security"
-        ]
+        ["claude", "codex", "grok", "k3", "plan", "security"]
     );
     let detach = command
         .get_arguments()
@@ -133,15 +131,6 @@ fn command_subtree_matches_cli_surface() {
         );
     }
     let m = |default: &str| ("model".to_string(), Some('m'), default.to_string());
-    assert_eq!(
-        flags(node(&r, &["command", "antislop"])),
-        [
-            f("workdir", "."),
-            f("no-queue", "false"),
-            m("codex,claude"),
-            f("effort", "")
-        ]
-    );
     assert_eq!(
         flags(node(&r, &["command", "plan"])),
         [
@@ -194,8 +183,6 @@ fn other_commands_match_cli_surface() {
     );
 }
 
-// ---- Go TestClaudeCommandsArePublic / TestGrokCommandIsPublic / TestRunGrokCommandFlags ----
-
 #[test]
 fn model_commands_are_public_and_registered() {
     let r = root();
@@ -231,8 +218,6 @@ fn model_commands_are_public_and_registered() {
     }
 }
 
-// ---- Go TestModelCommandParentsRejectUnknownRunnerNames ----
-
 #[test]
 fn model_command_parents_reject_unknown_runner_names() {
     assert_eq!(
@@ -246,8 +231,6 @@ fn model_command_parents_reject_unknown_runner_names() {
     assert_eq!(parse_ok(&["run"]).id, CommandId::Run);
     assert_eq!(parse_ok(&["command"]).id, CommandId::Command);
 }
-
-// ---- Go TestRemovedReviewCommandsDoNotResolve ----
 
 /// Commands removed on 2026-09-26 must not resolve: `rival review`,
 /// `rival command megareview`, the Sol commands and the web dashboard.
@@ -563,7 +546,7 @@ fn flag_errors_have_pflag_text() {
 }
 
 #[test]
-fn durations_parse_like_go() {
+fn duration_flags_parse_signed_values_and_defaults() {
     let inv = parse_ok(&["wait", "--timeout", "1s", "--poll=100ms"]);
     assert_eq!(inv.duration("timeout"), 1_000_000_000);
     assert_eq!(inv.duration("poll"), 100_000_000);
@@ -593,10 +576,6 @@ fn model_values_accumulate_like_pflag_string_slices() {
     let inv = parse_ok(&["command", "plan"]);
     assert_eq!(inv.strings("model"), ["codex"]);
     assert!(!inv.changed("model"));
-    assert_eq!(
-        parse_ok(&["command", "antislop"]).strings("model"),
-        ["codex", "claude"]
-    );
     let inv = parse_ok(&["command", "plan", "-m", "claude"]);
     assert_eq!(
         inv.strings("model"),
@@ -642,10 +621,7 @@ fn ints_parse_like_strconv_base_zero() {
     for v in ["", "x", "08", "0x", "1__0", "_1", "1_", "--1", "1.5"] {
         assert_eq!(
             parse_int(v),
-            Err(format!(
-                "strconv.ParseInt: parsing {}: invalid syntax",
-                gostd::quote(v)
-            )),
+            Err(format!("strconv.ParseInt: parsing {:?}: invalid syntax", v)),
             "{v}"
         );
     }
@@ -657,8 +633,8 @@ fn ints_parse_like_strconv_base_zero() {
         assert_eq!(
             parse_int(v),
             Err(format!(
-                "strconv.ParseInt: parsing {}: value out of range",
-                gostd::quote(v)
+                "strconv.ParseInt: parsing {:?}: value out of range",
+                v
             )),
             "{v}"
         );
@@ -674,7 +650,7 @@ fn ints_parse_like_strconv_base_zero() {
 }
 
 #[test]
-fn help_topic_quote_matches_go_sharp_q() {
+fn help_topic_quote_is_debug_quoted() {
     assert_eq!(quote_topic(&argv(&["foo"])), "[`foo`]");
     assert_eq!(quote_topic(&argv(&["a", "b c"])), "[`a` `b c`]");
     assert_eq!(quote_topic(&argv(&["a`b"])), "[\"a`b\"]");

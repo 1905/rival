@@ -23,7 +23,7 @@ soak:
 	python3 app/scripts/soak_test.py
 
 # CLI (Rust). `rival version` prints RIVAL_VERSION; the default is the git
-# description, like the removed Go Makefile's VERSION.
+# description.
 RIVAL_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 # Release build of the CLI for this host: target/release/rival.

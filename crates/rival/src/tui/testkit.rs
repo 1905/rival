@@ -304,7 +304,7 @@ pub fn job_model(env: &JobEnv, sessions: Vec<Arc<Session>>, width: u16, height: 
     m
 }
 
-/// Go `openDetail`: [`job_model`], then the real enter key.
+/// [`job_model`], then the real enter key.
 pub fn open_detail(env: &JobEnv, sessions: Vec<Arc<Session>>, width: u16, height: u16) -> Model {
     let mut m = job_model(env, sessions, width, height);
     drive(&mut m, env, [key("enter")]);
@@ -323,7 +323,7 @@ pub fn fixed_zone(_utc: NaiveDateTime) -> FixedOffset {
     *fixed_now().offset()
 }
 
-/// Go test helper `press`: a key press by bubbletea name.
+/// A key press by bubbletea name.
 pub fn press(name: &str) -> KeyEvent {
     let none = KeyModifiers::NONE;
     let mut chars = name.chars();
@@ -387,7 +387,7 @@ pub fn list_model(sessions: Vec<Arc<Session>>, width: u16, height: u16) -> Model
     m
 }
 
-/// Go `listFixture`: one running, one completed today, two old runs.
+/// One running, one completed today, two old runs.
 pub fn list_fixture() -> Vec<Arc<Session>> {
     let now = fixed_now();
     let s = |id: &str,
@@ -405,7 +405,7 @@ pub fn list_fixture() -> Vec<Arc<Session>> {
             mode: mode.into(),
             effort: effort.into(),
             status: status.into(),
-            start_time: start,
+            start_time: Some(start),
             work_dir: workdir.into(),
             ..Session::default()
         })
@@ -473,13 +473,13 @@ pub fn run(
         mode: mode.into(),
         effort: effort.into(),
         status: status.into(),
-        start_time: start,
+        start_time: Some(start),
         work_dir: workdir.into(),
         ..Session::default()
     }
 }
 
-/// Go `filterFixture`: one run per item. Two TODAY, one YESTERDAY, one
+/// One run per item. Two TODAY, one YESTERDAY, one
 /// OLDER; ids start a, b, c, d.
 pub fn filter_fixture(now: DateTime<FixedOffset>) -> Vec<DisplayItem> {
     let solo = |s: Session| DisplayItem {
@@ -535,7 +535,7 @@ pub fn filter_fixture(now: DateTime<FixedOffset>) -> Vec<DisplayItem> {
     ]
 }
 
-/// Go `manyRuns`: `n` runs, newest first, ids r000, r001, ...: the first 30
+/// `n` runs, newest first, ids r000, r001, ...: the first 30
 /// today, the next 40 yesterday, the rest older. Every third run failed.
 pub fn many_runs(n: usize, now: DateTime<FixedOffset>) -> Vec<Arc<Session>> {
     (0..n)
@@ -563,7 +563,7 @@ pub fn many_runs(n: usize, now: DateTime<FixedOffset>) -> Vec<Arc<Session>> {
         .collect()
 }
 
-/// Go `previewFixture` without the log files the list never reads: one
+/// The preview runs without the log files the list never reads: one
 /// running, one completed, one failed run, all today.
 pub fn preview_fixture() -> Vec<Arc<Session>> {
     let now = fixed_now();
@@ -610,7 +610,7 @@ pub fn preview_fixture() -> Vec<Arc<Session>> {
     ]
 }
 
-/// Go `previewFixture`: [`preview_fixture`] with a log per run that names
+/// [`preview_fixture`] with a log per run that names
 /// it, so a test can tell which run a pane shows.
 pub fn preview_fixture_logs(h: &Harness) -> Vec<Arc<Session>> {
     let logs = [
@@ -630,7 +630,7 @@ pub fn preview_fixture_logs(h: &Harness) -> Vec<Arc<Session>> {
         .collect()
 }
 
-/// Go `groupFixture`: two reviewers plus the judge, handed over in the
+/// Two reviewers plus the judge, handed over in the
 /// wrong order so grouping has to sort them.
 pub fn group_fixture(h: &Harness) -> Vec<Arc<Session>> {
     let base = fixed_now() - TimeDelta::minutes(5);

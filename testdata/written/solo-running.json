@@ -10,7 +10,7 @@
   "prompt_hash": "9566779c",
   "status": "running",
   "start_time": "2026-09-26T03:10:00.123456789Z",
-  "queued_at": "2026-09-26T03:09:58.5Z",
+  "queued_at": "2026-09-26T03:09:58.500Z",
   "work_dir": "/Users/dev/src/orbit-web",
   "log_file": "/Users/dev/.rival/sessions/a1b2c3d4-0001-4000-8000-000000000001.log",
   "output_bytes": 0,

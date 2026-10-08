@@ -1,11 +1,11 @@
-//! Go: `internal/executor/claude_test.go`, plus exact argv vectors, auth
+//! Claude executor tests: exact argv vectors, auth
 //! env stripping, error wrapping and transport-mode checks.
 
 use super::*;
 #[cfg(unix)]
 use crate::executor::testutil::retry_busy;
 use crate::executor::testutil::{Env, Spawned, recorder, strings};
-use crate::session::{MODE_ANTISLOP, MODE_PLAN, MODE_SECURITY};
+use crate::session::{MODE_PLAN, MODE_SECURITY};
 
 /// The read-only (review and task modes) argv, including the empty
 /// `--setting-sources` value and the repeated tool list.
@@ -83,13 +83,13 @@ fn claude_args_exact_vectors_and_effort_mapping() {
     }
 }
 
-/// Go: TestClaudeReviewTransportRestrictions, plus the security task mode.
+/// Review transport restrictions, plus the security task mode.
 /// The fake drains the prompt first, fails if CLAUDECODE or
 /// ANTHROPIC_API_KEY reached it, then prints its argv one per line.
 #[cfg(unix)]
 #[test]
 fn claude_review_transport_restrictions() {
-    for mode in ["review", "plan", "antislop", "security", "raw"] {
+    for mode in ["review", "plan", "security", "raw"] {
         let mut env = Env::new();
         env.set("CLAUDECODE", Some("1"))
             .set("RIVAL_CLAUDE_AUTH", Some("subscription"))
@@ -144,7 +144,7 @@ fn claude_review_transport_restrictions() {
     }
 }
 
-/// Go: TestClaudeDockerReviewMountIsReadOnly (exact argv here).
+/// The docker review mount is read-only (exact argv).
 #[cfg(unix)]
 #[test]
 fn claude_docker_review_mount_is_read_only() {
@@ -390,7 +390,6 @@ fn docker_transport_needs_the_token_and_absolutizes_the_workdir() {
     );
 }
 
-/// Go: TestClaudeAuthHint.
 #[test]
 fn claude_auth_hint_cases() {
     let dir = tempfile::tempdir().unwrap();
@@ -475,7 +474,6 @@ fn claude_auth_hint_cases() {
     );
 }
 
-/// Go: TestSetClaudeTransportModePreservesPlanTask.
 #[test]
 fn set_claude_transport_mode_preserves_plan_task() {
     let mut plan = Session {
@@ -493,12 +491,11 @@ fn set_claude_transport_mode_preserves_plan_task() {
     assert_eq!(standalone.mode, "docker");
 }
 
-/// Go: TestSetClaudeTransportModePreservesTaskModes, plus security.
+/// Setting the transport mode keeps the task modes, security included.
 #[test]
 fn set_claude_transport_mode_preserves_task_modes() {
     for (name, mode, want) in [
         ("plan survives", MODE_PLAN, MODE_PLAN),
-        ("antislop survives", MODE_ANTISLOP, MODE_ANTISLOP),
         ("security survives", MODE_SECURITY, MODE_SECURITY),
         ("raw records transport", "raw", "native"),
         ("review records transport", "review", "native"),

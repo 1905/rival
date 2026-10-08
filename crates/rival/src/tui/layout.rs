@@ -1,4 +1,4 @@
-//! Frame geometry. Go: `internal/dashboard/layout.go`.
+//! Frame geometry.
 
 use super::session_list::LIST_FIXED_WIDTH;
 use super::styles::{BANNER_LINES, COMPACT_HEADER_BELOW_HEIGHT};
@@ -26,7 +26,7 @@ pub struct Layout {
     pub too_small: bool,
 }
 
-/// Go: `computeLayout`. Splits the terminal into header, tab bar, body and
+/// Splits the terminal into header, tab bar, body and
 /// help bar: `header_h + 1 + body_h + 1 == height`. From
 /// [`PREVIEW_MIN_WIDTH`] up the body splits into the list (55%, but never
 /// narrower than its fixed columns plus the border) and the preview, with a

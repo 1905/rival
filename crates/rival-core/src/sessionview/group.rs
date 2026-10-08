@@ -1,6 +1,4 @@
 //! Dashboard buckets and the group reducers.
-//!
-//! Go: `internal/sessionview/group.go`.
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -8,8 +6,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, FixedOffset, Local, TimeDelta};
 
-use crate::gojson;
-use crate::gostd;
+use crate::duration;
 use crate::session::{self, Session};
 
 /// One row in a dashboard: either a multi-session group or a single
@@ -69,19 +66,13 @@ pub fn status<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
     "completed"
 }
 
-/// Classifies a GROUP, and returns exactly one of "security", "antislop",
-/// "plan", or "megareview". There is no empty value. A solo row must display
-/// the session's own mode instead of calling this.
+/// Classifies a GROUP, and returns exactly one of "security", "plan", or
+/// "megareview". There is no empty value. A solo row must display the
+/// session's own mode instead of calling this.
 ///
-/// Precedence: security, then antislop, then plan, else megareview. A group
-/// never mixes antislop and plan members, because one command creates all of
-/// them.
+/// Precedence: security, then plan, else megareview.
 pub fn kind<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
-    for mode in [
-        session::MODE_SECURITY,
-        session::MODE_ANTISLOP,
-        session::MODE_PLAN,
-    ] {
+    for mode in [session::MODE_SECURITY, session::MODE_PLAN] {
         if sessions.iter().any(|s| s.borrow().mode == mode) {
             return mode;
         }
@@ -111,20 +102,18 @@ pub fn elapsed<S: Borrow<Session>>(sessions: &[S]) -> String {
 /// extends the span to `now`. A queued member counts from `queued_at`. It
 /// returns "-" when no member has started.
 pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>) -> String {
-    // Go uses the zero time.Time as the "unset" sentinel for both bounds.
-    let zero = gojson::zero_time();
-    let (mut earliest, mut latest) = (zero, zero);
+    let mut earliest: Option<DateTime<FixedOffset>> = None;
+    let mut latest: Option<DateTime<FixedOffset>> = None;
     for s in sessions {
         let s = s.borrow();
-        let mut start = s.start_time;
-        if let Some(queued_at) = s.queued_at
-            && (start == zero || queued_at < start)
-        {
-            start = queued_at;
-        }
-        if start == zero {
+        // An earlier queued_at replaces start_time.
+        let start = match (s.start_time, s.queued_at) {
+            (Some(start), Some(queued_at)) => Some(start.min(queued_at)),
+            (start, queued_at) => start.or(queued_at),
+        };
+        let Some(start) = start else {
             continue;
-        }
+        };
 
         let mut end = start;
         if s.status == "running" || s.status == "queued" {
@@ -132,7 +121,7 @@ pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>
         } else if let Some(end_time) = s.end_time {
             end = end_time;
         } else if !s.duration.is_empty()
-            && let Ok(nanos) = gostd::parse_duration(&s.duration)
+            && let Ok(nanos) = duration::parse(&s.duration)
         {
             end = start
                 .checked_add_signed(TimeDelta::nanoseconds(nanos))
@@ -141,17 +130,15 @@ pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>
         if end < start {
             end = start;
         }
-        if earliest == zero || start < earliest {
-            earliest = start;
-        }
-        if latest == zero || end > latest {
-            latest = end;
-        }
+        earliest = Some(earliest.map_or(start, |e| e.min(start)));
+        latest = Some(latest.map_or(end, |l| if end > l { end } else { l }));
     }
-    if earliest != zero && latest > earliest {
-        return session::duration_text(session::sub_nanos(latest, earliest));
+    match (earliest, latest) {
+        (Some(earliest), Some(latest)) if latest > earliest => {
+            session::duration_text(session::sub_nanos(latest, earliest))
+        }
+        _ => "-".to_string(),
     }
-    "-".to_string()
 }
 
 #[cfg(test)]
@@ -192,7 +179,6 @@ mod tests {
         TimeDelta::minutes(n)
     }
 
-    // Go: TestGroupBucketsAndKeys.
     #[test]
     fn group_buckets_and_keys() {
         let solo = sess("s1", "", "completed", "review", "codex", SOL, "high");
@@ -206,7 +192,6 @@ mod tests {
         assert_eq!(buckets[1].sessions.len(), 2);
     }
 
-    // Go: TestGroupPreservesFirstAppearanceOrder.
     #[test]
     fn group_preserves_first_appearance_order() {
         let first = sess("x", "g2", "completed", "review", "codex", SOL, "high");
@@ -218,7 +203,7 @@ mod tests {
         assert_eq!(keys, ["g2", "g1"]);
     }
 
-    // Go: TestGroupDoesNotMutateInput. Also checks the input order, which a
+    // Also checks the input order, which a
     // Rust caller could otherwise lose to an in-place member sort.
     #[test]
     fn group_does_not_mutate_input() {
@@ -242,7 +227,6 @@ mod tests {
         );
     }
 
-    // Go: TestStatusTier.
     #[test]
     fn status_tier() {
         let cases: [(&str, &[&str], &str); 4] = [
@@ -272,13 +256,9 @@ mod tests {
         }
     }
 
-    // Go: TestKindPrecedence.
     #[test]
     fn kind_precedence() {
-        let cases: [(&str, &[&str], &str); 6] = [
-            ("antislop solo", &["antislop"], "antislop"),
-            ("antislop group", &["antislop", "antislop"], "antislop"),
-            ("antislop wins over plan", &["plan", "antislop"], "antislop"),
+        let cases: [(&str, &[&str], &str); 3] = [
             ("plan", &["plan", "plan"], "plan"),
             ("review is megareview", &["review", "review"], "megareview"),
             ("raw is megareview", &["raw"], "megareview"),
@@ -296,17 +276,16 @@ mod tests {
         }
     }
 
-    // Not in the Go suite: security precedes every other kind.
+    // Security precedes every other kind.
     #[test]
     fn kind_security_wins() {
         let sessions = [
-            sess("a", "g", "completed", "antislop", "codex", SOL, "high"),
+            sess("a", "g", "completed", "plan", "codex", SOL, "high"),
             sess("b", "g", "completed", "security", "codex", SOL, "high"),
         ];
         assert_eq!(kind(&sessions), "security");
     }
 
-    // Go: TestEffort.
     #[test]
     fn effort_shared_mixed_and_empty() {
         let same = [
@@ -324,7 +303,7 @@ mod tests {
         assert_eq!(effort::<Session>(&[]), "");
     }
 
-    // Go: TestElapsedSpansTheWholeGroup. Elapsed is the wall-clock span of
+    // Elapsed is the wall-clock span of
     // the whole group; the TUI used to report the longest single member.
     #[test]
     fn elapsed_spans_the_whole_group() {
@@ -334,14 +313,14 @@ mod tests {
             Session {
                 id: "a".into(),
                 status: "completed".into(),
-                start_time: base,
+                start_time: Some(base),
                 end_time: Some(base + minutes(4)),
                 ..Session::default()
             },
             Session {
                 id: "b".into(),
                 status: "completed".into(),
-                start_time: base + minutes(4),
+                start_time: Some(base + minutes(4)),
                 end_time: Some(base + minutes(7)),
                 ..Session::default()
             },
@@ -356,14 +335,14 @@ mod tests {
             Session {
                 id: "a".into(),
                 status: "completed".into(),
-                start_time: base,
+                start_time: Some(base),
                 end_time: Some(base + minutes(10)),
                 ..Session::default()
             },
             Session {
                 id: "b".into(),
                 status: "completed".into(),
-                start_time: base + minutes(2),
+                start_time: Some(base + minutes(2)),
                 end_time: Some(base + minutes(5)),
                 ..Session::default()
             },
@@ -371,15 +350,15 @@ mod tests {
         assert_eq!(elapsed_at(&overlapping, now), "10m0s");
     }
 
-    // Go: TestElapsedUsesDurationFallbackAndQueuedAt. The injected `now`
-    // makes the queued span exact instead of Go's 9m..12m window.
+    // The injected `now`
+    // makes the queued span exact instead of a 9m..12m window.
     #[test]
     fn elapsed_uses_duration_fallback_and_queued_at() {
         let base = base();
         let with_duration = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             duration: "3m0s".into(),
             ..Session::default()
         }];
@@ -394,7 +373,6 @@ mod tests {
         assert_eq!(elapsed_at(&queued, base + minutes(10)), "10m0s");
     }
 
-    // Go: TestElapsedWithoutStartIsDash.
     #[test]
     fn elapsed_without_start_is_dash() {
         let queued = [Session {
@@ -406,13 +384,13 @@ mod tests {
     }
 
     #[test]
-    fn elapsed_edges_follow_go() {
+    fn elapsed_edge_cases() {
         let base = base();
         // An earlier queued_at replaces start_time; running extends to now.
         let running = [Session {
             id: "a".into(),
             status: "running".into(),
-            start_time: base + minutes(5),
+            start_time: Some(base + minutes(5)),
             queued_at: Some(base),
             ..Session::default()
         }];
@@ -422,7 +400,7 @@ mod tests {
         let backwards = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             end_time: Some(base - minutes(1)),
             ..Session::default()
         }];
@@ -432,17 +410,17 @@ mod tests {
         let bad_duration = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             duration: "soon".into(),
             ..Session::default()
         }];
         assert_eq!(elapsed_at(&bad_duration, base), "-");
 
-        // Rounds to whole seconds, as Go's Round(time.Second).
+        // Rounds to the nearest whole second.
         let fractional = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             end_time: Some(base + TimeDelta::milliseconds(1500)),
             ..Session::default()
         }];

@@ -1,4 +1,4 @@
-//! Go: `internal/executor/grok_test.go`, plus exact argv vectors, the prompt
+//! Grok executor tests: exact argv vectors, the prompt
 //! file lifetime, error wrapping and preflight checks.
 
 use super::*;
@@ -29,7 +29,7 @@ fn argv(model: &str, file: &str, effort: &str, workdir: &str, review: bool) -> V
     args
 }
 
-/// Go `argValue`: the value following `flag`.
+/// The value following `flag`.
 fn arg_value<'a>(args: &'a [String], flag: &str) -> &'a str {
     args.iter()
         .position(|a| a == flag)
@@ -37,7 +37,6 @@ fn arg_value<'a>(args: &'a [String], flag: &str) -> &'a str {
         .map_or("", String::as_str)
 }
 
-/// Go: TestGrokEffort.
 #[test]
 fn grok_effort_cases() {
     for (effort, want) in [
@@ -64,7 +63,6 @@ fn grok_effort_cases() {
     );
 }
 
-/// Go: TestGrokRunArgs_AlwaysPassesPromptFileAndRuntimeFlags.
 #[test]
 fn grok_run_args_always_passes_prompt_file_and_runtime_flags() {
     let args = grok_run_args(
@@ -92,7 +90,6 @@ fn grok_run_args_always_passes_prompt_file_and_runtime_flags() {
     assert!(!args.iter().any(|a| a == "--sandbox"));
 }
 
-/// Go: TestGrokRunArgs_WorkdirAndReviewSandbox.
 #[test]
 fn grok_run_args_workdir_and_review_sandbox() {
     for (name, workdir, review) in [
@@ -111,7 +108,6 @@ fn grok_run_args_workdir_and_review_sandbox() {
     }
 }
 
-/// Go: TestGrokModelOrDefault.
 #[test]
 fn grok_model_or_default_cases() {
     assert_eq!(grok_model_or_default(""), config::GROK_MODEL);
@@ -119,7 +115,6 @@ fn grok_model_or_default_cases() {
     assert_eq!(grok_model_or_default("grok-4.5-fast"), "grok-4.5-fast");
 }
 
-/// Go: TestGrokRunArgs_ThreadsExplicitModel.
 #[test]
 fn grok_run_args_threads_explicit_model() {
     let args = grok_run_args("grok-4.5-fast", "/tmp/p.md", "high", "/repo", true).unwrap();
@@ -129,13 +124,11 @@ fn grok_run_args_threads_explicit_model() {
     assert_eq!(arg_value(&fallback, "-m"), config::GROK_MODEL);
 }
 
-/// Go: TestGrokRunArgs_PropagatesEffortError.
 #[test]
 fn grok_run_args_propagates_effort_error() {
     assert!(grok_run_args(config::GROK_MODEL, "/tmp/p.md", "turbo", "/repo", true).is_err());
 }
 
-/// Go: TestGrokFullPrompt_MatchesSharedComposition.
 #[test]
 fn grok_full_prompt_matches_shared_composition() {
     let cfg = Env::new().config();
@@ -147,7 +140,7 @@ fn grok_full_prompt_matches_shared_composition() {
     assert_eq!(grok_full_prompt(&cfg, "review this diff", "/repo"), want);
 }
 
-/// The variable Go's `os.TempDir` reads first: `TMPDIR` on Unix, `TMP` on
+/// The variable the temp-dir lookup reads first: `TMPDIR` on Unix, `TMP` on
 /// Windows. Tests set it in the injected config only.
 const TMP_VAR: &str = if cfg!(windows) { "TMP" } else { "TMPDIR" };
 
@@ -163,7 +156,7 @@ fn tmp_is_empty(tmp: &tempfile::TempDir) -> bool {
     std::fs::read_dir(tmp.path()).unwrap().count() == 0
 }
 
-/// Go: TestRunGrokModel_ThreadsModelToArgv. The prompt file exists with the
+/// The prompt file exists with the
 /// full prompt during the spawn, stdin carries nothing, and the file is
 /// gone afterwards.
 #[test]
@@ -204,7 +197,7 @@ fn run_grok_model_threads_model_to_argv() {
         assert_eq!(arg_value(&args, "-m"), want, "{name}");
         assert_eq!(args, argv(want, &file, "high", &work, true), "{name}");
         assert_eq!(stdin, "", "{name}: stdin must carry nothing");
-        // Go os.CreateTemp joins with the host separator.
+        // The temp file path joins with the host separator.
         assert!(
             file.starts_with(&format!(
                 "{}{}rival-grok-",
@@ -219,7 +212,7 @@ fn run_grok_model_threads_model_to_argv() {
     }
 }
 
-/// Go: TestRunGrok_SendsDefaultModel, end to end: the fake grok reads the
+/// End to end: the fake grok reads the
 /// prompt file while it runs and prints it after its argv.
 #[cfg(unix)]
 #[test]
@@ -317,7 +310,7 @@ fn run_grok_model_errors_remove_the_prompt_file() {
         "{err}"
     );
     assert!(
-        err.ends_with(&format!(".md: {}", crate::gostd::errtext::NO_SUCH_PATH)),
+        err.ends_with(&format!(".md: {}", crate::errtext::NO_SUCH_PATH)),
         "{err}"
     );
 }

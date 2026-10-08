@@ -1,10 +1,9 @@
-//! Go `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)`.
+//! SIGINT and SIGTERM handling for commands and the TUI.
 //!
 //! While at least one scope is open, SIGINT and SIGTERM notify every open
 //! scope instead of killing the process. When the last scope
 //! closes, the dispositions that were in place before the first scope come
-//! back, so outside a scope the signals act as before (Go: `stop()` →
-//! `signal.Stop`).
+//! back, so outside a scope the signals act as before.
 //!
 //! A small self-pipe adapter instead of a crate: `ctrlc`'s termination
 //! feature also traps SIGHUP and cannot unregister, and
@@ -15,13 +14,13 @@
 //!
 //! A scope either cancels a context ([`notify_context`], every command) or
 //! calls a function with the signal ([`notify`], the TUI, which must tell
-//! SIGINT from SIGTERM as bubbletea does).
+//! SIGINT from SIGTERM).
 //!
-//! Windows has console control events instead, mapped as Go's runtime maps
-//! them: Ctrl+C and Ctrl+Break are SIGINT; close, logoff and shutdown are
-//! SIGTERM. One `SetConsoleCtrlHandler` routine is added while a scope is
-//! open and removed with the last one. The system calls it on a thread of
-//! its own, so it notifies the scopes directly.
+//! Windows has console control events instead, mapped this way: Ctrl+C and
+//! Ctrl+Break are SIGINT; close, logoff and shutdown are SIGTERM. One
+//! `SetConsoleCtrlHandler` routine is added while a scope is open and removed
+//! with the last one. The system calls it on a thread of its own, so it
+//! notifies the scopes directly.
 
 use std::sync::Arc;
 
@@ -40,9 +39,9 @@ pub enum Signal {
 /// watcher thread, never inside the signal handler.
 type Sink = Arc<dyn Fn(Signal) + Send + Sync>;
 
-/// Keeps the scope's signal handling alive. Dropping it is Go's deferred
-/// `stop()`: the context (if any) is cancelled and, for the last open
-/// scope, the previous signal dispositions come back.
+/// Keeps the scope's signal handling alive. Dropping it ends the scope:
+/// the context (if any) is cancelled and, for the last open scope, the
+/// previous signal dispositions come back.
 #[must_use = "dropping the guard ends signal handling for the scope"]
 pub struct NotifyGuard {
     id: u64,
@@ -124,7 +123,8 @@ mod windows {
         STATE.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    /// Go runtime `ctrlHandler`'s mapping.
+    /// Maps a console control event to a signal: Ctrl+C and Ctrl+Break
+    /// are SIGINT; close, logoff and shutdown are SIGTERM.
     pub(super) fn signal_of(ctrl: u32) -> Option<Signal> {
         match ctrl {
             CTRL_C_EVENT | CTRL_BREAK_EVENT => Some(Signal::Interrupt),
@@ -134,9 +134,9 @@ mod windows {
     }
 
     /// Notifies every open scope. With none open the event is not handled
-    /// and the next routine (the default one) runs. Like Go, a SIGTERM-type
-    /// event blocks this thread afterwards: Windows ends the process once
-    /// the routine returns, and blocking leaves the scopes time to clean up.
+    /// and the next routine (the default one) runs. A SIGTERM-type event
+    /// blocks this thread afterwards: Windows ends the process once the
+    /// routine returns, and blocking leaves the scopes time to clean up.
     unsafe extern "system" fn handler(ctrl: u32) -> i32 {
         let Some(sig) = signal_of(ctrl) else {
             return 0;
@@ -163,7 +163,7 @@ mod windows {
             if unsafe { SetConsoleCtrlHandler(Some(handler), 1) } == 0 {
                 return Err(format!(
                     "SetConsoleCtrlHandler: {}",
-                    rival_core::gostd::os_error_text(&std::io::Error::last_os_error())
+                    std::io::Error::last_os_error()
                 ));
             }
             st.installed = true;
@@ -230,7 +230,7 @@ mod unix {
     }
 
     fn io_err(what: &str, err: &io::Error) -> String {
-        format!("{what}: {}", rival_core::gostd::os_error_text(err))
+        format!("{what}: {}", err)
     }
 
     extern "C" fn on_signal(sig: libc::c_int) {
@@ -618,7 +618,7 @@ mod tests {
         assert_eq!(
             report,
             "limited=true restored=true\n\
-             err=pipe: too many open files\n\
+             err=pipe: Too many open files (os error 24)\n\
              handler_installed=false dispositions_kept=true idle=true\n\
              fds_leaked=false\n\
              retry_installed=true\n\
@@ -659,7 +659,7 @@ mod windows_tests {
     const CONTROL_C_EXIT: u32 = 0xC000_013A;
 
     #[test]
-    fn events_map_like_go() {
+    fn console_events_map_to_signals() {
         assert_eq!(windows::signal_of(CTRL_C_EVENT), Some(Signal::Interrupt));
         assert_eq!(
             windows::signal_of(CTRL_BREAK_EVENT),

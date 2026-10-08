@@ -159,8 +159,8 @@ class CheckArchiveTest(unittest.TestCase):
             self.check("windows", "amd64", {"rival_windows_amd64.zip": members})
 
     def test_missing_bundled_file(self):
-        members = [m for m in default_members("darwin", "arm64") if m[0] != "licenses/Go-LICENSE"]
-        with self.assertRaisesRegex(cra.CheckError, "Go-LICENSE"):
+        members = [m for m in default_members("darwin", "arm64") if m[0] != "README.md"]
+        with self.assertRaisesRegex(cra.CheckError, "README.md"):
             self.check("darwin", "arm64", {"rival_darwin_arm64.tar.gz": members})
 
     def test_changed_bundled_file(self):

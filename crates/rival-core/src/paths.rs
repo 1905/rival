@@ -1,12 +1,12 @@
-//! Rival's state directory, Go path semantics, and `.env` files.
+//! Rival's state directory, lexical path handling, and `.env` files.
 //!
-//! Go: `config.SessionDirPath` / `QueueDirPath` join `.rival/...` onto
-//! `os.UserHomeDir()` and fall back to a relative `.rival` when the home
-//! directory is unknown. `RIVAL_HOME` is a Rust-port addition: when set, it is
-//! the rival root itself (no `.rival` appended).
+//! The session and queue directories join `.rival/...` onto the home
+//! directory and fall back to a relative `.rival` when the home directory is
+//! unknown. `RIVAL_HOME`, when set, is the rival root itself (no `.rival`
+//! appended).
 //!
 //! The `.env` reader is a direct port of `github.com/joho/godotenv` v1.5.1
-//! (`parser.go`), which Go uses both at startup and for API-key lookup.
+//! (`parser.go`). It is used both at startup and for API-key lookup.
 
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
@@ -18,7 +18,7 @@ use regex::{Captures, Regex};
 
 const ROOT_DIR: &str = ".rival";
 
-/// The variable Go's `os.UserHomeDir` reads.
+/// The variable that names the home directory.
 pub const HOME_VAR: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
 
 /// The Rust-port override for the rival root. Process environment only.
@@ -42,8 +42,8 @@ impl Paths {
         Self::from_vars(std::env::var_os(STATE_ROOT_VAR), std::env::var_os(HOME_VAR))
     }
 
-    /// Pure form of [`Paths::from_env`]. Empty values count as unset, like
-    /// Go's `os.UserHomeDir` erroring on an empty `$HOME`.
+    /// Pure form of [`Paths::from_env`]. Empty values count as unset: an
+    /// empty `$HOME` is no home directory.
     pub fn from_vars(rival_home: Option<OsString>, home: Option<OsString>) -> Self {
         if let Some(root) = rival_home.filter(|v| !v.is_empty()) {
             return Paths {
@@ -71,51 +71,95 @@ impl Paths {
     }
 }
 
-/// Go: `filepath.Clean` for the host, purely lexical: Unix rules, or on
-/// Windows the drive/UNC rules of [`crate::winpath`].
+/// Lexical clean for the host: Unix rules, or on Windows [`clean_windows`].
 pub fn clean(path: &Path) -> PathBuf {
     #[cfg(windows)]
-    return crate::winpath::clean_path(path);
+    return clean_windows(path);
     #[cfg(not(windows))]
     return clean_unix(path);
 }
 
-/// Go: `filepath.Join` of two elements for the host.
-pub fn join(a: &Path, b: &Path) -> PathBuf {
-    #[cfg(windows)]
-    return crate::winpath::join_paths(a, b);
-    #[cfg(not(windows))]
-    {
-        let (a_bytes, b_bytes) = (
-            a.as_os_str().as_encoded_bytes(),
-            b.as_os_str().as_encoded_bytes(),
-        );
-        match (a_bytes.is_empty(), b_bytes.is_empty()) {
-            (true, true) => PathBuf::new(),
-            (true, false) => clean_unix(b),
-            (false, true) => clean_unix(a),
-            (false, false) => {
-                let mut joined = a_bytes.to_vec();
-                joined.push(b'/');
-                joined.extend_from_slice(b_bytes);
-                // SAFETY: two valid encodings joined at an ASCII '/'.
-                clean_unix(Path::new(unsafe {
-                    OsStr::from_encoded_bytes_unchecked(&joined)
-                }))
+/// Lexical clean from the [`std::path`] components: drops `.` and empty
+/// elements, and removes a name before each `..`. A `..` stays at the start
+/// of a relative path and goes away after a root. The empty result is `.`.
+///
+/// A name that has a `:` (not valid in a Windows file name) can become a
+/// drive prefix when it is the first element, for example `a\..\c:`.
+#[cfg(windows)]
+fn clean_windows(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let rooted = path.has_root();
+    let mut parts: Vec<Component<'_>> = Vec::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if matches!(parts.last(), Some(Component::Normal(_))) {
+                    parts.pop();
+                } else if !rooted {
+                    parts.push(c);
+                }
             }
+            _ => parts.push(c),
+        }
+    }
+    let mut out = PathBuf::new();
+    for c in parts {
+        match c {
+            // The prefix keeps its spelling in std (`//host/share`). Write it
+            // with backslashes, as every other separator in the result.
+            Component::Prefix(p) => {
+                use std::os::windows::ffi::{OsStrExt, OsStringExt};
+                let wide: Vec<u16> = p
+                    .as_os_str()
+                    .encode_wide()
+                    .map(|u| {
+                        if u == u16::from(b'/') {
+                            u16::from(b'\\')
+                        } else {
+                            u
+                        }
+                    })
+                    .collect();
+                out.push(std::ffi::OsString::from_wide(&wide));
+            }
+            other => out.push(other),
+        }
+    }
+    if out.as_os_str().is_empty() {
+        return PathBuf::from(".");
+    }
+    out
+}
+
+/// Joins two elements for the host and cleans the result. Empty elements
+/// are dropped. Unlike [`Path::join`], an absolute `b` does not replace `a`.
+pub fn join(a: &Path, b: &Path) -> PathBuf {
+    match (a.as_os_str().is_empty(), b.as_os_str().is_empty()) {
+        (true, true) => PathBuf::new(),
+        (true, false) => clean(b),
+        (false, true) => clean(a),
+        (false, false) => {
+            // `a.join("")` adds a separator only where `Path::push` would:
+            // a Windows drive alone (`C:`) stays drive-relative. `b` is
+            // appended as text, so its root does not replace `a`.
+            let mut joined = a.join("").into_os_string();
+            joined.push(b);
+            clean(Path::new(&joined))
         }
     }
 }
 
-/// Go: `filepath.IsAbs` for the host.
+/// An absolute path for the host: [`Path::is_absolute`] on Windows (a drive
+/// with a root, UNC or `\\?\`), a leading `/` on Unix.
 pub fn is_abs(path: &Path) -> bool {
     #[cfg(windows)]
-    return crate::winpath::is_abs_path(path);
+    return path.is_absolute();
     #[cfg(not(windows))]
     return path.as_os_str().as_encoded_bytes().first() == Some(&b'/');
 }
 
-/// Go: `filepath.Clean` with Unix rules on every platform. A backslash is an
+/// Lexical clean with Unix rules on every platform. A backslash is an
 /// ordinary byte here.
 pub fn clean_unix(path: &Path) -> PathBuf {
     let bytes = path.as_os_str().as_encoded_bytes();
@@ -150,25 +194,24 @@ pub fn clean_unix(path: &Path) -> PathBuf {
     PathBuf::from(unsafe { OsString::from_encoded_bytes_unchecked(out) })
 }
 
-/// Go: `filepath.Abs`. `cwd` is the snapshotted `os.Getwd()` result; `None`
-/// stands for a `Getwd` error, which makes a relative path fail.
+/// An absolute, cleaned path. `cwd` is the working directory snapshot;
+/// `None` stands for a failed lookup, which makes a relative path fail.
 ///
-/// Windows follows [`crate::winpath::abs_with`]: drive, root-relative, UNC
-/// and drive-relative forms; another drive's own directory comes from the
-/// OS (`std::path::absolute`, `GetFullPathNameW` like Go's `syscall.FullPath`).
+/// On Windows a relative path joins `cwd` and then [`std::path::absolute`]
+/// resolves it. That covers a root-relative `\x` (the drive of `cwd`) and a
+/// drive-relative `D:x`, which the OS resolves from that drive's own
+/// directory of this process.
 pub fn abs(cwd: Option<&Path>, path: &Path) -> Option<PathBuf> {
-    #[cfg(windows)]
-    return crate::winpath::abs_with(cwd, path, |p| std::path::absolute(p).ok());
-    #[cfg(not(windows))]
-    {
-        if is_abs(path) {
-            return Some(clean(path));
-        }
-        cwd.map(|cwd| clean(&cwd.join(path)))
+    if is_abs(path) {
+        return Some(clean(path));
     }
+    let joined = cwd?.join(path);
+    #[cfg(windows)]
+    let joined = std::path::absolute(&joined).ok()?;
+    Some(clean(&joined))
 }
 
-/// Go: `os.Getwd` on Unix. An absolute `$PWD` naming the current directory
+/// The current directory on Unix. An absolute `$PWD` naming the current directory
 /// wins (so symlinked paths stay as the shell spelled them); otherwise the
 /// kernel's answer.
 pub fn getwd(pwd: Option<&OsStr>) -> Option<PathBuf> {
@@ -206,7 +249,7 @@ impl fmt::Display for DotenvError {
 
 impl std::error::Error for DotenvError {}
 
-/// Go: `godotenv.Read(path)`. The whole file parses or nothing is returned.
+/// Reads a `.env` file. The whole file parses or nothing is returned.
 /// A key assigned twice keeps its last value. `$VAR` expansion sees only
 /// keys assigned earlier in the same file, never the process environment.
 pub fn read_dotenv(path: &Path) -> Result<HashMap<String, String>, DotenvError> {
@@ -214,20 +257,20 @@ pub fn read_dotenv(path: &Path) -> Result<HashMap<String, String>, DotenvError> 
     parse_dotenv(&String::from_utf8_lossy(&data))
 }
 
-/// Go: `godotenv.Unmarshal`.
+/// Parses `.env` text.
 pub fn parse_dotenv(src: &str) -> Result<HashMap<String, String>, DotenvError> {
     let mut out = HashMap::new();
     parse_into(src, &mut out).map_err(DotenvError::Parse)?;
     Ok(out)
 }
 
-/// Go: `_ = godotenv.Load()`. Reads `./.env` only (no parent search); a
+/// Loads `./.env` into the process environment. Reads `./.env` only (no parent search); a
 /// missing or unparseable file is silently ignored, and existing process
 /// variables win, even when empty.
 ///
-/// Port addition: `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to
-/// the reviewed repository, and Go had no such variable for it to move
-/// rival's state with. Only the process environment can set it.
+/// `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to the reviewed
+/// repository, so it must not move rival's state. Only the process
+/// environment can set it.
 ///
 /// # Safety
 ///
@@ -243,10 +286,10 @@ pub unsafe fn load_dotenv() {
     );
 }
 
-/// Testable core of [`load_dotenv`]: Go's `loadFile(filename, false)`.
-/// `is_set` answers for the environment as it was before loading. Entries Go's
-/// `os.Setenv` would reject (empty key, `=` or NUL in the key, NUL in the
-/// value) are skipped, as Go ignores that error.
+/// Testable core of [`load_dotenv`]: existing variables are not overridden.
+/// `is_set` answers for the environment as it was before loading. Entries the
+/// OS would reject (empty key, `=` or NUL in the key, NUL in the value) are
+/// skipped silently.
 pub fn load_dotenv_with(path: &Path, is_set: impl Fn(&str) -> bool, set: impl FnMut(&str, &str)) {
     load_dotenv_for(path, cfg!(windows), is_set, set);
 }
@@ -323,7 +366,7 @@ fn locate_key_name(src: &str) -> Result<(String, &str), String> {
 
     let mut key = "";
     let mut offset = 0;
-    // Go ranges over bytes here and widens each byte to a rune.
+    // Ranges over bytes and widens each byte to a char, not over UTF-8.
     for (i, &b) in src.as_bytes().iter().enumerate() {
         let c = char::from(b);
         if is_space(c) {
@@ -341,9 +384,9 @@ fn locate_key_name(src: &str) -> Result<(String, &str), String> {
                     continue;
                 }
                 return Err(format!(
-                    "unexpected character {} in variable name near {}",
-                    crate::gostd::quote(&c.to_string()),
-                    crate::gostd::quote(src)
+                    "unexpected character {:?} in variable name near {:?}",
+                    c.to_string(),
+                    src
                 ));
             }
         }
@@ -421,8 +464,8 @@ fn expand_escapes(s: &str) -> String {
     UNESCAPE_RE.replace_all(&out, "${1}").into_owned()
 }
 
-/// godotenv `expandVariables`. Go also tests `submatch[2] == "("`, which can
-/// never hold (group 2 is always `$`), so `$(NAME` expands like `$NAME`.
+/// godotenv `expandVariables`. The original also tests `submatch[2] == "("`,
+/// which can never hold (group 2 is always `$`), so `$(NAME` expands like `$NAME`.
 fn expand_variables(v: &str, vars: &HashMap<String, String>) -> String {
     EXPAND_VAR_RE
         .replace_all(v, |caps: &Captures| {
@@ -457,7 +500,7 @@ mod tests {
                 Some("/h"),
                 "/h/.rival",
             ),
-            ("no home: relative .rival like Go", None, None, "./.rival"),
+            ("no home: relative .rival", None, None, "./.rival"),
             ("empty HOME: relative .rival", None, Some(""), "./.rival"),
         ];
         for (name, rival_home, home, want) in cases {
@@ -467,18 +510,17 @@ mod tests {
     }
 
     #[test]
-    fn subpaths_match_go_layout() {
+    fn subpaths_use_the_rival_layout() {
         let tmp = tempfile::tempdir().unwrap();
         let p = Paths::from_home(tmp.path());
-        // Go: filepath.Join(home, ".rival/sessions") and ".rival/queue".
         assert_eq!(p.sessions_dir(), tmp.path().join(".rival/sessions"));
         assert_eq!(p.queue_dir(), tmp.path().join(".rival/queue"));
         assert_eq!(p.config_file(), tmp.path().join(".rival/config.yaml"));
     }
 
-    // Cases from Go's path/filepath TestClean (Unix).
+    // Lexical clean cases for Unix paths.
     #[test]
-    fn clean_matches_go_filepath_clean() {
+    fn clean_resolves_dots_and_separators() {
         let cases = [
             ("abc", "abc"),
             ("abc/def", "abc/def"),
@@ -523,7 +565,7 @@ mod tests {
         );
     }
 
-    /// The host's `clean`, `join` and `is_abs` follow its own Go rules.
+    /// The host's `clean`, `join` and `is_abs` follow the host's rules.
     #[test]
     fn host_rules_dispatch_by_platform() {
         let got = |p: &str| clean(Path::new(p)).into_os_string();
@@ -555,6 +597,275 @@ mod tests {
         assert_eq!(abs(Some(cwd), Path::new("/a/./b/")), Some("/a/b".into()));
         assert_eq!(abs(None, Path::new("/a")), Some("/a".into()));
         assert_eq!(abs(None, Path::new("rel")), None);
+    }
+
+    /// The portable clean cases, as Windows runs them: `/` becomes `\`.
+    #[cfg(windows)]
+    const CLEAN_PORTABLE: &[(&str, &str)] = &[
+        ("abc", "abc"),
+        ("abc/def", "abc/def"),
+        ("a/b/c", "a/b/c"),
+        (".", "."),
+        ("..", ".."),
+        ("../..", "../.."),
+        ("../../abc", "../../abc"),
+        ("/abc", "/abc"),
+        ("/", "/"),
+        ("", "."),
+        ("abc/", "abc"),
+        ("abc/def/", "abc/def"),
+        ("a/b/c/", "a/b/c"),
+        ("./", "."),
+        ("../", ".."),
+        ("../../", "../.."),
+        ("/abc/", "/abc"),
+        ("abc//def//ghi", "abc/def/ghi"),
+        ("abc//", "abc"),
+        ("abc/./def", "abc/def"),
+        ("/./abc/def", "/abc/def"),
+        ("abc/.", "abc"),
+        ("abc/def/ghi/../jkl", "abc/def/jkl"),
+        ("abc/def/../ghi/../jkl", "abc/jkl"),
+        ("abc/def/..", "abc"),
+        ("abc/def/../..", "."),
+        ("/abc/def/../..", "/"),
+        ("abc/def/../../..", ".."),
+        ("/abc/def/../../..", "/"),
+        ("abc/def/../../../ghi/jkl/../../../mno", "../../mno"),
+        ("/../abc", "/abc"),
+        ("a/../b:/../../c", "../c"),
+        ("abc/./../def", "def"),
+        ("abc//./../def", "def"),
+        ("abc/../../././../def", "../../def"),
+    ];
+
+    /// Windows clean cases: drives, UNC shares and device paths.
+    #[cfg(windows)]
+    const CLEAN_WINDOWS: &[(&str, &str)] = &[
+        // A drive alone stays as it is (was `c:.`).
+        (r"c:", r"c:"),
+        (r"c:\", r"c:\"),
+        (r"c:\abc", r"c:\abc"),
+        (r"c:abc\..\..\.\.\..\def", r"c:..\..\def"),
+        (r"c:\abc\def\..\..", r"c:\"),
+        (r"c:\..\abc", r"c:\abc"),
+        (r"c:..\abc", r"c:..\abc"),
+        (r"c:\b:\..\..\..\d", r"c:\d"),
+        (r"\", r"\"),
+        (r"/", r"\"),
+        (r"\\i\..\c$", r"\\i\..\c$"),
+        (r"\\i\..\i\c$", r"\\i\..\i\c$"),
+        (r"\\i\..\I\c$", r"\\i\..\I\c$"),
+        (r"\\host\share\foo\..\bar", r"\\host\share\bar"),
+        // The prefix is written with backslashes.
+        (r"//host/share/foo/../baz", r"\\host\share\baz"),
+        (r"\\host\share\foo\..\..\..\..\bar", r"\\host\share\bar"),
+        (r"\\.\C:\a\..\..\..\..\bar", r"\\.\C:\bar"),
+        (r"\\.\C:\\\\a", r"\\.\C:\a"),
+        (r"\\a\b\..\c", r"\\a\b\c"),
+        // std reads a UNC share as a prefix plus its root, so the clean form
+        // ends with the root separator.
+        (r"\\a\b", r"\\a\b\"),
+        // A first element with a `:` is a drive for std (were `.\c:`,
+        // `.\c:\foo` and `.\c:foo`).
+        (r".\c:", r"c:"),
+        (r".\c:\foo", r"c:foo"),
+        (r".\c:foo", r"c:foo"),
+        // Without a share, `//abc` is not UNC for std: one root (were
+        // `\\abc`, `\\\abc` and `\\abc\\`).
+        (r"//abc", r"\abc"),
+        (r"///abc", r"\abc"),
+        (r"//abc//", r"\abc"),
+        (r"\\?\C:\", r"\\?\C:\"),
+        (r"\\?\C:\a", r"\\?\C:\a"),
+        // A first element with a `:` is a drive for std (were `.\c:`,
+        // `.\c:`, `.\c:\a` and `..\c:`).
+        (r"a/../c:", r"c:"),
+        (r"a\..\c:", r"c:"),
+        (r"a/../c:/a", r"c:a"),
+        (r"a/../../c:", r"c:"),
+        (r"foo:bar", r"foo:bar"),
+        // std has no `\??\` prefix, so nothing is inserted (was `\.\??\a`).
+        (r"/a/../??/a", r"\??\a"),
+    ];
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_clean_folds_std_components() {
+        let got = |p: &str| clean(Path::new(p)).into_os_string();
+        // Collect every mismatch, so one run shows all of them.
+        let mut bad = Vec::new();
+        let mut check = |input: &str, want: &str| {
+            for i in [input, want] {
+                let g = got(i);
+                if g.as_os_str() != std::ffi::OsStr::new(want) {
+                    bad.push(format!("clean({i:?}) = {g:?}, want {want:?}"));
+                }
+            }
+        };
+        for &(input, want) in CLEAN_PORTABLE {
+            check(input, &want.replace('/', r"\"));
+        }
+        for &(input, want) in CLEAN_WINDOWS {
+            check(input, want);
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    /// Several elements join two at a time, as callers do.
+    #[cfg(windows)]
+    #[test]
+    fn windows_join_appends_and_cleans() {
+        let cases: &[(&[&str], &str)] = &[
+            (&[], ""),
+            (&[""], ""),
+            (&["/"], "/"),
+            (&["a"], "a"),
+            (&["a", "b"], "a/b"),
+            (&["a", ""], "a"),
+            (&["", "b"], "b"),
+            (&["/", "a"], "/a"),
+            (&["/", "a/b"], "/a/b"),
+            (&["/", ""], "/"),
+            (&["/a", "b"], "/a/b"),
+            (&["a", "/b"], "a/b"),
+            (&["/a", "/b"], "/a/b"),
+            (&["a/", "b"], "a/b"),
+            (&["a/", ""], "a"),
+            (&["", ""], ""),
+            (&["/", "a", "b"], "/a/b"),
+            (&["directory", "file"], r"directory\file"),
+            (&[r"C:\Windows\", "System32"], r"C:\Windows\System32"),
+            (&[r"C:\Windows\", ""], r"C:\Windows"),
+            (&[r"C:\", "Windows"], r"C:\Windows"),
+            (&["C:", "a"], "C:a"),
+            (&["C:", r"a\b"], r"C:a\b"),
+            (&["C:", "a", "b"], r"C:a\b"),
+            (&["C:", "", "b"], "C:b"),
+            (&["C:", "", "", "b"], "C:b"),
+            // A drive alone stays as it is (were `C:.`).
+            (&["C:", ""], "C:"),
+            (&["C:", "", ""], "C:"),
+            (&["C:", r"\a"], r"C:\a"),
+            (&["C:", "", r"\a"], r"C:\a"),
+            (&["C:.", "a"], "C:a"),
+            (&["C:a", "b"], r"C:a\b"),
+            (&["C:a", "b", "d"], r"C:a\b\d"),
+            (&[r"\\host\share", "foo"], r"\\host\share\foo"),
+            (&[r"\\host\share\foo"], r"\\host\share\foo"),
+            // std keeps the spelling of the UNC prefix (was
+            // `\\host\share\foo\bar`).
+            (&["//host/share", "foo/bar"], r"//host/share\foo\bar"),
+            (&[r"\"], r"\"),
+            (&[r"\", ""], r"\"),
+            (&[r"\", "a"], r"\a"),
+            // `\\` and `\\a` without a share are not UNC for std, and each
+            // pair is cleaned (were `\\a`, `\\a\b`, `\\a\b\c`, `\\a\b\c`
+            // and `\\a`).
+            (&[r"\\", "a"], r"\a"),
+            (&[r"\", "a", "b"], r"\a\b"),
+            (&[r"\\", "a", "b"], r"\a\b"),
+            (&[r"\", r"\\a\b", "c"], r"\a\b\c"),
+            (&[r"\\a", "b", "c"], r"\a\b\c"),
+            (&[r"\\a\", "b", "c"], r"\a\b\c"),
+            (&["//", "a"], r"\a"),
+            (&[r"a:\b\c", r"x\..\y:\..\..\z"], r"a:\b\z"),
+            // std has no `\??\` prefix, so nothing is inserted (was
+            // `\.\??\a`).
+            (&[r"\", r"??\a"], r"\??\a"),
+        ];
+        let mut bad = Vec::new();
+        for &(elems, want) in cases {
+            let got = elems
+                .iter()
+                .fold(PathBuf::new(), |acc, e| join(&acc, Path::new(e)))
+                .into_os_string();
+            let want = want.replace('/', r"\");
+            if got.as_os_str() != std::ffi::OsStr::new(&want) {
+                bad.push(format!("join({elems:?}) = {got:?}, want {want:?}"));
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_is_abs_is_std_is_absolute() {
+        let cases = [
+            (r"C:\", true),
+            (r"c\", false),
+            (r"c::", false),
+            (r"c:", false),
+            (r"/", false),
+            (r"\", false),
+            (r"\Windows", false),
+            (r"c:a\b", false),
+            (r"c:\a\b", true),
+            (r"c:/a/b", true),
+            (r"\\host\share", true),
+            (r"\\host\share\", true),
+            (r"\\host\share\foo", true),
+            (r"//host/share/foo/bar", true),
+            (r"\\?\a\b\c", true),
+            // std has no `\??\` prefix: root-relative (was true).
+            (r"\??\a\b\c", false),
+        ];
+        for (path, want) in cases {
+            assert_eq!(is_abs(Path::new(path)), want, "is_abs({path:?})");
+        }
+        // Unix cases are never absolute without a drive, and keep their
+        // Unix answer with a `c:` prefix.
+        let unix = [
+            ("", false),
+            ("/", true),
+            ("/usr/bin/gcc", true),
+            ("..", false),
+            ("/a/../bb", true),
+            (".", false),
+            ("./", false),
+            ("lala", false),
+        ];
+        for (path, want) in unix {
+            assert!(!is_abs(Path::new(path)), "is_abs({path:?})");
+            let prefixed = format!("c:{path}");
+            assert_eq!(is_abs(Path::new(&prefixed)), want, "is_abs({prefixed:?})");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_abs_covers_drive_root_unc_and_relative_paths() {
+        let cwd = Path::new(r"C:\work\dir");
+        let abs = |p: &str| abs(Some(cwd), Path::new(p)).map(PathBuf::into_os_string);
+        assert_eq!(abs(r"D:\a\.\b\"), Some(r"D:\a\b".into()), "drive-rooted");
+        assert_eq!(abs(r"sub\..\x"), Some(r"C:\work\dir\x".into()), "relative");
+        assert_eq!(abs(""), Some(r"C:\work\dir".into()), "empty is cwd");
+        assert_eq!(abs(r"\top\x"), Some(r"C:\top\x".into()), "root-relative");
+        assert_eq!(
+            abs("/top/x"),
+            Some(r"C:\top\x".into()),
+            "slash root-relative"
+        );
+        assert_eq!(
+            abs(r"\\host\share\a\..\b"),
+            Some(r"\\host\share\b".into()),
+            "UNC"
+        );
+        // A drive-relative path takes the drive's own directory of this
+        // process from the OS, also on the drive of `cwd` (was
+        // `C:\work\dir\rel` for `c:rel`).
+        for p in [r"c:rel", r"D:rel"] {
+            let os = clean(&std::path::absolute(p).unwrap()).into_os_string();
+            assert_eq!(abs(p), Some(os), "drive-relative {p:?}");
+        }
+        // No working directory: only absolute paths resolve.
+        assert_eq!(super::abs(None, Path::new("rel")), None);
+        assert_eq!(super::abs(None, Path::new(r"\x")), None);
+        assert_eq!(super::abs(None, Path::new(r"c:rel")), None);
+        assert_eq!(
+            super::abs(None, Path::new(r"C:\x")).map(PathBuf::into_os_string),
+            Some(r"C:\x".into())
+        );
     }
 
     #[test]
@@ -744,7 +1055,7 @@ mod tests {
                 "A=1\nB=$A\nA=2\nC=$A",
                 &[("A", "2"), ("B", "1"), ("C", "2")],
             ),
-            // Go's dead `submatch[2] == "("` check: `$(NAME` expands.
+            // The dead `submatch[2] == "("` check: `$(NAME` expands.
             ("A=1\nB=$(A)", &[("A", "1"), ("B", "1)")]),
         ];
         for &(input, want) in cases {
@@ -786,7 +1097,7 @@ mod tests {
         ] {
             assert!(parse_dotenv(input).is_err(), "{input:?}");
         }
-        // A trailing key with no '=' parses under the empty key, like Go.
+        // A trailing key with no '=' parses under the empty key.
         assert_eq!(parsed("A=1\nFOO"), map(&[("A", "1"), ("", "FOO")]));
     }
 
@@ -849,7 +1160,7 @@ mod tests {
         let file = "RIVAL_HOME=./.rival-dev\nA=1\nHOME=/repo-home\n";
         for windows in [false, true] {
             // Unset: the file's value is dropped; other keys, HOME included,
-            // still load like Go.
+            // still load.
             let env = load_on(windows, file, &[]);
             assert_eq!(
                 env,
@@ -901,7 +1212,7 @@ mod tests {
 
     /// The Windows host loader, with the OS name comparison: no spelling of
     /// `RIVAL_HOME` loads, exported values (empty ones included) stay, and
-    /// near names and ordinary keys load like Go. The native child test in
+    /// near names and ordinary keys load. The native child test in
     /// `subprocess::windows_tests` checks the rule against the OS lookup.
     #[cfg(windows)]
     #[test]

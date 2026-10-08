@@ -1,0 +1,24 @@
+{
+  "name": "plan-missing-file",
+  "description": "`rival command plan` with `-re ultra docs/missing plan.md` on stdin. The path keeps its space and is resolved under the absolute workdir (the stdin effort is accepted because no --effort flag is given). The file does not exist, so rival prints 'plan file not found: <ROOT>/work/docs/missing plan.md' on stdout and again on stderr, exit code 1. No session, no reviewer.",
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan"
+      ],
+      "stdin": "-re ultra docs/missing plan.md\n",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "plan file not found: <ROOT>/work/docs/missing plan.md\n",
+        "stderr_lines": [
+          "plan file not found: <ROOT>/work/docs/missing plan.md"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

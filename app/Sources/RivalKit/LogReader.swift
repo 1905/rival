@@ -105,7 +105,7 @@ public func readTail(path: String, maxBytes: Int) throws -> (text: String, trunc
     return (dropInvalidUTF8(data), truncated)
 }
 
-/// Go `strings.ToValidUTF8(s, "")`: invalid byte sequences vanish.
+/// Decodes UTF-8 and drops invalid byte sequences without a replacement.
 func dropInvalidUTF8(_ data: Data) -> String {
     var it = data.makeIterator()
     var decoder = UTF8()

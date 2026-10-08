@@ -1,0 +1,25 @@
+{
+  "name": "install-unknown-target",
+  "description": "`rival install --target typo` exits 1 with stderr 'unknown install target \"typo\"; use auto, claude, codex, or all'. Nothing is written.",
+  "steps": [
+    {
+      "run": [
+        "install",
+        "--target",
+        "typo"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "unknown install target \"typo\"; use auto, claude, codex, or all"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "name": "workdir-missing",
+  "description": "Every --workdir flag with a missing directory. The path is made absolute, and a missing directory gives 'workdir not found: <abs>'. The command surface (model command after the stdin parse; plan and security commands first) also prints it to stdout and exits 1. The plain `run` command prints only the error, after reading --prompt-stdin. No provider, session or queue file is touched.",
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "claude",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "grok",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "k3",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "plan",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "security",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "workdir not found: <ROOT>/work/missing\n",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "run",
+        "claude",
+        "--prompt-stdin",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "hi",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "run",
+        "grok",
+        "--prompt-stdin",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "hi",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "run",
+        "k3",
+        "--prompt-stdin",
+        "--workdir",
+        "missing"
+      ],
+      "stdin": "hi",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "workdir not found: <ROOT>/work/missing"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

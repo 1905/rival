@@ -1,0 +1,114 @@
+{
+  "name": "command-claude-no-queue-workdir",
+  "description": "Same as executor-claude-success but runs `rival command claude --no-queue --workdir sub`. `--workdir sub` resolves to <ROOT>/work/sub, and every provider argv, cwd, preamble and session work_dir follows it. `--no-queue` marks the session running without touching the queue, so no ~/.rival/queue/.lock is created.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--dangerously-skip-permissions"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "You are working in project directory: <ROOT>/work/sub\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work/sub",
+              "env": {
+                "CLAUDECODE": null,
+                "ANTHROPIC_API_KEY": null
+              }
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "mode": "native",
+          "work_dir": "<ROOT>/work/sub",
+          "account": "subscription",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    }
+  ]
+}

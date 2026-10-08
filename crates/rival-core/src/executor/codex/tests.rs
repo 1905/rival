@@ -1,5 +1,5 @@
-//! Go: `internal/executor/codex_test.go`, plus exact argv/request, error
-//! wrapping and preflight checks against task-owned fakes.
+//! Codex executor tests: exact argv/request, error wrapping and preflight
+//! checks against task-owned fakes.
 
 use super::*;
 #[cfg(unix)]
@@ -26,7 +26,7 @@ fn argv(effort: &str, workdir: &str) -> Vec<String> {
     ])
 }
 
-/// Go: TestCodexRunArgs_UsesExplicitModelAndEffort (exact vector here).
+/// The explicit model and effort reach argv (exact vector).
 #[test]
 fn codex_run_args_uses_explicit_model_and_effort() {
     for effort in ["high", "ultra"] {
@@ -41,7 +41,6 @@ fn codex_run_args_uses_explicit_model_and_effort() {
     assert_eq!(codex_run_args(config::CODEX_MODEL, "", ""), argv("", ""));
 }
 
-/// Go: TestCodexPassesUltraAndXhighThroughUnaliased.
 #[test]
 fn codex_passes_ultra_and_xhigh_through_unaliased() {
     for effort in ["xhigh", "ultra"] {
@@ -53,8 +52,7 @@ fn codex_passes_ultra_and_xhigh_through_unaliased() {
     }
 }
 
-/// Go: TestRunCodexModelRejectsUnsupportedModel and
-/// TestRunCodexModelRejectsSolAndEmpty. Nothing is spawned.
+/// Unsupported, `sol` and empty models are rejected. Nothing is spawned.
 #[test]
 fn run_codex_model_rejects_unsupported_sol_and_empty() {
     let env = Env::new();
@@ -74,7 +72,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
         .unwrap_err();
         assert_eq!(
             err.to_string(),
-            format!("unsupported codex model {}", quote(model))
+            format!("unsupported codex model {:?}", model)
         );
         assert!(seen.is_none(), "{model}: spawned");
     }
@@ -124,7 +122,7 @@ fn run_codex_model_builds_the_exact_request() {
     );
 }
 
-/// Go's replacer: "Codex", "codex" and the model id all become the label.
+/// "Codex", "codex" and the model id all become the label.
 #[test]
 fn run_codex_model_wraps_errors_with_the_public_label() {
     let env = Env::new();

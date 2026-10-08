@@ -3,15 +3,15 @@
 
 Rust reopens a closed fd 0/1/2 on /dev/null before main. A loader
 constructor (crates/rival/src/startup_fds.rs) records the original state so
-`rival` can match Go. The Rust Reference keeps `#[used]` statics in object
+`rival` fails on a closed descriptor instead of using /dev/null. The Rust Reference keeps `#[used]` statics in object
 files only, so this script checks the linked debug and LTO release binaries
 by behavior:
 
-1. fd 2 closed, `command codex --detach`: Go fails to start the child
+1. fd 2 closed, `command codex --detach`: `rival` fails to start the child
    (EBADF) and exits 1. Without the constructor, Rust would spawn a detached
    child that prints the usage on stdout.
-2. fd 0 closed, `command codex`: Go fails the stdin read and exits 1 with
-   `read stdin: read /dev/stdin: bad file descriptor`. Without the
+2. fd 0 closed, `command codex`: `rival` fails the stdin read and exits 1 with
+   `read stdin: read /dev/stdin: Bad file descriptor (os error 9)`. Without the
    constructor, Rust would read /dev/null as a terminal and print usage.
 
 Both cases stop before any provider, queue or network work. Each run gets a
@@ -62,7 +62,7 @@ def check(binary):
     if code != 1 or out:
         problems.append(f"fd 2 closed + --detach: exit {code}, stdout {out!r} (want exit 1, no stdout)")
     code, out, err = run(binary, ["command", "codex"], 0)
-    want = b"read stdin: read /dev/stdin: bad file descriptor\n"
+    want = b"read stdin: read /dev/stdin: Bad file descriptor (os error 9)\n"
     if code != 1 or out or err != want:
         problems.append(f"fd 0 closed: exit {code}, stdout {out!r}, stderr {err!r} (want exit 1, {want!r})")
     return problems

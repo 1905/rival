@@ -1,5 +1,5 @@
-//! Go: `cmd/command_plan_test.go`, plus the `commandPlanAction` branches
-//! with a fake plan runner. No provider runs.
+//! `rival command plan`: options, plan paths and input parsing, plus the
+//! `command_plan_action` branches with a fake plan runner. No provider runs.
 
 use super::*;
 
@@ -54,11 +54,11 @@ fn options_read_every_flag() {
 
 // ---- TestResolvePlanPath_* ----
 
-/// An absolute workdir that does not exist, host-shaped: Go's `/x` on Unix,
+/// An absolute workdir that does not exist, host-shaped: `/x` on Unix,
 /// `C:\x` on Windows (where `/x` is only root-relative).
 const X: &str = if cfg!(windows) { r"C:\x" } else { "/x" };
 
-/// `rel` (slash-separated) under [`X`], as Go's `filepath.Join` writes it.
+/// `rel` (slash-separated) joined under [`X`] with the host separator.
 fn under_x(rel: &str) -> String {
     if cfg!(windows) {
         format!(r"{X}\{}", rel.replace('/', r"\"))
@@ -184,7 +184,7 @@ fn resolve_plan_path_expands_tilde_from_home() {
     );
 }
 
-/// Windows forms: Go `filepath.IsAbs`, `Join` and `Abs` keep the drive, so a
+/// Windows forms: the absolute check, join and absolutize keep the drive, so a
 /// root-relative path joins the workdir's drive, a slash path cleans to
 /// backslashes, and a relative workdir resolves against the cwd snapshot.
 #[cfg(windows)]
@@ -261,7 +261,7 @@ fn resolve_plan_path_reports_unreadable_files() {
     assert_eq!(
         resolve_plan_path(&s(&f), "/x", "", None).unwrap_err(),
         format!(
-            "cannot read plan file {0}: open {0}: permission denied",
+            "cannot read plan file {0}: open {0}: Permission denied (os error 13)",
             s(&f)
         )
     );
@@ -269,7 +269,7 @@ fn resolve_plan_path_reports_unreadable_files() {
     assert_eq!(
         resolve_plan_path(&format!("{}/x.md", s(&f)), "/x", "", None).unwrap_err(),
         format!(
-            "cannot read plan file {0}/x.md: stat {0}/x.md: not a directory",
+            "cannot read plan file {0}/x.md: stat {0}/x.md: Not a directory (os error 20)",
             s(&f)
         )
     );
@@ -413,7 +413,7 @@ fn parse_plan_input_cases() {
         ("inline option", "--effort=high plan.md", "plan.md", "high"),
         ("escaped dash path", "-- -draft.md", "-draft.md", ""),
         ("empty", "  \n", "", ""),
-        // Source branches beyond the Go table.
+        // More parser branches.
         (
             "escaped path keeps inner spaces",
             "--   -my plan.md \n",

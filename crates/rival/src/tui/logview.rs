@@ -1,5 +1,4 @@
-//! Reading session logs for display. Go: `internal/dashboard/logview.go`
-//! plus the "open log" helpers from `model.go`.
+//! Reading session logs for display, plus the "open log" helpers.
 //!
 //! Everything here blocks on the file system, so only [`super::jobs`] calls
 //! it, on the runtime's workers. The model keeps a [`LogSlot`] per pane and
@@ -11,14 +10,13 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use rival_core::gostd;
 use rival_core::logfmt;
 use rival_core::session::Session;
 
 use super::session_list::model_name;
 use super::text::hardwrap;
 
-/// Go: `sanitizeLog`. Strips terminal control sequences and then expands
+/// Strips terminal control sequences and then expands
 /// tabs: a tab is one rune but many cells, so leaving it in place makes
 /// wrapped lines overflow the terminal.
 pub fn sanitize_log(raw: &str) -> String {
@@ -39,7 +37,7 @@ pub fn display_text(s: &str) -> String {
     logfmt::expand_tabs(&strip_controls(s), logfmt::TAB_WIDTH)
 }
 
-/// Go: `readTail`, the seam tests use to count file reads.
+/// Reads a file's tail. Tests swap this seam to count file reads.
 pub type ReadTail = fn(&Path, i64) -> io::Result<(Vec<u8>, bool)>;
 
 /// Caps the preview's read. It keeps [`PREVIEW_TAIL_LINES`] lines of any
@@ -66,7 +64,7 @@ pub struct LogLines {
     pub lines: Vec<String>,
 }
 
-/// Go: `readLogLines`. Reads one log's tail, strips terminal control
+/// Reads one log's tail, strips terminal control
 /// sequences, and hard-wraps by display width so wide runes and tabs cannot
 /// push a line past `wrap_width`. A missing log is an error, an empty one has
 /// no lines.
@@ -87,8 +85,8 @@ pub fn read_log_lines(
     if last_n > 0 {
         max_bytes = max_bytes.min(PREVIEW_TAIL_BYTES);
     }
-    let (data, truncated) = read_tail(Path::new(path), max_bytes)
-        .map_err(|e| format!("open {path}: {}", gostd::os_error_text(&e)))?;
+    let (data, truncated) =
+        read_tail(Path::new(path), max_bytes).map_err(|e| format!("open {path}: {}", e))?;
     if data.is_empty() {
         return Ok(LogLines::default());
     }
@@ -128,7 +126,7 @@ pub fn read_log_lines(
     Ok(out)
 }
 
-/// Go: `nthLastNewline`. The byte index of the n-th newline from the end of
+/// The byte index of the n-th newline from the end of
 /// `s`, or `None` when `s` has fewer than `n` newlines.
 pub fn nth_last_newline(s: &str, n: usize) -> Option<usize> {
     let mut end = s.len();
@@ -149,7 +147,7 @@ pub struct FileState {
     pub mtime_nanos: i128,
 }
 
-/// Go: `os.Stat` for the cache key.
+/// The file state for the cache key.
 pub fn file_state(path: &str) -> io::Result<FileState> {
     let meta = fs::metadata(path)?;
     let mtime = meta.modified()?;
@@ -217,7 +215,7 @@ pub enum LogOutcome {
         state: Option<FileState>,
         lines: LogLines,
     },
-    /// The read failed; the text is Go's error message.
+    /// The read failed; the text is the error message.
     Failed(String),
 }
 
@@ -229,7 +227,7 @@ pub struct LogResult {
     pub outcome: LogOutcome,
 }
 
-/// Go: `logCache.read` on a worker. Stats the file; reads it only when its
+/// The log cache read, on a worker. Stats the file; reads it only when its
 /// state differs from `req.known`.
 pub fn load_log(req: LogRequest, read_tail: ReadTail) -> LogResult {
     let read = |state| match read_log_lines(&req.key.path, req.key.width, req.key.last_n, read_tail)
@@ -292,7 +290,7 @@ impl LogSlot {
         if cached.is_some() && !refresh {
             return None;
         }
-        // Go caches only successful reads; a failed one is read again.
+        // Only successful reads are cached; a failed one is read again.
         let known = cached.filter(|e| e.result.is_ok()).and_then(|e| e.state);
         self.seq += 1;
         self.in_flight = Some((key.clone(), self.seq));
@@ -346,14 +344,14 @@ impl LogSlot {
 
 // --- open log ----------------------------------------------------------------
 
-/// Go: `createLogView`. Copies the raw log, with no public model renaming, to
+/// Copies the raw log, with no public model renaming, to
 /// a temp file in `dir`, so the model id in the file matches the screen.
 pub fn create_log_view(dir: &Path, s: &Session) -> io::Result<PathBuf> {
     let data = fs::read(&s.log_file)?;
     create_text_view(dir, &data)
 }
 
-/// Go: `createGroupLogView`. Every member's raw log under a heading with
+/// Every member's raw log under a heading with
 /// its model, role and effort, in one temp file in `dir`.
 pub fn create_group_log_view<S: AsRef<Session>>(dir: &Path, sessions: &[S]) -> io::Result<PathBuf> {
     let mut content = Vec::new();
@@ -371,11 +369,7 @@ pub fn create_group_log_view<S: AsRef<Session>>(dir: &Path, sessions: &[S]) -> i
         match fs::read(&s.log_file) {
             Err(e) => {
                 if s.error_msg.is_empty() {
-                    let msg = format!(
-                        "(log unavailable: open {}: {})\n",
-                        s.log_file,
-                        gostd::os_error_text(&e)
-                    );
+                    let msg = format!("(log unavailable: open {}: {})\n", s.log_file, e);
                     content.extend_from_slice(msg.as_bytes());
                 }
             }
@@ -391,7 +385,7 @@ pub fn create_group_log_view<S: AsRef<Session>>(dir: &Path, sessions: &[S]) -> i
     create_text_view(dir, &content)
 }
 
-/// Go: `groupLogLabel`. Heads one member in the combined group log: its raw
+/// Heads one member in the combined group log: its raw
 /// model id, its role and its effort.
 pub fn group_log_label(s: &Session) -> String {
     let role = if s.mode == "consilium" {
@@ -407,7 +401,7 @@ pub fn group_log_label(s: &Session) -> String {
     label
 }
 
-/// Go: `createTextView` (`os.CreateTemp("", "rival-log-*.txt")`). A file
+/// Writes `content` to a new `rival-log-*.txt` temp file in `dir`. A file
 /// that cannot be written whole is removed again.
 pub fn create_text_view(dir: &Path, content: &[u8]) -> io::Result<PathBuf> {
     let mut opts = fs::OpenOptions::new();

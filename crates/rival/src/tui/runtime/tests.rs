@@ -92,14 +92,14 @@ fn finished_sessions() -> Vec<Arc<Session>> {
         cli: "codex".into(),
         model: "gpt-6-astra".into(),
         status: "completed".into(),
-        start_time: fixed_now(),
+        start_time: Some(fixed_now()),
         ..Session::default()
     })]
 }
 
 // --- exits ------------------------------------------------------------------
 
-/// Bubbletea's exits (controller preflight on Go 4.1.1): q and a raw ctrl+c
+/// Bubbletea's exits (controller preflight on 4.1.1): q and a raw ctrl+c
 /// quit with exit 0; SIGTERM is `QuitMsg` (exit 0); SIGINT is
 /// `InterruptMsg`, and `Program.Run` wraps `ErrInterrupted` in
 /// `ErrProgramKilled`, so the root prints
@@ -147,8 +147,8 @@ fn nothing_after_the_quit_key_reaches_the_model() {
     assert_eq!(m.lay.width, 100);
 }
 
-/// A resize reaches the model while stdout is a terminal. Without one Go
-/// never learns a size, so it is ignored.
+/// A resize reaches the model while stdout is a terminal. Without one the
+/// TUI never learns a size, so it is ignored.
 #[test]
 fn resizes_reach_the_model_only_from_a_terminal() {
     let h = harness();
@@ -653,7 +653,7 @@ fn watch_delivers_snapshots_and_stop_joins_every_thread() {
     }
 }
 
-/// Go `errMsg`: a watcher that cannot start reports its error, and the
+/// A watcher that cannot start reports its error, and the
 /// watch still stops cleanly.
 #[test]
 fn a_watch_that_cannot_start_reports_its_error() {

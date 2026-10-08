@@ -1,5 +1,5 @@
-//! Go: `internal/queue/queue_test.go`, plus Rust-only checks of the record
-//! bytes, the decoder and the injected clock.
+//! Queue tests, plus checks of the record bytes, the decoder and the
+//! injected clock.
 
 use super::*;
 use crate::cancel::Context;
@@ -64,7 +64,7 @@ fn write_raw_ticket(dir: &Path, nano: i64, pid: i64, state: &str, session_ids: &
         pid,
         pid_start,
         state: state.to_string(),
-        created_at: unix(nano),
+        created_at: Some(unix(nano)),
         file: ticket_filename(&unix(nano), pid, &id),
         ..Ticket::default()
     };
@@ -91,7 +91,6 @@ fn spawn_wait(mut m: Manager, ctx: Context) -> mpsc::Receiver<(Result<(), WaitEr
     rx
 }
 
-// Go: TestImmediatePromoteOnEmptyQueue.
 #[test]
 fn immediate_promote_on_empty_queue() {
     let dir = tempfile::tempdir().unwrap();
@@ -108,7 +107,6 @@ fn immediate_promote_on_empty_queue() {
     assert_eq!(m.ticket().unwrap().state, STATE_RUNNING);
 }
 
-// Go: TestFIFOOrder.
 #[test]
 fn fifo_order() {
     let dir = tempfile::tempdir().unwrap();
@@ -149,7 +147,6 @@ fn fifo_order() {
     assert_eq!(got, vec![2, 3], "promotion order");
 }
 
-// Go: TestCapacityTwoPromotesBothInOneCycle.
 #[test]
 fn capacity_two_promotes_both_in_one_cycle() {
     let dir = tempfile::tempdir().unwrap();
@@ -178,7 +175,6 @@ fn capacity_two_promotes_both_in_one_cycle() {
     r.unwrap();
 }
 
-// Go: TestDeadTicketReapedThenPromote.
 #[test]
 fn dead_ticket_reaped_then_promote() {
     let dir = tempfile::tempdir().unwrap();
@@ -192,7 +188,6 @@ fn dead_ticket_reaped_then_promote() {
     assert_eq!(entries.len(), 1, "entries (dead tickets reaped)");
 }
 
-// Go: TestSIGKILLSurvivorHoldsSlot.
 #[test]
 fn sigkill_survivor_holds_slot() {
     let dir = tempfile::tempdir().unwrap();
@@ -213,7 +208,6 @@ fn sigkill_survivor_holds_slot() {
     r.unwrap();
 }
 
-// Go: TestUnparseableFileTolerance.
 #[test]
 fn unparseable_file_tolerance() {
     let dir = tempfile::tempdir().unwrap();
@@ -240,7 +234,6 @@ fn unparseable_file_tolerance() {
     assert!(!old.exists(), "stale unparseable file was not cleaned up");
 }
 
-// Go: TestCtxCancelWhileWaiting.
 #[test]
 fn ctx_cancel_while_waiting() {
     let dir = tempfile::tempdir().unwrap();
@@ -259,7 +252,6 @@ fn ctx_cancel_while_waiting() {
     }
 }
 
-// Go: TestQueueTimeout.
 #[test]
 fn queue_timeout() {
     let dir = tempfile::tempdir().unwrap();
@@ -276,14 +268,14 @@ fn queue_timeout() {
     assert_eq!(err.to_string(), "queue timeout after 50ms");
 }
 
-// Go: TestPIDReuseGuardReapsRecycledHolder. A running ticket whose PID is
+// A running ticket whose PID is
 // live but whose recorded start time does NOT match the live process (i.e.
 // the PID was recycled by an unrelated process) must be reaped, freeing the
 // slot.
 #[test]
 fn pid_reuse_guard_reaps_recycled_holder() {
-    // Go skips where the start time is unsupported. macOS, Linux and Windows
-    // (GetProcessTimes) all support it, so here the case always runs.
+    // macOS, Linux and Windows (GetProcessTimes) all support the start
+    // time, so the case always runs.
     assert!(
         proc_start_ok(),
         "process start time must be readable on this platform"
@@ -297,7 +289,7 @@ fn pid_reuse_guard_reaps_recycled_holder() {
         pid: own_pid(),
         pid_start: 1, // deliberately wrong — simulates a recycled PID
         state: STATE_RUNNING.to_string(),
-        created_at: unix(1),
+        created_at: Some(unix(1)),
         file: ticket_filename(&unix(1), own_pid(), id),
         ..Ticket::default()
     };
@@ -310,7 +302,6 @@ fn pid_reuse_guard_reaps_recycled_holder() {
         .unwrap_or_else(|e| panic!("recycled-PID ticket should have been reaped: {e}"));
 }
 
-// Go: TestSelfHealAfterTicketRemoved.
 #[test]
 fn self_heal_after_ticket_removed() {
     let dir = tempfile::tempdir().unwrap();
@@ -326,14 +317,13 @@ fn self_heal_after_ticket_removed() {
     fs::remove_file(dir.path().join(&holder)).unwrap();
     let (r, m) = recv(&done, "waiter");
     r.unwrap_or_else(|e| panic!("waiter did not recover from removed ticket: {e}"));
-    // Rust-only: the healed ticket kept its id under a new tail filename.
+    // The healed ticket kept its id under a new tail filename.
     let healed = m.ticket().unwrap();
     assert_eq!(healed.id, tk.id);
     assert_ne!(healed.file, tk.file);
     assert!(healed.created_at > tk.created_at);
 }
 
-// Go: TestPositionCallback.
 #[test]
 fn position_callback() {
     let dir = tempfile::tempdir().unwrap();
@@ -368,7 +358,6 @@ fn position_callback() {
     );
 }
 
-// Go: TestClearForceAndDeadOnly.
 #[test]
 fn clear_force_and_dead_only() {
     let dir = tempfile::tempdir().unwrap();
@@ -385,13 +374,12 @@ fn clear_force_and_dead_only() {
     assert_eq!(m.clear(true).unwrap(), 1, "force clear removed");
 }
 
-// ---- Rust-only checks ----
+// ---- record, decoder, clock and lock checks ----
 
-/// Go `json.MarshalIndent` bytes of a waiting and a promoted ticket, from Go
-/// 1.25.14 against the current `ticket.go` (`Ticket{...}` literal values
-/// below, UTC and +03:00 zones).
+/// The bytes of a waiting and a promoted ticket (UTC and +03:00 zones).
+/// `<`, `>` and `&` are written as they are.
 #[test]
-fn ticket_json_matches_go_bytes() {
+fn ticket_json_bytes() {
     let created = DateTime::parse_from_rfc3339("2026-10-02T14:05:09.1234Z").unwrap();
     let started = DateTime::parse_from_rfc3339("2026-10-02T17:06:00+03:00").unwrap();
     let minimal = Ticket {
@@ -399,12 +387,12 @@ fn ticket_json_matches_go_bytes() {
         mode: "review".into(),
         pid: 42,
         state: STATE_WAITING.into(),
-        created_at: created,
+        created_at: Some(created),
         ..Ticket::default()
     };
     assert_eq!(
         String::from_utf8(minimal.to_json().unwrap()).unwrap(),
-        "{\n  \"id\": \"abc\",\n  \"mode\": \"review\",\n  \"pid\": 42,\n  \"state\": \"waiting\",\n  \"created_at\": \"2026-10-02T14:05:09.1234Z\"\n}"
+        "{\n  \"id\": \"abc\",\n  \"mode\": \"review\",\n  \"pid\": 42,\n  \"state\": \"waiting\",\n  \"created_at\": \"2026-10-02T14:05:09.123400Z\"\n}"
     );
     let full = Ticket {
         id: "6f1c2e7a-0000-4000-8000-000000000001".into(),
@@ -414,21 +402,21 @@ fn ticket_json_matches_go_bytes() {
         pid: 4242,
         pid_start: 1_790_000_000_123_456_000,
         state: STATE_RUNNING.into(),
-        created_at: created,
+        created_at: Some(created),
         started_at: Some(started),
         work_dir: "/tmp/w".into(),
         ..Ticket::default()
     };
     assert_eq!(
         String::from_utf8(full.to_json().unwrap()).unwrap(),
-        "{\n  \"id\": \"6f1c2e7a-0000-4000-8000-000000000001\",\n  \"group_id\": \"g\\u003c1\\u003e\",\n  \"session_ids\": [\n    \"s1\",\n    \"s\\u00262\"\n  ],\n  \"mode\": \"review\",\n  \"pid\": 4242,\n  \"pid_start\": 1790000000123456000,\n  \"state\": \"running\",\n  \"created_at\": \"2026-10-02T14:05:09.1234Z\",\n  \"started_at\": \"2026-10-02T17:06:00+03:00\",\n  \"work_dir\": \"/tmp/w\"\n}"
+        "{\n  \"id\": \"6f1c2e7a-0000-4000-8000-000000000001\",\n  \"group_id\": \"g<1>\",\n  \"session_ids\": [\n    \"s1\",\n    \"s&2\"\n  ],\n  \"mode\": \"review\",\n  \"pid\": 4242,\n  \"pid_start\": 1790000000123456000,\n  \"state\": \"running\",\n  \"created_at\": \"2026-10-02T14:05:09.123400Z\",\n  \"started_at\": \"2026-10-02T17:06:00+03:00\",\n  \"work_dir\": \"/tmp/w\"\n}"
     );
     assert_eq!(Ticket::from_json(&full.to_json().unwrap()).unwrap(), full);
 }
 
-/// Go `fmt.Sprintf("%019d-%d-%s.json", ...)`, including a negative nano.
+/// `%019d-%d-%s.json` of nano, pid and id8, including a negative nano.
 #[test]
-fn ticket_filename_matches_go() {
+fn ticket_filename_pads_nano_pid_and_id8() {
     let id = "6f1c2e7a-0000-4000-8000-000000000001";
     assert_eq!(
         ticket_filename(&unix(1_790_000_000_123_456_789), 4242, id),
@@ -444,31 +432,45 @@ fn ticket_filename_matches_go() {
     );
 }
 
-/// Go's decoder rules: case-insensitive keys, duplicates in order, `null`,
-/// unknown keys; any error skips the file.
+/// Exact keys, `null` as missing, unknown keys ignored; any error (a
+/// duplicate key too) skips the file. A ticket with escapes or the old unset
+/// time still loads.
 #[test]
-fn ticket_from_json_follows_go_decoder() {
+fn ticket_from_json_rules() {
     let t = Ticket::from_json(
-        br#"{"ID":"a","id":"b","Session_IDs":["x",null],"pid":7,"extra":1,
-             "started_at":null,"created_at":"2026-01-02T03:04:05Z","mode":null}"#,
+        br#"{"ID":"a","id":"b","Session_IDs":["x"],"session_ids":["y","z\u0026"],"pid":7,
+             "extra":1,"started_at":null,"created_at":"2026-01-02T03:04:05Z","mode":null}"#,
     )
     .unwrap();
     assert_eq!(t.id, "b");
-    assert_eq!(t.session_ids, vec!["x".to_string(), String::new()]);
+    assert_eq!(t.session_ids, vec!["y".to_string(), "z&".to_string()]);
     assert_eq!(t.pid, 7);
     assert_eq!(t.started_at, None);
     assert_eq!(t.mode, "");
     assert_eq!(
-        gojson::format_time(&t.created_at).unwrap(),
-        "2026-01-02T03:04:05Z"
+        t.created_at
+            .map(|t| crate::json::format_time(&t))
+            .as_deref(),
+        Some("2026-01-02T03:04:05Z")
+    );
+    let old = Ticket::from_json(br#"{"id":"a","created_at":"0001-01-01T00:00:00Z"}"#).unwrap();
+    assert_eq!(old.created_at, None);
+    assert_eq!(
+        Ticket::from_json(br#"{"id":"a","session_ids":null}"#)
+            .unwrap()
+            .session_ids,
+        Vec::<String>::new()
     );
 
     for bad in [
         &br#"{"id":"a","pid":"7"}"#[..],
         br#"{"id":"a","session_ids":"x"}"#,
         br#"{"id":"a","session_ids":[1]}"#,
+        br#"{"id":"a","session_ids":["x",null]}"#,
+        br#"{"id":"a","id":"b"}"#,
         br#"{"id":"a","created_at":"yesterday"}"#,
         br#"[]"#,
+        b"null",
         b"{not json",
     ] {
         assert!(
@@ -477,63 +479,10 @@ fn ticket_from_json_follows_go_decoder() {
             String::from_utf8_lossy(bad)
         );
     }
-    // A null document decodes to a zero ticket, which the scanner rejects
-    // for its empty id.
-    assert_eq!(Ticket::from_json(b"null").unwrap().id, "");
-}
-
-/// Go reuses the slice a duplicate `session_ids` key decodes into. Expected
-/// values come from Go 1.25.14 `json.Unmarshal` into `queue.Ticket`.
-#[test]
-fn ticket_session_ids_reuse_go_slice() {
-    let ids = |doc: &str| {
-        Ticket::from_json(format!(r#"{{"id":"t",{doc}}}"#).as_bytes())
-            .unwrap()
-            .session_ids
-    };
-    let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    assert_eq!(
-        ids(r#""session_ids":["a","b"],"session_ids":[null]"#),
-        v(&["a"])
-    );
-    assert_eq!(
-        ids(
-            r#""session_ids":["a","b","c"],"session_ids":["x"],"session_ids":[null,null,null,null]"#
-        ),
-        v(&["x", "b", "c", ""])
-    );
-    assert_eq!(
-        ids(
-            r#""session_ids":["a","b","c"],"session_ids":["x"],"session_ids":[null,null,null,null,null]"#
-        ),
-        v(&["x", "b", "c", "", ""])
-    );
-    assert_eq!(
-        ids(r#""session_ids":["a","b"],"session_ids":[],"session_ids":[null]"#),
-        v(&[""])
-    );
-    assert_eq!(
-        ids(r#""session_ids":["a","b"],"session_ids":null,"session_ids":[null]"#),
-        v(&[""])
-    );
-    assert_eq!(ids(r#""session_ids":["a"],"session_ids":[]"#), v(&[]));
-    assert_eq!(ids(r#""session_ids":["a"],"session_ids":null"#), v(&[]));
-
-    let err =
-        Ticket::from_json(br#"{"session_ids":["a","b"],"session_ids":[1,null]}"#).unwrap_err();
-    assert_eq!(
-        err,
-        "json: cannot unmarshal number into Go struct field Ticket.session_ids of type string"
-    );
-    let err = Ticket::from_json(br#"{"session_ids":["a"],"session_ids":"x"}"#).unwrap_err();
-    assert_eq!(
-        err,
-        "json: cannot unmarshal string into Go struct field Ticket.session_ids of type []string"
-    );
 }
 
 #[test]
-fn enqueue_writes_go_record_and_release_is_idempotent() {
+fn enqueue_writes_ticket_record_and_release_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
     let qdir = dir.path().join("nested/queue");
     let mut m = Manager::with_settings(qdir.clone(), 1, Duration::from_millis(5), Duration::ZERO);
@@ -542,7 +491,10 @@ fn enqueue_writes_go_record_and_release_is_idempotent() {
         .unwrap();
     assert_eq!(t.state, STATE_WAITING);
     assert_eq!(t.pid, own_pid());
-    assert_eq!(t.file, ticket_filename(&t.created_at, t.pid, &t.id));
+    assert_eq!(
+        t.file,
+        ticket_filename(&t.created_at.unwrap(), t.pid, &t.id)
+    );
     let on_disk = Ticket::from_json(&fs::read(qdir.join(&t.file)).unwrap()).unwrap();
     assert_eq!(
         Ticket {
@@ -586,7 +538,7 @@ fn wait_before_enqueue_errors() {
     assert_eq!(err.to_string(), "WaitForSlot called before Enqueue");
 }
 
-/// Go checks the context only after a scan, so a cancelled context still
+/// The context is checked only after a scan, so a cancelled context still
 /// promotes into a free slot, and is reported only when the slot is held.
 #[test]
 fn promotion_runs_before_cancellation_check() {
@@ -640,13 +592,13 @@ fn injected_clock_drives_timeout_and_staleness() {
     m.now = Some(clock);
     m.timeout = Duration::from_secs(3600);
     let t = m.enqueue("", &[], "review", "").unwrap();
-    assert_eq!(t.created_at, base);
+    assert_eq!(t.created_at, Some(base));
 
     let tmp = dir.path().join("x.json.tmp");
     fs::write(&tmp, "").unwrap();
     let mtime =
         DateTime::<Local>::from(fs::metadata(&tmp).unwrap().modified().unwrap()).fixed_offset();
-    // Exactly 60s old on the injected clock: kept (Go uses a strict >).
+    // Exactly 60s old on the injected clock: kept (the age check is strict >).
     *offset.lock().unwrap() = mtime - base + TimeDelta::seconds(60);
     m.list().unwrap();
     assert!(tmp.exists(), "a .tmp exactly 60s old must stay");
@@ -726,7 +678,7 @@ fn session_live_reads_minimal_fields() {
     write(
         "live",
         format!(
-            r#"{{"Status":"running","pid":{},"pid_start":{start},"start_time":"bad","prompt":7}}"#,
+            r#"{{"status":"running","pid":{},"pid_start":{start},"start_time":"bad","prompt":7}}"#,
             own_pid()
         ),
     );
@@ -776,12 +728,12 @@ fn lock_is_exclusive_and_released_on_panic() {
     assert!(r.is_err());
 
     let (held_tx, held_rx) = mpsc::channel();
-    let (go_tx, go_rx) = mpsc::channel::<()>();
+    let (start_tx, start_rx) = mpsc::channel::<()>();
     let d2 = d.clone();
     let holder = thread::spawn(move || {
         with_lock(&d2, || {
             held_tx.send(()).unwrap();
-            go_rx.recv().unwrap();
+            start_rx.recv().unwrap();
             Ok(())
         })
         .unwrap();
@@ -797,7 +749,7 @@ fn lock_is_exclusive_and_released_on_panic() {
         got_rx.recv_timeout(Duration::from_millis(100)).is_err(),
         "second locker entered while the first held the lock"
     );
-    go_tx.send(()).unwrap();
+    start_tx.send(()).unwrap();
     holder.join().unwrap();
     recv(&got_rx, "second locker");
 }

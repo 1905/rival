@@ -1,7 +1,7 @@
 //! `rival wait`: block until review sessions finish; the exit code reflects
 //! the outcome.
 //!
-//! Go: `cmd/wait.go`. Two modes:
+//! Two modes:
 //!
 //! - `--log <stderr-file>` (used by skills): parse the detached rival PID and
 //!   session IDs from a run's stderr file, poll the rival process for
@@ -10,7 +10,7 @@
 //! - `<session-id>...` (terminal status only): poll the named sessions' JSON
 //!   until all reach a terminal state.
 //!
-//! Durations are signed nanoseconds, like Go's `time.Duration`.
+//! Durations are signed nanoseconds.
 
 use std::fmt;
 use std::io::{self, Read, Write};
@@ -22,7 +22,7 @@ use regex::Regex;
 use regex::bytes::Regex as BytesRegex;
 use rival_core::cancel::Context;
 use rival_core::paths::Paths;
-use rival_core::{gojson, gostd, procinfo};
+use rival_core::{duration, procinfo, session};
 
 /// All watched sessions completed.
 pub const WAIT_EXIT_COMPLETED: i32 = 0;
@@ -34,10 +34,10 @@ pub const WAIT_EXIT_CRASHED: i32 = 3;
 pub const WAIT_EXIT_TIMEOUT: i32 = 4;
 pub const WAIT_EXIT_USAGE: i32 = 64;
 
-/// Go: the `--poll` default, `config.QueuePollInterval` (2s).
+/// The `--poll` default: the queue poll interval (2s).
 pub const DEFAULT_POLL: i64 = rival_core::config::QUEUE_POLL_INTERVAL.as_nanos() as i64;
 
-/// "rival: detached pid=12345" (from `detach.rs`). Go's `\d` is ASCII only.
+/// "rival: detached pid=12345" (from `detach.rs`). Digits are ASCII only.
 static DETACHED_PID_RE: LazyLock<BytesRegex> =
     LazyLock::new(|| BytesRegex::new(r"rival: detached pid=([0-9]+)").unwrap());
 /// zerolog: ..."session":"<uuid>"...
@@ -58,7 +58,7 @@ pub fn is_session_id(s: &str) -> bool {
     SESSION_ID_ONLY_RE.is_match(s)
 }
 
-/// Go: `&ExitCodeError{Code, Err}` from `waitAction`. Root prints `message`
+/// An error with an exit code from [`wait_action`]. Root prints `message`
 /// on stderr and exits with `code`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WaitError {
@@ -83,11 +83,11 @@ impl fmt::Display for WaitError {
 
 impl std::error::Error for WaitError {}
 
-/// The `wait` flags. P3 fills `timeout` with the default Go computes in
-/// `init()` from the process env before `.env` loads.
+/// The `wait` flags. `timeout` defaults to a value computed from the process
+/// env before `.env` loads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WaitOptions {
-    /// `--log`; empty means unset, as in Go.
+    /// `--log`; empty means unset.
     pub log: PathBuf,
     /// `--timeout`, nanoseconds.
     pub timeout: i64,
@@ -99,8 +99,8 @@ pub struct WaitOptions {
     pub auto_fix_policy: &'static str,
 }
 
-/// Go: `waitAction`. `paths` locates the session files; `ctx` is the signal
-/// context (Go: `signal.NotifyContext(SIGINT, SIGTERM)`); `out` is stdout.
+/// `rival wait`. `paths` locates the session files; `ctx` is the signal
+/// context (done on SIGINT or SIGTERM); `out` is stdout.
 pub fn wait_action(
     opts: &WaitOptions,
     args: &[String],
@@ -149,8 +149,8 @@ pub fn wait_action(
         for id in args {
             if !is_session_id(id) {
                 return Err(WaitError::usage(format!(
-                    "invalid session ID {} (expected a UUID)",
-                    gostd::quote(id)
+                    "invalid session ID {:?} (expected a UUID)",
+                    id
                 )));
             }
         }
@@ -204,9 +204,9 @@ pub struct Waiter<'a> {
     pub timeout: i64,
 
     pub load_session: Box<dyn FnMut(&str) -> SessionStatus + 'a>,
-    /// Go: `procinfo.Alive(pid, start)`.
+    /// Whether `pid` with this start time is still alive.
     pub ralive: Box<dyn FnMut(i64, i64) -> bool + 'a>,
-    /// A monotonic clock in nanoseconds (any origin). Go: `time.Now`.
+    /// A monotonic clock in nanoseconds (any origin).
     pub now: Box<dyn FnMut() -> i128 + 'a>,
     pub out: &'a mut dyn Write,
 }
@@ -270,7 +270,7 @@ impl Waiter<'_> {
             if (self.now)() >= deadline {
                 let mut line = format!(
                     "still running after {} (rival pid {})",
-                    gostd::format_duration(self.timeout),
+                    duration::format(self.timeout),
                     self.pid
                 )
                 .into_bytes();
@@ -280,7 +280,7 @@ impl Waiter<'_> {
                 return WAIT_EXIT_TIMEOUT;
             }
 
-            // Go: `select { case <-ctx.Done(): case <-time.After(w.poll): }`.
+            // Sleep one poll interval, or less if the context ends first.
             let poll = Duration::from_nanos(self.poll.max(0) as u64);
             if ctx.wait_timeout(poll).is_some() {
                 self.print(b"interrupted while waiting\n");
@@ -317,7 +317,7 @@ impl Waiter<'_> {
                 Some(c) => c.to_string(),
                 None => "-".to_string(),
             };
-            // Go slices bytes: `id[:8]`.
+            // The first 8 bytes of the id.
             let id = s.id.as_bytes();
             let id = &id[..id.len().min(8)];
             let mut line = id.to_vec();
@@ -337,7 +337,7 @@ impl Waiter<'_> {
         code
     }
 
-    /// Go ignores stdout write errors here.
+    /// Stdout write errors are ignored here.
     fn print(&mut self, bytes: &[u8]) {
         let _ = self.out.write_all(bytes);
     }
@@ -376,7 +376,7 @@ pub struct ParsedLog {
     pub ids: Vec<String>,
 }
 
-/// Go: `parseLogFile`. Extracts the detached rival PID and the run's session
+/// Extracts the detached rival PID and the run's session
 /// IDs. The PID's start time is pinned now so a later PID reuse cannot make
 /// a recycled PID look like our still-running rival.
 pub fn parse_log_file(path: &Path) -> Result<ParsedLog, String> {
@@ -390,12 +390,12 @@ pub fn parse_log_file_with(
     path: &Path,
     start_nanos: impl FnOnce(i64) -> i64,
 ) -> Result<ParsedLog, String> {
-    let quoted = gostd::quote(&path.to_string_lossy());
+    let quoted = format!("{:?}", path.to_string_lossy());
     let data = read_file(path).map_err(|e| format!("read log file {quoted}: {e}"))?;
 
     let mut pid = 0;
     if let Some(m) = DETACHED_PID_RE.captures(&data) {
-        // Go: `fmt.Sscanf("%d")`; an out-of-range value leaves pid at 0.
+        // An out-of-range value leaves pid at 0.
         pid = std::str::from_utf8(&m[1])
             .ok()
             .and_then(|s| s.parse::<i64>().ok())
@@ -438,7 +438,7 @@ fn scan_session_ids(data: &[u8]) -> Vec<String> {
     ids
 }
 
-/// Go: `loadSessionStatus`. Decodes only the four fields wait needs, so an
+/// Decodes only the four fields wait needs, so an
 /// unrelated malformed field (prompt, times) does not matter. Any decode
 /// error, or a missing file, is "not found".
 pub fn load_session_status(sessions_dir: &Path, id: &str) -> SessionStatus {
@@ -448,65 +448,36 @@ pub fn load_session_status(sessions_dir: &Path, id: &str) -> SessionStatus {
     decode_session_status(&data).unwrap_or_default()
 }
 
-/// Go: `json.Unmarshal` into the anonymous struct
-/// `{Status string; ExitCode *int; Duration string; ErrorMsg string}`.
+/// Decodes only the four fields wait needs. A missing key or `null` gives
+/// the default; a wrong type in one of them is an error.
 fn decode_session_status(data: &[u8]) -> Option<SessionStatus> {
-    const FIELDS: [&str; 4] = ["status", "exit_code", "duration", "error"];
-    let members = gojson::decode_object(data, "struct { Status string ...}").ok()?;
-    let mut s = SessionStatus {
+    let o = session::Outcome::from_json(data).ok()?;
+    Some(SessionStatus {
+        status: o.status,
+        exit_code: o.exit_code,
+        duration: o.duration,
+        error_msg: o.error_msg,
         found: true,
         ..SessionStatus::default()
-    };
-    let mut failed = false;
-    for (key, raw) in &members {
-        let Some(field) = gojson::match_field(&FIELDS, key) else {
-            continue;
-        };
-        // Go keeps decoding after a type mismatch but still returns an error.
-        let target = match field {
-            "status" => &mut s.status,
-            "duration" => &mut s.duration,
-            "error" => &mut s.error_msg,
-            _ => {
-                match gojson::decode_int(raw) {
-                    // A JSON null makes a pointer nil.
-                    Ok(v) => s.exit_code = v,
-                    Err(_) => failed = true,
-                }
-                continue;
-            }
-        };
-        match gojson::decode_string(raw) {
-            Ok(Some(v)) => *target = v,
-            Ok(None) => {} // null leaves a string unchanged
-            Err(_) => failed = true,
-        }
-    }
-    (!failed).then_some(s)
+    })
 }
 
-/// Go: `os.ReadFile`, with its `*PathError` text (`open <path>: <errno>`,
-/// `read <path>: <errno>`).
+/// Reads a file; the error text is `open <path>: <errno>` or
+/// `read <path>: <errno>`.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let op_err = |op: &str, err: io::Error| {
-        format!(
-            "{op} {}: {}",
-            path.to_string_lossy(),
-            gostd::os_error_text(&err)
-        )
-    };
-    let mut file = gostd::open_file(path).map_err(|e| op_err("open", e))?;
+    let op_err = |op: &str, err: io::Error| format!("{op} {}: {}", path.to_string_lossy(), err);
+    let mut file = std::fs::File::open(path).map_err(|e| op_err("open", e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data).map_err(|e| op_err("read", e))?;
     Ok(data)
 }
 
-/// Go's `int` PID narrowed to the platform `pid_t`; out of range is 0.
+/// A PID narrowed to the platform `pid_t`; out of range is 0.
 fn proc_pid(pid: i64) -> i32 {
     i32::try_from(pid).unwrap_or(0)
 }
 
-/// Go: `procinfo.Alive`.
+/// Whether the rival process `pid` with start time `start` is alive.
 fn rival_alive(pid: i64, start: i64) -> bool {
     procinfo::alive(proc_pid(pid), start)
 }

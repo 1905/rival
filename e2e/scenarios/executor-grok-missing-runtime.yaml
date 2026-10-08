@@ -1,0 +1,29 @@
+{
+  "name": "executor-grok-missing-runtime",
+  "description": "`rival command grok` with no grok on PATH: the preflight fails before any session or queue work is created, stderr shows the error, and the exit code is 1.",
+  "fakes": {
+    "absent": [
+      "grok"
+    ]
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "grok"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "grok runtime is not installed"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": []
+  }
+}

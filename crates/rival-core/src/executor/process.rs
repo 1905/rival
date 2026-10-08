@@ -19,21 +19,20 @@ use std::io::{self, PipeReader, PipeWriter};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
-use crate::gostd;
 #[cfg(not(windows))]
 use crate::paths;
 
-/// Go `syscall.ForkLock` on macOS. std's `io::pipe` there is `pipe(2)`
+/// Fork lock on macOS. std's `io::pipe` there is `pipe(2)`
 /// followed by two separate close-on-exec calls; a fork between them gives
 /// the child both pipe ends. Pipe creation holds this lock shared, every
-/// Rival spawn holds it exclusively, as Go's `os.Pipe` and `forkExec` do.
+/// Rival spawn holds it exclusively.
 ///
 /// It covers only Rival's own [`pipe`] and [`spawn`] calls. A library that
 /// creates descriptors or forks on its own does not take it.
 #[cfg(target_os = "macos")]
 static FORK_LOCK: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
-/// Runs `create` while no Rival spawn can fork (Go `ForkLock.RLock`).
+/// Runs `create` while no Rival spawn can fork (shared lock).
 /// Other platforms keep std's behavior unchanged and take no lock: Linux
 /// uses `pipe2(O_CLOEXEC)`, Windows creates non-inheritable handles.
 fn with_pipe_lock<T>(create: impl FnOnce() -> T) -> T {
@@ -44,13 +43,13 @@ fn with_pipe_lock<T>(create: impl FnOnce() -> T) -> T {
     create()
 }
 
-/// Go `os.Pipe`: std's `io::pipe` under the fork lock. Every pipe Rival
+/// std's `io::pipe` under the fork lock. Every pipe Rival
 /// creates outside a spawn goes through here.
 pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
     with_pipe_lock(io::pipe)
 }
 
-/// `cmd.spawn()` under the fork lock (Go `forkExec`'s `acquireForkLock`).
+/// `cmd.spawn()` under the fork lock (exclusive lock).
 /// The lock covers std's own stdio and error pipes, which it creates inside
 /// `spawn`, and is released when the child has exec'd or failed to; never
 /// held while the caller waits for or reads from the child. Nothing locks
@@ -94,11 +93,10 @@ pub(crate) fn start_provider(cmd: &mut Command) -> io::Result<ProcessHandle> {
     spawn(cmd).map(ProcessHandle::new)
 }
 
-/// The program path to start when the child runs in `dir` (Go `cmd.Dir`).
-/// Unix `execve` resolves a relative program after the `chdir`, as Go does,
-/// so the path is kept. Windows makes it absolute against `dir` with Go's
-/// `StartProcess` rule ([`windows::program_in_dir`]); its error fails the
-/// start like Go's.
+/// The program path to start when the child runs in `dir` .
+/// Unix `execve` resolves a relative program after the `chdir`, so the path
+/// is kept. Windows makes it absolute against `dir`
+/// ([`windows::program_in_dir`]); its error fails the start.
 pub fn program_in_dir(program: &Path, dir: &Path) -> io::Result<PathBuf> {
     #[cfg(windows)]
     return windows::program_in_dir(program, dir);
@@ -109,44 +107,44 @@ pub fn program_in_dir(program: &Path, dir: &Path) -> io::Result<PathBuf> {
     }
 }
 
-/// Go `exec.ErrNotFound`.
+/// Error text when no executable is found.
 #[cfg(not(windows))]
 const ERR_NOT_FOUND: &str = "executable file not found in $PATH";
 #[cfg(windows)]
 use windows::ERR_NOT_FOUND;
-/// Go `exec.ErrDot`.
+/// Error text for a hit relative to the current directory.
 const ERR_DOT: &str = "cannot run executable found relative to current directory";
 
-/// Go `*exec.Error` from `exec.LookPath`: `exec: "<name>": <err>`.
+/// A failed path lookup: `exec: "<name>": <err>`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookPathError {
     pub name: String,
     pub err: String,
-    /// Go returns the relative path together with `ErrDot`.
+    /// The relative path, set together with the dot error.
     pub dot_path: Option<PathBuf>,
 }
 
 impl fmt::Display for LookPathError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "exec: {}: {}", gostd::quote(&self.name), self.err)
+        write!(f, "exec: {:?}: {}", self.name, self.err)
     }
 }
 
 impl std::error::Error for LookPathError {}
 
-/// Go `exec.LookPath` (Unix) with an explicit `$PATH` value (`None` = unset).
+/// Path lookup (Unix) with an explicit `$PATH` value (`None` = unset).
 /// A name containing `/` is checked as-is. Otherwise each `$PATH` element is
 /// tried in order; an empty element means `.`, and a hit that is not
 /// absolute is an `ErrDot` error.
 ///
-/// Windows follows Go's Windows `LookPath` instead (`PATHEXT`, the implicit
+/// Windows uses its own lookup instead (`PATHEXT`, the implicit
 /// current-directory hit, `%PATH%` quoting); see [`windows::look_path_exts`].
 /// `PATHEXT` and `NoDefaultCurrentDirectoryInExePath` come from the process
-/// environment, as Go reads them.
+/// environment.
 #[cfg(windows)]
 pub fn look_path(file: &str, path_env: Option<&OsStr>) -> Result<PathBuf, LookPathError> {
     if matches!(file, "" | "." | "..") {
-        // Go `validateLookPath`.
+        // Empty and dot names are invalid.
         return Err(LookPathError {
             name: file.to_string(),
             err: ERR_NOT_FOUND.to_string(),
@@ -194,22 +192,19 @@ pub fn look_path(file: &str, path_env: Option<&OsStr>) -> Result<PathBuf, LookPa
     Err(error(ERR_NOT_FOUND.to_string(), None))
 }
 
-/// Go `exec.findExecutable`: stat (following links), not a directory, then
+/// Checks that `path` is executable: stat (following links), not a directory, then
 /// `faccessat(X_OK, AT_EACCESS)`; ENOSYS/EPERM fall back to the mode bits.
 #[cfg(unix)]
 fn find_executable(path: &Path) -> Result<(), String> {
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::PermissionsExt;
 
-    let meta = std::fs::metadata(path)
-        .map_err(|e| format!("stat {}: {}", path.display(), gostd::os_error_text(&e)))?;
+    let meta = std::fs::metadata(path).map_err(|e| format!("stat {}: {}", path.display(), e))?;
     if meta.is_dir() {
-        return Err(gostd::os_error_text(&io::Error::from_raw_os_error(
-            libc::EISDIR,
-        )));
+        return Err(io::Error::from_raw_os_error(libc::EISDIR).to_string());
     }
     let cpath = std::ffi::CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| gostd::os_error_text(&io::Error::from_raw_os_error(libc::EINVAL)))?;
+        .map_err(|_| io::Error::from_raw_os_error(libc::EINVAL).to_string())?;
     // SAFETY: cpath is a valid NUL-terminated string for the call.
     let rc =
         unsafe { libc::faccessat(libc::AT_FDCWD, cpath.as_ptr(), libc::X_OK, libc::AT_EACCESS) };
@@ -222,14 +217,14 @@ fn find_executable(path: &Path) -> Result<(), String> {
             if meta.permissions().mode() & 0o111 != 0 {
                 Ok(())
             } else {
-                Err("permission denied".to_string())
+                Err(io::Error::from_raw_os_error(libc::EACCES).to_string())
             }
         }
-        _ => Err(gostd::os_error_text(&err)),
+        _ => Err(err.to_string()),
     }
 }
 
-/// Starts the provider in its own process group (Go `Setpgid: true`), so a
+/// Starts the provider in its own process group , so a
 /// cancellation can SIGKILL the launcher and every descendant that stayed in
 /// the group. `process_group(0)` is std's `setpgid(0, 0)` in the child.
 #[cfg(unix)]
@@ -238,20 +233,20 @@ pub(crate) fn configure_group(cmd: &mut Command) {
     cmd.process_group(0);
 }
 
-/// Go's Windows `setProcessGroup` is a no-op. Rust contains the provider in
+/// Windows needs no process group setup. Rust contains the provider in
 /// Jobs instead, set up by [`start_provider`].
 #[cfg(windows)]
 pub(crate) fn configure_group(_cmd: &mut Command) {}
 
-/// Makes `cmd` start `program` the way Go's `syscall.forkExec` does: a raw
+/// Makes `cmd` start `program` as a raw
 /// `execve(program, [arg0, args...], env)`. `arg0` is the name the caller
-/// gave (Go's `cmd.Args[0]`), not the resolved path. `env` is the final,
+/// gave, not the resolved path. `env` is the final,
 /// deduped `KEY=VALUE` list; it is passed as-is, in order, and an entry
-/// without `=` is kept, as Go does.
+/// without `=` is kept.
 ///
 /// Why not std's own exec: std ends in libc `posix_spawnp` or `execvp`, and
 /// Apple's libc retries an ENOEXEC image (an executable text file without a
-/// shebang) through `/bin/sh`. Go reports `exec format error` instead.
+/// shebang) through `/bin/sh`. Rival reports `exec format error` instead.
 ///
 /// The `pre_exec` hook runs in the forked child after std has set up the
 /// stdio, the cwd, the process group and the SIGPIPE reset, and before std's
@@ -260,7 +255,7 @@ pub(crate) fn configure_group(_cmd: &mut Command) {}
 /// to the parent through its launch-error pipe as a spawn error.
 ///
 /// A NUL in `program`, `arg0` or an argument is EINVAL here, before the
-/// spawn, as in Go's `forkExec`. `env` was already checked by `dedup_env`.
+/// spawn. `env` was already checked by `dedup_env`.
 #[cfg(unix)]
 pub(crate) fn set_exec<S: AsRef<OsStr>>(
     cmd: &mut Command,
@@ -282,12 +277,12 @@ pub(crate) fn set_exec<S: AsRef<OsStr>>(
 
 /// Windows: std's own `CreateProcessW`, which keeps std's argument quoting
 /// and its safe `.bat`/`.cmd` handling (through `cmd.exe`). `env` replaces
-/// the whole environment, plus Go's `addCriticalEnv`: `SYSTEMROOT` from this
+/// the whole environment, plus `SYSTEMROOT` from this
 /// process when `env` has none.
 ///
-/// Differences from Go, which builds the command line itself: the child's
-/// first command-line word is the program path std was given, not `arg0`;
-/// and std drops an entry without `=` (Go would pass it through).
+/// Differences from the Unix path: the child's first command-line word is
+/// the program path std was given, not `arg0`; and std drops an entry
+/// without `=`.
 #[cfg(windows)]
 pub(crate) fn set_exec<S: AsRef<OsStr>>(
     cmd: &mut Command,
@@ -302,7 +297,7 @@ pub(crate) fn set_exec<S: AsRef<OsStr>>(
     Ok(())
 }
 
-/// Go `exec.addCriticalEnv` (Windows): appends `SYSTEMROOT=<systemroot>` when
+/// Appends `SYSTEMROOT=<systemroot>` when
 /// no entry has that key (ASCII case ignored). Pure, for tests on every
 /// platform.
 pub fn add_critical_env(
@@ -395,21 +390,21 @@ impl ExecImage {
     }
 }
 
-/// Result of the group kill, as Go's `cmd.Cancel` reports it.
+/// Result of the group kill.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum KillOutcome {
     /// The signal was sent.
     Sent,
-    /// ESRCH: Go maps it to `os.ErrProcessDone`.
+    /// ESRCH: the process is already gone.
     Done,
     /// Any other errno text.
     Failed(String),
 }
 
-/// An exit as Go's `ProcessState` reports it.
+/// How a process exited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ExitState {
-    /// Go `ExitCode()`: the code, or -1 when a signal ended the process.
+    /// The code, or -1 when a signal ended the process.
     pub(crate) code: i64,
     pub(crate) success: bool,
 }
@@ -441,7 +436,7 @@ impl ProcessHandle {
         self.pid
     }
 
-    /// Go's `cmd.Cancel`: `kill(-pid, SIGKILL)`; with setpgid the group ID
+    /// Kills the group: `kill(-pid, SIGKILL)`; with setpgid the group ID
     /// equals the leader's PID.
     pub(crate) fn kill_group(&mut self) -> KillOutcome {
         if self.reaped {
@@ -456,7 +451,7 @@ impl ProcessHandle {
         if err.raw_os_error() == Some(libc::ESRCH) {
             KillOutcome::Done
         } else {
-            KillOutcome::Failed(gostd::os_error_text(&err))
+            KillOutcome::Failed(err.to_string())
         }
     }
 
@@ -494,7 +489,7 @@ impl ProcessHandle {
     }
 }
 
-/// Go `Process.Wait` error prefix (`NewSyscallError`).
+/// Syscall name used as the wait error prefix.
 #[cfg(target_os = "linux")]
 pub(crate) const WAIT_SYSCALL: &str = "waitid";
 #[cfg(windows)]
@@ -502,14 +497,13 @@ pub(crate) const WAIT_SYSCALL: &str = "WaitForSingleObject";
 #[cfg(not(any(target_os = "linux", windows)))]
 pub(crate) const WAIT_SYSCALL: &str = "wait";
 
-/// Go `os.Pipe` error prefix (`NewSyscallError`).
+/// Syscall name used as the pipe error prefix.
 #[cfg(target_os = "linux")]
 pub(crate) const PIPE_SYSCALL: &str = "pipe2";
 #[cfg(not(target_os = "linux"))]
 pub(crate) const PIPE_SYSCALL: &str = "pipe";
 
-/// Ends worker pipe IO once the drain grace has passed. Go closes the pipe
-/// files; closing a descriptor from another thread does not reliably
+/// Ends worker pipe IO once the drain grace has passed. Closing a descriptor from another thread does not reliably
 /// interrupt a blocked read on Linux (close(2)), so the Unix workers use
 /// nonblocking IO and bounded poll waits that recheck this flag. Windows
 /// workers wait on their overlapped IO and this manual-reset event together,
@@ -549,7 +543,7 @@ const POLL_SLICE_MS: libc::c_int = 50;
 #[derive(Debug)]
 pub(crate) enum Io {
     Done(usize),
-    /// Go's read/write on a file closed by the drain grace.
+    /// A read or write on a file closed by the drain grace.
     Aborted,
     Err(io::Error),
 }
@@ -637,7 +631,7 @@ pub(crate) fn read_some(r: &std::io::PipeReader, buf: &mut [u8], abort: &Abort) 
 }
 
 /// Writes once (possibly short). Blocks (interruptibly) like [`read_some`].
-/// An empty `buf` still makes one write call, as Go's `poll.FD.Write` does.
+/// An empty `buf` still makes one write call.
 #[cfg(unix)]
 pub(crate) fn write_some(w: &std::io::PipeWriter, buf: &[u8], abort: &Abort) -> Io {
     use std::io::Write;
@@ -660,7 +654,7 @@ pub(crate) fn write_some(w: &std::io::PipeWriter, buf: &[u8], abort: &Abort) -> 
     }
 }
 
-/// Go `(*os.File).Close` with its error: std's `File` drop ignores it.
+/// Closes a file and returns the error: std's `File` drop ignores it.
 #[cfg(unix)]
 pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
     use std::os::fd::IntoRawFd;
@@ -670,7 +664,7 @@ pub(crate) fn close_file(file: std::fs::File) -> io::Result<()> {
         return Ok(());
     }
     let err = io::Error::last_os_error();
-    // Go's poll.FD ignores EINTR from close: the descriptor is gone either way.
+    // EINTR from close is ignored: the descriptor is gone either way.
     if err.kind() == io::ErrorKind::Interrupted {
         return Ok(());
     }
@@ -684,7 +678,7 @@ mod tests {
     use std::ffi::OsString;
 
     #[test]
-    fn look_path_error_text_matches_go() {
+    fn look_path_error_text_format() {
         let err = look_path("no-such-rival-binary", Some(OsStr::new("/nonexistent"))).unwrap_err();
         let path_var = if cfg!(windows) { "%PATH%" } else { "$PATH" };
         assert_eq!(
@@ -698,7 +692,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn look_path_follows_go_unix_rules() {
+    fn look_path_follows_unix_rules() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("bin");
@@ -726,22 +720,22 @@ mod tests {
         let plain_s = plain.to_str().unwrap();
         assert_eq!(
             look_path(plain_s, None).unwrap_err().to_string(),
-            format!("exec: \"{plain_s}\": permission denied")
+            format!("exec: \"{plain_s}\": Permission denied (os error 13)")
         );
         let dir_s = bin.join("dir");
         let dir_s = dir_s.to_str().unwrap();
         assert_eq!(
             look_path(dir_s, None).unwrap_err().to_string(),
-            format!("exec: \"{dir_s}\": is a directory")
+            format!("exec: \"{dir_s}\": Is a directory (os error 21)")
         );
         let missing = bin.join("missing");
         let missing = missing.to_str().unwrap();
         assert_eq!(
             look_path(missing, None).unwrap_err().to_string(),
-            format!("exec: \"{missing}\": stat {missing}: no such file or directory")
+            format!("exec: \"{missing}\": stat {missing}: No such file or directory (os error 2)")
         );
 
-        // A relative $PATH hit is Go's ErrDot. The process cwd is never
+        // A relative $PATH hit is a dot error. The process cwd is never
         // changed: the relative dir climbs from the cwd to "/" first.
         let cwd = std::env::current_dir().unwrap();
         let mut rel = PathBuf::new();
@@ -756,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn add_critical_env_matches_go() {
+    fn add_critical_env_appends_systemroot() {
         let env = |items: &[&str]| -> Vec<std::ffi::OsString> {
             items.iter().map(std::ffi::OsString::from).collect()
         };

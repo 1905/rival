@@ -157,9 +157,8 @@ created, so `rival sessions` and the dashboards report the level actually sent.
 
 The built-in defaults are Codex `xhigh`, Claude `medium`, Kimi K3 `max`, and
 Grok `high` — which is also grok-4.6's own default. Codex and Claude keep these
-defaults on plan reviews. Antislop is the one exception: Codex runs at `high`
-there. An explicit `-re` or a configured effort still wins everywhere. Plan
-review and antislop accept `codex` and `claude`.
+defaults on plan reviews. An explicit `-re` or a configured effort still wins
+everywhere. Plan review accepts `codex` and `claude`.
 
 Invalid model labels or effort values in `~/.rival/config.yaml` stop the command
 before sessions or queue entries are created. An old `efforts.sol` entry is

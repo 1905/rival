@@ -1,5 +1,4 @@
 //! `rival install`: writes the embedded skills for Claude Code and Codex.
-//! Go: `cmd/install.go`.
 //!
 //! Skills go under the user's home (`$HOME`), never under `RIVAL_HOME`,
 //! which only moves Rival's own state.
@@ -12,7 +11,7 @@ use std::path::{Path, PathBuf};
 use rival_core::config::Config;
 use rival_core::executor::look_path;
 use rival_core::paths::{self, HOME_VAR};
-use rival_core::{gostd, skills};
+use rival_core::skills;
 use sha2::{Digest, Sha256};
 
 use crate::root::{CmdEnv, CmdError};
@@ -21,7 +20,7 @@ use crate::tree::Invocation;
 #[cfg(test)]
 mod tests;
 
-/// Go `retiredSkillNameHashes`: lets upgrades remove two retired
+/// Lets upgrades remove two retired
 /// integration skills without retaining their obsolete public names
 /// anywhere in the shipped tree. The values are SHA-256(name), not content
 /// hashes.
@@ -30,7 +29,7 @@ pub const RETIRED_SKILL_NAME_HASHES: [&str; 2] = [
     "75160929d947197a4444be684d0c9a67784cc4ebd84b45cd1de2234a6981056a",
 ];
 
-/// Go `codexInstalled`'s system applications directory.
+/// The system applications directory checked for an installed Codex app.
 const SYSTEM_APPLICATIONS: &str = "/Applications";
 
 /// `rival install [--force] [--target auto|claude|codex|all]`.
@@ -43,7 +42,7 @@ pub fn install_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdE
     )
 }
 
-/// Go `runInstall`, with the system applications directory injected.
+/// Runs the install, with the system applications directory injected.
 fn run_install(
     env: &mut CmdEnv<'_>,
     force: bool,
@@ -71,7 +70,6 @@ fn run_install(
     install_targets(&targets, force, &mut *reader, env.stdout).map_err(CmdError::plain)
 }
 
-/// Go `os.UserHomeDir`.
 fn user_home_dir(cfg: &Config) -> Result<&str, &'static str> {
     match cfg.getenv(HOME_VAR) {
         "" if cfg!(windows) => Err("%userprofile% is not defined"),
@@ -80,14 +78,13 @@ fn user_home_dir(cfg: &Config) -> Result<&str, &'static str> {
     }
 }
 
-/// Go `skillTarget`: a skill host and its skills directory.
+/// A skill host and its skills directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillTarget {
     pub host: &'static str,
     pub base: PathBuf,
 }
 
-/// Go `skillTargets`.
 pub fn skill_targets(
     home: &Path,
     target: &str,
@@ -107,13 +104,13 @@ pub fn skill_targets(
         "codex" => Ok(vec![codex()]),
         "all" => Ok(vec![claude(), codex()]),
         _ => Err(format!(
-            "unknown install target {}; use auto, claude, codex, or all",
-            gostd::quote(target)
+            "unknown install target {:?}; use auto, claude, codex, or all",
+            target
         )),
     }
 }
 
-/// Go `detectCodex`: a `codex` on `path_env`, or a directory at
+/// A `codex` on `path_env`, or a directory at
 /// `codex_home` (`$CODEX_HOME`), `~/.codex`, `~/Applications/Codex.app` or
 /// `<applications>/Codex.app`.
 pub fn detect_codex(home: &Path, applications: &Path, path_env: &OsStr, codex_home: &str) -> bool {
@@ -130,7 +127,7 @@ pub fn detect_codex(home: &Path, applications: &Path, path_env: &OsStr, codex_ho
     .any(|path| fs::metadata(path).is_ok_and(|m| m.is_dir()))
 }
 
-/// Go `installTargets`: one reader for every target, so answers already
+/// One reader for every target, so answers already
 /// buffered for a later target are not lost.
 pub fn install_targets(
     targets: &[SkillTarget],
@@ -144,7 +141,6 @@ pub fn install_targets(
     Ok(())
 }
 
-/// Go `installSkills`.
 pub fn install_skills(
     target: &SkillTarget,
     force: bool,
@@ -205,11 +201,11 @@ fn install_skills_with(
                 out,
                 "  ? {name} — update v{dst_version} → v{src_version}? [y/N] "
             );
-            // Go `ReadString('\n')`: the error is ignored, the bytes read
+            // The error is ignored, the bytes read
             // so far are the answer.
             let mut line = Vec::new();
             let _ = reader.read_until(b'\n', &mut line);
-            let answer = gostd::to_lower(&String::from_utf8_lossy(&line));
+            let answer = String::from_utf8_lossy(&line).to_lowercase();
             let answer = answer.trim();
             if answer != "y" && answer != "yes" {
                 let _ = writeln!(out, "    skipped");
@@ -264,7 +260,7 @@ fn install_skills_with(
     Ok(())
 }
 
-/// Go `removeSkillDirsByHash`: removes every entry of `target_base` whose
+/// Removes every entry of `target_base` whose
 /// name hashes to one of `hashes`, in name order. A missing directory
 /// removes nothing.
 fn remove_skill_dirs_by_hash(target_base: &Path, hashes: &[&str]) -> io::Result<usize> {
@@ -294,7 +290,7 @@ fn sha256_hex(data: &[u8]) -> String {
         .collect()
 }
 
-/// Go `os.RemoveAll` for a path that exists: a symlink is removed, never
+/// Removes a path that exists: a symlink is removed, never
 /// followed.
 fn remove_all(path: &Path) -> io::Result<()> {
     let removed = match fs::symlink_metadata(path) {
@@ -308,31 +304,29 @@ fn remove_all(path: &Path) -> io::Result<()> {
     }
 }
 
-/// Go `readEmbeddedSkill`: the skill's content and frontmatter version.
+/// The skill's content and frontmatter version.
 fn read_embedded_skill(name: &str) -> Result<(Vec<u8>, String), String> {
     let content = skills::read_file(&format!("{name}/SKILL.md"))?;
     let version = parse_version(&String::from_utf8_lossy(content));
     Ok((content.to_vec(), version))
 }
 
-/// Go `os.ReadFile`, with its `*PathError` text.
+/// Reads a file; the error is [`path_error`] text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let mut file = gostd::open_file(path).map_err(|e| path_error("open", path, &e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| path_error("open", path, &e))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| path_error("read", path, &e))?;
     Ok(data)
 }
 
-/// Go `writeSkill`.
 fn write_skill(dir: &Path, file: &Path, content: &[u8]) -> Result<(), String> {
     mkdir_all(dir)
         .map_err(|e| format!("mkdir {}: {}", dir.display(), path_error("mkdir", dir, &e)))?;
     write_file(file, content).map_err(|e| format!("write {}: {e}", file.display()))
 }
 
-/// Go `os.MkdirAll(dir, 0o755)`. Go's error may name the parent that
-/// failed; this one always names `dir`.
+/// Creates `dir` and its parents (mode 0o755). The error always names `dir`.
 fn mkdir_all(dir: &Path) -> io::Result<()> {
     match fs::metadata(dir) {
         Ok(meta) if meta.is_dir() => return Ok(()),
@@ -346,7 +340,7 @@ fn mkdir_all(dir: &Path) -> io::Result<()> {
     builder.create(dir)
 }
 
-/// Go `os.WriteFile(file, content, 0o644)`, with its `*PathError` text.
+/// Writes a file (mode 0o644); the error is [`path_error`] text.
 fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
     let mut opts = OpenOptions::new();
     opts.write(true).create(true).truncate(true);
@@ -357,12 +351,12 @@ fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
         .map_err(|e| path_error("write", path, &e))
 }
 
-/// Go `*fs.PathError` text: `<op> <path>: <errno text>`.
+/// Error text: `<op> <path>: <errno text>`.
 fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
-    format!("{op} {}: {}", path.display(), gostd::os_error_text(err))
+    format!("{op} {}: {}", path.display(), err)
 }
 
-/// Go `parseVersion`: the `version:` field of the YAML frontmatter, which
+/// The `version:` field of the YAML frontmatter, which
 /// sits between the first and second `---` lines; `unknown` when absent.
 pub fn parse_version(content: &str) -> String {
     let mut in_frontmatter = false;

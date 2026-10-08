@@ -1,6 +1,6 @@
 //! JSON-lines logger with zerolog's field names and order.
 //!
-//! Go: `zerolog.New(os.Stderr).With().Timestamp().Str("app", "rival")`. A line is
+//! A line is
 //! `level`, `app`, the per-call fields in call order, `time`, then `message`.
 //! `time` is RFC3339 at seconds precision in local time; an empty message is
 //! omitted, and duplicate keys are kept as written.
@@ -43,7 +43,7 @@ enum Value {
     Str(String),
     Int(i64),
     Bool(bool),
-    /// A JSON number already in Go's text form.
+    /// A JSON number already in its final text form.
     Number(String),
 }
 
@@ -96,12 +96,12 @@ impl Event {
         self
     }
 
-    /// Go zerolog `Dur`: milliseconds as a float (`DurationFieldUnit` =
+    /// zerolog `Dur`: milliseconds as a float (`DurationFieldUnit` =
     /// ms, `DurationFieldInteger` = false), so 5s prints `5000` and 1.5ms
-    /// prints `1.5`. Rust's shortest float text equals Go's
+    /// prints `1.5`. Rust's shortest float text equals zerolog's
     /// `strconv.FormatFloat(v, 'f', -1, 64)` only below 1e21 ms; zerolog
-    /// prints 'e' from there. Go's signed `time.Duration` (at most ~9.2e15
-    /// ms) never gets there; a larger Rust `Duration` would print wrong.
+    /// prints 'e' from there. A signed 64-bit nanosecond duration (at most
+    /// ~9.2e15 ms) never gets there; a larger `Duration` would print wrong.
     pub fn dur(mut self, key: &str, d: Duration) -> Self {
         let ms = d.as_nanos() as f64 / 1e6;
         self.fields
@@ -109,8 +109,8 @@ impl Event {
         self
     }
 
-    /// Adds `"error": <err>`. Uses `{:#}` so an anyhow chain prints as Go's
-    /// wrapped `err.Error()` does ("outer: inner").
+    /// Adds `"error": <err>`. Uses `{:#}` so an anyhow chain prints as
+    /// "outer: inner".
     pub fn err(self, err: impl Display) -> Self {
         self.str("error", format!("{err:#}"))
     }
@@ -191,7 +191,7 @@ pub fn set_writer(w: Box<dyn Write + Send>) {
     *SINK.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(w);
 }
 
-/// Turns all logging on or off. Go's TUI sets `log.Logger = zerolog.Nop()`.
+/// Turns all logging on or off. The TUI turns it off.
 pub fn set_enabled(enabled: bool) {
     ENABLED.store(enabled, Ordering::Relaxed);
 }
@@ -273,17 +273,17 @@ mod tests {
     // Golden lines from zerolog v1.33.0 with
     // zerolog.New(w).With().Timestamp().Str("app", "rival") and a fixed
     // TimestampFunc of 2026-10-02T14:05:09.123456789+03:00.
-    const GO_INFO: &str = r#"{"level":"info","app":"rival","session":"abc123","pid":4242,"detach":true,"error":"boom: \"quoted\"\n<tag>&","time":"2026-10-02T14:05:09+03:00","message":"reaping orphaned session"}"#;
-    const GO_DEBUG_EMPTY: &str =
+    const WANT_INFO: &str = r#"{"level":"info","app":"rival","session":"abc123","pid":4242,"detach":true,"error":"boom: \"quoted\"\n<tag>&","time":"2026-10-02T14:05:09+03:00","message":"reaping orphaned session"}"#;
+    const WANT_DEBUG_EMPTY: &str =
         r#"{"level":"debug","app":"rival","time":"2026-10-02T14:05:09+03:00"}"#;
-    const GO_WARN_DUP: &str = r#"{"level":"warn","app":"rival","k":"v","k":"dup","neg":-7,"f":false,"time":"2026-10-02T14:05:09+03:00","message":"tab\there é"}"#;
-    const GO_ERROR: &str =
+    const WANT_WARN_DUP: &str = r#"{"level":"warn","app":"rival","k":"v","k":"dup","neg":-7,"f":false,"time":"2026-10-02T14:05:09+03:00","message":"tab\there é"}"#;
+    const WANT_ERROR: &str =
         r#"{"level":"error","app":"rival","time":"2026-10-02T14:05:09+03:00","message":"nil err"}"#;
-    const GO_UTC: &str =
+    const WANT_UTC: &str =
         r#"{"level":"info","app":"rival","time":"2026-01-02T03:04:05Z","message":"utc"}"#;
 
     #[test]
-    fn matches_go_zerolog_golden_lines() {
+    fn matches_zerolog_golden_lines() {
         let t = plus3(2026, 10, 2, 14, 5, 9);
         let utc = FixedOffset::east_opt(0)
             .unwrap()
@@ -298,12 +298,12 @@ mod tests {
                     .bool("detach", true)
                     .err("boom: \"quoted\"\n<tag>&")
                     .format("reaping orphaned session", t),
-                GO_INFO,
+                WANT_INFO,
             ),
             (
                 "debug, empty message omitted",
                 debug().format("", t),
-                GO_DEBUG_EMPTY,
+                WANT_DEBUG_EMPTY,
             ),
             (
                 "warn, duplicate keys and escapes",
@@ -313,10 +313,10 @@ mod tests {
                     .int("neg", -7)
                     .bool("f", false)
                     .format("tab\there é", t),
-                GO_WARN_DUP,
+                WANT_WARN_DUP,
             ),
-            ("error level", error().format("nil err", t), GO_ERROR),
-            ("utc offset prints Z", info().format("utc", utc), GO_UTC),
+            ("error level", error().format("nil err", t), WANT_ERROR),
+            ("utc offset prints Z", info().format("utc", utc), WANT_UTC),
         ];
         for (name, rust, go) in cases {
             assert_eq!(parse(&rust), parse(go), "{name}: maps differ");
@@ -325,15 +325,15 @@ mod tests {
         }
     }
 
-    // Expected text derived from the zerolog v1.33.0 source (not a Go run):
+    // Expected text derived from the zerolog v1.33.0 source (not a live run):
     // Dur → AppendDuration(float64(d)/float64(time.Millisecond)) →
     // appendFloat(v, 64, -1) = strconv 'f' -1, as 1ns = 1e-6ms is not below
     // the 1e-6 'e' cutoff. Calls: Str("session","s1"), Dur("grace",5s),
     // Dur("d",1500µs), Dur("z",0), Dur("n",1ns).
-    const GO_DUR: &str = r#"{"level":"warn","app":"rival","session":"s1","grace":5000,"d":1.5,"z":0,"n":0.000001,"time":"2026-10-02T14:05:09+03:00","message":"m"}"#;
+    const WANT_DUR: &str = r#"{"level":"warn","app":"rival","session":"s1","grace":5000,"d":1.5,"z":0,"n":0.000001,"time":"2026-10-02T14:05:09+03:00","message":"m"}"#;
 
     #[test]
-    fn dur_matches_go_zerolog_float_milliseconds() {
+    fn dur_matches_zerolog_float_milliseconds() {
         let line = warn()
             .str("session", "s1")
             .dur("grace", Duration::from_secs(5))
@@ -341,11 +341,11 @@ mod tests {
             .dur("z", Duration::ZERO)
             .dur("n", Duration::from_nanos(1))
             .format("m", plus3(2026, 10, 2, 14, 5, 9));
-        assert_eq!(line, GO_DUR);
+        assert_eq!(line, WANT_DUR);
     }
 
     #[test]
-    fn err_prints_anyhow_chain_like_go_wrapping() {
+    fn err_prints_anyhow_chain_as_outer_colon_inner() {
         let err = anyhow::anyhow!("inner").context("outer");
         let line = warn().err(err).format("x", plus3(2026, 1, 1, 0, 0, 0));
         assert_eq!(parse(&line)["error"], "outer: inner");

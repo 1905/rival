@@ -1,0 +1,16 @@
+{
+  "name": "queue-empty",
+  "description": "`rival queue` with no tickets prints 'Queue is empty.' and exits 0. The command creates ~/.rival/queue and its .lock file; the pre-run dead-ticket scan does nothing because the dir did not exist yet.",
+  "steps": [
+    {
+      "run": ["queue"],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Queue is empty.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {"home_files": [".rival/queue/.lock"]}
+}

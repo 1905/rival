@@ -1,0 +1,62 @@
+{
+  "name": "wait-invalid",
+  "description": "`rival wait` usage errors, each exiting 64 with the message on stderr. Order: --poll <= 0 is rejected before any mode check; then --log combined with positional IDs; then neither given; then a positional ID that is not a valid session ID (quoted in the message); then log-file read errors ('read log file \"<path>\": open <path>: no such file or directory'); then a log with no detached pid and no 'starting' line (a 'reaping' line does not count). A valid but unknown session ID prints 'no such session (file not found) — check the ID' on stdout and exits 64 with 'rival wait: exit 64' on stderr. A bad --timeout value fails argument parsing ('invalid argument ... for \"--timeout\" flag: ...' with the duration parser's error) and exits 1. No command here creates a file: the reap finds no session or queue dir.",
+  "fixtures": [
+    {"write": "logs/reaper-only.log", "text": "some unrelated output\n{\"session\":\"22222222-2222-2222-2222-222222222222\",\"message\":\"reaping orphaned session\"}\n"}
+  ],
+  "steps": [
+    {
+      "run": ["wait", "--poll", "0s"],
+      "expect": {"exit_code": 64, "stdout": "", "stderr_lines": ["--poll must be > 0"]}
+    },
+    {
+      "run": ["wait", "--poll=-1s", "11111111-1111-1111-1111-111111111111"],
+      "expect": {"exit_code": 64, "stdout": "", "stderr_lines": ["--poll must be > 0"]}
+    },
+    {
+      "run": ["wait", "--log", "<ROOT>/logs/reaper-only.log", "11111111-1111-1111-1111-111111111111"],
+      "expect": {"exit_code": 64, "stdout": "", "stderr_lines": ["pass either --log or session IDs, not both"]}
+    },
+    {
+      "run": ["wait"],
+      "expect": {"exit_code": 64, "stdout": "", "stderr_lines": ["provide --log <file> or one or more session IDs"]}
+    },
+    {
+      "run": ["wait", "11111111-1111-1111-1111-111111111111", "../x\"y"],
+      "expect": {"exit_code": 64, "stdout": "", "stderr_lines": ["invalid session ID \"../x\\\"y\" (expected a UUID)"]}
+    },
+    {
+      "run": ["wait", "--log", "<ROOT>/logs/missing.log"],
+      "expect": {
+        "exit_code": 64,
+        "stdout": "",
+        "stderr_lines": ["read log file \"<ROOT>/logs/missing.log\": open <ROOT>/logs/missing.log: No such file or directory (os error 2)"]
+      }
+    },
+    {
+      "run": ["wait", "--log", "<ROOT>/logs/reaper-only.log"],
+      "expect": {
+        "exit_code": 64,
+        "stdout": "",
+        "stderr_lines": ["no detached pid or run session found in \"<ROOT>/logs/reaper-only.log\" (run may have failed before launch)"]
+      }
+    },
+    {
+      "run": ["wait", "--poll", "100ms", "33333333-3333-3333-3333-333333333333"],
+      "expect": {
+        "exit_code": 64,
+        "stdout": "no such session (file not found) — check the ID\n",
+        "stderr_lines": ["rival wait: exit 64"]
+      }
+    },
+    {
+      "run": ["wait", "--timeout", "abc", "11111111-1111-1111-1111-111111111111"],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": ["invalid argument \"abc\" for \"--timeout\" flag: time: invalid duration \"abc\""]
+      }
+    }
+  ],
+  "expect": {"home_files": []}
+}

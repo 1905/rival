@@ -1,6 +1,5 @@
 //! The full-screen view of one run: tabs, group members, a follow-able
-//! viewport, search and the stop confirm. Go:
-//! `internal/dashboard/detail_view.go`.
+//! viewport, search and the stop confirm.
 //!
 //! The pane never reads a file. The Raw tab shows what its [`LogSlot`]
 //! holds; [`DetailPane::reload`] returns the read a worker should make, and
@@ -16,8 +15,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gojson;
-use rival_core::gostd;
 use rival_core::session::Session;
 
 use super::input::TextInput;
@@ -43,7 +40,7 @@ use super::viewport::Viewport;
 pub enum DetailTab {
     /// The parsed answer of a finished member.
     Result,
-    /// The raw log (Go: Output).
+    /// The raw log.
     #[default]
     Raw,
     Prompt,
@@ -80,7 +77,7 @@ impl DetailTab {
 /// caller, which owns its height.
 pub const DETAIL_CHROME_H: usize = 5;
 
-/// Go: `vpHeight`. The viewport height for a pane of `height` rows. Resize
+/// The viewport height for a pane of `height` rows. Resize
 /// and render both use it, so the viewport never holds more rows than the
 /// screen keeps.
 pub fn vp_height(height: usize) -> usize {
@@ -258,7 +255,7 @@ impl DetailPane {
         true
     }
 
-    /// Go: `resize`. Fits the viewport to a `width`×`height` pane. A reader
+    /// Fits the viewport to a `width`×`height` pane. A reader
     /// following the tail stays on it; anyone else keeps their place,
     /// clamped to the new end.
     pub fn resize(&mut self, width: usize, height: usize) {
@@ -286,7 +283,7 @@ impl DetailPane {
         (!is_live(&s.status) && !s.log_file.is_empty()).then(|| ResultTarget::of(s))
     }
 
-    /// Go: `reload`. Rebuilds the current tab's content for `item`. `reset`
+    /// Rebuilds the current tab's content for `item`. `reset`
     /// resets the scroll position: Raw jumps to the tail, the other tabs to
     /// the top. Otherwise Raw follows the tail only while follow is on, and
     /// a scrolled-up reader keeps their place.
@@ -450,7 +447,7 @@ impl DetailPane {
         }
     }
 
-    /// Go: `applyContent`. Pushes the lines into the viewport with search
+    /// Pushes the lines into the viewport with search
     /// matches highlighted. The viewport clamps its offset, so a shrinking
     /// log never leaves it scrolled past its end.
     pub fn apply_content(&mut self, styles: &Styles) {
@@ -465,7 +462,7 @@ impl DetailPane {
         self.vp.set_content(out);
     }
 
-    /// Go: `runSearch`. Sets the query and jumps to its first match.
+    /// Sets the query and jumps to its first match.
     pub fn run_search(&mut self, query: &str, styles: &Styles) {
         self.query = query.trim().to_string();
         self.match_idx = 0;
@@ -473,7 +470,7 @@ impl DetailPane {
         self.jump_to_match();
     }
 
-    /// Go: `stepMatch`. The next (+1) or previous (-1) match, wrapping.
+    /// The next (+1) or previous (-1) match, wrapping.
     pub fn step_match(&mut self, delta: isize) {
         let n = self.matches.len() as isize;
         if n == 0 {
@@ -483,7 +480,7 @@ impl DetailPane {
         self.jump_to_match();
     }
 
-    /// Go: `jumpToMatch`. Scrolls the current match a third of the way
+    /// Scrolls the current match a third of the way
     /// down. Reading a match means reading old output, so follow pauses.
     fn jump_to_match(&mut self) {
         let Some(&line) = self.matches.get(self.match_idx) else {
@@ -496,7 +493,7 @@ impl DetailPane {
         self.follow = false;
     }
 
-    /// Go: `view`. The whole detail screen for `item`: exactly
+    /// The whole detail screen for `item`: exactly
     /// `area.height` rows, none wider than `area.width`. The viewport
     /// already holds the content; drawing reads no file.
     pub fn render(
@@ -536,7 +533,7 @@ impl DetailPane {
         }
     }
 
-    /// Go: `breadcrumb`. " rival › project › kind id8" on the left and
+    /// " rival › project › kind id8" on the left and
     /// "glyph status elapsed   follow ●" on the right.
     fn breadcrumb(&self, item: &DisplayItem, w: usize, spin: &str, ctx: &Ctx) -> Line<'static> {
         let st = ctx.styles;
@@ -578,7 +575,7 @@ impl DetailPane {
         join_ends(Line::from(left), right, w)
     }
 
-    /// Go: `tabBar`. The tabs on the left and, for a group, the member bar on
+    /// The tabs on the left and, for a group, the member bar on
     /// the right: " 1 Result  2 Raw  3 Prompt  4 Info      [ gpt-5.5 ] judge".
     fn tab_bar(&self, item: &DisplayItem, w: usize, st: &Styles) -> Line<'static> {
         let mut left = Vec::new();
@@ -618,7 +615,7 @@ impl DetailPane {
         join_ends(l, r, w)
     }
 
-    /// Go: `statusLine`. The row under the viewport: the confirm bar, the
+    /// The row under the viewport: the confirm bar, the
     /// search input, the search result, a one-shot notice, or the scroll
     /// position.
     fn status_line(&self, w: usize, st: &Styles) -> Line<'static> {
@@ -669,7 +666,7 @@ impl DetailPane {
     }
 }
 
-/// Go: `joinEnds`. `left` and `right` at the two ends of a `w`-cell line.
+/// `left` and `right` at the two ends of a `w`-cell line.
 /// When both do not fit, `left` is cut first: the status on the right
 /// matters more.
 pub fn join_ends(left: Line<'static>, right: Line<'static>, w: usize) -> Line<'static> {
@@ -688,7 +685,7 @@ pub fn join_ends(left: Line<'static>, right: Line<'static>, w: usize) -> Line<'s
     Line::from(spans)
 }
 
-/// Go: `memberLabel`. A member's tab name: its model id, or "judge" for the
+/// A member's tab name: its model id, or "judge" for the
 /// consilium judge.
 pub fn member_label(s: &Session) -> &str {
     if s.mode == "consilium" {
@@ -698,7 +695,7 @@ pub fn member_label(s: &Session) -> &str {
     }
 }
 
-/// Go: `outputLines`. The member's log, pre-wrapped, followed by its error
+/// The member's log, pre-wrapped, followed by its error
 /// when it failed. The error goes last because follow parks the reader
 /// there.
 pub fn output_lines(s: &Session, width: usize, log: &LogSlot, st: &Styles) -> Vec<Line<'static>> {
@@ -725,7 +722,7 @@ pub fn output_lines(s: &Session, width: usize, log: &LogSlot, st: &Styles) -> Ve
     lines
 }
 
-/// Go: `errorLines`. The error under an "error:" heading, wrapped to
+/// The error under an "error:" heading, wrapped to
 /// `width`, or nothing when there is none.
 pub fn error_lines(s: &Session, width: usize, st: &Styles) -> Vec<Line<'static>> {
     if s.error_msg.is_empty() {
@@ -740,7 +737,7 @@ pub fn error_lines(s: &Session, width: usize, st: &Styles) -> Vec<Line<'static>>
     out
 }
 
-/// Go: `promptLines`. The member's full prompt, word-wrapped. When the
+/// The member's full prompt, word-wrapped. When the
 /// stored record cannot be read it is the 100-byte preview plus a note;
 /// while the load is still running the note says so.
 pub fn prompt_lines(
@@ -759,7 +756,7 @@ pub fn prompt_lines(
     let mut lines: Vec<Line<'static>> = if s.prompt_preview.is_empty() {
         Vec::new()
     } else {
-        wrap_cells(&sanitize_log(&s.prompt_preview.to_str_lossy()), width)
+        wrap_cells(&sanitize_log(&s.prompt_preview), width)
             .into_iter()
             .map(Line::raw)
             .collect()
@@ -773,19 +770,19 @@ pub fn prompt_lines(
     lines
 }
 
-/// A stored time in the local zone, Go layout "2006-01-02 15:04:05"; empty
-/// for no time.
+/// A stored time in the local zone as `YYYY-MM-DD HH:MM:SS`; empty for no
+/// time.
 fn local_stamp(t: Option<chrono::DateTime<chrono::FixedOffset>>, zone: Zone) -> String {
     match t {
-        Some(t) if t != gojson::zero_time() => t
+        Some(t) => t
             .with_timezone(&zone(t.naive_utc()))
             .format("%Y-%m-%d %H:%M:%S")
             .to_string(),
-        _ => String::new(),
+        None => String::new(),
     }
 }
 
-/// Go: `infoLines`. Every stored field of `s`, one per row, then the full
+/// Every stored field of `s`, one per row, then the full
 /// error. Values wrap under their label rather than being cut.
 pub fn info_lines(s: &Session, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     let st = ctx.styles;
@@ -825,11 +822,7 @@ pub fn info_lines(s: &Session, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     add("mode", s.mode.clone(), st.text);
     add("status", s.status.clone(), st.status(&s.status));
     add("exit", exit, st.text);
-    add(
-        "started",
-        local_stamp(Some(s.start_time), ctx.zone),
-        st.text,
-    );
+    add("started", local_stamp(s.start_time, ctx.zone), st.text);
     add("ended", local_stamp(s.end_time, ctx.zone), st.text);
     add("duration", format_elapsed(s, ctx.now), st.text);
     add("queued at", local_stamp(s.queued_at, ctx.zone), st.text);
@@ -847,36 +840,45 @@ pub fn info_lines(s: &Session, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     out
 }
 
+/// Lowers `s` one char at a time and keeps the first char of each
+/// lowercase form, so `İ` becomes `i` and the char count does not change.
+fn lower_chars(s: &str) -> String {
+    s.chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
+}
+
 /// The plain text of a styled line.
 fn plain(line: &Line<'_>) -> String {
     line.spans.iter().map(|s| s.content.as_ref()).collect()
 }
 
-/// Go: `findMatches`. The indexes of the lines that contain `query`,
-/// ignoring case (Go's per-rune lowering) and styling. An empty query
-/// matches nothing.
+/// The indexes of the lines that contain `query`,
+/// ignoring case (per-char lowering) and styling. An empty query matches
+/// nothing.
 pub fn find_matches(lines: &[Line<'static>], query: &str) -> Vec<usize> {
-    let q = gostd::to_lower(query);
+    let q = lower_chars(query);
     if q.is_empty() {
         return Vec::new();
     }
     lines
         .iter()
         .enumerate()
-        .filter(|(_, l)| gostd::to_lower(&plain(l)).contains(&q))
+        .filter(|(_, l)| lower_chars(&plain(l)).contains(&q))
         .map(|(i, _)| i)
         .collect()
 }
 
-/// Go: `highlightLine`. Gives every case-insensitive occurrence of `query`
+/// Gives every case-insensitive occurrence of `query`
 /// the match style. Colours only, so the line keeps its width and text.
 pub fn highlight_line(line: &Line<'static>, query: &str, matched: Style) -> Line<'static> {
-    let q: Vec<char> = gostd::to_lower(query).chars().collect();
+    let q: Vec<char> = lower_chars(query).chars().collect();
     if q.is_empty() {
         return line.clone();
     }
-    // Go lowers rune by rune, so the lowered text has the same char count.
-    let lower: Vec<char> = gostd::to_lower(&plain(line)).chars().collect();
+    // `lower_chars` maps char to char, so the lowered text has the same
+    // char count.
+    let lower: Vec<char> = lower_chars(&plain(line)).chars().collect();
     let mut hit = vec![false; lower.len()];
     let mut i = 0;
     while i + q.len() <= lower.len() {

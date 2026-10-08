@@ -1,5 +1,5 @@
-//! What differs per model between the `command` and `run` surfaces. Go:
-//! `cmd/model_specs.go` plus the usage texts in `cmd/command_*.go`.
+//! What differs per model between the `command` and `run` surfaces, plus
+//! the usage texts.
 //!
 //! The executor signatures are not uniform: grok takes a review flag, K3
 //! takes no effort, and the others take effort but no flag. Each adapter
@@ -84,7 +84,7 @@ pub struct RunCall<'a, 'm> {
 pub type PreflightFn = Box<dyn Fn(&Config, &str) -> anyhow::Result<()>>;
 pub type RunFn = Box<dyn Fn(RunCall<'_, '_>) -> anyhow::Result<RunResult>>;
 
-/// Go `modelSpec`: one model's command and run surfaces. It carries only
+/// One model's command and run surfaces. It carries only
 /// what genuinely differs per model. Anything a single model needs stays an
 /// explicit branch in the workflows, keyed on `command_name`.
 pub struct ModelSpec {
@@ -111,7 +111,7 @@ impl ModelSpec {
         config::engine_label(self.cli, self.model)
     }
 
-    /// Go `resolveEffort`: K3 is pinned to the only level its provider
+    /// K3 is pinned to the only level its provider
     /// supports; grok clamps the shared ladder onto its own shorter menu.
     pub fn resolve_effort(&self, cfg: &Config, requested: &str) -> Result<String, String> {
         if self.command_name == config::K3_COMMAND_NAME {
@@ -136,7 +136,7 @@ impl ModelSpec {
         Ok(effort)
     }
 
-    /// Go `authHint`: a provider-specific hint for a failed run, or "" when
+    /// A provider-specific hint for a failed run, or "" when
     /// the provider has none. Only Claude distinguishes auth failures.
     pub fn auth_hint(&self, cfg: &Config, log_file: &str) -> String {
         if self.command_name != config::CLAUDE_LABEL {
@@ -146,7 +146,7 @@ impl ModelSpec {
     }
 }
 
-/// Go `sessionMode`: names the run for the dashboards.
+/// Names the run for the dashboards.
 pub fn session_mode(is_review: bool) -> &'static str {
     if is_review { "review" } else { "raw" }
 }

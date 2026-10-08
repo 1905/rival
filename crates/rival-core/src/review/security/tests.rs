@@ -1,5 +1,5 @@
-//! Go: `internal/review/security_test.go`, plus the parse half of cmd
-//! `TestSecurityParsesFinalAnswerNotToolOutput`.
+//! Security review validation and rendering, plus the parse half of the
+//! security command's final-answer test.
 
 use super::*;
 use crate::config::{K3_LABEL, KIMI_MODEL, PromptKind};
@@ -22,7 +22,6 @@ fn finding(file: &str, title: &str, severity: &str) -> ReviewerFinding {
     }
 }
 
-/// Go: TestValidateSecurityResultRejectsUnusablePayloads.
 #[test]
 fn validate_security_result_rejects_unusable_payloads() {
     let cases = [
@@ -50,13 +49,11 @@ fn validate_security_result_rejects_unusable_payloads() {
     }
 }
 
-/// Go: TestValidateSecurityResultAcceptsACleanReview.
 #[test]
 fn validate_security_result_accepts_a_clean_review() {
     validate_security_result(Some(&out("No vulnerabilities found.", vec![])), "").unwrap();
 }
 
-/// Go: TestFormatSecurityResultFallsBackOnUnusableOutput.
 #[test]
 fn format_security_result_falls_back_on_unusable_output() {
     let (got, result) = format_security_result(
@@ -79,7 +76,6 @@ fn format_security_result_falls_back_on_unusable_output() {
     assert!(!got.contains("No vulnerabilities found"), "{got}");
 }
 
-/// Go: TestFormatSecurityConsoleOrdersBySeverity.
 #[test]
 fn format_security_console_orders_by_severity() {
     let mut med = finding("b.go", "open redirect", "medium");
@@ -93,7 +89,6 @@ fn format_security_console_orders_by_severity() {
     assert!(got.contains("1 crit, 0 high, 1 med, 0 low"), "{got}");
 }
 
-/// Go: TestFormatSecurityConsoleCleanReview.
 #[test]
 fn format_security_console_clean_review() {
     let got = format_security_console(&out("nothing found", vec![]), K3_LABEL, "src/");
@@ -103,8 +98,7 @@ fn format_security_console_clean_review() {
     );
 }
 
-/// Go: review_promptEcho — output where the model reflected the prompt
-/// back instead of reviewing.
+/// Output where the model reflected the prompt back instead of reviewing.
 fn prompt_echo() -> String {
     let (_home, cfg) = temp_config();
     format!(
@@ -113,7 +107,6 @@ fn prompt_echo() -> String {
     )
 }
 
-/// Go: TestEchoedPromptIsNotACleanReview.
 #[test]
 fn echoed_prompt_is_not_a_clean_review() {
     let echoed = prompt_echo();
@@ -130,7 +123,6 @@ fn echoed_prompt_is_not_a_clean_review() {
     assert!(text.contains("UNUSABLE OUTPUT"), "{text}");
 }
 
-/// Go: TestGenuineCleanReviewIsStillAccepted.
 #[test]
 fn genuine_clean_review_is_still_accepted() {
     let parsed = out("No issues found.", vec![]);
@@ -148,9 +140,9 @@ fn genuine_clean_review_is_still_accepted() {
     assert!(text.contains("No vulnerabilities found."), "{text}");
 }
 
-/// Go: cmd TestSecurityParsesFinalAnswerNotToolOutput, parse half. A
-/// security payload printed by a tool must not pass for the review; prose
-/// in the final answer is unusable output.
+/// The parse half of the security command's final-answer test. A security
+/// payload printed by a tool must not pass for the review; prose in the final
+/// answer is unusable output.
 #[test]
 fn security_parses_final_answer_not_tool_output() {
     let raw = concat!(

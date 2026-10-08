@@ -1,0 +1,70 @@
+{
+  "name": "update-check-notice-source-compat",
+  "description": "Source-compatibility case for the background update check on the default dev build. Versions are compared as normalised strings, not semver: 'dev' stays 'dev' and the canned tag vzzz becomes 'zzz', which sorts after 'dev', so the notice prints on stderr with a blank line before and after. CI and RIVAL_NO_UPDATE_CHECK are unset. Step 1: no cache, so one GET is sent and {latest, checked_at} is written under ~/.rival/.update-check. Step 2: the cache is younger than 24h, so the notice prints again with no request. The command waits up to 2s for the check before exit.",
+  "env": {
+    "CI": null,
+    "RIVAL_NO_UPDATE_CHECK": null
+  },
+  "steps": [
+    {
+      "run": [
+        "version"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [
+          "",
+          "  Update available: vdev → vzzz — run 'rival update'",
+          ""
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "version"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [
+          "",
+          "  Update available: vdev → vzzz — run 'rival update'",
+          ""
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/.update-check"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/.update-check",
+        "json": {
+          "latest": "zzz",
+          "checked_at": "<TIME>"
+        }
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "vzzz"
+        }
+      }
+    }
+  }
+}

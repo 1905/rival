@@ -1,4 +1,4 @@
-//! Go: `internal/executor/kimi_test.go`, plus the exact request per mode and
+//! Kimi executor tests: the exact request per mode and
 //! an end-to-end check of the env each mode hands the child.
 
 use std::ffi::{OsStr, OsString};
@@ -14,7 +14,7 @@ fn k3() -> config::SecurityModel {
     config::open_code_entry_for(config::KIMI_MODEL).expect("K3 missing from the registry")
 }
 
-/// Go: TestDropMatchesPrefixAndExact. Entries ending in "_" are prefix
+/// Entries ending in "_" are prefix
 /// drops — "AWS_" must catch the whole credential family; exact entries
 /// must not over-match.
 #[test]
@@ -36,7 +36,7 @@ fn drop_matches_prefix_and_exact() {
     }
 }
 
-/// Go: TestMoonshotEnvPrefixesAreBlocked. Project-loaded Moonshot variables
+/// Project-loaded Moonshot variables
 /// never pass through raw to a child; the key reaches OpenCode only through
 /// OPENCODE_CONFIG_CONTENT.
 #[test]
@@ -53,9 +53,9 @@ fn moonshot_env_prefixes_are_blocked() {
     assert_eq!(kept, vec![OsString::from("PATH=/bin")]);
 }
 
-/// Go: TestKimiRunOptsByMode, plus the task modes: every mode other than
-/// "review" gets the full-auto profile and the credential strip (Go's
-/// `mode != "review"`).
+/// Run options by mode, plus the task modes: every mode other than
+/// "review" gets the full-auto profile and the credential strip
+/// (`mode != "review"`).
 #[test]
 fn kimi_run_opts_by_mode() {
     let mut env = Env::new();
@@ -73,7 +73,7 @@ fn kimi_run_opts_by_mode() {
     );
     assert_eq!(review.api_key, "test-key");
 
-    for mode in ["raw", "plan", "antislop", "security", ""] {
+    for mode in ["raw", "plan", "security", ""] {
         let opts = kimi_run_opts(&cfg, mode, &env.work_str());
         assert_eq!(opts.permission, OPENCODE_FULL_AUTO_PERMISSION, "{mode}");
         assert_eq!(opts.drop_env, strings(&KIMI_DROP_ENV), "{mode}");
@@ -81,7 +81,6 @@ fn kimi_run_opts_by_mode() {
     }
 }
 
-/// Go: TestMoonshotModelUsesKimiKey.
 #[test]
 fn moonshot_model_uses_kimi_key() {
     let mut env = Env::new();
@@ -98,7 +97,7 @@ fn moonshot_model_uses_kimi_key() {
     assert!(joined.contains(r#""moonshotai""#), "{joined}");
 }
 
-/// Go: TestMoonshotFallbackWalksUpFromWorkdir. The fake opencode exists
+/// The fake opencode exists
 /// for the preflight lookup only and fails loudly if it is ever run.
 #[cfg(unix)]
 #[test]
@@ -124,7 +123,6 @@ fn moonshot_fallback_walks_up_from_workdir() {
     kimi_preflight(&cfg, &sub).unwrap();
 }
 
-/// Go: TestKimiRawEnvUsesFullAutoPermission.
 #[test]
 fn kimi_raw_env_uses_full_auto_permission() {
     let mut env = Env::new();
@@ -244,7 +242,7 @@ fn kimi_child_env_per_mode() {
     env.fake("opencode", "#!/bin/sh\n/bin/cat >/dev/null\n/usr/bin/env\n");
     let cfg = env.config();
     let work = env.work_str();
-    for (mode, stripped) in [("review", false), ("raw", true), ("antislop", true)] {
+    for (mode, stripped) in [("review", false), ("raw", true), ("plan", true)] {
         let mut sess = env.session("opencode", mode, config::KIMI_MODEL, &work);
         let mut out = Vec::new();
         retry_busy(

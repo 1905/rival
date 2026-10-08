@@ -1,5 +1,4 @@
-//! `rival run <model>`: the terminal-facing workflow. Go:
-//! `cmd/model_run.go`.
+//! `rival run <model>`: the terminal-facing workflow.
 
 use std::io::Write;
 
@@ -15,13 +14,12 @@ use crate::model_command::{
 };
 use crate::model_specs::{ModelSpec, RunCall};
 use crate::root::{CmdEnv, CmdError};
-use crate::ste_fix;
 use crate::workdir::resolve_workdir;
 
 #[cfg(test)]
 mod tests;
 
-/// Go `runOptions`: the run surface's flag values.
+/// The run surface's flag values.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RunOptions {
     pub workdir: String,
@@ -33,7 +31,7 @@ pub struct RunOptions {
     pub prompt_stdin: bool,
 }
 
-/// Go `runModelRun`. It differs from the command surface on purpose: the
+/// It differs from the command surface on purpose: the
 /// prompt comes from flags rather than parsed stdin args, output mirrors to
 /// stdout as it arrives, only a successful review reads the log back (to
 /// print the formatted findings after the mirror), and a nonzero exit
@@ -193,20 +191,6 @@ pub fn run_model_run(
     };
     // A zero exit is not a review: quota errors and empty output also exit 0.
     let log_file = sess.log_file.clone();
-    let mut log = log;
-    if let Some(line) = ste_fix::refine(
-        &ste_fix::Rerun {
-            ctx: &ctx,
-            cfg,
-            spec,
-            workdir: &run_workdir,
-            cred_workdir: &workdir,
-        },
-        &mut sess,
-        &log,
-    ) {
-        log.push_str(&line);
-    }
     let out = match finish_review(cfg, spec, &mut sess, &log, &scope, &log_file) {
         Ok(out) => out,
         Err(reason) => {

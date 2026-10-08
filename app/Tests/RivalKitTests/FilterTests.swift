@@ -2,7 +2,7 @@ import XCTest
 @testable import RivalKit
 
 /// Parity with TestSectionFor, TestMatchesFilter, TestBuildRows and
-/// TestBuildRowsGroupsOutOfOrderItems in rival/internal/dashboard/session_list_test.go.
+/// TestBuildRowsGroupsOutOfOrderItems in the rival CLI's dashboard tests.
 final class FilterTests: XCTestCase {
     var calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
@@ -24,7 +24,7 @@ final class FilterTests: XCTestCase {
             (date(2026, 9, 25, 23, 59), .yesterday),
             (days(-3, from: now), .thisWeek),
             (days(-30, from: now), .older),
-            (Date.goZero, .older),
+            (Date.zeroTime, .older),
         ]
         for (t, want) in cases {
             XCTAssertEqual(section(for: t, now: now, calendar: calendar), want, "\(t)")

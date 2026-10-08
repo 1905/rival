@@ -1,9 +1,9 @@
 //! The live stdout mirror of `rival run`. The provider's stdout lines go
 //! through a bounded queue to a thread that owns the real stdout.
 //!
-//! Go wrote each line straight to `os.Stdout`. A reader that keeps the pipe
-//! open but stops reading then blocked that write forever, past a cancel or
-//! `RIVAL_RUN_TIMEOUT`, so the run never ended and kept its queue slot.
+//! A direct write of each line to stdout blocks forever when a reader keeps
+//! the pipe open but stops reading, past a cancel or `RIVAL_RUN_TIMEOUT`, so
+//! the run never ends and keeps its queue slot.
 //! Here a full queue waits on the run's context instead: once the context is
 //! done, the rest of the live copy is dropped (the session log keeps all of
 //! it) and the run ends as usual.

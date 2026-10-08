@@ -1,7 +1,7 @@
 import XCTest
 @testable import RivalKit
 
-/// Shared vectors with rival/internal/logfmt/logfmt_test.go.
+/// Shared vectors with the rival CLI's log formatter tests.
 final class LogTests: XCTestCase {
     // TestSanitize, verbatim (tabs survive this step).
     static let vectors: [(String, String, String)] = [

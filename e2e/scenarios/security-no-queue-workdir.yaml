@@ -1,0 +1,105 @@
+{
+  "name": "security-no-queue-workdir",
+  "description": "Same as security-k3-structured but run as `rival command security --no-queue --workdir sub`. `--workdir sub` resolves to <ROOT>/work/sub, and every argv, cwd, preamble and session work_dir follows it. With --no-queue the sessions are marked running without taking a queue slot, so no ~/.rival/queue/.lock is created.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "run",
+              "--pure",
+              "-m",
+              "moonshotai/kimi-k3",
+              "--variant",
+              "max",
+              "--dir",
+              "<ROOT>/work/sub"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "Answer the user's question directly\\. Do not offer follow-up options, menus, walkthroughs, or ask if they want more\\. No filler, no sign-offs\\. Just deliver the answer and stop\\.\n\nYou are working in project directory: <ROOT>/work/sub\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nReview scope: src/api/\n\n## Role: Security Reviewer\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work/sub",
+              "env": {
+                "OPENCODE_PERMISSION": "{\"read\":\"allow\",\"grep\":\"allow\",\"glob\":\"allow\",\"list\":\"allow\",\"external_directory\":\"deny\",\"edit\":\"deny\",\"bash\":\"deny\",\"task\":\"deny\",\"webfetch\":\"deny\",\"websearch\":\"deny\"}",
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"provider\":{\"moonshotai\":{\"options\":{\"apiKey\":\"sk-parity\"}}}}",
+                "OPENCODE_DB": {
+                  "$regex": "rival-[0-9a-f-]{36}\\.db"
+                }
+              }
+            },
+            "stdout": "{\"summary\":\"One injectable query.\",\"findings\":[{\"file\":\"src/api/users.go\",\"line\":42,\"severity\":\"high\",\"category\":\"injection\",\"title\":\"SQL built from request input\",\"body\":\"the handler concatenates the id parameter into the query\",\"failure_scenario\":\"id=1 OR 1=1 returns every user\",\"suggestion\":\"use a bound parameter\",\"confidence\":9}]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": "sk-parity"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security",
+        "--no-queue",
+        "--workdir",
+        "sub"
+      ],
+      "stdin": "src/api/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL SECURITY REVIEW ═══\n\nModel: kimi-k3\nScope: src/api/\n\nSummary: One injectable query.\n\n1. [high] SQL built from request input — src/api/users.go:42\n   the handler concatenates the id parameter into the query\n   Scenario: id=1 OR 1=1 returns every user\n   Fix: use a bound parameter\n   (injection, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting security reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "model": "kimi-k3"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "opencode",
+          "model": "moonshotai/kimi-k3",
+          "effort": "max",
+          "mode": "security",
+          "review_scope": "src/api/",
+          "work_dir": "<ROOT>/work/sub",
+          "output_bytes": 337,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "{\"summary\":\"One injectable query.\",\"findings\":[{\"file\":\"src/api/users.go\",\"line\":42,\"severity\":\"high\",\"category\":\"injection\",\"title\":\"SQL built from request input\",\"body\":\"the handler concatenates the id parameter into the query\",\"failure_scenario\":\"id=1 OR 1=1 returns every user\",\"suggestion\":\"use a bound parameter\",\"confidence\":9}]}\n"
+      }
+    ],
+    "calls": {
+      "opencode": 1
+    }
+  },
+  "fixtures": [
+    {
+      "mkdir": "work/sub"
+    }
+  ]
+}

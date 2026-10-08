@@ -1,0 +1,80 @@
+{
+  "name": "detach-wait-success",
+  "description": "`rival command claude --detach` re-runs itself with the same args plus RIVAL_DETACHED=1 (the fake sees it), in a new session, with stdin/stdout/stderr inherited. The parent prints 'rival: detached pid=N' on stderr and exits 0 before any session or queue work. The child reads the prompt from the inherited stdin, logs 'starting claude (command mode)' (effort medium, mode raw), runs the fake natively, completes the session, and writes 'A done' to the inherited stdout. owner_pid is the child, so it equals the printed pid. `rival wait --log` reads that pid and session ID from the log, sees the terminal session, prints '<id8> completed exit=0 <duration>' and exits 0.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv_prefix": ["-p"],
+            "times": 1,
+            "expect": {
+              "stdin": {"$regex": "(?s).*explain the auth flow.*"},
+              "env": {"RIVAL_DETACHED": "1"}
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "normalise": [
+    {"regex": "(?m)^([0-9a-f]{8}) (?:completed|failed) exit=", "kind": "uuid_prefix"},
+    {"regex": "(?m)^<UUID\\d+:8> \\S+ exit=-?\\d+ (\\S+)", "kind": "duration"}
+  ],
+  "steps": [
+    {
+      "run": ["command", "claude", "--detach"],
+      "stdin": "explain the auth flow",
+      "stdout_file": "out/claude.out",
+      "stderr_file": "out/claude.err",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": ["rival: detached pid=<PID1>"],
+        "log_events": [
+          {"level": "info", "message": "starting claude (command mode)",
+           "fields": {"session": "<UUID1>", "effort": "medium", "mode": "raw"}},
+          {"level": "info", "message": "model native auth mode",
+           "fields": {"session": "<UUID1>", "auth": "subscription", "model": "claude"}}
+        ]
+      }
+    },
+    {"wait_idle": true, "timeout": 30},
+    {
+      "run": ["wait", "--log", "<ROOT>/out/claude.err"],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "<UUID1:8> completed exit=0 <DURATION>\nauto-fix: off\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "mode": "native",
+          "effort": "medium",
+          "account": "subscription",
+          "work_dir": "<ROOT>/work",
+          "output_bytes": 7,
+          "output_lines": 1,
+          "owner_pid": "<PID1>"
+        }
+      },
+      {"path": "<HOME>/.rival/sessions/<UUID1>.log", "text": "A done\n"}
+    ],
+    "calls": {"claude": 1}
+  }
+}

@@ -13,9 +13,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # The full parity scenario run is on from P3 (every non-TUI command ported).
+  # The full e2e scenario run is on from P3 (every non-TUI command ported).
   # Set it to "false" to skip; the skip is then reported as a warning.
-  PARITY_SCENARIOS: "true"
+  E2E_SCENARIOS: "true"
 
 jobs:
   test:
@@ -25,7 +25,7 @@ jobs:
       matrix:
         # Windows runs the whole Rust workspace, including the native
         # process-tree and cross-process queue tests. The Unix fd check and
-        # the parity scenarios (fake CLIs are Python scripts with Unix
+        # the e2e scenarios (fake CLIs are Python scripts with Unix
         # shebangs) stay macOS/Linux only.
         os: [macos-15, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -88,19 +88,33 @@ jobs:
           git status --porcelain -- testdata/
           test -z "$(git status --porcelain -- testdata/)"
 
-      - name: Parity runner self-tests
-        if: runner.os != 'Windows'
-        run: python3 -m unittest discover -s parity -p 'test_*.py'
+      # rival is Rust-only. Allowed: release history, plans, captured
+      # review text in fixtures, and the retired skill names that install
+      # must keep deleting.
+      - name: No Go, STE or antislop names
+        if: runner.os == 'Linux'
+        run: |
+          ! git grep -n -I -E '\bGo\b|gostd|gojson|winpath|\bgo_[a-z]|[a-z]_go\b|_go_|\bGO_|\bste_|ste100|antislop' -- . \
+            ':!plans' ':!CHANGELOG.md' ':!.github/workflows/ci.yml' \
+            ':!testdata/logs/consilium_echoed_schema.log' \
+            ':!crates/rival-core/src/review/testdata/consilium_echoed_schema.log' \
+            ':!app/Tests/Fixtures' \
+            ':!crates/rival-core/src/skills.rs' ':!crates/rival-core/src/skills/tests.rs' \
+            ':!crates/rival-core/src/session/tests.rs'
 
-      - name: Parity scenarios
+      - name: E2E runner self-tests
+        if: runner.os != 'Windows'
+        run: python3 -m unittest discover -s e2e -p 'test_*.py'
+
+      - name: E2E scenarios
         if: runner.os != 'Windows'
         run: |
-          if [ "$PARITY_SCENARIOS" != "true" ]; then
-            echo "::warning::Parity scenarios skipped: PARITY_SCENARIOS=$PARITY_SCENARIOS (enabled from P3)."
+          if [ "$E2E_SCENARIOS" != "true" ]; then
+            echo "::warning::E2E scenarios skipped: E2E_SCENARIOS=$E2E_SCENARIOS (enabled from P3)."
             exit 0
           fi
           cargo build -p rival --locked
-          python3 parity/run.py --bin target/debug/rival
+          python3 e2e/run.py --bin target/debug/rival
 
       # The app decodes the Rust writer's golden files (testdata/written).
       - name: Swift session decoding

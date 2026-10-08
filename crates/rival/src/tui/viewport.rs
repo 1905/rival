@@ -1,5 +1,5 @@
-//! A vertical scroller over pre-wrapped lines. Go: the bubbles `viewport`
-//! the detail screen uses, with its pager keys.
+//! A vertical scroller over pre-wrapped lines for the detail screen, with
+//! pager keys.
 //!
 //! Content is wrapped to the width before it arrives, so there is no soft
 //! wrap and no horizontal scroll: every line already fits.
@@ -41,7 +41,7 @@ impl Viewport {
         self.lines.len()
     }
 
-    /// Go: `GetContent`. The plain text of every line.
+    /// The plain text of every line.
     #[cfg(test)]
     pub fn content_text(&self) -> String {
         self.lines
@@ -63,7 +63,7 @@ impl Viewport {
         self.y_offset >= self.max_y_offset()
     }
 
-    /// Go: `SetContentLines`. One empty line counts as no content. The offset
+    /// Replaces the lines. One empty line counts as no content. The offset
     /// is clamped, so a shrinking log never leaves the view past its end.
     pub fn set_content(&mut self, lines: Vec<Line<'static>>) {
         self.lines = lines;
@@ -75,7 +75,7 @@ impl Viewport {
         }
     }
 
-    /// Go: `SetYOffset`, clamped to the content.
+    /// Sets the scroll offset, clamped to the content.
     pub fn set_y_offset(&mut self, n: isize) {
         self.y_offset = (n.max(0) as usize).min(self.max_y_offset());
     }

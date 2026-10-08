@@ -1,0 +1,16 @@
+{
+  "name": "sessions-empty",
+  "description": "`rival sessions` with no session files prints 'No sessions found.' and the home directory stays empty.",
+  "steps": [
+    {
+      "run": ["sessions"],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "No sessions found.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {"home_files": []}
+}

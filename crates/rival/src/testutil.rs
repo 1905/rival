@@ -1,6 +1,6 @@
 //! Test fixtures for the command workflows: a temp HOME and config, fake
-//! stdin, a fake provider (Go `fakeRun`) and a fake MR resolver (Go
-//! `fakeMR`). Nothing reads or mutates the process environment.
+//! stdin, a fake provider and a fake MR resolver. Nothing reads or mutates
+//! the process environment.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -30,28 +30,36 @@ pub fn json_answer_log() -> String {
     )
 }
 
-/// Go's `syscall.Errno` text for the OS errors the fixtures provoke. Windows
-/// prints the English `FormatMessage` text.
+/// The `io::Error` text for the OS errors the fixtures provoke. Windows
+/// prints the English system message.
 pub const NO_SUCH_FILE: &str = if cfg!(windows) {
-    "The system cannot find the file specified."
+    "The system cannot find the file specified. (os error 2)"
 } else {
-    "no such file or directory"
+    "No such file or directory (os error 2)"
 };
 
 /// A missing parent directory: ENOENT on Unix, `ERROR_PATH_NOT_FOUND` on
 /// Windows.
 pub const NO_SUCH_PATH: &str = if cfg!(windows) {
-    "The system cannot find the path specified."
+    "The system cannot find the path specified. (os error 3)"
 } else {
-    "no such file or directory"
+    "No such file or directory (os error 2)"
 };
 
 /// A write to a closed standard handle: EBADF on Unix,
 /// `ERROR_INVALID_HANDLE` on Windows.
 pub const CLOSED_HANDLE: &str = if cfg!(windows) {
-    "The handle is invalid."
+    "The handle is invalid. (os error 6)"
 } else {
-    "bad file descriptor"
+    "Bad file descriptor (os error 9)"
+};
+
+/// The failed step and its text when a directory is read as a file. On Unix
+/// the open works and the read fails. On Windows the open fails.
+pub const DIR_AS_FILE: (&str, &str) = if cfg!(windows) {
+    ("open", "Access is denied. (os error 5)")
+} else {
+    ("read", "Is a directory (os error 21)")
 };
 
 /// The OS error behind [`CLOSED_HANDLE`].
@@ -101,7 +109,7 @@ impl Fixture {
         }
         let mut env: HashMap<String, String> = HashMap::new();
         env.insert("HOME".into(), home.path().to_str().unwrap().into());
-        // Go's os.UserHomeDir reads USERPROFILE on Windows: the same temp
+        // The home dir lookup reads USERPROFILE on Windows: the same temp
         // home, so no test sees the real profile. Tests that change the home
         // use paths::HOME_VAR.
         if cfg!(windows) {
@@ -123,17 +131,17 @@ impl Fixture {
         Fixture { home, cfg }
     }
 
-    /// Go `session.LoadAll()`.
+    /// Every saved session.
     pub fn sessions(&self) -> Vec<Session> {
         Session::load_all(self.cfg.paths())
     }
 }
 
-/// Go `withStdin`: stdin holds `data` (a regular file, so not a char device).
+/// Fake stdin: it holds `data` (a regular file, so not a char device).
 pub struct FakeStdin {
     pub data: Vec<u8>,
     pub char_device: bool,
-    /// Go `os.Stdin.Stat()` fails (closed fd 0).
+    /// The stat of stdin fails (closed fd 0).
     pub stat_failed: bool,
     pub read_error: Option<String>,
     /// Panics on read, to prove a workflow never reached it.
@@ -180,7 +188,7 @@ impl StdinSource for FakeStdin {
     }
 }
 
-/// Go `fakeRun`: records what the provider was handed and writes `log` as
+/// The fake provider: records what it was handed and writes `log` as
 /// its output.
 #[derive(Debug, Default)]
 pub struct FakeRun {
@@ -250,7 +258,7 @@ pub fn fake_spec(f: &SharedRun) -> ModelSpec {
     spec
 }
 
-/// Go `fakeMR`: the resolver returns a snapshot in a temp dir for MR
+/// The fake MR resolver: returns a snapshot in a temp dir for MR
 /// scopes and nothing otherwise; `calls` counts every call.
 pub struct FakeMr {
     pub _dir: tempfile::TempDir,
@@ -322,7 +330,7 @@ pub fn with_env(
     }
 }
 
-/// Go `runCommandWith`: `rival command codex --no-queue` with `input` on
+/// `rival command codex --no-queue` with `input` on
 /// stdin and the fake provider.
 pub fn run_command_with(
     fix: &Fixture,

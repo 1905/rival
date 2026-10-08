@@ -1,0 +1,69 @@
+case folding
+orchestrator
+scenario
+harness
+worktree
+workspace
+serde
+std
+chrono
+antislop
+rival-antislop
+spec
+text
+line
+format
+rename
+description
+archive
+escape
+license
+overflow
+deserializer
+getter
+export
+grep
+pathspec
+pin
+regenerate
+generator
+decode
+clippy
+fmt
+telemetry
+phase
+gate
+plan
+skill
+app
+doc
+docs
+byte
+pattern
+behavior
+dispatch
+effort
+lookup
+match
+grammar
+lexical
+round-trip
+expected value
+master
+field
+inherited bugs
+review language
+parse
+e2e
+message
+duration
+checkbox
+rival
+block
+unknown-command
+invalid-duration
+case-sensitive
+word check
+verb
+public
+pathspec exclusion

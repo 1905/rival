@@ -1,7 +1,6 @@
-//! Go: `internal/review/planrun_test.go` and `selection_test.go`, plus
-//! Rust-only pins for persisted sessions, concurrency, the queue ticket,
-//! cancellation and timeouts. Every test uses a temp home; fakes stand in
-//! for the provider CLIs.
+//! Plan runs and model selection, plus pins for persisted sessions,
+//! concurrency, the queue ticket, cancellation and timeouts. Every test uses
+//! a temp home; fakes stand in for the provider CLIs.
 
 use std::sync::{Condvar, Mutex};
 use std::time::Duration;
@@ -10,13 +9,12 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::config::{
-    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, DEFAULT_ANTISLOP_EFFORT, GPT56_SOL_MODEL, KIMI_MODEL,
-    SOL_LABEL,
+    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, GPT56_SOL_MODEL, KIMI_MODEL, SOL_LABEL,
 };
 use crate::review::parse_reviewer_log;
 use crate::review::plan::PlanOutput;
 use crate::review::testutil::config_in;
-use crate::session::{MODE_ANTISLOP, MODE_PLAN};
+use crate::session::{MODE_PLAN, MODE_SECURITY};
 
 /// A minimal valid plan payload `parse_plan_output` accepts.
 const REAL_PLAN_JSON: &str = r#"{"summary":"ok plan","rating":7,"findings":[]}"#;
@@ -28,8 +26,7 @@ const PEER_TIMEOUT: Duration = Duration::from_secs(10);
 const EMPTY_REASON: &str = "produced no output (empty result); likely an auth/session failure";
 const QUOTA_REASON: &str = "hit provider quota/rate limit (429)";
 
-/// Go `loadPlanTestConfig`: a temp home with an optional
-/// `~/.rival/config.yaml`.
+/// A temp home with an optional `~/.rival/config.yaml`.
 fn plan_test_config(contents: &str) -> (TempDir, Config) {
     plan_test_config_env(contents, &[])
 }
@@ -191,9 +188,8 @@ impl Rendezvous {
     }
 }
 
-/// Go: TestCodexPlanUsesCodexRuntimeAndStructuredOutput (with the P2a
-/// fixture repair: the fake drains stdin before it exits). Runs the real
-/// executor against a fake `codex`; `PATH` holds only the fake.
+/// The fake drains stdin before it exits. Runs the real executor against
+/// a fake `codex`; `PATH` holds only the fake.
 #[cfg(unix)]
 #[test]
 fn codex_plan_uses_codex_runtime_and_structured_output() {
@@ -310,7 +306,6 @@ fn skipped(cli: &str, model: &str, reason: &str) -> SkippedCLI {
     }
 }
 
-/// Go: TestAssemblePlanResults_AllFailed.
 #[test]
 fn assemble_plan_results_all_failed() {
     let batch = vec![
@@ -332,7 +327,6 @@ fn assemble_plan_results_all_failed() {
     );
 }
 
-/// Go: TestAssemblePlanResults_OneSkippedOneOK.
 #[test]
 fn assemble_plan_results_one_skipped_one_ok() {
     let batch = vec![run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON)];
@@ -357,7 +351,6 @@ fn assemble_plan_results_one_skipped_one_ok() {
     );
 }
 
-/// Go: TestAssemblePlanResults_NonzeroExitSkips.
 #[test]
 fn assemble_plan_results_nonzero_exit_skips() {
     let batch = vec![
@@ -376,7 +369,6 @@ fn assemble_plan_results_nonzero_exit_skips() {
     );
 }
 
-/// Go: TestAssemblePlanResults_QuotaSkips.
 #[test]
 fn assemble_plan_results_quota_skips() {
     let batch = vec![
@@ -392,7 +384,6 @@ fn assemble_plan_results_quota_skips() {
     );
 }
 
-/// Go: TestAssemblePlanResults_ParseFailKeepsRaw.
 #[test]
 fn assemble_plan_results_parse_fail_keeps_raw() {
     // Exit 0, no quota, but no parseable plan payload → keep raw, no parse.
@@ -412,7 +403,6 @@ fn assemble_plan_results_parse_fail_keeps_raw() {
     );
 }
 
-/// Go: TestAssemblePlanResults_EmptyOutputSkips.
 #[test]
 fn assemble_plan_results_empty_output_skips() {
     // An exit-0 run that wrote nothing must be skipped, not treated as a
@@ -430,14 +420,12 @@ fn assemble_plan_results_empty_output_skips() {
     );
 }
 
-/// Go: TestPlanEngineLabel.
 #[test]
 fn plan_engine_label() {
     assert_eq!(config::engine_label("codex", GPT56_SOL_MODEL), SOL_LABEL);
     assert_eq!(config::engine_label("claude", CLAUDE_MODEL), CLAUDE_LABEL);
 }
 
-/// Go: TestPlanFailureReasonUsesModelName.
 #[test]
 fn plan_failure_reason_uses_model_name() {
     let got = plan_failure_reason(
@@ -462,7 +450,6 @@ fn plan_failure_reason_uses_model_name() {
     );
 }
 
-/// Go: TestFormatPlanResult_SingleParsed.
 #[test]
 fn format_plan_result_single_parsed() {
     let res = PlanRunResult {
@@ -486,7 +473,6 @@ fn format_plan_result_single_parsed() {
     );
 }
 
-/// Go: TestFormatPlanResult_SingleParseFailReturnsRaw.
 #[test]
 fn format_plan_result_single_parse_fail_returns_raw() {
     let res = PlanRunResult {
@@ -504,7 +490,6 @@ fn format_plan_result_single_parse_fail_returns_raw() {
     );
 }
 
-/// Go: TestFormatPlanResult_MultiBlocksAndSkipped.
 #[test]
 fn format_plan_result_multi_blocks_and_skipped() {
     let res = PlanRunResult {
@@ -550,7 +535,6 @@ fn format_plan_result_multi_blocks_and_skipped() {
     assert!(!out.to_lowercase().contains("codex"), "{out}");
 }
 
-/// Go: TestAssemblePlanResults_ErrUsesReason.
 #[test]
 fn assemble_plan_results_err_uses_reason() {
     // A timeout-style failure carries a reason that must surface in skipped,
@@ -571,7 +555,6 @@ fn assemble_plan_results_err_uses_reason() {
     assert_eq!(res.skipped, vec![skipped("claude", CLAUDE_MODEL, &reason)]);
 }
 
-/// Go: TestRunPlanCLI_RestoresPlanMode.
 #[test]
 fn run_plan_cli_restores_plan_mode() {
     let (_home, cfg) = plan_test_config("");
@@ -616,7 +599,6 @@ fn run_plan_cli_restores_plan_mode() {
     assert_eq!(saved.output_bytes, REAL_PLAN_JSON.len() as i64);
 }
 
-/// Go: TestRunPlanReviewResolvesPerModelEfforts.
 #[test]
 fn run_plan_review_resolves_per_model_efforts() {
     struct Case {
@@ -708,7 +690,6 @@ fn run_plan_review_resolves_per_model_efforts() {
     }
 }
 
-/// Go: TestRunPlanReviewPreservesRequestedOrderWhenClaudeFinishesFirst.
 /// Codex cannot finish until Claude has, so this also proves the two run at
 /// once.
 #[test]
@@ -754,9 +735,8 @@ fn reviewers_run_simultaneously() {
     assert_eq!(got, [("claude", 9), ("codex", 4)]);
 }
 
-/// Go: TestRunDocReviewAppliesFallbackEffortAndTarget. Antislop passes its
-/// own prompt and a high fallback effort; the target lands as the session's
-/// review scope.
+/// A doc review passes its own prompt and a fallback effort; the target lands
+/// as the session's review scope.
 #[test]
 fn run_doc_review_applies_fallback_effort_and_target() {
     let (_home, cfg) = plan_test_config("");
@@ -770,10 +750,10 @@ fn run_doc_review_applies_fallback_effort_and_target() {
         ok_plan()
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
-        prompt: "ANTISLOP PROMPT",
+        mode: MODE_PLAN,
+        prompt: "DOC PROMPT",
         target: "src/api/",
-        fallback_effort: DEFAULT_ANTISLOP_EFFORT,
+        fallback_effort: "high",
     };
     run_doc(&cfg, &ex, &doc, "", &clis(&["claude"])).unwrap();
     assert_eq!(
@@ -781,18 +761,17 @@ fn run_doc_review_applies_fallback_effort_and_target() {
         [(
             "medium".to_string(),
             "src/api/".to_string(),
-            "ANTISLOP PROMPT".to_string()
+            "DOC PROMPT".to_string()
         )]
     );
     let sess = persisted(&cfg, "claude");
     assert_eq!(sess.review_scope, "src/api/");
-    assert_eq!(sess.prompt, "ANTISLOP PROMPT");
-    assert_eq!(sess.mode, MODE_ANTISLOP);
+    assert_eq!(sess.prompt, "DOC PROMPT");
+    assert_eq!(sess.mode, MODE_PLAN);
     assert_eq!(sess.status, "completed");
 }
 
-/// Go: TestRunDocReviewRecordsTheRequestedMode. Antislop runs carry their
-/// own session mode.
+/// Doc runs carry the mode the caller passes.
 #[test]
 fn run_doc_review_records_the_requested_mode() {
     let (_home, cfg) = plan_test_config("");
@@ -802,17 +781,16 @@ fn run_doc_review_records_the_requested_mode() {
         ok_plan()
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
+        mode: MODE_SECURITY,
         prompt: "PROMPT",
         target: "src/",
         fallback_effort: "xhigh",
     };
     run_doc(&cfg, &ex, &doc, "", &clis(&["claude"])).unwrap();
-    assert_eq!(observed.lock().unwrap().clone(), [MODE_ANTISLOP]);
-    assert_eq!(persisted(&cfg, "claude").mode, MODE_ANTISLOP);
+    assert_eq!(observed.lock().unwrap().clone(), [MODE_SECURITY]);
+    assert_eq!(persisted(&cfg, "claude").mode, MODE_SECURITY);
 }
 
-/// Go: TestRunPlanReviewStillRecordsPlanMode.
 #[test]
 fn run_plan_review_still_records_plan_mode() {
     let (_home, cfg) = plan_test_config("");
@@ -826,37 +804,7 @@ fn run_plan_review_still_records_plan_mode() {
     assert_eq!(persisted(&cfg, "claude").mode, MODE_PLAN);
 }
 
-/// Go: TestAntislopCodexEffortReachesRuntime.
-#[test]
-fn antislop_codex_effort_reaches_runtime() {
-    for (name, config_yaml, override_effort, want) in [
-        ("default", "", "", "high"),
-        ("configured", "efforts:\n  codex: medium\n", "", "medium"),
-        ("explicit", "efforts:\n  codex: medium\n", "xhigh", "xhigh"),
-    ] {
-        let (_home, cfg) = plan_test_config(config_yaml);
-        let observed = Mutex::new(Vec::<String>::new());
-        let ex = fake(|_, sess, _, _, effort, _| {
-            if sess.effort != effort {
-                bail!("session/runtime effort mismatch");
-            }
-            observed.lock().unwrap().push(effort.into());
-            ok_plan()
-        });
-        let doc = DocReview {
-            mode: MODE_ANTISLOP,
-            prompt: "review",
-            target: "src/",
-            fallback_effort: DEFAULT_ANTISLOP_EFFORT,
-        };
-        run_doc(&cfg, &ex, &doc, override_effort, &clis(&["codex"]))
-            .unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        assert_eq!(observed.lock().unwrap().clone(), [want], "{name}");
-    }
-}
-
-/// Go: TestRunFailureReasonIgnoresQuotaTextInARealReview. Quota wording
-/// inside a real review must not fail the run.
+/// Quota wording inside a real review must not fail the run.
 #[test]
 fn run_failure_reason_ignores_quota_text_in_a_real_review() {
     let reason = |raw: &str| run_failure_reason("codex", raw, parse_reviewer_log(raw).is_ok());
@@ -881,9 +829,8 @@ fn run_failure_reason_ignores_quota_text_in_a_real_review() {
     assert_eq!(run_failure_reason("", "", false), EMPTY_REASON);
 }
 
-/// Go `codexToolPlanTranscript`: a codex log where an `exec` tool printed a
-/// valid plan assessment and the final answer, after the last "codex"
-/// header, is `final_answer`.
+/// A codex log where an `exec` tool printed a valid plan assessment and the
+/// final answer, after the last "codex" header, is `final_answer`.
 fn codex_tool_plan_transcript(final_answer: &str) -> String {
     format!(
         "user\nreview the plan\nexec\ncat old-review.json\n{}\ncodex\n{final_answer}\n",
@@ -891,8 +838,7 @@ fn codex_tool_plan_transcript(final_answer: &str) -> String {
     )
 }
 
-/// Go: TestAssemblePlanResults_ParsesFinalAnswerNotToolOutput. A plan
-/// assessment printed by a tool is never the model's review.
+/// A plan assessment printed by a tool is never the model's review.
 #[test]
 fn assemble_plan_results_parses_final_answer_not_tool_output() {
     let raw = codex_tool_plan_transcript("The plan looks broadly fine, a few nits.");
@@ -911,8 +857,7 @@ fn assemble_plan_results_parses_final_answer_not_tool_output() {
     );
 }
 
-/// Go: TestRunDocReview_QuotaFinalAnswerFailsDespiteToolPlanJSON. The
-/// per-run session status also judges the final answer.
+/// The per-run session status also judges the final answer.
 #[test]
 fn run_doc_review_quota_final_answer_fails_despite_tool_plan_json() {
     let (_home, cfg) = plan_test_config("");
@@ -923,10 +868,10 @@ fn run_doc_review_quota_final_answer_fails_despite_tool_plan_json() {
         ))
     });
     let doc = DocReview {
-        mode: MODE_ANTISLOP,
+        mode: MODE_SECURITY,
         prompt: "PROMPT",
         target: "src/",
-        fallback_effort: DEFAULT_ANTISLOP_EFFORT,
+        fallback_effort: "high",
     };
     let err = run_doc(&cfg, &ex, &doc, "", &clis(&["codex"])).unwrap_err();
     assert_eq!(
@@ -939,7 +884,6 @@ fn run_doc_review_quota_final_answer_fails_despite_tool_plan_json() {
     assert_eq!(sess.error_msg, "codex hit provider quota/rate limit (429)");
 }
 
-/// Go: `selection_test.go` TestOpencodeVariant_PerCuratedModel.
 #[test]
 fn opencode_variant_per_curated_model() {
     for (model, effort, want) in [
@@ -1356,8 +1300,8 @@ fn plan_prompt_names_the_file() {
     assert!(!prompt.contains("{FILE}"));
 }
 
-/// Controller feedback 1: Go's deferred finalizer also runs on a panic. A
-/// panicking executor leaves the session failed with "interrupted".
+/// The session finalizer also runs on a panic. A panicking executor leaves
+/// the session failed with "interrupted".
 #[test]
 fn run_plan_cli_fails_the_session_on_unwind() {
     let (_home, cfg) = plan_test_config("");

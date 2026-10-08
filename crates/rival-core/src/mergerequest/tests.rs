@@ -1,6 +1,6 @@
-//! Go: `internal/mergerequest/mergerequest_test.go`, plus source-derived
-//! cases. Only task-owned local repositories, a git wrapper that rewrites
-//! the fetch URL to a local path, and a fake `glab` run. No network, no
+//! Merge request preparation tests. Only task-owned local repositories, a
+//! git wrapper that rewrites the fetch URL to a local path, and a fake
+//! `glab` run. No network, no
 //! credentials, no host Git config (`GIT_CONFIG_GLOBAL=/dev/null`). Every
 //! test-side git (fixture and wrapper) runs with `protocol.allow=never` and
 //! `protocol.file.allow=always`: a missed rewrite fails here instead of
@@ -47,7 +47,7 @@ fn real_git() -> PathBuf {
     process::look_path("git", std::env::var_os("PATH").as_deref()).expect("git on PATH")
 }
 
-/// Go's `fixture`: a remote with a base and an MR head commit, a caller
+/// A remote with a base and an MR head commit, a caller
 /// clone on an unrelated dirty branch whose origin is the HTTPS target, a
 /// git wrapper, a fake glab, and an empty snapshot dir as `$TMPDIR`.
 struct Fixture {
@@ -60,7 +60,7 @@ struct Fixture {
     snapshots: PathBuf,
     git_path: PathBuf,
     mr: Metadata,
-    /// The child env in order; later entries win in Go's `dedupEnv`.
+    /// The child env in order; later entries win.
     env: Vec<(String, String)>,
 }
 
@@ -241,7 +241,7 @@ impl Fixture {
         out.stdout
     }
 
-    /// Go `json.Marshal(f.mr)`.
+    /// Writes the MR metadata as JSON.
     fn save(&self) {
         let raw = serde_json::json!({
             "iid": self.mr.iid,
@@ -277,8 +277,6 @@ fn assert_err(result: Result<Option<Snapshot>, String>) -> String {
     }
 }
 
-// ---- Go TestParseTarget ----
-
 #[test]
 fn parse_target() {
     for suffix in ["", "/", "/diffs", "/commits", "?foo=bar#note_123"] {
@@ -310,9 +308,9 @@ fn parse_target() {
 /// A parsed target as `(url, host, project, iid)`, or the error text.
 type Want = Result<(&'static str, &'static [u8], &'static [u8], i64), &'static str>;
 
-/// Go `net/url` rules that a WHATWG parser would get wrong.
+/// URL decoding rules that a WHATWG parser would get wrong.
 #[test]
-fn parse_target_follows_go_url_decoding() {
+fn parse_target_keeps_strict_url_decoding() {
     let shape = "use one HTTPS GitLab merge request URL as the entire review scope";
     let invalid = "invalid GitLab merge request URL";
     let project = "invalid GitLab project path";
@@ -327,7 +325,7 @@ fn parse_target_follows_go_url_decoding() {
                 7,
             )),
         ),
-        // A bare trailing "?" is Go's ForceQuery, which parseTarget keeps.
+        // A bare trailing "?" is kept.
         (
             "https://h/g/app/-/merge_requests/7?",
             Ok(("https://h/g/app/-/merge_requests/7?", b"h", b"g/app", 7)),
@@ -451,8 +449,6 @@ fn contains_reads_the_raw_scope() {
     assert!(!contains("src/api/"));
 }
 
-// ---- Go TestRemoteIdentity ----
-
 #[test]
 fn remote_identity() {
     for raw in [
@@ -520,8 +516,6 @@ fn remote_identity_source_rules() {
     }
 }
 
-// ---- Go TestPrepareKeepsOrdinaryScopesLocal ----
-
 #[test]
 fn prepare_keeps_ordinary_scopes_local() {
     let tmp = tempfile::tempdir().unwrap();
@@ -530,8 +524,6 @@ fn prepare_keeps_ordinary_scopes_local() {
     let got = prepare(&Context::background(), &cfg, "src/api/", "/does-not-exist");
     assert!(matches!(got, Ok(None)), "local scope = {got:?}");
 }
-
-// ---- Go TestPreparePinsMRWithoutChangingDirtyCheckout ----
 
 #[test]
 fn prepare_pins_mr_without_changing_dirty_checkout() {
@@ -592,7 +584,7 @@ fn prepare_pins_mr_without_changing_dirty_checkout() {
         "api\n--hostname\ngitlab.example.com\nprojects/group%2Fsub%2Fapp/merge_requests/42\n",
         "API request did not use URL host/project"
     );
-    // The snapshot lives under $TMPDIR with Go's MkdirTemp name.
+    // The snapshot lives under $TMPDIR as `rival-mr-<digits>`.
     let name = snap.file_name().unwrap().to_str().unwrap();
     let digits = name.strip_prefix("rival-mr-").unwrap();
     assert!(
@@ -608,7 +600,7 @@ fn prepare_pins_mr_without_changing_dirty_checkout() {
 
     snapshot.close().unwrap();
     assert!(!snap.exists(), "snapshot was not removed");
-    // Go's RemoveAll of a missing path is not an error.
+    // Closing an already removed snapshot is not an error.
     snapshot.close().unwrap();
 }
 
@@ -732,8 +724,6 @@ fn prepare_runs_isolated_git_steps() {
     }
 }
 
-// ---- Go TestPrepareIgnoresInheritedGitRepository ----
-
 #[test]
 fn prepare_ignores_inherited_git_repository() {
     for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
@@ -769,8 +759,6 @@ fn prepare_ignores_inherited_git_repository() {
     }
 }
 
-// ---- Go TestPrepareRefusesOversizedDiff ----
-
 #[test]
 fn prepare_refuses_oversized_diff() {
     let mut f = Fixture::new();
@@ -798,8 +786,6 @@ fn diff_limit_is_512_kib_inclusive() {
     assert!(diff_too_large(512 * 1024 + 1));
     assert!(!diff_too_large(0));
 }
-
-// ---- Go TestPrepareFailsClosed ----
 
 #[test]
 fn prepare_fails_closed() {
@@ -869,12 +855,12 @@ fn prepare_fails_closed() {
             let err = assert_err(got);
             let want: &str = match name {
                 "api" => {
-                    "resolve MR via glab: exit status 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+                    "resolve MR via glab: exit status: 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
                 }
                 "json" => "decode GitLab MR: ",
                 "wrong-mr" | "wrong-project" => no_mr,
                 "missing-base" | "stale-head" => stale,
-                "missing-object" => "prepare MR checkout: git fetch: exit status ",
+                "missing-object" => "prepare MR checkout: git fetch: exit status: ",
                 "wrong-remote" => {
                     "no Git remote matches MR project gitlab.example.com/group/sub/app; use --workdir for that repository (or add its target remote for a fork MR)"
                 }
@@ -898,7 +884,7 @@ fn prepare_fails_closed() {
 
 // ---- process launch ----
 
-/// Go reports `exec format error` for a shebang-less glab; it never falls
+/// A shebang-less glab is an `Exec format error`; it never falls
 /// back to `/bin/sh`.
 #[test]
 fn glab_without_shebang_is_exec_format_error() {
@@ -912,7 +898,7 @@ fn glab_without_shebang_is_exec_format_error() {
     assert_eq!(
         err,
         format!(
-            "resolve MR via glab: fork/exec {}: exec format error; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)",
+            "resolve MR via glab: start {}: Exec format error (os error 8); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)",
             glab.display()
         )
     );
@@ -932,7 +918,7 @@ fn git_without_shebang_is_exec_format_error() {
     assert_eq!(
         err,
         format!(
-            "MR review requires a local repository with a remote for the target project: git remote: fork/exec {}: exec format error",
+            "MR review requires a local repository with a remote for the target project: git remote: start {}: Exec format error (os error 8)",
             git.display()
         )
     );
@@ -940,14 +926,14 @@ fn git_without_shebang_is_exec_format_error() {
 }
 
 #[test]
-fn missing_tools_and_workdir_report_go_errors() {
+fn missing_tools_and_workdir_report_errors() {
     let mut f = Fixture::new();
     let missing = f.root.join("missing");
     let err = assert_err(f.prepare_in(&Context::background(), TEST_URL, &missing));
     assert_eq!(
         err,
         format!(
-            "MR review requires a local repository with a remote for the target project: git remote: chdir {}: no such file or directory",
+            "MR review requires a local repository with a remote for the target project: git remote: chdir {}: No such file or directory (os error 2)",
             missing.display()
         )
     );
@@ -967,7 +953,7 @@ fn missing_tools_and_workdir_report_go_errors() {
     );
 }
 
-/// Cancelling a running glab kills it (Go's `Process.Kill`), reaps it, and
+/// Cancelling a running glab kills it, reaps it, and
 /// reports the exit status, not the context error.
 #[test]
 fn cancel_kills_running_glab() {
@@ -998,14 +984,14 @@ fn cancel_kills_running_glab() {
     );
     assert_eq!(
         err,
-        "resolve MR via glab: signal: killed; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+        "resolve MR via glab: signal: 9 (SIGKILL); check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
     );
     assert!(f.snapshot_entries().is_empty());
 }
 
 /// Cancelling during the fetch, once the isolated checkout exists, kills
-/// git and removes the checkout on the error path (Snapshot's Drop, Go's
-/// deferred Close). The caller's repository is untouched.
+/// git and removes the checkout on the error path (Snapshot's Drop). The
+/// caller's repository is untouched.
 #[test]
 fn cancel_during_fetch_removes_the_checkout() {
     let mut f = Fixture::new();
@@ -1042,7 +1028,7 @@ fn cancel_during_fetch_removes_the_checkout() {
         "cancel did not stop git fetch"
     );
     assert_eq!(during.len(), 1, "no checkout during the fetch: {during:?}");
-    assert_eq!(err, "prepare MR checkout: git fetch: signal: killed");
+    assert_eq!(err, "prepare MR checkout: git fetch: signal: 9 (SIGKILL)");
     assert!(
         f.snapshot_entries().is_empty(),
         "leaked checkout after a cancelled fetch: {:?}",
@@ -1111,7 +1097,7 @@ fn git_env_clears_repository_overrides_and_adds_no_pwd() {
 }
 
 #[test]
-fn trim_space_and_fields_follow_go_unicode_space() {
+fn trim_space_and_fields_follow_unicode_space() {
     assert_eq!(trim_space(" \t\u{a0}x y\u{2028}\n".as_bytes()), b"x y");
     assert_eq!(trim_space(b"\xff \n"), b"\xff");
     assert_eq!(trim_space(b" \x85"), b"\x85"); // a lone continuation byte is not NEL
@@ -1124,11 +1110,11 @@ fn trim_space_and_fields_follow_go_unicode_space() {
 }
 
 #[test]
-fn decode_metadata_follows_go_json() {
+fn decode_metadata_reads_exact_keys_and_null_as_empty() {
     let mr = decode_metadata(
-        br#"{"IID":42,"Web_URL":"u","SHA":"s","Source_Branch":"f","target_branch":"m",
-            "DIFF_REFS":{"BASE_SHA":"b","Head_Sha":"h","x":1},"unknown":[1],
-            "sha":null,"iid":null}"#,
+        br#"{"iid":42,"web_url":"u","SHA":"s","source_branch":"f","target_branch":"m",
+            "diff_refs":{"base_sha":"b","head_sha":"h","x":1},"unknown":[1],
+            "sha":null}"#,
     )
     .unwrap();
     assert_eq!(
@@ -1136,46 +1122,49 @@ fn decode_metadata_follows_go_json() {
         Metadata {
             iid: 42,
             web_url: "u".into(),
-            sha: "s".into(),
+            sha: String::new(),
             source_branch: "f".into(),
             target_branch: "m".into(),
             base: "b".into(),
             head: "h".into(),
         }
     );
-    assert_eq!(decode_metadata(b"null").unwrap(), Metadata::default());
     assert_eq!(
-        decode_metadata(br#"{"sha":"a","sha":"b"}"#).unwrap().sha,
-        "b"
+        decode_metadata(br#"{"diff_refs":null}"#).unwrap(),
+        Metadata::default()
     );
     for (input, want) in [
         (
-            &br#"[]"#[..],
-            "json: cannot unmarshal array into Go value of type mergerequest.metadata",
+            &b"null"[..],
+            "invalid type: null, expected a JSON object at line 1 column 4",
+        ),
+        (
+            br#"[]"#,
+            "invalid type: sequence, expected a JSON object at line 1 column 0",
         ),
         (
             br#"{"iid":"42"}"#,
-            "json: cannot unmarshal string into Go struct field metadata.iid of type int",
+            "invalid type: string \"42\", expected i64 at line 1 column 11",
         ),
         (
             br#"{"iid":4.2}"#,
-            "json: cannot unmarshal number 4.2 into Go struct field metadata.iid of type int",
+            "invalid type: floating point `4.2`, expected i64 at line 1 column 10",
         ),
         (
             br#"{"web_url":1}"#,
-            "json: cannot unmarshal number into Go struct field metadata.web_url of type string",
+            "invalid type: integer `1`, expected a string at line 1 column 12",
         ),
         (
             br#"{"diff_refs":"x"}"#,
-            r#"json: cannot unmarshal string into Go struct field metadata.diff_refs of type struct { Base string "json:\"base_sha\""; Head string "json:\"head_sha\"" }"#,
+            "invalid type: string \"x\", expected a JSON object at line 1 column 16",
         ),
         (
             br#"{"diff_refs":{"base_sha":1}}"#,
-            "json: cannot unmarshal number into Go struct field .diff_refs.base_sha of type string",
+            "invalid type: integer `1`, expected a string at line 1 column 26",
         ),
         (
-            br#"{"iid":true,"sha":1}"#,
-            "json: cannot unmarshal bool into Go struct field metadata.iid of type int",
+            br#"{"sha":"a","sha":"b"}"#,
+            "duplicate field `sha` at line 1 column 16",
         ),
     ] {
         assert_eq!(
@@ -1195,7 +1184,7 @@ fn commit_sha_is_forty_lowercase_hex() {
     assert!(!is_commit_sha(&format!("{}\n", "a".repeat(40))));
 }
 
-/// Go's `os.RemoveAll`: a file or symlink at the snapshot path is unlinked,
+/// A file or symlink at the snapshot path is unlinked,
 /// never followed; outside targets survive.
 #[test]
 fn close_removes_files_and_symlinks_without_following_them() {

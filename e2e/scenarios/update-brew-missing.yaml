@@ -1,0 +1,50 @@
+{
+  "name": "update-brew-missing",
+  "description": "`rival update` with no brew on PATH (fakes.absent): `brew upgrade` fails, it prints 'brew upgrade failed, trying reinstall...', and the reinstall fails the same way. Output: 'brew reinstall: exec: \"brew\": executable file not found in $PATH', exit code 1.",
+  "fakes": {
+    "absent": [
+      "brew"
+    ]
+  },
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n",
+        "stderr_lines": [
+          "brew reinstall: exec: \"brew\": executable file not found in $PATH"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "v9.9.9"
+        }
+      }
+    }
+  }
+}

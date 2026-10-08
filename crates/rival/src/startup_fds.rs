@@ -1,8 +1,9 @@
 //! Records which standard descriptors were closed when the process started.
 //!
 //! Rust's Unix runtime reopens a closed fd 0, 1 or 2 on `/dev/null` before
-//! `main`. Go does not, so a Go `rival --detach` with a closed stderr fails
-//! to start its child (`fork/exec ...: bad file descriptor`) and exits 1.
+//! `main`. Rival must still see the closed fd: a `rival --detach` with a
+//! closed stderr fails to start its child
+//! (`start ...: Bad file descriptor (os error 9)`) and exits 1.
 //! A loader constructor runs before that sanitizing step and records the
 //! original state here. It calls only `fcntl` and stores atomics: no
 //! allocation, std I/O, environment or runtime services.

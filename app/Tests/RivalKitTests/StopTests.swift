@@ -102,7 +102,7 @@ final class StopTests: XCTestCase {
     }
 
     // Codex finding 4: the app finalizes a dead member only when its owning
-    // rival process is gone too (reaper.go). A live owner finishes its own run.
+    // rival process is gone too (the CLI's reaper rule). A live owner finishes its own run.
     func testDeadToMarkFollowsTheOwnerRule() {
         let item = run(
             Session(id: "legacy", status: "running", pid: 100, pidStart: 5),
@@ -175,7 +175,7 @@ final class StopTests: XCTestCase {
         let startDate = Date(timeIntervalSince1970: Double(start) / 1e9)
         XCTAssertLessThanOrEqual(startDate, Date())
         XCTAssertGreaterThan(startDate, Date().addingTimeInterval(-24 * 3600))
-        XCTAssertEqual(start % 1000, 0, "microsecond source, scaled to ns like Go")
+        XCTAssertEqual(start % 1000, 0, "microsecond source, scaled to ns like the CLI")
         XCTAssertEqual(inspector.startTime(pid: getpid()), start, "stable across reads")
         XCTAssertNil(inspector.startTime(pid: 1 << 24))
         XCTAssertNil(inspector.startTime(pid: 0))

@@ -1,5 +1,4 @@
-//! Queue slots for a review batch, and skipped-reviewer records. Go:
-//! `internal/review/slots.go`.
+//! Queue slots for a review batch, and skipped-reviewer records.
 
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -8,7 +7,7 @@ use anyhow::anyhow;
 
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd;
+use crate::duration;
 use crate::logging;
 use crate::paths::Paths;
 use crate::queue::Manager;
@@ -58,8 +57,7 @@ pub struct GroupSlot<'a> {
 }
 
 /// Holds a queue slot. Dropping it, or calling [`SlotRelease::release`],
-/// frees the slot, so every return path of the caller releases it. Go: the
-/// `release` func, called via `defer`.
+/// frees the slot, so every return path of the caller releases it.
 #[must_use = "dropping the guard frees the queue slot at once"]
 #[derive(Debug)]
 pub struct SlotRelease {
@@ -89,8 +87,8 @@ impl Drop for SlotRelease {
 /// Enqueues one ticket covering `sessions` and blocks until a slot is free,
 /// then marks them running.
 ///
-/// Go takes the ticket sessions and the run sessions as two slices; every
-/// caller passes the same one, so this takes one.
+/// Every caller passes the same sessions as ticket sessions and as run
+/// sessions, so this takes one slice.
 ///
 /// Progress goes to `stderr` (the process stderr in production) with the
 /// "rival queue:" prefix, because stdout carries the final output that
@@ -148,7 +146,7 @@ fn wait_with_manager(
         let msg = if wait_err.is_queue_timeout() {
             format!(
                 "queue timeout after {} — queue may be wedged; inspect with 'rival queue', purge with 'rival queue clear'",
-                gostd::format_duration(nanos(m.timeout))
+                duration::format(nanos(m.timeout))
             )
         } else {
             "cancelled while queued".to_string()

@@ -1,4 +1,4 @@
-//! Native Windows checks of the overlapped pipe IO, the owner Job and Go's
+//! Native Windows checks of the overlapped pipe IO, the owner Job and the
 //! Windows `LookPath`. Every wait is bounded; a hang fails the test.
 
 use std::io::{Read, Write};
@@ -178,7 +178,7 @@ fn look(file: &str, path_env: &str) -> Result<PathBuf, LookPathError> {
 }
 
 #[test]
-fn look_path_follows_go_windows_rules() {
+fn look_path_follows_windows_rules() {
     let tmp = tempfile::tempdir().unwrap();
     // A directory with a space and a quoted `;` in %PATH%.
     let bin = tmp.path().join("npm bin;x");
@@ -217,10 +217,7 @@ fn look_path_follows_go_windows_rules() {
     let missing_s = missing.to_str().unwrap();
     assert_eq!(
         look(missing_s, "").unwrap_err().to_string(),
-        format!(
-            "exec: {}: file does not exist",
-            crate::gostd::quote(missing_s)
-        )
+        format!("exec: {:?}: file does not exist", missing_s)
     );
     let no_ext = bin.join("nope");
     assert_eq!(
@@ -228,7 +225,7 @@ fn look_path_follows_go_windows_rules() {
         windows::ERR_NOT_FOUND
     );
 
-    // The process-level entry point validates like Go.
+    // The process-level entry point validates the same way.
     assert_eq!(
         super::look_path("", None).unwrap_err().err,
         windows::ERR_NOT_FOUND
@@ -254,7 +251,7 @@ fn look_path_follows_go_windows_rules() {
 }
 
 #[test]
-fn path_ext_matches_go() {
+fn path_ext_defaults_and_parsing() {
     let ext = |v: &str| windows::path_ext(Some(std::ffi::OsStr::new(v)));
     assert_eq!(windows::path_ext(None), [".com", ".exe", ".bat", ".cmd"]);
     assert_eq!(ext(""), [".com", ".exe", ".bat", ".cmd"]);
@@ -285,7 +282,8 @@ fn provider_flags_hide_a_new_console_only_without_one() {
     );
 }
 
-/// Go `StartProcess` with a `Dir`, through the real `GetFullPathNameW`.
+/// A program for a child in another directory, through the real
+/// `GetFullPathNameW` of `std::path::absolute`.
 #[test]
 fn program_in_dir_uses_the_os_full_path() {
     let tmp = tempfile::tempdir().unwrap();
@@ -299,28 +297,57 @@ fn program_in_dir_uses_the_os_full_path() {
     let p = |s: &str| windows::program_in_dir(Path::new(s), dir).unwrap();
     // Root-relative: the directory's drive.
     assert_eq!(p(r"\tool.exe"), PathBuf::from(format!(r"{drive}\tool.exe")));
-    // Relative and same-drive-relative: under the directory.
+    assert_eq!(p("/tool.exe"), PathBuf::from(format!(r"{drive}\tool.exe")));
+    // Relative: under the directory.
     assert_eq!(p(r"bin\..\tool.exe"), dir.join("tool.exe"));
-    assert_eq!(p(&format!("{drive}tool.exe")), dir.join("tool.exe"));
+    assert_eq!(p(r"..\tool.exe"), dir.parent().unwrap().join("tool.exe"));
+    // Drive-relative: the OS resolves it from the drive's own directory of
+    // this process, also on the drive of `dir` (was `dir\tool.exe`).
+    let same_drive = format!("{drive}tool.exe");
+    assert_eq!(p(&same_drive), std::path::absolute(&same_drive).unwrap());
     // Absolute and UNC programs are kept.
     assert_eq!(p(r"Z:\x\tool.exe"), PathBuf::from(r"Z:\x\tool.exe"));
+    assert_eq!(p("Z:/x/tool.exe"), PathBuf::from("Z:/x/tool.exe"));
     assert_eq!(p(r"\\srv\share\t.exe"), PathBuf::from(r"\\srv\share\t.exe"));
-    // No directory: unchanged. A bare drive: Go's EINVAL.
+    // No directory: unchanged.
     assert_eq!(
         windows::program_in_dir(Path::new("rel.exe"), Path::new("")).unwrap(),
         PathBuf::from("rel.exe")
     );
-    let err = windows::program_in_dir(Path::new(drive), dir).unwrap_err();
-    assert_eq!(
-        crate::executor::subprocess::spawn_error_text(&err),
-        "invalid argument"
-    );
+    // An empty program is an invalid input. A bare drive is the drive's own
+    // directory of this process (was an invalid input).
+    let err = windows::program_in_dir(Path::new(""), dir).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(err.to_string(), "invalid input parameter");
+    assert_eq!(p(drive), std::path::absolute(drive).unwrap());
     // A relative directory is resolved against this process's directory.
     let cwd = std::env::current_dir().unwrap();
     assert_eq!(
         windows::program_in_dir(Path::new("t.exe"), Path::new("sub")).unwrap(),
         cwd.join("sub").join("t.exe")
     );
+}
+
+#[test]
+fn bare_name_has_no_directory_and_no_drive() {
+    for name in ["codex", "codex.cmd", "foo:bar"] {
+        assert!(windows::is_bare_name(name), "{name:?}");
+    }
+    // `.` and `..` have no file name in std (were bare names).
+    for name in [
+        "",
+        ".",
+        "..",
+        r"x\codex",
+        "x/codex",
+        r"codex\",
+        "C:codex",
+        "a:b",
+        r"C:\codex",
+        r"\\host\share\codex",
+    ] {
+        assert!(!windows::is_bare_name(name), "{name:?}");
+    }
 }
 
 #[test]

@@ -72,7 +72,7 @@ class GoreleaserTest(unittest.TestCase):
                  .replace("{{ .Os }}_{{ .Arch }}", target) for target in SIX}
         self.assertEqual(names, {f"rival_{t}" for t in SIX})
         self.assertEqual(archive["format_overrides"], [{"goos": "windows", "formats": ["zip"]}])
-        for name in ("LICENSE", "README.md", "licenses/Go-LICENSE"):
+        for name in ("LICENSE", "README.md"):
             self.assertIn(name, archive["files"])
             self.assertTrue((ROOT / name).is_file(), name)
 

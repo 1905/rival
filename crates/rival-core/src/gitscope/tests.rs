@@ -1,5 +1,5 @@
-//! Go: `internal/gitscope/gitscope_test.go`, plus Rust-only pins of the
-//! source behavior (env, PWD, merge quirks, DiffStat).
+//! Git scope tests, plus pins of the source behavior (env, PWD, merge
+//! quirks, DiffStat).
 //!
 //! The tests run the installed `git` in temp repos. The child env is
 //! explicit: the process `PATH` (read only), a temp `HOME`, and
@@ -51,7 +51,7 @@ impl Fixture {
         cfg.with_environ(environ)
     }
 
-    /// Go `initRepo`: init, `checkout -b main`, one commit of a.go.
+    /// Init, `checkout -b main`, one commit of a.go.
     fn init_repo(&self) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         self.git(dir.path(), &["init"]);
@@ -158,7 +158,7 @@ fn resolve_merges_tracked_then_untracked() {
 }
 
 #[test]
-fn merge_file_lists_keeps_go_duplicate_quirks() {
+fn merge_file_lists_keeps_duplicate_quirks() {
     assert_eq!(merge_file_lists("", "x\ny"), "x\ny");
     assert_eq!(merge_file_lists("x\ny", ""), "x\ny");
     // Items are trimmed and blank lines dropped once both lists are set.
@@ -202,8 +202,8 @@ fn diff_stat_follows_resolve_modes() {
     assert!(stat.starts_with("a.go | "), "{stat:?}");
 }
 
-/// Go's `gitCmd` leaves `Cmd.Env` nil, so a caller's `GIT_DIR` points git at
-/// another repository. Pinned as-is (known Go bug, see the Task 2.5 report).
+/// `git_cmd` does not clear the inherited env, so a caller's `GIT_DIR` points
+/// git at another repository. Pinned as-is (known bug, see the Task 2.5 report).
 #[test]
 fn inherited_git_dir_overrides_the_workdir_repo() {
     let fx = Fixture::new();
@@ -237,7 +237,7 @@ fn missing_git_resolves_to_empty() {
     );
 }
 
-/// Go's `Cmd.environ` adds no `PWD` on Windows: an inherited one passes
+/// No `PWD` is added on Windows: an inherited one passes
 /// through unchanged, and none appears otherwise. The fake git is a `.cmd`
 /// found through `PATHEXT`; in a batch file an unset `%PWD%` is empty.
 #[cfg(windows)]
@@ -262,12 +262,12 @@ fn git_cmd_adds_no_pwd_on_windows() {
     assert_eq!(got.trim_end(), r"[C:\stale]|x");
 }
 
-/// Go's `Cmd.environ`: with `Dir` set and `Env` nil, `PWD=<Abs(Dir)>` is
-/// appended, so it wins over an inherited PWD. The fake git sees argv0
-/// `git`, the args, and the env unfiltered.
+/// With a workdir set and no explicit env, `PWD=<Abs(Dir)>` is appended,
+/// so it wins over an inherited PWD. The fake git sees argv0 `git`, the
+/// args, and the env unfiltered.
 #[cfg(unix)]
 #[test]
-fn git_cmd_env_argv_and_pwd_follow_go() {
+fn git_cmd_env_argv_and_pwd() {
     let mut fx = Fixture::new();
     let bin = tempfile::tempdir().unwrap();
     write_exe(
@@ -296,7 +296,7 @@ fn git_cmd_env_argv_and_pwd_follow_go() {
     assert_eq!(got.unwrap(), want);
 
     // A relative workdir is made absolute against cfg.cwd; without a cwd it
-    // fails before the spawn, as Go's filepath.Abs error does.
+    // fails before the spawn with the getwd error.
     assert_eq!(
         git_cmd(&cfg, ".", &["status"]).unwrap_err(),
         "getwd: no such file or directory"
@@ -308,10 +308,10 @@ fn git_cmd_env_argv_and_pwd_follow_go() {
     let got = retry_busy(|| git_cmd(&cfg, ".", &["x"])).unwrap();
     assert!(got.contains(&format!("|x|{}|", s(&here_link))), "{got:?}");
 
-    // A failing git is an error with Go's exit text.
+    // A failing git is an error with the exit status text.
     write_exe(&bin.path().join("git"), "#!/bin/sh\necho out\nexit 3\n");
     let got = retry_busy(|| git_cmd(&cfg, "", &["x"]));
-    assert_eq!(got.unwrap_err(), "exit status 3");
+    assert_eq!(got.unwrap_err(), "exit status: 3");
 }
 
 /// Linux ETXTBSY: another test thread may fork while a fake is open for

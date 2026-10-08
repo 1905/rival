@@ -1,6 +1,5 @@
 //! A one-line text input: the list filter and the detail search.
-//! Go: the bubbles `textinput` both used, with the same keys where the TUI
-//! needs them.
+//! It handles the standard text-input keys the TUI needs.
 
 use crossterm::event::KeyEvent;
 use ratatui::style::Modifier;
@@ -10,9 +9,9 @@ use super::keys::key_name;
 use super::styles::Styles;
 use super::text::width;
 
-/// Go: `ti.CharLimit = 200`.
+/// The most chars the input holds.
 const CHAR_LIMIT: usize = 200;
-/// Go: `ti.SetWidth(24)`. Text cells shown after the prompt.
+/// Text cells shown after the prompt.
 const VIEW_WIDTH: usize = 24;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -3,7 +3,8 @@
 //!
 //! This is the app's newer answer extraction (codex footer, hook lines,
 //! double-answer dedupe, unanswered-transcript rejection). It is separate from
-//! [`crate::review::parse`], which keeps Go's CLI behavior for output parity.
+//! [`crate::review::parse`], which keeps the CLI review parse behavior for
+//! output parity.
 
 use std::collections::HashMap;
 
@@ -45,7 +46,7 @@ pub struct SeverityGroup {
 /// What the Result view shows for a finished run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunResult {
-    /// A JSON payload. `rating` is set for plan and antislop payloads, None
+    /// A JSON payload. `rating` is set for plan payloads, None
     /// for a code review. `groups` are placeholder-free, sorted and bucketed.
     Findings {
         summary: String,

@@ -1,0 +1,107 @@
+{
+  "name": "executor-claude-success",
+  "description": "`rival command claude` raw prompt with a fake provider that exits 0. The scenario pins the exact argv, stdin, cwd and env (CLAUDECODE and ANTHROPIC_API_KEY are removed from the child env). The plain log ('A done') reaches stdout unchanged, the session completes, exit 0.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--dangerously-skip-permissions"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work",
+              "env": {
+                "CLAUDECODE": null,
+                "ANTHROPIC_API_KEY": null
+              }
+            },
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "mode": "native",
+          "work_dir": "<ROOT>/work",
+          "account": "subscription",
+          "output_bytes": 7,
+          "output_lines": 1
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  }
+}

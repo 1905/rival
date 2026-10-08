@@ -15,7 +15,7 @@ fn write_log(content: &str) -> (tempfile::TempDir, PathBuf) {
     (dir, p)
 }
 
-// ---- Go: TestParseLogFile ----
+// ---- parse_log_file ----
 
 #[test]
 fn parse_log_file_cases() {
@@ -94,7 +94,7 @@ fn parse_log_file_cases() {
     }
 }
 
-/// Go `%q` of a printable path: only `\` and `"` are escaped, so a Windows
+/// A quoted printable path: only `\` and `"` are escaped, so a Windows
 /// path doubles its separators.
 fn quoted(path: &str) -> String {
     format!("\"{}\"", path.replace('\\', r"\\").replace('"', "\\\""))
@@ -116,21 +116,16 @@ fn parse_log_file_missing_file_errors() {
     );
 }
 
-/// Go's Windows `syscall.Open` opens a directory for reading
-/// (`FILE_FLAG_BACKUP_SEMANTICS`); the read then fails with
-/// `ERROR_INVALID_FUNCTION`.
+/// A directory as the log file: on Unix the open works and the read fails.
+/// On Windows the open fails.
 #[test]
 fn parse_log_file_directory_is_a_read_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().to_string_lossy().into_owned();
-    let text = if cfg!(windows) {
-        "Incorrect function."
-    } else {
-        "is a directory"
-    };
+    let (op, text) = crate::testutil::DIR_AS_FILE;
     assert_eq!(
         parse_log_file(dir.path()).unwrap_err(),
-        format!("read log file {}: read {path}: {text}", quoted(&path))
+        format!("read log file {}: {op} {path}: {text}", quoted(&path))
     );
 }
 
@@ -182,7 +177,7 @@ fn parse_log_file_first_pid_wins_dedupes_by_first_occurrence() {
 
 #[test]
 fn parse_log_file_pid_edge_cases() {
-    // Sscanf overflow leaves pid 0; Go's \d is ASCII only.
+    // An overflowing pid parses as 0; the digit match is ASCII only.
     for content in [
         "rival: detached pid=99999999999999999999\n",
         "rival: detached pid=\u{0661}\u{0662}\n",
@@ -203,7 +198,7 @@ fn parse_log_file_pid_edge_cases() {
     assert!(parse_log_file_with(&p, |_| 0).unwrap().ids.is_empty());
 }
 
-// ---- Go: TestWaiterRun and friends ----
+// ---- Waiter::run ----
 
 fn status(st: &str, exit: Option<i64>, duration: &str, err: &str) -> SessionStatus {
     SessionStatus {
@@ -485,7 +480,7 @@ fn zero_or_negative_timeout_checks_status_and_liveness_first() {
     w.timeout = 0;
     assert_eq!(w.run(&Context::background()), WAIT_EXIT_CRASHED);
     drop(w);
-    // Alive and running: immediate timeout, Go duration text.
+    // Alive and running: immediate timeout, duration text like `1m30s`.
     for (timeout, text) in [(0, "0s"), (-SECOND, "-1s"), (90 * SECOND, "1m30s")] {
         let mut buf = Vec::new();
         let ticks = Rc::new(Cell::new(0i128));
@@ -667,7 +662,7 @@ fn polls_until_rival_dies() {
 // ---- session status decoding ----
 
 #[test]
-fn decode_session_status_matches_go_anonymous_struct() {
+fn decode_session_status_reads_four_fields() {
     let ok = |json: &str| decode_session_status(json.as_bytes());
     // Unrelated malformed fields do not matter.
     let got = ok(r#"{"id":5,"prompt":{"x":[1]},"created_at":"not a time","status":"completed","exit_code":0,"duration":"3s","error":""}"#).unwrap();
@@ -681,19 +676,13 @@ fn decode_session_status_matches_go_anonymous_struct() {
             ..SessionStatus::default()
         }
     );
-    // Case-insensitive keys; duplicate keys: last wins; null pointer resets.
-    let got = ok(r#"{"STATUS":"running","Status":"failed","exit_code":2,"Exit_Code":null,"ERROR":"x","error":null}"#).unwrap();
+    // Exact keys; null reads as the default.
+    let got =
+        ok(r#"{"STATUS":"running","status":"failed","exit_code":null,"ERROR":"x","error":null}"#)
+            .unwrap();
     assert_eq!(got.status, "failed");
     assert_eq!(got.exit_code, None);
-    assert_eq!(got.error_msg, "x", "null leaves a string unchanged");
-    // Top-level null decodes to the zero struct, which counts as found.
-    assert_eq!(
-        ok("null"),
-        Some(SessionStatus {
-            found: true,
-            ..SessionStatus::default()
-        })
-    );
+    assert_eq!(got.error_msg, "");
     for bad in [
         r#"{"status":5}"#,
         r#"{"exit_code":"0"}"#,
@@ -702,7 +691,9 @@ fn decode_session_status_matches_go_anonymous_struct() {
         r#"{"exit_code":99999999999999999999}"#,
         r#"{"duration":true}"#,
         r#"{"status":"completed","error":["a"]}"#,
+        r#"{"status":"a","status":"b"}"#,
         r#"[]"#,
+        "null",
         r#""s""#,
         r#"{"status":"completed""#,
         "",

@@ -1,21 +1,21 @@
 //! The command tree, defined once in clap: names, flags, defaults, help and
 //! completion scripts. clap parses the command line.
 //!
-//! Go builds the tree with cobra and pflag. The clap settings below match
-//! the pflag rules rival relies on: value flags take the next word even
-//! when it starts with `-`, bools take only `--flag=value`, the last value
-//! wins, `--model` values append, and leaf commands accept stray words. A
-//! narrow adapter then applies the cobra rules clap has no setting for
-//! (help lookup, non-runnable commands, `NoArgs`) and rewrites clap errors
-//! into the exact cobra/pflag texts with exit code 1. Help prose and
-//! completion scripts may differ from Go; errors and accepted input may not.
+//! The clap settings below match the cobra/pflag rules rival relies on:
+//! value flags take the next word even when it starts with `-`, bools take
+//! only `--flag=value`, the last value wins, `--model` values append, and
+//! leaf commands accept stray words. A narrow adapter then applies the
+//! cobra rules clap has no setting for (help lookup, non-runnable commands,
+//! `NoArgs`) and rewrites clap errors into the exact cobra/pflag texts with
+//! exit code 1. Help prose and completion scripts may differ from cobra;
+//! errors and accepted input may not.
 
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use rival_core::gostd;
+use rival_core::duration;
 
-use crate::gocsv;
+use crate::csvflag;
 
 #[cfg(test)]
 mod tests;
@@ -25,7 +25,6 @@ mod tests;
 pub enum CommandId {
     Root,
     Command,
-    CommandAntislop,
     CommandClaude,
     CommandCodex,
     CommandGrok,
@@ -58,7 +57,6 @@ impl CommandId {
         Some(match path {
             ["rival"] => Root,
             ["rival", "command"] => Command,
-            ["rival", "command", "antislop"] => CommandAntislop,
             ["rival", "command", "claude"] => CommandClaude,
             ["rival", "command", "codex"] => CommandCodex,
             ["rival", "command", "grok"] => CommandGrok,
@@ -109,7 +107,7 @@ impl CommandId {
     }
 }
 
-/// Values Go computes at package init, before `.env` loads.
+/// Values computed at startup, before `.env` loads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Defaults {
     /// `rival wait --timeout` default (`config.MaxRunWait()`), nanoseconds.
@@ -180,8 +178,7 @@ fn string_flag(long: &'static str, default: &str, help: &'static str) -> Arg {
 }
 
 fn duration_flag(long: &'static str, default: i64, help: &'static str) -> Arg {
-    value_flag(long, "duration", gostd::format_duration(default), help)
-        .value_parser(gostd::parse_duration)
+    value_flag(long, "duration", duration::format(default), help).value_parser(duration::parse)
 }
 
 /// pflag `StringSliceP`: each value is one CSV record; the first occurrence
@@ -189,7 +186,7 @@ fn duration_flag(long: &'static str, default: i64, help: &'static str) -> Arg {
 fn model_flag(default: &'static str, help: &'static str) -> Arg {
     value_flag("model", "strings", default.to_string(), help)
         .short('m')
-        .value_parser(gocsv::read_as_csv)
+        .value_parser(csvflag::read_as_csv)
         .action(ArgAction::Append)
 }
 
@@ -239,9 +236,9 @@ fn shell(name: &'static str) -> Command {
     ))
 }
 
-/// The whole tree. Child order is Go's `AddCommand` order: the `init`
-/// functions run in file-name order, then cobra appends `help` and
-/// `completion`. That order decides the suggestion order.
+/// The whole tree. Child order is the old cobra registration order (by
+/// source file name), then `help` and `completion`. That order decides the
+/// suggestion order.
 pub fn build(defaults: &Defaults) -> Command {
     let command_cmd = with_args(command(
         "command",
@@ -256,19 +253,6 @@ pub fn build(defaults: &Defaults) -> Command {
         .global(true),
     )
     .subcommands([
-        with_args(command(
-            "antislop",
-            "Quality-only slop & over-engineering review (code or plan)",
-        ))
-        .args([
-            workdir(),
-            no_queue(),
-            model_flag(
-                "codex,claude",
-                "antislop model(s): codex, claude (comma-separated). Default models are codex and claude",
-            ),
-            effort("override reasoning effort for every selected model: low, medium, high, xhigh, ultra"),
-        ]),
         model_command("claude", "Skill-facing Claude executor"),
         model_command("codex", "Skill-facing Codex executor"),
         model_command("grok", "Skill-facing Grok executor"),
@@ -475,9 +459,9 @@ pub fn parse(root: &mut Command, args: &[String]) -> Result<Parsed, String> {
         && let Some(first) = args.first()
     {
         return Err(format!(
-            "unknown command {} for {}",
-            gostd::quote(first),
-            gostd::quote(&path.join(" "))
+            "unknown command {:?} for {:?}",
+            first,
+            path.join(" ")
         ));
     }
     Ok(Parsed::Run(Invocation {
@@ -500,8 +484,8 @@ fn cobra_error(err: &clap::Error, root: &Command, raw: &[String]) -> String {
         ErrorKind::InvalidSubcommand => {
             let typed = ctx(ContextKind::InvalidSubcommand);
             format!(
-                "unknown command {} for \"rival\"{}",
-                gostd::quote(&typed),
+                "unknown command {:?} for \"rival\"{}",
+                typed,
                 suggestions(root, &typed)
             )
         }
@@ -542,11 +526,7 @@ fn cobra_error(err: &clap::Error, root: &Command, raw: &[String]) -> String {
             let cause = std::error::Error::source(err)
                 .map(ToString::to_string)
                 .unwrap_or_default();
-            format!(
-                "invalid argument {} for {} flag: {cause}",
-                gostd::quote(&value),
-                gostd::quote(&flag)
-            )
+            format!("invalid argument {:?} for {:?} flag: {cause}", value, flag)
         }
         // Not produced by this tree; keep clap's text, still exit 1.
         _ => err
@@ -593,13 +573,13 @@ fn short_cluster_rest(raw: &[String], c: char) -> String {
 /// cobra `findSuggestions` with the default minimum distance 2. `help` is
 /// never suggested.
 fn suggestions(root: &Command, typed: &str) -> String {
-    let typed = gostd::to_lower(typed);
+    let typed = typed.to_lowercase();
     let found: Vec<&str> = root
         .get_subcommands()
         .map(Command::get_name)
         .filter(|name| *name != "help")
         .filter(|name| {
-            let name = gostd::to_lower(name);
+            let name = name.to_lowercase();
             levenshtein(&typed, &name) <= 2 || name.starts_with(&typed)
         })
         .collect();
@@ -631,7 +611,7 @@ fn levenshtein(s: &str, t: &str) -> usize {
     prev[s.len()]
 }
 
-/// Go `%q` of a shorthand byte: a quoted rune literal.
+/// A shorthand byte as a quoted character literal.
 fn quote_char(c: char) -> String {
     match c {
         '\'' => "'\\''".to_string(),
@@ -648,32 +628,24 @@ fn quote_char(c: char) -> String {
     }
 }
 
-/// Go `strconv.ParseBool`, with its error text.
+/// Parses a bool flag value (`1`, `t`, `true`, …), with a
+/// `strconv.ParseBool` error text.
 pub fn parse_bool(s: &str) -> Result<bool, String> {
     match s {
         "1" | "t" | "T" | "TRUE" | "true" | "True" => Ok(true),
         "0" | "f" | "F" | "FALSE" | "false" | "False" => Ok(false),
         _ => Err(format!(
-            "strconv.ParseBool: parsing {}: invalid syntax",
-            gostd::quote(s)
+            "strconv.ParseBool: parsing {:?}: invalid syntax",
+            s
         )),
     }
 }
 
-/// Go `strconv.ParseInt(s, 0, 64)`, with its error text.
+/// Parses an i64 with base prefixes and underscores, with a `strconv.ParseInt`
+/// error text.
 pub fn parse_int(s0: &str) -> Result<i64, String> {
-    let syntax = || {
-        format!(
-            "strconv.ParseInt: parsing {}: invalid syntax",
-            gostd::quote(s0)
-        )
-    };
-    let range = || {
-        format!(
-            "strconv.ParseInt: parsing {}: value out of range",
-            gostd::quote(s0)
-        )
-    };
+    let syntax = || format!("strconv.ParseInt: parsing {:?}: invalid syntax", s0);
+    let range = || format!("strconv.ParseInt: parsing {:?}: value out of range", s0);
     let (neg, s) = match s0.as_bytes().first() {
         None => return Err(syntax()),
         Some(b'+') => (false, &s0[1..]),
@@ -733,7 +705,7 @@ pub fn parse_int(s0: &str) -> Result<i64, String> {
     })
 }
 
-/// Go `strconv.underscoreOK`: underscores only between digits, or right
+/// Underscores only between digits, or right
 /// after a base prefix.
 fn underscore_ok(s: &str) -> bool {
     let b = s.as_bytes();
@@ -833,7 +805,7 @@ pub fn quote_topic(args: &[String]) -> String {
             if backquotable {
                 format!("`{a}`")
             } else {
-                gostd::quote(a)
+                format!("{:?}", a)
             }
         })
         .collect();

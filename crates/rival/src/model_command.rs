@@ -1,28 +1,26 @@
-//! `rival command <model>`: the skill-facing workflow. Go:
-//! `cmd/model_command.go`.
+//! `rival command <model>`: the skill-facing workflow.
 
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::{Config, PromptKind, public_runtime_log};
 use rival_core::executor::RunResult;
+use rival_core::logging;
 use rival_core::paths::Paths;
 use rival_core::review::{self, GroupSlot};
 use rival_core::session::{NewSession, Session};
-use rival_core::{gostd, logging};
 
 use crate::gitscope_helper::{build_review_prompt, lens_prompt};
 use crate::merge_request::{ReviewTarget, prepare_review_target_with, reject_unresolved_mr};
 use crate::model_specs::{ModelSpec, RunCall, session_mode};
 use crate::root::{CmdEnv, CmdError};
-use crate::ste_fix;
 use crate::workdir::resolve_workdir_or_exit;
 
 #[cfg(test)]
 mod tests;
 
-/// Go `runModelCommand`: read args from stdin, run the provider, then print
-/// the result for the calling skill to capture. A successful review prints
-/// the formatted findings and the log path; a raw prompt, or any failed run,
-/// prints the log. Every model's `rival command <name>` goes through it.
+/// Reads args from stdin, runs the provider, then prints the result for the
+/// calling skill to capture. A successful review prints the formatted
+/// findings and the log path; a raw prompt, or any failed run, prints the
+/// log. Every model's `rival command <name>` goes through it.
 pub fn run_model_command(
     env: &mut CmdEnv<'_>,
     spec: &ModelSpec,
@@ -69,8 +67,8 @@ pub fn run_model_command(
     (spec.preflight)(cfg, &workdir).map_err(|e| CmdError::plain(format!("{e:#}")))?;
 
     // Cancel the MR resolve, the queue wait and the child on SIGINT/SIGTERM
-    // so the cleanup below runs. Locals drop in reverse order, like Go's
-    // defers: run timeout, slot, unfinished session, MR checkout, signals.
+    // so the cleanup below runs. Locals drop in reverse order: run timeout,
+    // slot, unfinished session, MR checkout, signals.
     let (ctx, _signals) = env.signal_context()?;
 
     let mut prompt = parsed.prompt.clone();
@@ -167,22 +165,7 @@ pub fn run_model_command(
         // A zero exit is not a review: quota errors and empty output also
         // exit 0.
         let log_file = sess.log_file.clone();
-        let rewrite = ste_fix::refine(
-            &ste_fix::Rerun {
-                ctx: &ctx,
-                cfg,
-                spec,
-                workdir: &run_workdir,
-                cred_workdir: &workdir,
-            },
-            &mut sess,
-            &log_text,
-        );
-        let review_text = match rewrite {
-            Some(line) => std::borrow::Cow::Owned(format!("{log_text}{line}")),
-            None => std::borrow::Cow::Borrowed(log_text.as_str()),
-        };
-        match finish_review(cfg, spec, &mut sess, &review_text, &scope, &log_file) {
+        match finish_review(cfg, spec, &mut sess, &log_text, &scope, &log_file) {
             Err(reason) => {
                 exit_code = 1;
                 exit_msg = reason;
@@ -225,9 +208,9 @@ pub(crate) struct PreparedReview {
     pub target: ReviewTarget,
 }
 
-/// Go `prepareReview`: resolves a review's scope and builds its bug-hunter
-/// prompt. A GitLab MR scope is pinned to a snapshot checkout and its
-/// identity line goes to stdout first.
+/// Resolves a review's scope and builds its bug-hunter prompt. A GitLab MR
+/// scope is pinned to a snapshot checkout and its identity line goes to
+/// stdout first.
 pub(crate) fn prepare_review(
     ctx: &Context,
     env: &mut CmdEnv<'_>,
@@ -263,10 +246,10 @@ pub(crate) fn prepare_review(
     })
 }
 
-/// Go `finishReview`: turns a zero-exit review log into the formatted
-/// review. When the run produced no review (empty log, or only a quota
-/// error) it records the failure on `sess` and returns the reason instead;
-/// output that merely does not parse still formats, as UNPARSED.
+/// Turns a zero-exit review log into the formatted review. When the run
+/// produced no review (empty log, or only a quota error) it records the
+/// failure on `sess` and returns the reason instead; output that merely does
+/// not parse still formats, as UNPARSED.
 pub(crate) fn finish_review(
     cfg: &Config,
     spec: &ModelSpec,
@@ -294,8 +277,7 @@ pub(crate) fn finish_review(
     ))
 }
 
-/// Go `failSession`: records a failure and logs when the record cannot be
-/// saved.
+/// Records a failure and logs when the record cannot be saved.
 pub(crate) fn fail_session(paths: &Paths, sess: &mut Session, exit_code: i64, reason: &str) {
     if let Err(e) = sess.fail(paths, exit_code, reason) {
         logging::warn()
@@ -305,8 +287,7 @@ pub(crate) fn fail_session(paths: &Paths, sess: &mut Session, exit_code: i64, re
     }
 }
 
-/// Go `completeSession`: records a successful run and logs when the record
-/// cannot be saved.
+/// Records a successful run and logs when the record cannot be saved.
 pub(crate) fn complete_session(paths: &Paths, sess: &mut Session, result: &RunResult) {
     if let Err(e) = sess.complete(
         paths,
@@ -321,21 +302,20 @@ pub(crate) fn complete_session(paths: &Paths, sess: &mut Session, result: &RunRe
     }
 }
 
-/// Go `os.ReadFile` of the session log, with its `*PathError` text.
+/// Reads the whole session log; an error is `<op> <path>: <errno text>`.
 pub(crate) fn read_log(path: &str) -> Result<Vec<u8>, String> {
     use std::io::Read;
-    let open =
-        gostd::open_file(path).map_err(|e| format!("open {path}: {}", gostd::os_error_text(&e)))?;
+    let open = std::fs::File::open(path).map_err(|e| format!("open {path}: {}", e))?;
     let mut data = Vec::new();
     let mut file = open;
     file.read_to_end(&mut data)
-        .map_err(|e| format!("read {path}: {}", gostd::os_error_text(&e)))?;
+        .map_err(|e| format!("read {path}: {}", e))?;
     Ok(data)
 }
 
 /// A session this command owns. Dropping it while the session is still
-/// queued or running records `interrupted` (Go's deferred check), also on
-/// an early return or a panic.
+/// queued or running records `interrupted`, also on an early return or a
+/// panic.
 pub(crate) struct OwnedSession<'p>(pub Session, &'p Paths);
 
 impl<'p> OwnedSession<'p> {
@@ -367,7 +347,7 @@ impl Drop for OwnedSession<'_> {
     }
 }
 
-/// Go `defer cancelRun()`: [`CancelFunc`] does not cancel on drop.
+/// Cancels the run on drop: [`CancelFunc`] does not cancel on drop.
 pub(crate) struct CancelOnDrop(pub CancelFunc);
 
 impl Drop for CancelOnDrop {

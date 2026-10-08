@@ -4,7 +4,7 @@ import Observation
 
 /// Where rival keeps its state.
 public enum RivalPaths {
-    /// `RIVAL_HOME` when set and non-empty, else `~/.rival`. The Go CLI always
+    /// `RIVAL_HOME` when set and non-empty, else `~/.rival`. The rival CLI always
     /// writes under `~/.rival`; the override exists so the app can run against
     /// a fixture directory.
     public static func root(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {

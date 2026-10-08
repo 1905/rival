@@ -1,5 +1,5 @@
 //! The run list: status tabs, filter input, day sections, pages and the
-//! cursor. Go: `internal/dashboard/session_list.go`.
+//! cursor.
 //!
 //! The grouping rules (status, kind, effort, elapsed) live in
 //! `rival_core::sessionview`; only presentation stays here.
@@ -12,8 +12,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gojson;
-use rival_core::gostd;
 use rival_core::session::{self, Session};
 use rival_core::sessionview;
 
@@ -39,14 +37,19 @@ pub fn group_elapsed(item: &DisplayItem, now: DateTime<FixedOffset>) -> String {
     sessionview::elapsed_at(&item.sessions, now)
 }
 
-/// Go: `formatElapsed`. A finished run's recorded duration, a running run's
+/// A finished run's recorded duration, a running run's
 /// age, or how long a queued run has waited in line.
 pub fn format_elapsed(s: &Session, now: DateTime<FixedOffset>) -> String {
     if !s.duration.is_empty() {
         return s.duration.clone();
     }
     if s.status == "running" {
-        return session::duration_text(session::sub_nanos(now, s.start_time));
+        // An unset start saturates, as the distant unset time of older
+        // releases did.
+        let nanos = s
+            .start_time
+            .map_or(i64::MAX, |t| session::sub_nanos(now, t));
+        return session::duration_text(nanos);
     }
     if s.status == "queued"
         && let Some(queued_at) = s.queued_at
@@ -107,7 +110,6 @@ pub fn short_kind(mode: &str) -> &str {
     match mode {
         "megareview" | "consilium" => "mega",
         session::MODE_SECURITY => "sec",
-        session::MODE_ANTISLOP => "slop",
         session::MODE_PLAN => "plan",
         "raw" => "raw",
         "" | "review" | "native" | "docker" => "review",
@@ -127,16 +129,19 @@ pub fn project_name(workdir: &str) -> String {
     return base_name(workdir).to_string();
 }
 
-/// Go: `filepath.Base` on Windows. Both separators count and a drive or UNC
-/// volume is dropped: `C:\work\app` and `\\host\share\app` give `app`, a
-/// drive root gives `\`. Session data written on Windows may use either
+/// The last element on Windows ([`std::path::Path::file_name`]). Both
+/// separators count and a drive or UNC volume is dropped: `C:\work\app` and
+/// `\\host\share\app` give `app`. A path without a last element, such as a
+/// drive root, is shown whole. Session data written on Windows may use either
 /// separator.
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg(windows)]
 fn windows_base_name(path: &str) -> String {
-    String::from_utf8_lossy(&rival_core::winpath::base(path.as_bytes())).into_owned()
+    std::path::Path::new(path)
+        .file_name()
+        .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
-/// Go: `filepath.Base` on Unix: only `/` separates, so a backslash is an
+/// The last path element on Unix: only `/` separates, so a backslash is an
 /// ordinary name byte.
 #[cfg_attr(windows, allow(dead_code))]
 fn base_name(path: &str) -> &str {
@@ -156,19 +161,19 @@ fn base_name(path: &str) -> &str {
 pub const SECTION_ORDER: [&str; 4] = ["TODAY", "YESTERDAY", "THIS WEEK", "OLDER"];
 
 /// The local time zone as a lookup: the UTC offset in force at a UTC
-/// instant. Go: `Location.lookup`. Tests inject a fixed or a switching zone.
+/// instant. Tests inject a fixed or a switching zone.
 pub type Zone = fn(NaiveDateTime) -> FixedOffset;
 
-/// The system time zone. Go: `time.Local`.
+/// The system time zone.
 pub fn local_zone(utc: NaiveDateTime) -> FixedOffset {
     Local.offset_from_utc_datetime(&utc)
 }
 
-/// Go: `time.Date(y, m, d, 0, 0, 0, 0, loc)`. It guesses the offset at the
-/// wall time read as UTC, then uses the offset in force at the guessed
-/// instant. Each midnight gets its own offset, so a DST switch between two
-/// boundaries moves neither. A midnight the switch skips or repeats
-/// resolves as in Go.
+/// The local midnight that starts `day` in `zone`. It guesses the offset
+/// at the wall time read as UTC, then uses the offset in force at the
+/// guessed instant. Each midnight gets its own offset, so a DST switch
+/// between two boundaries moves neither. A midnight the switch skips or
+/// repeats resolves through the same two lookups.
 fn midnight(zone: Zone, day: NaiveDate) -> DateTime<FixedOffset> {
     let wall = day.and_time(NaiveTime::MIN);
     let at = |offset: FixedOffset| wall.checked_sub_offset(offset).unwrap_or(wall);
@@ -203,11 +208,12 @@ impl DayBounds {
         }
     }
 
-    /// `t`'s index in [`SECTION_ORDER`].
-    fn section_index(&self, t: DateTime<FixedOffset>) -> usize {
-        if t == gojson::zero_time() {
-            3
-        } else if t >= self.today {
+    /// `t`'s index in [`SECTION_ORDER`]. No time sorts with the oldest.
+    fn section_index(&self, t: Option<DateTime<FixedOffset>>) -> usize {
+        let Some(t) = t else {
+            return 3;
+        };
+        if t >= self.today {
             0
         } else if t >= self.yesterday {
             1
@@ -221,7 +227,7 @@ impl DayBounds {
 
 /// Buckets `t` relative to `now` by calendar day in `zone`.
 pub fn section_for(
-    t: DateTime<FixedOffset>,
+    t: Option<DateTime<FixedOffset>>,
     now: DateTime<FixedOffset>,
     zone: Zone,
 ) -> &'static str {
@@ -230,14 +236,9 @@ pub fn section_for(
 
 /// When a run appeared: its start, or its queue time when it has not
 /// started yet.
-pub fn item_time(item: &DisplayItem) -> DateTime<FixedOffset> {
-    let Some(s) = item.primary() else {
-        return gojson::zero_time();
-    };
-    match s.queued_at {
-        Some(queued_at) if s.start_time == gojson::zero_time() => queued_at,
-        _ => s.start_time,
-    }
+pub fn item_time(item: &DisplayItem) -> Option<DateTime<FixedOffset>> {
+    let s = item.primary()?;
+    s.start_time.or(s.queued_at)
 }
 
 // --- status -----------------------------------------------------------------
@@ -318,7 +319,8 @@ pub fn status_glyph<'a>(status: &str, spin: &'a str) -> &'a str {
 
 /// Splits a filter into lowercase, AND-ed terms.
 pub fn filter_terms(filter: &str) -> Vec<String> {
-    gostd::to_lower(filter)
+    filter
+        .to_lowercase()
         .split_whitespace()
         .map(str::to_string)
         .collect()
@@ -331,7 +333,7 @@ pub fn matches_filter(item: &DisplayItem, hay: &mut Option<String>, terms: &[Str
     if terms.is_empty() {
         return true;
     }
-    let hay = hay.get_or_insert_with(|| gostd::to_lower(&filter_haystack(item)));
+    let hay = hay.get_or_insert_with(|| filter_haystack(item).to_lowercase());
     terms.iter().all(|t| hay.contains(t.as_str()))
 }
 
@@ -345,7 +347,7 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
     b.push('\n');
     b.push_str(&kind_label(item));
     for s in &item.sessions {
-        let preview = s.prompt_preview.to_str_lossy();
+        let preview = s.prompt_preview.as_str();
         let project = project_name(&s.work_dir);
         let id = short_id(&s.id);
         for f in [
@@ -353,7 +355,7 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
             model_name(s),
             s.effort.as_str(),
             project.as_str(),
-            &*preview,
+            preview,
             s.review_scope.as_str(),
             &*id,
         ] {
@@ -364,8 +366,8 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
     b
 }
 
-/// Go: `id[:8]`, the first 8 bytes. A cut inside a multi-byte char keeps
-/// its stray bytes as U+FFFD.
+/// The first 8 bytes of the id. A cut inside a multi-byte char keeps its
+/// stray bytes as U+FFFD.
 pub fn short_id(id: &str) -> Cow<'_, str> {
     if id.len() > 8 {
         String::from_utf8_lossy(&id.as_bytes()[..8])
@@ -397,7 +399,7 @@ impl Row {
     }
 }
 
-/// Go: `rowsAndCounts`. Applies the status tab and the text filter, then
+/// Applies the status tab and the text filter, then
 /// groups what is left under section headers. Empty sections are omitted.
 /// Items keep their relative order inside a section, so the watcher's
 /// newest-first sort holds. It also returns the per-tab counts of filter
@@ -480,7 +482,7 @@ impl Columns {
     }
 }
 
-/// Go: `layoutColumns`. Sizes the columns for a pane width. A row is a
+/// Sizes the columns for a pane width. A row is a
 /// leading space then the cells separated by single spaces; PROJECT takes
 /// whatever is left.
 pub fn layout_columns(width: usize) -> Columns {
@@ -511,8 +513,8 @@ pub fn layout_columns(width: usize) -> Columns {
     c
 }
 
-/// Go: `joinCells` without styles. Lays cells out per the column widths,
-/// dropping zero-width columns.
+/// Lays cells out per the column widths, without styles, dropping zero-width
+/// columns.
 pub fn join_cells(c: &Columns, cells: [&str; 6]) -> String {
     let mut out = String::from(" ");
     let mut first = true;
@@ -529,8 +531,8 @@ pub fn join_cells(c: &Columns, cells: [&str; 6]) -> String {
     out
 }
 
-/// Go: `joinCells` with styles. Each cell is fitted first and then styled,
-/// so styling cannot change the width.
+/// Lays cells out per the column widths, with styles. Each cell is fitted
+/// first and then styled, so styling cannot change the width.
 fn join_styled_cells(c: &Columns, cells: [&str; 6], styles: [Style; 6]) -> Line<'static> {
     let mut spans = vec![Span::raw(" ")];
     let mut first = true;
@@ -563,7 +565,7 @@ pub fn row_time(item: &DisplayItem, now: DateTime<FixedOffset>) -> String {
     t
 }
 
-/// Go: `renderRow`. One run as exactly `width` cells.
+/// One run as exactly `width` cells.
 pub fn render_row(
     item: &DisplayItem,
     c: &Columns,
@@ -892,10 +894,7 @@ impl ListPane {
     /// Explains an empty body.
     pub fn empty_message(&self) -> String {
         if !self.filter.is_empty() {
-            return format!(
-                "no runs match {} · esc clears",
-                gostd::quote(&self.filter.value())
-            );
+            return format!("no runs match {:?} · esc clears", self.filter.value());
         }
         if self.tab != StatusTab::All {
             return format!("no {} runs", self.tab.label().to_lowercase());
@@ -903,7 +902,7 @@ impl ListPane {
         "No sessions yet. Run rival to get started.".to_string()
     }
 
-    /// Go: `tabBar`. The status tabs with their counts on the left and the
+    /// The status tabs with their counts on the left and the
     /// filter on the right, as exactly `w` cells.
     pub fn tab_bar(&self, w: usize, loading: bool, styles: &Styles) -> Line<'static> {
         if w == 0 {
@@ -954,7 +953,7 @@ impl ListPane {
         pad_line(Line::from(left), w)
     }
 
-    /// Go: `view`. The column titles, the visible rows of the current page
+    /// The column titles, the visible rows of the current page
     /// and the page footer as exactly `height` lines of exactly `width`
     /// cells. Only the visible window is built, so 3000 rows cost the same
     /// as 30.

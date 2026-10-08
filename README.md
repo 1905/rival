@@ -25,7 +25,6 @@ The optional macOS viewer installs separately: `brew install --cask 1905/tap/riv
 | `/rival-claude review` | Claude (Opus 5.5, medium) hunts bugs in your changed files. |
 | `/rival-security` | Hunts exploitable vulnerabilities across twelve classes. |
 | `/rival-plan-codex plan.md` | Codex rates a plan from 1 to 10 and lists its bugs and gaps. |
-| `/rival-antislop` | Finds over-engineering and code that should not exist, with a cut list. |
 
 | Rival.app | `rival tui` |
 |---|---|
@@ -45,7 +44,7 @@ Everything below is checked against the `rival` binary and its source. Commands,
 4. [Detached flow and `rival wait`](#detached-flow-and-rival-wait)
 5. [Models and effort](#models-and-effort)
 6. [Code review: JSON contract and console output](#code-review-json-contract-and-console-output)
-7. [Plan and antislop: contract and rating](#plan-and-antislop-contract-and-rating)
+7. [Plan: contract and rating](#plan-contract-and-rating)
 8. [Security review](#security-review)
 9. [GitLab MR review](#gitlab-mr-review)
 10. [Configuration](#configuration)
@@ -61,7 +60,7 @@ Everything below is checked against the `rival` binary and its source. Commands,
 
 Choose your system below. The CLI runs on macOS, Linux and Windows. Rival.app is available only on macOS.
 
-**Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier contain the Go CLI for macOS and Linux only.
+**Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier support macOS and Linux only.
 
 #### macOS
 
@@ -200,7 +199,7 @@ For a Homebrew installation, run `rival update`. It checks the latest release, u
 
 For a manual archive installation, repeat your OS's download, checksum and extraction steps with the new release. Then run `rival install` again. For a source installation, update the checkout and repeat `cargo install --locked --path crates/rival`. Binary upgrades through `rival update` require Homebrew.
 
-Each Rust release archive contains `rival` (`rival.exe` on Windows), `LICENSE`, `README.md` and `licenses/Go-LICENSE`. Keep the license files with redistributed copies.
+Each Rust release archive contains `rival` (`rival.exe` on Windows), `LICENSE` and `README.md`. Keep the license file with redistributed copies.
 
 ```bash
 rival install                   # Claude Code, plus Codex when detected
@@ -216,7 +215,7 @@ rival install --force           # overwrite without prompting
 
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
-- `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable`, `rival-antislop-plan` and older names.
+- `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable` and older names.
 
 #### Provider runtimes
 
@@ -232,7 +231,7 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 
 ### Skills
 
-`rival install` installs nine skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs eight skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
 
 | Skill | Syntax | Runs | Default model and effort |
 |---|---|---|---|
@@ -241,7 +240,6 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 | `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
 | `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
 | `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
-| `/rival-antislop` | `[-m codex,claude] [-re level] [--] [scope]` | `rival command antislop` | Codex high + Claude medium |
 | `/rival-plan` | `<plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned) |
 | `/rival-plan-codex` | `<plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned) |
 | `/rival-plan-claude` | `[-re level] <plan.md>` | `rival command plan --model claude` | Claude, medium |
@@ -268,19 +266,17 @@ Top-level commands (`rival --help`):
 `rival command` subcommands. Each reads its input from stdin.
 
 - If stdin is a terminal or `/dev/null`, every subcommand prints its usage and starts no model.
-- Empty piped input prints usage for `codex`, `claude`, `grok`, `k3` and `plan`. For `antislop` and `security`, empty piped input reviews the changed files.
+- Empty piped input prints usage for `codex`, `claude`, `grok`, `k3` and `plan`. For `security`, empty piped input reviews the changed files.
 
 | Subcommand | Flags (defaults) |
 |---|---|
 | `codex`, `claude`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
 | `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`codex`; accepts `codex`, `claude`), `--effort` |
-| `antislop` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`codex,claude`), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
-- `antislop` input: `[-m selector[,selector]] [-re level] [--] [scope]`. Pass `-m` either as a flag or in stdin, not both.
 
 `rival run` subcommands: `claude`, `grok`, `k3`. There is no `rival run codex`; use `rival command codex`.
 
@@ -298,7 +294,6 @@ echo 'review src/api/'             | rival command codex --workdir .
 echo '-re high review'             | rival command claude --workdir .
 echo 'explain the auth flow'       | rival command codex --workdir .
 echo 'docs/plan.md'                | rival command plan --workdir .
-echo '-m claude src/'              | rival command antislop --workdir .
 echo 'explain the auth flow'       | rival run claude --prompt-stdin --workdir .
 rival run grok --review src/api/ --workdir .
 rival command security --which
@@ -345,7 +340,7 @@ cat out.txt                       # the review
 
 | Label | Model id | Runtime | Built-in effort |
 |---|---|---|---|
-| `codex` | `gpt-6-astra` | Codex CLI | `xhigh` (antislop: `high`) |
+| `codex` | `gpt-6-astra` | Codex CLI | `xhigh` |
 | `claude` | `claude-opus-5-5` | Claude Code CLI (native, else Docker) | `medium` |
 | `kimi-k3` | `moonshotai/kimi-k3` | OpenCode, Moonshot provider | `max` (only level) |
 | `grok` | `grok-4.6` | Grok CLI | `high` |
@@ -413,9 +408,9 @@ Log: ~/.rival/sessions/<session-id>.log
 - An empty `findings` array prints `No issues found.`.
 - If the output does not parse, Rival prints `═══ RIVAL REVIEW — UNPARSED OUTPUT ═══` with a `Problem:` line and the raw output. The run still exits `0`. Treat that block as "no structured review", never as a clean review.
 
-### Plan and antislop: contract and rating
+### Plan: contract and rating
 
-`rival command plan` reviews one markdown plan or spec. `rival command antislop` reviews code for slop and over-engineering and never reports bugs. Both use this JSON shape:
+`rival command plan` reviews one markdown plan or spec. It uses this JSON shape:
 
 ```json
 {
@@ -429,26 +424,25 @@ Log: ~/.rival/sessions/<session-id>.log
       "category": "...",
       "title": "one-line description",
       "body": "what is wrong and why it matters",
-      "suggestion": "concrete fix, or the concrete cut",
+      "suggestion": "concrete fix",
       "confidence": 8
     }
   ]
 }
 ```
 
-| | Plan | Antislop |
-|---|---|---|
-| `rating` | 1 (unimplementable or dangerously wrong) to 10 (ready to execute) | Leanness: 1 (mostly slop) to 10 (nothing left to cut) |
-| `category` | `bug`, `gap`, `ambiguity`, `scope`, `verification` | `reuse`, `simplify`, `efficiency`, `altitude`, `compat`, `reinvention`, `slop`, `yagni` |
-| Console title | `═══ RIVAL PLAN REVIEW ═══` then `File: <path>` | `═══ RIVAL ANTISLOP REVIEW ═══` then `Scope: <scope>` |
-| Rating line | `Rating: 7/10` | `Leanness: 7/10` |
-| No findings | `No bugs or gaps found.` | `No slop found.` |
+| Field | Plan |
+|---|---|
+| `rating` | 1 (unimplementable or dangerously wrong) to 10 (ready to execute) |
+| `category` | `bug`, `gap`, `ambiguity`, `scope`, `verification` |
+| Console title | `═══ RIVAL PLAN REVIEW ═══` then `File: <path>` |
+| Rating line | `Rating: 7/10` |
+| No findings | `No bugs or gaps found.` |
 
 - A payload with a `rating` outside 1–10 is rejected as not a real answer.
 - Findings print in the same numbered layout as code review, without the `Scenario:` line, followed by the `Findings:` tally.
 - With two models, the title names both (`═══ RIVAL PLAN REVIEW (codex + claude) ═══`). Each model gets a `── <label> ──` block.
 - A model that cannot run is listed as `Skipped: <label> — <reason>`. It does not fail the run.
-- Antislop runs Codex and Claude by default. `-m codex` or `-m claude` runs one model.
 
 ### Security review
 
@@ -479,7 +473,7 @@ rival run claude --review https://gitlab.example.com/group/project/-/merge_reque
 ```
 
 - Supported by `rival command codex|claude|grok|k3` in review mode and by `rival run <x> --review`.
-- Rejected before any reviewer starts by raw prompts, `antislop` and `security`.
+- Rejected before any reviewer starts by raw prompts and `security`.
 - The scope must be one HTTPS URL of the form `.../<namespace>/<project>/-/merge_requests/<N>`, optionally ending in `/diffs` or `/commits`.
 - The workdir must be a git repository with a remote for the same host and project.
 - Rival resolves the MR with `glab api` (authenticate with `glab auth login --hostname <host>`). It then fetches the exact base and head commits into a temporary checkout. Your checkout and index are not touched.
@@ -504,7 +498,6 @@ claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
-ste_rewrite: false             # true: one more provider call rewrites findings that use words from the STE not-approved list
 
 roles:                # optional prompt overrides
   bug_hunter: "..."   # replaces the code-review instructions
@@ -515,7 +508,6 @@ roles:                # optional prompt overrides
 - An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
 - An old `efforts.sol` key is ignored.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
-- `ste_rewrite` is off by default. When it is on and a review has 3 or more flagged words, rival calls the same provider once more with the review JSON and the flagged words. It keeps the rewrite only if the findings, files, lines, severities, categories and confidences are unchanged, text lengths stay within half to double, and the flagged-word count drops. Otherwise the original review stands. The session log ends with the review the command printed. The provider's rewrite transcript goes to `<session log>.ste-rewrite`. The word list is `crates/rival-core/data/ste.json`.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
 Environment variables:
@@ -546,7 +538,7 @@ Every run writes to `~/.rival/sessions/` (`$RIVAL_HOME/sessions/` when `RIVAL_HO
 - `<session-id>.json`: the session record. It is written to `<session-id>.json.tmp` first and then renamed.
 - `<session-id>.log`: the full model output.
 
-Main JSON fields: `id`, `group_id` (shared by the models of one plan or antislop run), `cli`, `mode`, `model`, `effort`, `review_scope`, `prompt_preview`, `status` (`queued`, `running`, `completed`, `failed`), `start_time`, `end_time`, `exit_code`, `duration`, `work_dir`, `log_file`, `error`, `pid`, `pid_start`.
+Main JSON fields: `id`, `group_id` (shared by the models of one plan run), `cli`, `mode`, `model`, `effort`, `review_scope`, `prompt_preview`, `status` (`queued`, `running`, `completed`, `failed`), `start_time`, `end_time`, `exit_code`, `duration`, `work_dir`, `log_file`, `error`, `pid`, `pid_start`.
 
 `rival sessions` prints them as a table. The TUI and Rival.app read the same directory.
 
@@ -618,7 +610,7 @@ Claude runs through the Claude Code CLI and bills your subscription login by def
 | `api` | Bill the API key. `ANTHROPIC_API_KEY` must be set, or the run fails. |
 | any other value | Error. |
 
-- Claude code, plan and antislop reviews can use only the Read, Glob and Grep tools. Shell, edits, MCP tools, hooks and plugins are disabled. The Docker transport also mounts the repository read-only.
+- Claude code and plan reviews can use only the Read, Glob and Grep tools. Shell, edits, MCP tools, hooks and plugins are disabled. The Docker transport also mounts the repository read-only.
 - These are CLI tool restrictions, not an operating-system sandbox.
 - Grok review mode passes `--sandbox read-only`. The Grok CLI profiles fail open when the host has no kernel sandbox, so treat that as a request, not a guarantee.
 - Rival removes known credential variables from child processes, and blocks the `GROK_` and `XAI_` prefixes.

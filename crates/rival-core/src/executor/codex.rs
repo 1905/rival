@@ -1,5 +1,3 @@
-//! Go: `internal/executor/codex.go`.
-
 #[cfg(test)]
 mod tests;
 
@@ -12,10 +10,9 @@ use super::oscmd::{self, Output};
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
-use crate::gostd::quote;
 use crate::session::Session;
 
-/// Go `CodexPreflightFor`: checks that codex is installed and authenticated,
+/// Checks that codex is installed and authenticated,
 /// naming the given model in its errors.
 pub fn codex_preflight_for(cfg: &Config, model: &str) -> anyhow::Result<()> {
     let label = config::engine_label("codex", model);
@@ -33,7 +30,7 @@ pub fn codex_preflight_for(cfg: &Config, model: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Go `RunCodexModel`: executes a prompt with one explicit model. Review
+/// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
 /// also the model sent to the runtime. Codex is the only model it runs.
 #[allow(clippy::too_many_arguments)]
@@ -63,7 +60,7 @@ pub(crate) fn run_codex_model_with(
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CODEX_MODEL {
-        bail!("unsupported codex model {}", quote(model));
+        bail!("unsupported codex model {:?}", model);
     }
     let args = codex_run_args(model, effort, workdir);
 

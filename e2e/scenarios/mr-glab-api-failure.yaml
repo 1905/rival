@@ -1,0 +1,110 @@
+{
+  "name": "mr-glab-api-failure",
+  "description": "`rival command codex` with `review https://gitlab.example.com/group/sub/app/-/merge_requests/42` on stdin, in a git repo whose origin is https://gitlab.example.com/group/sub/app.git. Rival runs `codex login status`, finds the matching remote, then runs `glab api --hostname gitlab.example.com projects/group%2Fsub%2Fapp/merge_requests/42` in the caller workdir with GitLab token/host vars and DEBUG removed, GIT_TERMINAL_PROMPT=0 and GLAB_CHECK_UPDATE=false. glab exits 1 (401 on its stderr). Rival reports 'resolve MR via glab: exit status: 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)'. No checkout, session or queue work happens. Stderr carries the error, exit code is 1, and <ROOT>/tmp (TMPDIR) stays empty because no checkout was created.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          }
+        ]
+      },
+      "glab": {
+        "responses": [
+          {
+            "argv": [
+              "api",
+              "--hostname",
+              "gitlab.example.com",
+              "projects/group%2Fsub%2Fapp/merge_requests/42"
+            ],
+            "times": 1,
+            "expect": {
+              "cwd": "<ROOT>/work",
+              "env": {
+                "GITLAB_TOKEN": null,
+                "GITLAB_ACCESS_TOKEN": null,
+                "OAUTH_TOKEN": null,
+                "CI_JOB_TOKEN": null,
+                "GITLAB_HOST": null,
+                "GITLAB_URI": null,
+                "GL_HOST": null,
+                "DEBUG": null,
+                "GIT_TERMINAL_PROMPT": "0",
+                "GLAB_CHECK_UPDATE": "false"
+              }
+            },
+            "stdout": "",
+            "exit": 1,
+            "stderr": "glab: 401 Unauthorized\n"
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "GITLAB_TOKEN": "wrong-host-token",
+    "GITLAB_ACCESS_TOKEN": "wrong-host-token",
+    "OAUTH_TOKEN": "wrong-host-token",
+    "CI_JOB_TOKEN": "wrong-host-token",
+    "GITLAB_HOST": "other.example.com",
+    "GITLAB_URI": "https://other.example.com",
+    "GL_HOST": "other.example.com",
+    "DEBUG": "1"
+  },
+  "fixtures": [
+    {
+      "git": "work",
+      "args": [
+        "init",
+        "-q"
+      ]
+    },
+    {
+      "git": "work",
+      "args": [
+        "remote",
+        "add",
+        "origin",
+        "https://gitlab.example.com/group/sub/app.git"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review https://gitlab.example.com/group/sub/app/-/merge_requests/42",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "resolve MR via glab: exit status: 1; check network and glab auth login --hostname gitlab.example.com (host-scoped credentials required)"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [],
+    "calls": {
+      "codex": 1,
+      "glab": 1
+    },
+    "dirs": [
+      {
+        "path": "<ROOT>/tmp",
+        "entries": []
+      }
+    ]
+  }
+}

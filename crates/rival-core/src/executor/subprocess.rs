@@ -1,7 +1,6 @@
-//! Go: `internal/executor/subprocess.go`, with `subprocess_unix.go` and
-//! `subprocess_other.go` behind [`super::process`].
+//! Runs a provider subprocess; the platform parts live in [`super::process`].
 //!
-//! Go's goroutines map to scoped threads: one writes the prompt, one tees
+//! Scoped threads do the IO: one writes the prompt, one tees
 //! stdout, one copies stderr. The calling thread plays `exec.Cmd`'s context
 //! watcher: it kills the provider group on cancellation, bounds the drain,
 //! then reaps. Only this thread signals or reaps, and it never signals after
@@ -26,7 +25,6 @@ use super::process::{self, Abort, ExitState, Io, KillOutcome, ProcessHandle};
 use crate::cancel::{CancelFunc, Context};
 use crate::envname;
 use crate::gitscope;
-use crate::gostd;
 use crate::logging::{self, Event};
 use crate::paths::Paths;
 use crate::procinfo;
@@ -69,19 +67,19 @@ const BLOCKED_ENV_PREFIXES: [&str; 16] = [
 /// group (a provider child that called setsid) still holds them.
 pub const PIPE_DRAIN_GRACE: Duration = Duration::from_secs(5);
 
-/// Go's `os.Pipe` names: the read end is `|0`, the write end `|1`.
+/// Pipe file names in error texts: the read end is `|0`, the write end `|1`.
 const PIPE_READ_NAME: &str = "|0";
 const PIPE_WRITE_NAME: &str = "|1";
-/// Go `os.ErrClosed`: IO on a pipe file closed by the drain grace.
+/// Error text for IO on a pipe file closed by the drain grace.
 const ERR_CLOSED: &str = "file already closed";
 
 const STDOUT_BUF: usize = 64 * 1024;
-/// Go `io.Copy`'s buffer.
+/// The stderr copy buffer.
 const STDERR_BUF: usize = 32 * 1024;
 /// Upper bound of one sleep while polling for the leader's exit.
 const REAP_POLL_MAX: Duration = Duration::from_millis(50);
 
-/// Go `executor.Result`.
+/// The outcome of a provider run.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RunResult {
     pub exit_code: i64,
@@ -89,7 +87,7 @@ pub struct RunResult {
     pub output_lines: i64,
 }
 
-/// The arguments of Go's `RunSubprocess`, minus the context, session and
+/// The arguments of [`run_subprocess`], minus the context, session and
 /// mirror. No `Debug`: it carries the prompt and credential env.
 #[derive(Clone, Copy)]
 pub struct Request<'a> {
@@ -101,21 +99,21 @@ pub struct Request<'a> {
     /// Vars removed from the inherited env before `env` is appended. An
     /// entry ending in `_` drops every variable with that prefix.
     pub drop_env: &'a [&'a str],
-    /// Go `os.Environ()`: the inherited env in order (`KEY=VALUE`). It is
+    /// The inherited env in order (`KEY=VALUE`). It is
     /// also where `$PATH` for the binary lookup comes from. Production code
     /// passes [`crate::config::Config::environ`].
     pub environ: &'a [OsString],
 }
 
-/// Go `safeEnv`: `environ` without Git repository overrides and without the
+/// `environ` without Git repository overrides and without the
 /// blocked prefixes that a repo-local .env could inject. Windows compares
 /// the prefixes case-insensitively (see [`safe_env_case`]).
 pub fn safe_env(environ: &[OsString]) -> Vec<OsString> {
     safe_env_case(cfg!(windows), environ)
 }
 
-/// [`safe_env`] with an explicit name rule (see [`crate::envname`]). Go's
-/// `strings.HasPrefix` is case-sensitive; Windows env names are not, so
+/// [`safe_env`] with an explicit name rule (see [`crate::envname`]). A
+/// plain prefix match is case-sensitive; Windows env names are not, so
 /// there `Node_Options` must go as `NODE_OPTIONS` does.
 pub(crate) fn safe_env_case(case_insensitive: bool, environ: &[OsString]) -> Vec<OsString> {
     gitscope::repository_env(environ)
@@ -128,7 +126,7 @@ pub(crate) fn safe_env_case(case_insensitive: bool, environ: &[OsString]) -> Vec
         .collect()
 }
 
-/// Go `dropMatches`: whether `kv` (a `KEY=VALUE` entry) is named by
+/// Whether `kv` (a `KEY=VALUE` entry) is named by
 /// `drop_env`. An entry ending in `_` is a prefix match ("AWS_" drops every
 /// AWS_* var — exact name lists rot as providers add credential vars); any
 /// other entry matches that exact variable name. `case_insensitive` (the
@@ -159,8 +157,8 @@ fn drop_hit(case_insensitive: bool, kv: &OsStr, prefixes: &[String]) -> bool {
         .any(|p| envname::has_prefix(case_insensitive, kv, p))
 }
 
-/// The env the child gets: Go's `append(base, env...)` after `safeEnv` and
-/// `dropEnv`.
+/// The env the child gets: the safe base env with `drop_env` applied, then
+/// the request env appended.
 pub fn child_env(req: &Request<'_>) -> Vec<OsString> {
     child_env_case(cfg!(windows), req)
 }
@@ -177,7 +175,7 @@ pub(crate) fn child_env_case(case_insensitive: bool, req: &Request<'_>) -> Vec<O
     base
 }
 
-/// Where Go splits an env entry into key and value (`dedupEnvCase`): the
+/// Where an env entry splits into key and value: the
 /// first `=`, but a leading `=` belongs to the key. `None` = no `=`.
 fn env_key_end(kv: &[u8]) -> Option<usize> {
     match kv.iter().position(|&b| b == b'=') {
@@ -186,15 +184,15 @@ fn env_key_end(kv: &[u8]) -> Option<usize> {
     }
 }
 
-/// Go `exec.dedupEnv`: the last value of each key wins, in the order of
+/// The last value of each key wins, in the order of
 /// each key's last occurrence. An entry without `=` is kept as-is. An entry
 /// with a NUL byte is skipped and reported. Windows compares keys case
-/// insensitively (Go `strings.ToLower`).
+/// insensitively (lowercased).
 pub(crate) fn dedup_env(env: &[OsString]) -> Result<Vec<OsString>, String> {
     dedup_env_case(cfg!(windows), env)
 }
 
-/// Go `exec.dedupEnvCase` (`nulOK` false).
+/// [`dedup_env`] with an explicit name rule.
 pub(crate) fn dedup_env_case(
     case_insensitive: bool,
     env: &[OsString],
@@ -217,7 +215,7 @@ pub(crate) fn dedup_env_case(
         let key = &bytes[..i];
         let key = if case_insensitive {
             match std::str::from_utf8(key) {
-                Ok(k) => gostd::to_lower(k).into_bytes(),
+                Ok(k) => k.to_lowercase().into_bytes(),
                 Err(_) => key.to_ascii_lowercase(),
             }
         } else {
@@ -238,8 +236,8 @@ pub(crate) fn set_env(cmd: &mut Command, env: &[OsString]) {
     cmd.env_clear();
     for kv in env {
         let bytes = kv.as_encoded_bytes();
-        // Rust's Command needs a key and a value; Go would pass an
-        // entry without "=" through unchanged.
+        // Command needs a key and a value, so an entry without "=" is
+        // skipped.
         if let Some(i) = env_key_end(bytes) {
             // SAFETY: both halves split at an ASCII '='.
             let (k, v) = unsafe {
@@ -253,7 +251,7 @@ pub(crate) fn set_env(cmd: &mut Command, env: &[OsString]) {
     }
 }
 
-/// Go `os.Getenv` on an `os.Environ()` list: the first entry wins. Windows
+/// Looks up `key` in an env list: the first entry wins. Windows
 /// names are case-insensitive (ASCII), as `GetEnvironmentVariableW` treats
 /// them.
 pub(crate) fn getenv<'a>(environ: &'a [OsString], key: &str) -> Option<&'a OsStr> {
@@ -282,7 +280,7 @@ pub(crate) fn getenv_case<'a>(
     })
 }
 
-/// Go `exec.Command`: a name without a separator is looked up in `$PATH`
+/// A name without a separator is looked up in `$PATH`
 /// now; the error is reported by `Start`.
 #[cfg(not(windows))]
 fn resolve(binary: &str, environ: &[OsString], _dir: &str) -> Result<PathBuf, String> {
@@ -295,22 +293,21 @@ fn resolve(binary: &str, environ: &[OsString], _dir: &str) -> Result<PathBuf, St
     process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string())
 }
 
-/// Go `exec.Command` plus `Start` on Windows: a bare name (`filepath.Base`
-/// of itself) is looked up in `%PATH%` with `PATHEXT`; any other name gets
-/// its `PATHEXT` extension from `lookExtensions`, a relative one against
-/// `dir` (the `cmd.Dir`).
+/// Command start on Windows: a bare name (no directory, no drive) is looked
+/// up in `%PATH%` with `PATHEXT`; any other name gets its `PATHEXT`
+/// extension from `look_extensions`, a relative one against `dir` (the
+/// child's directory).
 #[cfg(windows)]
 fn resolve(binary: &str, environ: &[OsString], dir: &str) -> Result<PathBuf, String> {
-    use super::process::windows::{LookEnv, look_extensions};
-    use crate::winpath;
+    use super::process::windows::{LookEnv, is_bare_name, look_extensions};
 
     if binary.is_empty() {
         return Err("exec: no command".to_string());
     }
-    if winpath::base(binary.as_bytes()) == binary.as_bytes() {
+    if is_bare_name(binary) {
         return process::look_path(binary, getenv(environ, "PATH")).map_err(|e| e.to_string());
     }
-    let dir = if winpath::is_abs(binary.as_bytes()) {
+    let dir = if Path::new(binary).is_absolute() {
         ""
     } else {
         dir
@@ -318,31 +315,21 @@ fn resolve(binary: &str, environ: &[OsString], dir: &str) -> Result<PathBuf, Str
     look_extensions(binary, dir, &LookEnv::process()).map_err(|e| e.to_string())
 }
 
-/// Go's text for an `io::Error` without a file name.
+/// The text of an `io::Error` without a file name. A write that stops
+/// short reads `short write`.
 pub(crate) fn io_text(err: &io::Error) -> String {
     if err.kind() == io::ErrorKind::WriteZero {
         return "short write".to_string();
     }
-    if err.raw_os_error().is_some() {
-        return gostd::os_error_text(err);
-    }
     err.to_string()
 }
 
-/// Go `*os.PathError` text for IO on a named file.
+/// `<op> <name>: <errno text>` for IO on a named file.
 fn file_error(op: &str, name: &str, err: &io::Error) -> String {
     format!("{op} {name}: {}", io_text(err))
 }
 
-/// Go's `fork/exec` error text. A NUL in an argument is EINVAL in Go.
-pub(crate) fn spawn_error_text(err: &io::Error) -> String {
-    if err.raw_os_error().is_none() && err.kind() == io::ErrorKind::InvalidInput {
-        return "invalid argument".to_string();
-    }
-    io_text(err)
-}
-
-/// Go's `w.Write(p)` contract over a Rust writer: loops over short writes and
+/// A full-write contract over a writer: loops over short writes and
 /// returns the bytes written plus the first error.
 fn write_full<W: Write + ?Sized>(w: &mut W, mut buf: &[u8]) -> (usize, Option<io::Error>) {
     let mut n = 0;
@@ -360,14 +347,14 @@ fn write_full<W: Write + ?Sized>(w: &mut W, mut buf: &[u8]) -> (usize, Option<io
     (n, None)
 }
 
-/// Go `syncWriter` around the session log file.
+/// A locked writer around the session log file.
 struct SyncLog {
     file: Mutex<File>,
     name: String,
 }
 
 impl SyncLog {
-    /// One locked write; the error text is Go's `write <path>: <errno>`.
+    /// One locked write; the error text is `write <path>: <errno>`.
     fn write(&self, p: &[u8]) -> (usize, Option<String>) {
         let mut file = self.file.lock().unwrap_or_else(|e| e.into_inner());
         let (n, err) = write_full(&mut *file, p);
@@ -411,7 +398,7 @@ impl Drain {
     }
 }
 
-/// Go's `defer wg.Done()`, also on panic. A panicking worker fires the
+/// Marks a worker done, also on panic. A panicking worker fires the
 /// abort so its siblings stop too; the calling thread then kills and reaps.
 struct WorkerGuard<'a> {
     drain: &'a Drain,
@@ -440,7 +427,7 @@ struct StdoutTotals {
     err: Option<String>,
 }
 
-/// Go `RunSubprocess`: runs `req.binary` in its own process group in
+/// Runs `req.binary` in its own process group in
 /// `sess.work_dir`, writes `req.prompt` to its stdin, tees stdout to the
 /// session log and `mirror`, and copies stderr to the log only.
 ///
@@ -497,13 +484,8 @@ pub fn run_subprocess(
         }
         let env = dedup_env(&env).map_err(|e| anyhow!("start {binary}: {e}"))?;
 
-        let fork_error = |e: &io::Error| {
-            anyhow!(
-                "start {binary}: fork/exec {}: {}",
-                lp.display(),
-                spawn_error_text(e)
-            )
-        };
+        let fork_error =
+            |e: &io::Error| anyhow!("start {binary}: {}", super::oscmd::fork_error(&lp, e));
         let program =
             process::program_in_dir(&lp, Path::new(&sess.work_dir)).map_err(|e| fork_error(&e))?;
         let mut cmd = Command::new(program);
@@ -516,8 +498,8 @@ pub fn run_subprocess(
             .stdout(Stdio::from(stdout_w))
             .stderr(Stdio::from(stderr_w));
         let spawned = image.and_then(|()| process::start_provider(&mut cmd));
-        // Closes our copies of the child's pipe ends (Go closes childIOFiles
-        // after Start), so EOF arrives once the provider side is done.
+        // Closes our copies of the child's pipe ends after the start, so EOF
+        // arrives once the provider side is done.
         drop(cmd);
         let proc: ProcessHandle = spawned.map_err(|e| fork_error(&e))?;
 
@@ -562,8 +544,8 @@ struct Pipes {
     abort: Abort,
 }
 
-/// Go's `cmd.Cancel` plus `watchCtx`: kills the group and returns the error
-/// `cmd.Wait` would report when the child itself exits 0.
+/// Kills the group on cancellation and returns the error to report when the
+/// child itself exits 0.
 fn cancel_group(proc: &mut ProcessHandle, ctx: &Context) -> Option<String> {
     match proc.kill_group() {
         KillOutcome::Sent => ctx.err().map(|e| e.to_string()),
@@ -601,7 +583,7 @@ fn supervise(
         cond: Condvar::new(),
         wake: wake.clone(),
     };
-    // `Some(err)` once the group kill ran; Go calls Cancel at most once.
+    // `Some(err)` once the group kill ran; the kill runs at most once.
     let mut watch: Option<Option<String>> = None;
     let mut aborted = false;
 
@@ -681,7 +663,7 @@ fn supervise(
     let (stdin_err, totals, stderr_err) = match (stdin_res, stdout_res, stderr_res) {
         (Ok(a), Ok(b), Ok(c)) => (a, b, c),
         (a, b, c) => {
-            // Go would crash the process. Kill and reap the provider first.
+            // A worker panicked. Kill and reap the provider first.
             drop((stdout, stderr));
             proc.kill_group();
             let _ = reap(&mut proc, None, &mut watch);
@@ -690,11 +672,11 @@ fn supervise(
         }
     };
     if aborted {
-        // Go closes the read ends at the grace, before cmd.Wait.
+        // Close the read ends at the grace, before the reap.
         drop((stdout, stderr));
     }
 
-    // Go's cmd.Wait: reap the leader; the context watcher still kills the
+    // Reap the leader; the context watcher still kills the
     // group if the context ends first.
     let state = reap(&mut proc, Some(ctx), &mut watch);
 
@@ -743,10 +725,10 @@ fn supervise(
 }
 
 /// Polls `waitpid(WNOHANG)` until the leader is reaped. With a context, a
-/// cancellation seen before the reap kills the group once: Go's watcher
-/// calls Cancel as soon as the context is done, until `cmd.Wait` has reaped
-/// the leader. The check runs before each reap attempt, and no signal is
-/// ever sent after the reap.
+/// cancellation seen before the reap kills the group once: the watcher
+/// kills as soon as the context is done, until the leader is reaped. The
+/// check runs before each reap attempt, and no signal is ever sent after
+/// the reap.
 fn reap(
     proc: &mut ProcessHandle,
     ctx: Option<&Context>,
@@ -773,7 +755,7 @@ fn reap(
     }
 }
 
-/// Go's stdin goroutine: write the prompt, then close the pipe.
+/// The stdin worker: write the prompt, then close the pipe.
 fn write_prompt(
     stdin: PipeWriter,
     prompt: &str,
@@ -806,9 +788,9 @@ fn write_prompt(
     err
 }
 
-/// Go's stdout goroutine: `bufio.Reader.ReadBytes('\n')` — each complete
+/// The stdout worker: each complete
 /// line, or the nonempty tail before EOF or an error — goes to the log and
-/// then the mirror (`io.MultiWriter`). Lines have no length limit.
+/// then the mirror. Lines have no length limit.
 fn tee_stdout(
     stdout: &PipeReader,
     log: &SyncLog,
@@ -867,10 +849,10 @@ fn tee_stdout(
     totals
 }
 
-/// Go `io.MultiWriter(safeLog, mirror).Write(line)`: the log first (a full
+/// Writes one line to the log and the mirror: the log first (a full
 /// `os.File` write), then one mirror `Write`. It stops at the first failing
 /// writer and returns that writer's count; a short write without an error
-/// is `io.ErrShortWrite`. A Rust writer reports no count with an error, so
+/// is a short-write error. A writer reports no count with an error, so
 /// a failing mirror counts 0.
 fn tee_line<W: Write + ?Sized>(
     line: &[u8],
@@ -897,8 +879,8 @@ fn tee_line<W: Write + ?Sized>(
     (line.len(), None)
 }
 
-/// Go's stderr goroutine: `io.Copy(safeLog, stderr)`. A log write error
-/// stops the copy, as in Go; the pipe stays open until the reap.
+/// The stderr worker: copies stderr to the log. A log write error
+/// stops the copy; the pipe stays open until the reap.
 fn copy_stderr(
     stderr: &PipeReader,
     log: &SyncLog,
@@ -928,7 +910,7 @@ fn copy_stderr(
 }
 
 /// Both name rules, on every host: `true` is the case-insensitive rule (the
-/// OS's on Windows, the ASCII model elsewhere), `false` Go's (and Unix's)
+/// OS's on Windows, the ASCII model elsewhere), `false` the Unix
 /// case-sensitive one. Every name here is ASCII, so both agree.
 #[cfg(test)]
 mod env_case_tests {

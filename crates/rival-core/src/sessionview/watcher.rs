@@ -1,8 +1,7 @@
 //! Session directory watcher for the dashboard.
 //!
-//! Go: `internal/dashboard/watcher.go` (fsnotify). This port uses the
-//! `notify` crate, std channels and [`crate::cancel::Context`]; there is no
-//! async runtime.
+//! Uses the `notify` crate, std channels and [`crate::cancel::Context`];
+//! there is no async runtime.
 //!
 //! [`watch_sessions`] runs the initial scan on the caller's thread, sends the
 //! first [`SessionEvent`], and then hands the directory watch to one worker
@@ -101,7 +100,7 @@ pub fn watch_sessions(
 
     let (fs_tx, fs_rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(fs_tx)?;
-    // On error the watcher drops here, as Go closes it.
+    // On error the watcher drops here, which closes it.
     watcher.watch(&dir, RecursiveMode::NonRecursive)?;
 
     // One shared cache serves every reload below. It reparses only the files
@@ -138,7 +137,7 @@ pub fn watch_sessions(
     })
 }
 
-/// Go: `os.MkdirAll(dir, 0700)`.
+/// `mkdir -p` with mode 0700.
 fn create_dir_all(dir: &Path) -> anyhow::Result<()> {
     let mut builder = std::fs::DirBuilder::new();
     builder.recursive(true);
@@ -182,7 +181,7 @@ fn run(
 #[derive(Debug, Default)]
 struct RefreshFilter {
     /// Starts at 0 although the initial scan already moved the cache's
-    /// revision, as in Go: the first later log event therefore refreshes
+    /// revision: the first later log event therefore refreshes
     /// even when nothing changed.
     last_revision: u64,
 }
@@ -209,10 +208,9 @@ impl RefreshFilter {
     }
 }
 
-/// The paths of an event Go's filter (`Write`, `Create` or `Remove`) would
-/// see, or `None` for any other event. fsnotify reports a rename into the
-/// directory as `Create` on the new name and ignores the old name; inotify
-/// tells the two apart, FSEvents and Windows report both as `Name(Any)`.
+/// The paths of a `Write`, `Create` or `Remove` event, or `None` for any
+/// other event. A rename into the directory counts as `Create` on the new
+/// name, and the old name is ignored. inotify tells the two apart, FSEvents and Windows report both as `Name(Any)`.
 fn event_names(event: &notify::Event) -> Option<&[std::path::PathBuf]> {
     match event.kind {
         EventKind::Create(_)
@@ -235,7 +233,7 @@ enum Send {
     Disconnected,
 }
 
-/// Go: `select { case ch <- v: case <-ctx.Done(): }`. Retries a full
+/// Sends `value` unless `ctx` is done first. Retries a full
 /// channel until it has room or `ctx` is done. A dropped receiver ends the
 /// wait, since nothing could read the value.
 fn send_or_cancel<T>(ctx: &Context, tx: &SyncSender<T>, mut value: T) -> Send {
@@ -304,8 +302,7 @@ mod tests {
         }
     }
 
-    // Go: TestWatchSessionsClosesProgressOnEmptyDir. The progress channel is
-    // closed once the initial scan is sent, also with no sessions at all.
+    // The progress channel is closed once the initial scan is sent, also with no sessions at all.
     #[test]
     fn watch_sessions_closes_progress_on_empty_dir() {
         let tmp = tempfile::tempdir().unwrap();
@@ -511,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn event_names_follow_the_go_filter() {
+    fn event_names_keep_write_create_remove() {
         let cases = [
             (EventKind::Create(CreateKind::File), true),
             (EventKind::Remove(RemoveKind::File), true),
@@ -540,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn refresh_filter_follows_go() {
+    fn refresh_filter_refreshes_on_log_and_json_events() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
         write_session(dir, "a");
@@ -552,7 +549,7 @@ mod tests {
         let log = dir.join("a.log").to_string_lossy().into_owned();
         let json = dir.join("a.json").to_string_lossy().into_owned();
 
-        // Go quirk: last_revision starts at 0, so the first log event after
+        // Quirk: last_revision starts at 0, so the first log event after
         // the initial snapshot refreshes although nothing changed.
         let ev = filter
             .handle(&write_event(&log), &cache)
@@ -570,7 +567,7 @@ mod tests {
                 .handle(&write_event("/s/notes.txt"), &cache)
                 .is_none()
         );
-        // A chmod on a JSON file is outside Go's filter.
+        // A chmod on a JSON file is outside the filter.
         let chmod = event(
             EventKind::Modify(ModifyKind::Metadata(MetadataKind::Permissions)),
             &json,

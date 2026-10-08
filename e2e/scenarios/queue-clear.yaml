@@ -1,0 +1,82 @@
+{
+  "name": "queue-clear",
+  "description": "`rival queue clear`, `rival queue clear --force` and `rival queue` with a dead-PID ticket, a fresh unparseable .json and a fresh .tmp planted in the queue dir. The pre-run scan reaps the dead ticket first (log 'reaping dead queue ticket' with ticket/pid/state), so `queue clear` prints 'Removed 0 dead tickets.'. The two fresh files are younger than 60s and are kept, so `queue clear --force` skips the unparseable file and prints 'Removed 0 tickets.', and `rival queue` prints 'Queue is empty.'. All exit 0.",
+  "fixtures": [
+    {
+      "write": "home/.rival/queue/0000000000000000001-16777216-dead-1.json",
+      "json": {
+        "id": "dead-1",
+        "mode": "review",
+        "pid": 16777216,
+        "state": "running",
+        "created_at": "2026-01-02T03:04:05Z"
+      },
+      "mode": "0600"
+    },
+    {
+      "write": "home/.rival/queue/0000000000000000002-1-garbage.json",
+      "text": "{not json",
+      "mode": "0600"
+    },
+    {
+      "write": "home/.rival/queue/0000000000000000003-1-inflight.json.tmp",
+      "text": "{",
+      "mode": "0600"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "queue",
+        "clear"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Removed 0 dead tickets.\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "reaping dead queue ticket",
+            "fields": {
+              "ticket": "dead-1",
+              "pid": "<PID1>",
+              "state": "running"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "queue",
+        "clear",
+        "--force"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Removed 0 tickets.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "queue"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Queue is empty.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/queue/0000000000000000002-1-garbage.json",
+      ".rival/queue/0000000000000000003-1-inflight.json.tmp"
+    ]
+  }
+}

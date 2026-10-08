@@ -1,5 +1,5 @@
 //! The root command: startup order, the pre-run hook, dispatch and exit
-//! codes. Go: `main.go`, `cmd/root.go`.
+//! codes.
 
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
@@ -20,9 +20,7 @@ use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{
-    command_antislop, command_plan, command_security, install, queue_sessions, update_cmd,
-};
+use crate::{command_plan, command_security, install, queue_sessions, update_cmd};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -40,7 +38,7 @@ const BANNER: &str = "
 /// command finished. It matches the check's own HTTP timeout.
 pub const UPDATE_CHECK_WAIT: Duration = Duration::from_secs(2);
 
-/// A command failure. Go: a plain `error` (exit 1) or `*ExitCodeError`.
+/// A command failure: a plain error (exit 1) or one with its own exit code.
 /// The root prints `message` on stderr and exits with `code`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CmdError {
@@ -49,7 +47,7 @@ pub struct CmdError {
 }
 
 impl CmdError {
-    /// A plain Go `error`: exit code 1.
+    /// A plain error: exit code 1.
     pub fn plain(message: impl Into<String>) -> Self {
         CmdError {
             code: 1,
@@ -57,7 +55,7 @@ impl CmdError {
         }
     }
 
-    /// Go `&ExitCodeError{Code: code, Err: err}`.
+    /// An error with its own exit code.
     pub fn exit(code: i32, message: impl Into<String>) -> Self {
         CmdError {
             code,
@@ -74,21 +72,21 @@ impl fmt::Display for CmdError {
 
 impl std::error::Error for CmdError {}
 
-/// Go `os.Stdin` as the commands use it.
+/// Standard input as the commands use it.
 pub trait StdinSource {
-    /// Go `os.Stdin.Stat()` succeeded and reports a character device (a
-    /// terminal, or `/dev/null`).
+    /// A stat of stdin succeeded and reports a character device (a terminal,
+    /// or `/dev/null`).
     fn is_char_device(&self) -> bool;
-    /// Go `os.Stdin.Stat()` failed (fd 0 closed or invalid). Only
+    /// A stat of stdin failed (fd 0 closed or invalid). Only
     /// `command security` tells this apart from a non-terminal stdin: it
     /// skips the read instead of failing it.
     fn stat_failed(&self) -> bool {
         false
     }
-    /// Go `io.ReadAll(os.Stdin)`. The error is Go's `*PathError` text.
+    /// Reads all of stdin. The error is `read /dev/stdin: <errno text>`.
     fn read_all(&mut self) -> Result<Vec<u8>, String>;
-    /// Go `bufio.NewReader(cmd.InOrStdin())` for line prompts. Callers keep
-    /// one reader for the whole command, so buffered answers are not lost.
+    /// A buffered reader for line prompts. Callers keep one reader for the
+    /// whole command, so buffered answers are not lost.
     fn reader(&mut self) -> Box<dyn BufRead + '_>;
 }
 
@@ -97,8 +95,8 @@ pub struct ProcessStdin;
 
 impl StdinSource for ProcessStdin {
     fn is_char_device(&self) -> bool {
-        // A descriptor closed at startup fails Go's Stat; Rust reopened it
-        // on /dev/null, which would read as a character device.
+        // A descriptor closed at startup counts as a failed stat; Rust
+        // reopened it on /dev/null, which would read as a character device.
         if startup_fds::closed_at_start(0) {
             return false;
         }
@@ -110,15 +108,13 @@ impl StdinSource for ProcessStdin {
     }
 
     fn read_all(&mut self) -> Result<Vec<u8>, String> {
-        let text =
-            |e: &io::Error| format!("read /dev/stdin: {}", rival_core::gostd::os_error_text(e));
+        let text = |e: &io::Error| format!("read /dev/stdin: {}", e);
         if startup_fds::closed_at_start(0) {
             return Err(text(&io::Error::from_raw_os_error(libc::EBADF)));
         }
-        // Windows: std reads EOF from a missing handle (`handle_ebadf`); Go
-        // does not. An INVALID_HANDLE_VALUE makes Go's `os.Stdin` nil, whose
-        // Read is the bare `os.ErrInvalid`. A NULL handle is still a File,
-        // and its ReadFile fails with ERROR_INVALID_HANDLE.
+        // Windows: std reads EOF from a missing handle (`handle_ebadf`); this
+        // read fails instead. An INVALID_HANDLE_VALUE gives the bare
+        // [`NilFile`] error. A NULL handle fails with ERROR_INVALID_HANDLE.
         #[cfg(windows)]
         match std_handle(windows_sys::Win32::System::Console::STD_INPUT_HANDLE) {
             StdHandle::Invalid => return Err(NilFile.to_string()),
@@ -134,7 +130,7 @@ impl StdinSource for ProcessStdin {
     }
 
     /// A fd 0 closed at startup reads EOF here (Rust reopened it on
-    /// /dev/null); Go's read fails. Both give a prompt an empty answer.
+    /// /dev/null), where a failed read would give the same empty answer.
     fn reader(&mut self) -> Box<dyn BufRead + '_> {
         Box::new(io::stdin().lock())
     }
@@ -157,26 +153,25 @@ fn stdin_stat_ok() -> bool {
     unsafe { libc::fstat(0, &mut st) == 0 }
 }
 
-/// Go `os.Stdin.Stat()` on Windows reports `ModeCharDevice` for a
-/// `FILE_TYPE_CHAR` handle: a console, and also the `NUL` device.
+/// On Windows a `FILE_TYPE_CHAR` handle is a character device: a console,
+/// and also the `NUL` device.
 #[cfg(windows)]
 fn stdin_is_char_device() -> bool {
     use windows_sys::Win32::Storage::FileSystem::FILE_TYPE_CHAR;
     stdin_file_type() == Some(FILE_TYPE_CHAR)
 }
 
-/// Go `os.Stdin.Stat()` succeeding on Windows: a usable standard input
-/// handle whose file type can be read. An INVALID_HANDLE_VALUE (Go's
-/// `os.Stdin` is nil: `ErrInvalid`) or a NULL handle (`GetFileType` fails)
-/// fails, as does an unknown type with an error.
+/// A stdin stat succeeding on Windows: a usable standard input handle
+/// whose file type can be read. An INVALID_HANDLE_VALUE or a NULL handle
+/// (`GetFileType` fails) fails, as does an unknown type with an error.
 #[cfg(windows)]
 fn stdin_stat_ok() -> bool {
     stdin_file_type().is_some()
 }
 
-/// A Windows standard handle as Go's `syscall.getStdHandle` keeps it. Go's
-/// `os.NewFile` rejects only INVALID_HANDLE_VALUE (a nil `*File`); a NULL
-/// handle becomes a `File` whose calls fail with ERROR_INVALID_HANDLE.
+/// A Windows standard handle. Only INVALID_HANDLE_VALUE means no file
+/// ([`NilFile`]); a NULL handle is a file whose calls fail with
+/// ERROR_INVALID_HANDLE.
 #[cfg(windows)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum StdHandle {
@@ -200,7 +195,7 @@ pub(crate) fn std_handle(which: windows_sys::Win32::System::Console::STD_HANDLE)
     }
 }
 
-/// ERROR_INVALID_HANDLE: what Go's ReadFile/WriteFile/GetFileType on a NULL
+/// ERROR_INVALID_HANDLE: what ReadFile/WriteFile/GetFileType on a NULL
 /// standard handle fail with.
 #[cfg(windows)]
 fn invalid_handle_error() -> io::Error {
@@ -227,9 +222,9 @@ pub(crate) fn stdin_file_type() -> Option<u32> {
     }
 }
 
-/// Go's `os.ErrInvalid` from a nil `*os.File` (`checkValid`): its text has
-/// no op or path. Windows `os.Stdin`/`os.Stdout` are nil when the standard
-/// handle is INVALID_HANDLE_VALUE.
+/// The error of a standard stream with no file: its text has no op or
+/// path. On Windows stdin/stdout have no file when the standard handle is
+/// INVALID_HANDLE_VALUE.
 #[derive(Debug)]
 pub struct NilFile;
 
@@ -241,20 +236,20 @@ impl std::fmt::Display for NilFile {
 
 impl std::error::Error for NilFile {}
 
-/// Whether `e` is [`NilFile`]: Go prints it bare, without `write <path>:`.
+/// Whether `e` is [`NilFile`], which prints bare, without `write <path>:`.
 pub fn is_nil_file(e: &io::Error) -> bool {
     e.get_ref().is_some_and(|inner| inner.is::<NilFile>())
 }
 
-/// Unbuffered stdout, like Go's `os.Stdout`: every write reaches fd 1 at
-/// once, so it interleaves with stderr in call order. When fd 1 was closed
-/// at startup, writes fail with EBADF as Go's do (Rust reopened it on
-/// /dev/null, where they would succeed).
+/// Unbuffered stdout: every write reaches fd 1 at once, so it interleaves
+/// with stderr in call order. When fd 1 was closed at startup, writes fail
+/// with EBADF (Rust reopened it on /dev/null, where they would succeed).
 ///
 /// Windows: std turns a write to a missing handle into a silent success
-/// (`handle_ebadf`). Go fails it: INVALID_HANDLE_VALUE with [`NilFile`], a
-/// NULL handle with ERROR_INVALID_HANDLE. The handle is checked before each
-/// write. A valid handle that fails later still goes through std.
+/// (`handle_ebadf`). This writer fails it: INVALID_HANDLE_VALUE with
+/// [`NilFile`], a NULL handle with ERROR_INVALID_HANDLE. The handle is
+/// checked before each write. A valid handle that fails later still goes
+/// through std.
 pub struct ProcessStdout;
 
 impl Write for ProcessStdout {
@@ -279,11 +274,11 @@ impl Write for ProcessStdout {
     }
 }
 
-/// Go `mergerequest.Prepare` or a test fake (Go's `prepareMR` package var).
+/// Prepares the MR snapshot checkout, or a test fake.
 pub type PrepareMr = dyn Fn(&Context, &Config, &str, &str) -> Result<Option<Snapshot>, String>;
 
-/// What a command action reads and writes. Go reaches these through
-/// globals; here they are injected so tests never touch the process.
+/// What a command action reads and writes. These are injected so tests
+/// never touch the process.
 pub struct CmdEnv<'a> {
     pub cfg: &'a Config,
     pub stdin: &'a mut dyn StdinSource,
@@ -302,7 +297,7 @@ pub struct CmdEnv<'a> {
 /// Makes an owned stdout writer for a thread that can outlive a borrow.
 pub type LiveStdout = dyn Fn() -> Box<dyn Write + Send> + Sync;
 
-/// Go `signal.NotifyContext(...)` plus its deferred `stop()`.
+/// SIGINT/SIGTERM handling for one run; dropping it restores the defaults.
 pub enum SignalScope {
     Notify(#[allow(dead_code, reason = "held for its Drop")] NotifyGuard),
     Plain(CancelFunc),
@@ -334,7 +329,7 @@ impl CmdEnv<'_> {
 
 pub type ConfigHook = Arc<dyn Fn(&Config) + Send + Sync>;
 
-/// Go `update.Check(Version)`, printing its notice to the writer.
+/// The update check, printing its notice to the writer.
 pub type UpdateHook = Arc<dyn Fn(&Config, &mut dyn Write) + Send + Sync>;
 
 /// Runs the dashboard. The error is the text after "tui: ".
@@ -342,13 +337,13 @@ pub type TuiHook = Box<dyn Fn(&Config) -> Result<(), String>>;
 
 /// The root's side effects, injectable for tests.
 pub struct RootHooks {
-    /// Go `reap()`: fail orphaned sessions, then drop dead queue tickets.
+    /// Fails orphaned sessions, then drops dead queue tickets.
     pub reap: ConfigHook,
-    /// Go `update.Check(Version)`.
+    /// The update check.
     pub update_check: UpdateHook,
-    /// Go `detachIfRequested(true)`.
+    /// Detaches into the background when the command asked for it.
     pub detach: Box<dyn Fn() -> DetachOutcome>,
-    /// Go `tea.NewProgram(dashboard.New()).Run()`.
+    /// Runs the dashboard.
     pub tui: TuiHook,
 }
 
@@ -365,17 +360,17 @@ impl RootHooks {
     }
 }
 
-/// Go `reap`. Sessions first: queue ticket liveness reads session state.
+/// Reaps orphans. Sessions first: queue ticket liveness reads session state.
 pub fn reap(cfg: &Config) {
     session::reaper::reap_orphans(cfg.paths());
     queue::Manager::new(cfg.paths(), cfg).reap_dead();
 }
 
-/// Go `main` + `cmd.Execute`. Returns the process exit code.
+/// The process entry: setup, then the command. Returns the process exit code.
 pub fn main_entry() -> i32 {
-    // Go package init runs before main: config.yaml is read with the
-    // pre-.env HOME, and `wait --timeout` gets its default from the
-    // pre-.env RIVAL_QUEUE_TIMEOUT / RIVAL_RUN_TIMEOUT.
+    // Config loads before .env: config.yaml is read with the pre-.env HOME,
+    // and `wait --timeout` gets its default from the pre-.env
+    // RIVAL_QUEUE_TIMEOUT / RIVAL_RUN_TIMEOUT.
     let initial = Config::load(&Paths::from_env());
     let defaults = Defaults {
         wait_timeout: initial.max_run_wait(),
@@ -387,8 +382,8 @@ pub fn main_entry() -> i32 {
     // Runtime getenv calls see .env additions; the user config stays the
     // one loaded above.
     let cfg = initial.reload_env(Paths::from_env());
-    // Go: telemetry.Init after the logger, then a deferred Flush that only
-    // a normal return from Execute reaches (every error path calls os.Exit).
+    // Telemetry starts after the logger. Only a successful run flushes it;
+    // an error or an early exit skips the flush.
     let telemetry = Telemetry::init(rival_core::VERSION, |key| cfg.getenv(key));
 
     let args: Vec<String> = std::env::args_os()
@@ -416,8 +411,7 @@ pub fn main_entry() -> i32 {
         &args,
         UPDATE_CHECK_WAIT,
     );
-    // Go `defer telemetry.RecoverPanic()` in Execute: a no-op (see
-    // Telemetry::recover_panic).
+    // A no-op (see Telemetry::recover_panic).
     telemetry.recover_panic();
     if exit.returned {
         telemetry.flush();
@@ -425,11 +419,11 @@ pub fn main_entry() -> i32 {
     exit.code
 }
 
-/// How Go's `Execute` ended.
+/// How the command run ended.
 pub(crate) struct Exit {
     pub code: i32,
-    /// `Execute` returned normally (no `os.Exit`), so `main`'s deferred
-    /// telemetry flush runs.
+    /// The run succeeded (no error, no early exit), so the telemetry flush
+    /// runs.
     pub returned: bool,
 }
 
@@ -443,15 +437,15 @@ struct Background {
 }
 
 impl Background {
-    /// Go `waitForReap`: a background reap always finishes, so the exit
-    /// never cuts a session save short.
+    /// A background reap always finishes, so the exit never cuts a session
+    /// save short.
     fn wait_for_reap(&mut self) {
         if let Some(handle) = self.reap.take() {
             let _ = handle.join();
         }
     }
 
-    /// Go `waitForUpdateCheck`: at most [`UPDATE_CHECK_WAIT`]. Returns the
+    /// Waits at most [`UPDATE_CHECK_WAIT`] for the update check. Returns the
     /// buffered notice, if the check finished and buffered one.
     fn wait_for_update_check(&mut self, limit: Duration) -> Vec<u8> {
         self.update
@@ -464,7 +458,7 @@ impl Background {
 /// What the pre-run hook decided.
 enum PreRun {
     Continue,
-    /// Exit now with this code (Go `os.Exit` inside the hook).
+    /// Exit now with this code.
     Exit(i32),
     Fail(CmdError),
 }
@@ -481,7 +475,7 @@ pub(crate) fn execute_with_wait(
     execute_inner(env, hooks, defaults, args, update_wait).code
 }
 
-/// Go `cmd.Execute` over `args` (no program name).
+/// Parses and runs `args` (no program name).
 fn execute_inner(
     env: &mut CmdEnv<'_>,
     hooks: &RootHooks,
@@ -531,7 +525,7 @@ fn execute_inner(
     }
 }
 
-/// Go `PersistentPreRunE`, in its order: config error, detach, reap, update
+/// The pre-run hook, in this order: config error, detach, reap, update
 /// check.
 fn pre_run(
     env: &mut CmdEnv<'_>,
@@ -564,9 +558,9 @@ fn pre_run(
     let cfg = env.cfg.clone();
     let check = Arc::clone(&hooks.update_check);
     std::thread::spawn(move || {
-        // Go prints the notice on stderr whenever the check ends. Under the
-        // TUI that would draw over the screen, so the notice is buffered
-        // and the root prints it after the terminal is restored.
+        // Other commands print the notice on stderr whenever the check ends.
+        // Under the TUI that would draw over the screen, so the notice is
+        // buffered and the root prints it after the terminal is restored.
         let mut held = Vec::new();
         if tui {
             check(&cfg, &mut held);
@@ -610,14 +604,13 @@ fn dispatch(
         CommandId::CommandGrok => model_command(env, inv, grok_spec),
         CommandId::CommandK3 => model_command(env, inv, k3_spec),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
-        CommandId::CommandAntislop => command_antislop::command_antislop_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
         CommandId::Queue => queue_sessions::queue_list_action(env),
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),
         CommandId::Update => update_cmd::update_action(env),
-        // Go `cmd/tui.go`: `fmt.Errorf("tui: %w", err)`.
+        // The error text is prefixed with "tui: ".
         CommandId::Tui => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),

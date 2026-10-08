@@ -1,5 +1,5 @@
 //! `rival update`: upgrades through Homebrew, then reinstalls the skills
-//! from the upgraded binary. Go: `cmd/update.go`.
+//! from the upgraded binary.
 
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
@@ -16,23 +16,23 @@ use crate::root::{CmdEnv, CmdError};
 #[cfg(test)]
 mod tests;
 
-/// Go `codexInstalled`'s system applications directory.
+/// The system applications directory checked for an installed Codex app.
 const SYSTEM_APPLICATIONS: &str = "/Applications";
 
 /// Where child processes read and write.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChildIo {
-    /// Go with `os.Stdin`/`os.Stdout`/`os.Stderr`: the child shares this
+    /// The child shares this
     /// process's descriptors (production).
     Inherit,
-    /// Go with `cmd.SetOut(&buf)`: output is copied into the command's
+    /// Output is copied into the command's
     /// writers, and the installer's input comes from the command's stdin
     /// source (tests).
     #[cfg_attr(not(test), allow(dead_code, reason = "test seam"))]
     Capture,
 }
 
-/// `rival update`: Go `runUpdate`.
+/// `rival update`.
 pub fn update_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
     let _ = write!(env.stdout, "Checking for updates... ");
     let latest = update::fetch_latest(&update::releases_url(env.cfg))
@@ -46,7 +46,7 @@ pub fn update_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
     )
 }
 
-/// Go `updateToVersion`, with the child stdio and the system applications
+/// Updates to `latest`, with the child stdio and the system applications
 /// directory injected.
 pub fn update_to_version(
     env: &mut CmdEnv<'_>,
@@ -57,7 +57,7 @@ pub fn update_to_version(
 ) -> Result<(), CmdError> {
     if latest == current {
         let _ = writeln!(env.stdout, "already on latest (v{current})");
-        // Go returns os.UserHomeDir's error unwrapped.
+        // A missing home directory is returned as is, unwrapped.
         let home = match env.cfg.getenv(HOME_VAR) {
             "" if cfg!(windows) => return Err(CmdError::plain("%userprofile% is not defined")),
             "" => return Err(CmdError::plain("$HOME is not defined")),
@@ -103,7 +103,7 @@ pub fn update_to_version(
     Ok(())
 }
 
-/// Go `installUpdatedSkills`: re-exec the Homebrew installation, because
+/// Re-execs the Homebrew installation, because
 /// this process still embeds the old skills.
 pub fn install_updated_skills(
     env: &mut CmdEnv<'_>,
@@ -122,14 +122,14 @@ pub fn install_updated_skills(
 /// A child's stdin.
 #[derive(Clone, Copy)]
 enum Input {
-    /// Go's nil `Stdin`: the null device. brew gets this, so it cannot eat
+    /// The null device. brew gets this, so it cannot eat
     /// answers meant for the installer.
     Null,
-    /// Go `cmd.InOrStdin()`.
+    /// The command's stdin.
     Command,
 }
 
-/// Go `exec.CommandContext(...).Run()` with the command's stdout/stderr.
+/// Runs a command to completion with the command's stdout/stderr.
 fn run(
     env: &mut CmdEnv<'_>,
     io: ChildIo,
@@ -185,8 +185,8 @@ fn copy(from: Option<&mut impl Read>, to: &mut (dyn Write + Send)) {
     }
 }
 
-/// Go `exec.Command(...).Output()`: stdout captured, stderr kept out of the
-/// terminal (Go saves it on the `ExitError`, which nothing prints).
+/// Runs a command with stdout captured and stderr kept out of the terminal
+/// (nothing prints it).
 fn output(env: &CmdEnv<'_>, name: &str, args: &[&str]) -> Result<Vec<u8>, String> {
     let (mut cmd, path) = oscmd::command(env.cfg, name, args)?;
     cmd.stdin(Stdio::null())
@@ -209,6 +209,6 @@ fn exit_result(status: std::process::ExitStatus) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err(oscmd::exit_status_text(status))
+        Err(status.to_string())
     }
 }

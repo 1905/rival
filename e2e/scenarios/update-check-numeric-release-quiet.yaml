@@ -1,0 +1,62 @@
+{
+  "name": "update-check-numeric-release-quiet",
+  "description": "Update check with a numeric release v9.9.9 on the dev build: '9.9.9' normalises to '009.009.009', which sorts before 'dev', so no notice prints. The answer is still cached (latest '9.9.9'); the second run reads the fresh cache and sends no request. Plain numeric ordering (1.2.3 < 1.10.0 etc.) is covered by the update::tests unit tests.",
+  "env": {
+    "CI": null,
+    "RIVAL_NO_UPDATE_CHECK": null
+  },
+  "steps": [
+    {
+      "run": [
+        "version"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "version"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n         _             __\n   _____(_)   ______ _/ /\n  / ___/ / | / / __ `/ /\n / /  / /| |/ / /_/ / /\n/_/  /_/ |___/\\__,_/_/\n  dev\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/.update-check"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/.update-check",
+        "json": {
+          "latest": "9.9.9",
+          "checked_at": "<TIME>"
+        }
+      }
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "v9.9.9"
+        }
+      }
+    }
+  }
+}

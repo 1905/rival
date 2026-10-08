@@ -1,5 +1,5 @@
-//! Go `list_model_test.go` and `pagination_test.go` at the model level, and
-//! the list's golden frames.
+//! List model and pagination tests at the model level, and the list's
+//! golden frames.
 
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ fn selected_id(m: &Model) -> String {
         .unwrap_or_default()
 }
 
-/// Go `itemRows`: how many runs (not headers) pass the tab and the filter.
+/// How many runs (not headers) pass the tab and the filter.
 fn run_rows(m: &Model) -> usize {
     m.list.rows.iter().filter(|r| r.is_run()).count()
 }
@@ -40,7 +40,7 @@ fn at(m: &Model) -> (usize, String) {
     (m.list.page(), selected_id(m))
 }
 
-// --- Go list_model_test.go ---------------------------------------------------
+// --- list model ----------------------------------------------------------------
 
 #[test]
 fn list_keys_move_the_cursor() {
@@ -284,7 +284,7 @@ fn list_shows_no_prompt() {
     );
 }
 
-// --- Go pagination_test.go ---------------------------------------------------
+// --- pagination ----------------------------------------------------------------
 
 fn many_model(n: usize, width: u16, height: u16) -> Model {
     list_model(many_runs(n, fixed_now()), width, height)
@@ -510,6 +510,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
         Arc::new(Session {
             queue_position: 2,
             queued_at: Some(ago(1)),
+            start_time: None,
             ..run(
                 "g0000002-wait",
                 "opencode",
@@ -517,7 +518,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
                 "review",
                 "high",
                 "queued",
-                rival_core::gojson::zero_time(),
+                ago(1),
                 "/src/ledger",
             )
         }),
@@ -589,7 +590,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
             "g0000009-slop",
             "grok",
             rival_core::config::GROK_MODEL,
-            "antislop",
+            "plan",
             "completed",
             "2m0s",
             ago(50),

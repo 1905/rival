@@ -7,7 +7,7 @@ release:
     name: rival
 
 # GoReleaser's Rust builder runs `<tool> <command> --target=<triple> <flags>`
-# and maps each triple to the {{ .Os }} / {{ .Arch }} values the Go build used
+# and maps each triple to the {{ .Os }} / {{ .Arch }} values the old release names used
 # (x86_64 → amd64, aarch64 → arm64). release.yml runs both entries on hosted
 # macOS: the Apple SDK and LLVM come from that host.
 builds:
@@ -65,12 +65,9 @@ archives:
         formats:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    # LICENSE covers rival; licenses/Go-LICENSE covers the Go Unicode tables
-    # and algorithms vendored into the Rust port.
     files:
       - LICENSE
       - README.md
-      - licenses/Go-LICENSE
 
 # Generates a Homebrew *Formula* (class Rival < Formula) at the tap repo root —
 # matching the existing 1905/homebrew-tap layout (formulae at root, no Formula/

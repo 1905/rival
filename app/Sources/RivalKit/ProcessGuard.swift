@@ -3,8 +3,8 @@ import Foundation
 
 /// Reads a process's start time, the guard against PID reuse.
 public protocol ProcessInspector {
-    /// Start time of `pid` in Unix nanoseconds (the unit of Go's
-    /// `procinfo.StartNanos` and the session's `pid_start`), or nil when no
+    /// Start time of `pid` in Unix nanoseconds (the unit the rival CLI records
+    /// in the session's `pid_start`), or nil when no
     /// such process exists.
     func startTime(pid: Int32) -> Int64?
 }
@@ -16,7 +16,7 @@ public protocol Signaller {
 }
 
 /// `sysctl(KERN_PROC_PID)` → `kp_proc.p_starttime`, converted exactly as
-/// `rival/internal/procinfo/start_darwin.go` does: `sec*1e9 + usec*1000`.
+/// the rival CLI does on macOS: `sec*1e9 + usec*1000`.
 public struct SystemProcessInspector: ProcessInspector {
     public init() {}
 
@@ -25,8 +25,8 @@ public struct SystemProcessInspector: ProcessInspector {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
-        // A missing PID succeeds with size 0; Go's SysctlKinfoProc rejects any
-        // size other than a full kinfo_proc, and so does this.
+        // A missing PID succeeds with size 0; the rival CLI rejects any size
+        // other than a full kinfo_proc, and so does this.
         guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0,
               size == MemoryLayout<kinfo_proc>.stride
         else { return nil }
@@ -114,11 +114,11 @@ public func stop(_ item: RunItem, inspector: ProcessInspector, signaller: Signal
     return out
 }
 
-/// The reaper rule (`rival/internal/session/reaper.go`): true when the rival
+/// The rival CLI's reaper rule: true when the rival
 /// process that owns `session` is gone, so nobody else will finalize it. A
 /// session without a recorded owner (older releases) counts as unowned. An
-/// owner PID that exists without a recorded start counts as alive, like Go's
-/// `procinfo.Alive(pid, 0)`.
+/// owner PID that exists without a recorded start counts as alive, as the
+/// rival CLI treats a PID with no recorded start.
 public func ownerGone(_ session: Session, inspector: ProcessInspector) -> Bool {
     guard let owner = session.ownerPID, owner > 0 else { return true }
     guard let started = inspector.startTime(pid: owner) else { return true }

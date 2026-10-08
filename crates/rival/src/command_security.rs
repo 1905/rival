@@ -1,5 +1,4 @@
 //! `rival command security`: security review with the configured model.
-//! Go: `cmd/command_security.go`.
 
 use std::path::Path;
 
@@ -48,8 +47,7 @@ type RunFn<'a> = dyn Fn(
     ) -> anyhow::Result<RunResult>
     + 'a;
 
-/// Go `executor.OpencodePreflightEntry` and `executor.RunOpencodeEntry`;
-/// tests inject fakes.
+/// The opencode preflight and run entry points; tests inject fakes.
 pub struct SecurityExecutor<'a> {
     pub preflight: Box<PreflightFn<'a>>,
     pub run: Box<RunFn<'a>>,
@@ -96,7 +94,7 @@ impl SecurityOptions {
     }
 }
 
-/// Go `commandSecurityAction` with the real opencode adapter.
+/// [`run_command_security`] with the real opencode adapter.
 pub fn command_security_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     run_command_security(
         env,
@@ -105,7 +103,7 @@ pub fn command_security_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result
     )
 }
 
-/// Go `securityScopeAndPrompt`: builds the security-lens prompt. An empty
+/// Builds the security-lens prompt. An empty
 /// scope auto-detects the changed files. Returns `(prompt, scope)`.
 pub(crate) fn security_scope_and_prompt(
     cfg: &Config,
@@ -123,7 +121,7 @@ pub(crate) fn security_scope_and_prompt(
     (prompt, scope)
 }
 
-/// Go `printSecurityResolution`: reports which model will run, and whether
+/// Reports which model will run, and whether
 /// it can. It fails when the model is unusable so a caller can check before
 /// launching a detached run.
 fn print_security_resolution(
@@ -165,7 +163,7 @@ fn print_security_resolution(
     Ok(())
 }
 
-/// Go `commandSecurityAction`.
+/// Runs `rival command security` with the given executor.
 pub fn run_command_security(
     env: &mut CmdEnv<'_>,
     opts: &SecurityOptions,
@@ -178,7 +176,7 @@ pub fn run_command_security(
     let entry = match cfg.resolve_security_model() {
         Ok(entry) => entry,
         Err(e) => {
-            // Go prints it here and Execute prints it again.
+            // Printed here, and the root prints it again.
             let msg = e.to_string();
             let _ = writeln!(env.stderr, "{msg}");
             return Err(CmdError::exit(1, msg));
@@ -242,7 +240,7 @@ pub fn run_command_security(
         .str("model", entry.label)
         .msg("starting security reviewer");
 
-    // Locals drop in reverse order, like Go's defers: run timeout, slot,
+    // Locals drop in reverse order: run timeout, slot,
     // signals, unfinished session.
     let (ctx, _signals) = env.signal_context()?;
 
@@ -349,7 +347,7 @@ pub fn run_command_security(
     Ok(())
 }
 
-/// Go `formatSecurityOutput`: parses a zero-exit security run and renders
+/// Parses a zero-exit security run and renders
 /// it. Only the final answer is parsed, as for code reviews, so a payload
 /// printed by a tool (a file the model read) cannot pass for the review.
 /// Validation still sees the whole log: its echo check looks for the prompt

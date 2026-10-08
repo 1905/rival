@@ -1,5 +1,4 @@
 //! Key bindings, mode routing and the help bar.
-//! Go: `internal/dashboard/keys.go` plus the bubbles `help` view.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::text::{Line, Span};
@@ -244,7 +243,7 @@ impl KeyMap {
         help
     }
 
-    /// Go: `keyMap.help`. The bindings to advertise in `mode`.
+    /// The bindings to advertise in `mode`.
     pub fn help(&self, mode: Mode) -> ModeHelp {
         match mode {
             Mode::Filter => ModeHelp::simple(vec![

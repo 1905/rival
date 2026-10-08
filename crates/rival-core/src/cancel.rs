@@ -1,17 +1,15 @@
-//! Synchronous cancellation with Go `context` semantics.
-//!
-//! Go: `context.Background`, `WithCancel`, `WithDeadline`, `WithTimeout`. A
-//! context is done once it or any ancestor is cancelled or its deadline
+//! Synchronous cancellation contexts: background, cancel, deadline and
+//! timeout. A context is done once it or any ancestor is cancelled or its deadline
 //! passes. A child's deadline is the earlier of its own and its parent's.
-//! Cancelling a child never touches its parent. [`Context::wait_timeout`] is
-//! Go's `select { case <-ctx.Done(): case <-time.After(d): }` and wakes as
+//! Cancelling a child never touches its parent. [`Context::wait_timeout`] waits
+//! for either the context to be done or the timeout to pass, and wakes as
 //! soon as the context is done.
 
 use std::fmt;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
-/// Go: `context.Canceled` and `context.DeadlineExceeded`.
+/// Why a context is done: cancelled, or its deadline passed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextError {
     Canceled,
@@ -50,9 +48,9 @@ impl Inner {
     }
 
     /// Marks this context and every descendant done with `err`. The first
-    /// error wins, as in Go. Deadlines expire lazily, so a cancel that
+    /// error wins. Deadlines expire lazily, so a cancel that
     /// arrives after the deadline has passed records `DeadlineExceeded`:
-    /// Go's timer would already have fired.
+    /// a timer would already have fired.
     fn cancel(&self, err: ContextError) {
         let children = {
             let mut st = self.lock();
@@ -96,9 +94,9 @@ pub struct Context {
     inner: Arc<Inner>,
 }
 
-/// Go: `context.CancelFunc`. Cancels its context and all descendants with
+/// Cancels its context and all descendants with
 /// [`ContextError::Canceled`]. Idempotent. Dropping it does NOT cancel; call
-/// [`CancelFunc::cancel`] (Go's `defer cancel()`).
+/// [`CancelFunc::cancel`].
 #[derive(Clone)]
 pub struct CancelFunc {
     inner: Arc<Inner>,
@@ -126,7 +124,7 @@ impl fmt::Debug for CancelFunc {
 }
 
 impl Context {
-    /// Go: `context.Background()`. Never done, no deadline.
+    /// The root context. Never done, no deadline.
     pub fn background() -> Context {
         Context {
             inner: Arc::new(Inner {
@@ -138,12 +136,12 @@ impl Context {
         }
     }
 
-    /// Go: `context.WithCancel(ctx)`.
+    /// A child context that its own cancel function can cancel.
     pub fn with_cancel(&self) -> (Context, CancelFunc) {
         self.child(self.inner.deadline)
     }
 
-    /// Go: `context.WithDeadline(ctx, d)`. A parent deadline that comes
+    /// A child context with a deadline. A parent deadline that comes
     /// first wins. A deadline already past makes the child done at once with
     /// [`ContextError::DeadlineExceeded`].
     pub fn with_deadline(&self, deadline: Instant) -> (Context, CancelFunc) {
@@ -154,7 +152,7 @@ impl Context {
         self.child(Some(effective))
     }
 
-    /// Go: `context.WithTimeout(ctx, d)`.
+    /// A child context with a deadline `timeout` from now.
     pub fn with_timeout(&self, timeout: Duration) -> (Context, CancelFunc) {
         match Instant::now().checked_add(timeout) {
             Some(deadline) => self.with_deadline(deadline),
@@ -163,7 +161,7 @@ impl Context {
         }
     }
 
-    /// Go: `context.WithTimeout(ctx, time.Duration(nanos))` for a signed
+    /// A child context with a timeout in nanoseconds, for a signed
     /// budget such as `Config::run_timeout_budget`. Zero or negative means a
     /// deadline already past, so the child is done at once.
     pub fn with_timeout_nanos(&self, nanos: i64) -> (Context, CancelFunc) {
@@ -200,7 +198,7 @@ impl Context {
         (Context { inner }, cancel)
     }
 
-    /// Go: `ctx.Err()`. `None` while the context is live.
+    /// Why the context is done. `None` while the context is live.
     pub fn err(&self) -> Option<ContextError> {
         self.inner.err()
     }
@@ -209,7 +207,7 @@ impl Context {
         self.err().is_some()
     }
 
-    /// Go: `ctx.Deadline()`.
+    /// The context's deadline, if any.
     pub fn deadline(&self) -> Option<Instant> {
         self.inner.deadline
     }
@@ -249,7 +247,7 @@ impl Context {
         }
     }
 
-    /// Blocks until the context is done (Go: `<-ctx.Done()`). Blocks forever
+    /// Blocks until the context is done. Blocks forever
     /// on [`Context::background`].
     pub fn wait(&self) -> ContextError {
         loop {
@@ -266,7 +264,7 @@ mod tests {
     use std::thread;
 
     #[test]
-    fn errors_print_go_text() {
+    fn errors_print_their_text() {
         assert_eq!(ContextError::Canceled.to_string(), "context canceled");
         assert_eq!(
             ContextError::DeadlineExceeded.to_string(),

@@ -496,7 +496,7 @@ fn watch_tree(report: PathBuf) -> mpsc::Receiver<(Watched, Watched)> {
 }
 
 /// (a) A deadline ends the run: the launcher and the grandchild that holds
-/// stdout both die, the pipes close and the run returns. Go's Windows kill
+/// stdout both die, the pipes close and the run returns. The Windows kill
 /// leaves exit code 1.
 #[test]
 fn owner_timeout_kills_launcher_and_grandchild() {

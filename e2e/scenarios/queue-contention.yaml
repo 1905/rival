@@ -1,0 +1,199 @@
+{
+  "name": "queue-contention",
+  "description": "Two `rival run claude --prompt-stdin` runs with RIVAL_MAX_CONCURRENT=1. Run A takes the only slot and holds it inside the fake claude. `rival queue` lists A's running ticket: position '-', mode raw, A's rival pid, a wait duration, the workdir. Run B (RIVAL_QUEUE_TIMEOUT=1s) is not promoted, prints once 'rival queue: position 1/1 (1 running), waiting <DURATION>', then fails with 'rival queue: queue timeout after 1s — queue may be wedged; ...' and exit 1. B never reaches the provider and has no session .log. `queue clear --force` then removes A's live ticket ('Removed 1 ticket.') and `rival queue` prints 'Queue is empty.'. A keeps running, finishes with exit 0 and its stdout is the live mirror ('A done'). The pid column is normalised to <PID1> and must equal owner_pid in A's session; wait and waiting values are durations.",
+  "timeout": 120,
+  "env": {
+    "RIVAL_MAX_CONCURRENT": "1"
+  },
+  "fixtures": [
+    {
+      "mkdir": "sync"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv_prefix": [
+              "-p"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s).*\\nfirst"
+              }
+            },
+            "touch": "<ROOT>/sync/a-running",
+            "wait_for": "<ROOT>/sync/go",
+            "wait_timeout": 60,
+            "stdout": "A done\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "normalise": [
+    {
+      "regex": "running   raw           (\\d+ *)  \\S",
+      "kind": "pid"
+    },
+    {
+      "regex": "<PID\\d+>  (\\S+ *)  <ROOT>/work",
+      "kind": "duration"
+    },
+    {
+      "regex": "\\(\\d+ running\\), waiting (\\S+)",
+      "kind": "duration"
+    }
+  ],
+  "steps": [
+    {
+      "start": "a",
+      "run": [
+        "run",
+        "claude",
+        "--prompt-stdin"
+      ],
+      "stdin": "first"
+    },
+    {
+      "wait_file": "sync/a-running",
+      "timeout": 30
+    },
+    {
+      "run": [
+        "queue"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "POS   STATE     MODE          PID      WAIT       WORKDIR\n-     running   raw           <PID1>  <DURATION>  <ROOT>/work\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "run",
+        "claude",
+        "--prompt-stdin"
+      ],
+      "stdin": "second",
+      "env": {
+        "RIVAL_QUEUE_TIMEOUT": "1s"
+      },
+      "timeout": 30,
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "rival queue: position 1/1 (1 running), waiting <DURATION>",
+          "rival queue: queue timeout after 1s — queue may be wedged; inspect with 'rival queue', purge with 'rival queue clear'"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude",
+            "fields": {
+              "session": "<UUID1>",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "queue",
+        "clear",
+        "--force"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Removed 1 ticket.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "queue"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Queue is empty.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "touch": "sync/go"
+    },
+    {
+      "wait": "a",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "A done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude",
+            "fields": {
+              "session": "<UUID2>",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID2>",
+              "auth": "subscription"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID2>.json",
+      ".rival/sessions/<UUID2>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 1,
+          "mode": "raw",
+          "queue_position": 1,
+          "error": "queue timeout after 1s — queue may be wedged; inspect with 'rival queue', purge with 'rival queue clear'"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "mode": "native",
+          "account": "subscription",
+          "output_bytes": 7,
+          "output_lines": 1,
+          "owner_pid": "<PID1>"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.log",
+        "text": "A done\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    }
+  }
+}
