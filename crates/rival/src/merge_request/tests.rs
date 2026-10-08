@@ -1,6 +1,6 @@
-//! Go: `cmd/mr_guard_test.go`, plus the `prepareReviewTarget` contract the
-//! `review_output_test.go` MR cases rely on (`fakeMR`). The full command
-//! paths (`runCommandWith`) arrive with the command tree in P3.
+//! MR guard tests, plus the [`prepare_review_target_with`] contract the
+//! review output MR cases rely on. The full command paths arrive with the
+//! command tree in P3.
 
 use super::*;
 
@@ -16,8 +16,6 @@ fn cfg(home: &Path) -> Config {
     Config::new(Paths::from_home(home), HashMap::new(), None).with_environ(Vec::new())
 }
 
-// ---- Go TestModelCommandRejectsMRInRawPrompt ----
-
 #[test]
 fn model_command_rejects_mr_in_raw_prompt() {
     let err = reject_unresolved_mr(&format!("сделай ревью МР {TEST_MR_URL}")).unwrap_err();
@@ -32,7 +30,7 @@ fn model_command_rejects_mr_in_raw_prompt() {
     assert_eq!(reject_unresolved_mr("explain the auth flow"), Ok(()));
 }
 
-/// Go `fakeMR`: the resolver returns a snapshot in a temp dir.
+/// A fake resolver result: a snapshot in a temp dir.
 fn fake_snapshot(dir: &Path) -> Snapshot {
     Snapshot::new(
         dir.to_str().unwrap().to_string(),

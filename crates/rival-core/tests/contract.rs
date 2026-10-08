@@ -1,8 +1,7 @@
-//! Session record contract shared with Swift (`app/Tests`), first set by Go
-//! `internal/session/testdata_contract_test.go`. `testdata/expected.json`
-//! holds the typed values; `testdata/written/` holds the writer's golden
-//! bytes. The tests here never rewrite the golden files; regenerate them
-//! on purpose with
+//! Session record contract shared with Swift (`app/Tests`).
+//! `testdata/expected.json` holds the typed values; `testdata/written/`
+//! holds the writer's golden bytes. The tests here never rewrite the golden
+//! files; regenerate them on purpose with
 //! `cargo test -p rival-core --test contract -- --ignored regenerate_written_golden`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,7 +13,7 @@ use rival_core::paths::Paths;
 use rival_core::session::{NewSession, Session};
 use serde::Deserialize;
 
-/// Every Session field, in Go struct order.
+/// Every Session field, in the record's field order.
 const FIELD_NAMES: [&str; 27] = [
     "id",
     "group_id",
@@ -327,7 +326,7 @@ struct CaseKeys {
 }
 
 #[test]
-fn contract_expected_lists_every_field_in_go_order() {
+fn contract_expected_lists_every_field_in_schema_order() {
     let order: KeyOrder = read_expected();
     let objects = order
         .sessions
@@ -336,7 +335,7 @@ fn contract_expected_lists_every_field_in_go_order() {
     for (name, keys) in objects {
         assert_eq!(
             keys.0, FIELD_NAMES,
-            "{name}: fields must list every Session field in Go order"
+            "{name}: fields must list every Session field in schema order"
         );
     }
 }

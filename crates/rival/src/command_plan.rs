@@ -28,7 +28,7 @@ Input is a single path to a markdown plan/spec file. The /rival-plan and
 and Claude to medium, unless overridden per model in ~/.rival/config.yaml.
 --model accepts codex and claude. An unavailable model is skipped, not fatal.";
 
-/// Go `review.RunPlanReview`; tests inject a fake.
+/// Runs the plan review; tests inject a fake.
 pub type PlanRunner<'a> = dyn Fn(&Context, &Config, &str, &ReviewBatch<'_>, &mut dyn Write) -> anyhow::Result<PlanRunResult>
     + 'a;
 
@@ -56,7 +56,7 @@ impl PlanOptions {
     }
 }
 
-/// Go `commandPlanAction` with the real plan runner.
+/// `rival plan` with the real plan runner.
 pub fn command_plan_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     run_command_plan(
         env,
@@ -137,9 +137,9 @@ pub(crate) fn fail_on_stdout(stdout: &mut dyn Write, msg: String) -> CmdError {
     CmdError::exit(1, msg)
 }
 
-/// Go `fmt.Errorf("write stdout: %w", err)` for a failed `os.Stdout` write.
-/// A nil Windows `os.Stdout` fails with the bare `os.ErrInvalid`, without
-/// the `*PathError` op and path.
+/// The error for a failed stdout write, prefixed `write stdout: `. A missing
+/// Windows stdout fails with the bare invalid-argument error, without the
+/// op and path.
 pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
     if crate::root::is_nil_file(e) {
         return CmdError::plain(format!("write stdout: {e}"));
@@ -147,8 +147,7 @@ pub(crate) fn write_stdout_error(e: &io::Error) -> CmdError {
     CmdError::plain(format!("write stdout: write /dev/stdout: {}", e))
 }
 
-/// Go `fmt.Errorf("invalid effort %q, must be one of: %v", effort,
-/// config.ValidEfforts)` for the `--effort` flag; `%v` prints the slice as
+/// The error for a bad `--effort` flag. The valid efforts print as
 /// `[low medium …]`.
 pub(crate) fn invalid_flag_effort(effort: &str) -> String {
     format!(
@@ -258,7 +257,7 @@ pub(crate) fn parse_plan_input(raw: &str) -> Result<(String, String), String> {
     Ok((path.to_string(), effort.to_string()))
 }
 
-/// The separators of Go's `popPlanToken` (`TrimLeft`/`IndexAny`).
+/// The separators [`pop_plan_token`] splits on.
 const TOKEN_SPACE: [char; 4] = [' ', '\t', '\r', '\n'];
 
 fn pop_plan_token(s: &str) -> (&str, &str) {
@@ -277,16 +276,16 @@ fn split_plan_option(token: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Go `filepath.Join(a, b)` for the host ([`paths::join`]): empty elements
+/// A lexical join for the host ([`paths::join`]): empty elements
 /// are dropped, the rest joined and cleaned; Windows keeps drive and UNC
 /// volumes. Unlike [`Path::join`], an absolute `b` does not replace `a`.
-fn go_join(a: &str, b: &str) -> String {
+fn lexical_join(a: &str, b: &str) -> String {
     paths::join(Path::new(a), Path::new(b))
         .to_string_lossy()
         .into_owned()
 }
 
-/// Go `os.Stat`'s `*PathError` op: `GetFileAttributesEx` is Windows' first
+/// The op in a failed stat's error: `GetFileAttributesEx` is Windows' first
 /// stat call.
 const STAT_OP: &str = if cfg!(windows) {
     "GetFileAttributesEx"
@@ -297,9 +296,10 @@ const STAT_OP: &str = if cfg!(windows) {
 /// Turns the raw user-supplied path into a validated
 /// absolute path to an existing regular file. Relative paths are resolved
 /// against `workdir`. Any file name is accepted; `.md` is not required.
-/// `home` is Go's `os.UserHomeDir()` (`$HOME`, `%USERPROFILE%` on Windows;
-/// empty = unavailable) and `cwd` the `os.Getwd()` snapshot `filepath.Abs`
-/// would use. `filepath.IsAbs`, `Join` and `Abs` follow the host's rules.
+/// `home` is the home directory (`$HOME`, `%USERPROFILE%` on Windows;
+/// empty = unavailable) and `cwd` the current directory snapshot used to
+/// make paths absolute. The absolute check, join and absolutize follow the
+/// host's rules.
 pub(crate) fn resolve_plan_path(
     raw_path: &str,
     workdir: &str,
@@ -309,10 +309,10 @@ pub(crate) fn resolve_plan_path(
     let mut p = raw_path.trim().to_string();
     // Expand a leading ~ to the home directory.
     if (p == "~" || p.starts_with("~/")) && !home.is_empty() {
-        p = go_join(home, &p[1..]);
+        p = lexical_join(home, &p[1..]);
     }
     if !paths::is_abs(Path::new(&p)) {
-        p = go_join(workdir, &p);
+        p = lexical_join(workdir, &p);
     }
     // Reject control characters (e.g. a newline in the file name): the path
     // is interpolated into the model prompt, so a control char could inject
@@ -336,7 +336,7 @@ pub(crate) fn resolve_plan_path(
     let abs = abs.to_string_lossy().into_owned();
 
     let meta = match std::fs::metadata(&abs) {
-        // Go os.IsNotExist: ENOENT only.
+        // Not found: ENOENT only.
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
             return Err(format!("plan file not found: {abs}"));
         }

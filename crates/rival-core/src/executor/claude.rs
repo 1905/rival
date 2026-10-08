@@ -52,9 +52,10 @@ pub fn run_claude(
 /// auto-selecting native (claude on `PATH`) vs docker. `spawn` is the
 /// subprocess step.
 ///
-/// Go derived `read_only` from the session mode. The caller passes it here
-/// instead, because this function replaces the mode with the transport
-/// ("native" or "docker"): a second call on the same session would lose it.
+/// The caller passes `read_only` rather than this function deriving it
+/// from the session mode, because this function replaces the mode with the
+/// transport ("native" or "docker"): a second call on the same session
+/// would lose it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_claude_model(
     cfg: &Config,
@@ -204,8 +205,8 @@ pub fn claude_auth_hint(cfg: &Config, log_file: &Path) -> String {
     let Ok(data) = std::fs::read(log_file) else {
         return String::new();
     };
-    // Go's strings.Contains on raw bytes: the ASCII markers match the same
-    // way in the lossy text.
+    // A byte search on the raw log: the ASCII markers match the same way in
+    // the lossy text.
     let text = String::from_utf8_lossy(&data);
     if !CLAUDE_AUTH_MARKERS.iter().any(|m| text.contains(m)) {
         return String::new();

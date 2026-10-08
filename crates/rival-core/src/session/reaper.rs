@@ -1,6 +1,4 @@
 //! Orphaned-session cleanup.
-//!
-//! Go: `internal/session/reaper.go`.
 
 use super::summary::load_all_summaries;
 use super::{Session, proc_pid};

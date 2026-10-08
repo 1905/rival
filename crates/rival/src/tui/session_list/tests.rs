@@ -33,7 +33,7 @@ fn sess(group_id: &str, cli: &str, model: &str, mode: &str) -> Session {
     }
 }
 
-/// Go `rows`: `rows_and_counts` without the counts, with a raw filter.
+/// `rows_and_counts` without the counts, with a raw filter.
 fn rows(
     items: &[DisplayItem],
     tab: StatusTab,
@@ -52,7 +52,7 @@ fn rows(
     .0
 }
 
-/// Go `rowSummary`: "#SECTION" or the first letter of the run id.
+/// "#SECTION" or the first letter of the run id.
 fn row_summary(items: &[DisplayItem], rows: &[Row]) -> Vec<String> {
     rows.iter()
         .map(|r| match *r {
@@ -71,14 +71,14 @@ fn pane(items: Vec<DisplayItem>, now: DateTime<FixedOffset>) -> ListPane {
     l
 }
 
-/// Go `manyListPane`.
+/// A list pane over `n` runs.
 fn many_list_pane(n: usize, now: DateTime<FixedOffset>) -> ListPane {
     let mut l = pane(group_sessions(&many_runs(n, now)), now);
     l.top();
     l
 }
 
-/// Go `selectedIDOf`: the first letter of the selected id.
+/// The first letter of the selected id.
 fn selected_letter(l: &ListPane) -> String {
     l.selected()
         .map(|i| i.primary().unwrap().id[..1].to_string())
@@ -91,7 +91,7 @@ fn selected_id(l: &ListPane) -> String {
         .unwrap_or_default()
 }
 
-/// Go `pageSummary`: the current page's rows, "#SECTION" or the run id.
+/// The current page's rows, "#SECTION" or the run id.
 fn page_summary(l: &ListPane) -> Vec<String> {
     let (rows, _) = l.page_rows();
     rows.iter()
@@ -102,7 +102,7 @@ fn page_summary(l: &ListPane) -> Vec<String> {
         .collect()
 }
 
-// --- Go session_list_test.go ------------------------------------------------
+// --- session list --------------------------------------------------------------
 
 #[test]
 fn group_effort_shows_mixed_defaults() {
@@ -361,9 +361,9 @@ fn wall(off: i32, y: i32, mo: u32, d: u32, h: u32, mi: u32) -> DateTime<FixedOff
     hours(off).with_ymd_and_hms(y, mo, d, h, mi, 0).unwrap()
 }
 
-/// Go `newDayBounds` builds each boundary with `time.Date` in the local
-/// zone. A DST switch between `now` and a boundary must not shift that
-/// boundary by the offset change. The spring "edge" cases, the fall cases
+/// Each day boundary is built as a local midnight in the zone. A DST switch
+/// between `now` and a boundary must not shift that boundary by the offset
+/// change. The spring "edge" cases, the fall cases
 /// without "edge" and "utc now" land in the wrong section when every
 /// midnight reuses `now`'s offset; the others pin the right side.
 #[test]
@@ -468,10 +468,10 @@ fn section_for_follows_dst_per_boundary() {
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
 
-/// Go `time.Date` on a midnight a switch skips or repeats: it guesses the
-/// offset at the wall time read as UTC, then rechecks it at the result.
+/// A midnight a switch skips or repeats: the offset is guessed at the wall
+/// time read as UTC, then rechecked at the result.
 #[test]
-fn midnight_resolves_skipped_and_repeated_midnights_as_go() {
+fn midnight_resolves_skipped_and_repeated_midnights() {
     let cases: [(&str, Zone, Option<NaiveDate>, DateTime<FixedOffset>); 5] = [
         // No switch that day: the plain local midnight.
         (
@@ -492,7 +492,7 @@ fn midnight_resolves_skipped_and_repeated_midnights_as_go() {
             NaiveDate::from_ymd_opt(2026, 10, 25),
             wall(2, 2026, 10, 25, 0, 0),
         ),
-        // 00:00 is skipped. Go's guess (-5) lands on 05:00 UTC, past the
+        // 00:00 is skipped. The guess (-5) lands on 05:00 UTC, past the
         // switch, so it retries with -4: 04:00 UTC, 23:00 the day before.
         (
             "skipped",
@@ -500,7 +500,7 @@ fn midnight_resolves_skipped_and_repeated_midnights_as_go() {
             NaiveDate::from_ymd_opt(2026, 3, 8),
             wall(-5, 2026, 3, 7, 23, 0),
         ),
-        // 00:00 happens twice. Go's guess (-4) holds: the first one.
+        // 00:00 happens twice. The guess (-4) holds: the first one.
         (
             "repeated",
             havana,
@@ -514,7 +514,7 @@ fn midnight_resolves_skipped_and_repeated_midnights_as_go() {
         assert_eq!(*got.offset(), zone(got.naive_utc()), "{name}: shown offset");
     }
     // The skipped midnight, seen through the sections: the hour before it
-    // already counts as the new day, as in Go.
+    // already counts as the new day.
     let now = wall(-4, 2026, 3, 8, 12, 0);
     assert_eq!(
         section_for(Some(wall(-5, 2026, 3, 7, 23, 30)), now, havana),
@@ -743,7 +743,7 @@ fn layout_columns_drops_effort_then_project() {
 }
 
 #[test]
-fn fit_cell_go_cases() {
+fn fit_cell_pads_and_truncates() {
     for (s, w, want) in [
         ("abc", 5, "abc  "),
         ("abcdef", 4, "abc…"),
@@ -867,7 +867,7 @@ fn rendered_rows_fill_exactly_the_pane_width() {
     }
 }
 
-// --- Go list_model_test.go (pane level) ---------------------------------------
+// --- list model (pane level) ---------------------------------------------------
 
 #[test]
 fn list_move_skips_section_rows() {
@@ -965,7 +965,7 @@ fn rebuild_anchors_by_item_key_and_skips_headers() {
     assert_eq!(selected_id(&l), "c");
 }
 
-// --- Go pagination_test.go (pane level) ---------------------------------------
+// --- pagination (pane level) ---------------------------------------------------
 
 #[test]
 fn page_slicing_with_sections() {

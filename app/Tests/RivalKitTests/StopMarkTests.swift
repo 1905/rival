@@ -84,7 +84,7 @@ final class StopMarkTests: XCTestCase {
         XCTAssertEqual(names, ["s1.json"], "no .json.tmp left behind")
         var st = stat()
         stat(dir.appendingPathComponent("s1.json").path, &st)
-        XCTAssertEqual(st.st_mode & 0o777, 0o600, "same mode as Go's Save")
+        XCTAssertEqual(st.st_mode & 0o777, 0o600, "same mode as the CLI's session writer")
     }
 
     // Codex finding 2: the owner finished the run between the snapshot and

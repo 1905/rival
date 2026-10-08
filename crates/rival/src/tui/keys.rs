@@ -1,5 +1,4 @@
 //! Key bindings, mode routing and the help bar.
-//! Go: `internal/dashboard/keys.go` plus the bubbles `help` view.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::text::{Line, Span};

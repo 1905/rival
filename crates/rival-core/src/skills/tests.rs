@@ -6,7 +6,6 @@ fn skill(name: &str) -> String {
     String::from_utf8(read_file(&format!("{name}/SKILL.md")).unwrap().to_vec()).unwrap()
 }
 
-// Go: TestPlanCodexSkillPinsXhighEffort.
 #[test]
 fn plan_codex_skill_pins_xhigh_effort() {
     let content = skill("rival-plan-codex");
@@ -26,7 +25,6 @@ fn plan_codex_skill_pins_xhigh_effort() {
     }
 }
 
-// Go: TestGrokSkillIsEmbedded.
 #[test]
 fn grok_skill_is_embedded() {
     let name = "rival-grok";
@@ -53,7 +51,6 @@ fn grok_skill_is_embedded() {
     );
 }
 
-// Go: TestPlanSkillRunsCodexAtXhigh.
 #[test]
 fn plan_skill_runs_codex_at_xhigh() {
     let name = "rival-plan";
@@ -75,8 +72,8 @@ fn plan_skill_runs_codex_at_xhigh() {
     }
 }
 
-// Go: TestAntislopPlanSkillIsGone. Plan mode was dropped on 2026-08-20. The
-// skill must stay deprecated so install removes copies already on disk.
+// Plan mode was dropped on 2026-08-20. The skill must stay deprecated so
+// install removes copies already on disk.
 #[test]
 fn antislop_plan_skill_is_gone() {
     assert!(
@@ -111,7 +108,6 @@ fn antislop_skill_is_deprecated() {
     );
 }
 
-// Go: TestSolSkillsAreRetired.
 #[test]
 fn sol_skills_are_retired() {
     for name in ["rival-sol", "rival-plan-sol"] {
@@ -158,7 +154,6 @@ struct Header {
     metadata: HashMap<String, String>,
 }
 
-// Go: TestEverySkillHasValidCodexVariant.
 #[test]
 fn every_skill_has_valid_codex_variant() {
     for name in NAMES {
@@ -191,9 +186,8 @@ fn every_skill_has_valid_codex_variant() {
     );
 }
 
-// Go: TestReviewSkillIsRetired. megareview was removed on 2026-09-26. Its
-// skill must stay deprecated so install removes copies already on disk,
-// for both hosts.
+// megareview was removed on 2026-09-26. Its skill must stay deprecated so
+// install removes copies already on disk, for both hosts.
 #[test]
 fn review_skill_is_retired() {
     let name = "rival-review";
@@ -211,7 +205,7 @@ fn review_skill_is_retired() {
     );
 }
 
-/// Go's `//go:embed` list is exactly `Names`.
+/// The embedded skill dirs are exactly `NAMES`.
 #[test]
 fn embedded_dirs_are_exactly_names() {
     let mut names = NAMES.to_vec();
@@ -222,9 +216,9 @@ fn embedded_dirs_are_exactly_names() {
     }
 }
 
-/// `codex.md` is the Codex template, not part of Go's `Files`.
+/// `codex.md` is the Codex template, not a readable skill file.
 #[test]
-fn read_file_hides_root_files_and_reports_go_error() {
+fn read_file_hides_root_files_and_reports_not_exist_error() {
     assert_eq!(
         read_file("codex.md").unwrap_err(),
         "open codex.md: file does not exist"
@@ -244,7 +238,7 @@ fn codex_skill_errors_quote_the_name() {
     );
 }
 
-/// The whole generated file for one skill: Go's format string, the input,
+/// The whole generated file for one skill: the frontmatter, the input,
 /// and `codex.md` with `{{COMMAND}}` replaced.
 #[test]
 fn codex_skill_full_output_for_plan_claude() {
@@ -259,7 +253,7 @@ fn codex_skill_full_output_for_plan_claude() {
     ));
 }
 
-/// The command each Codex skill launches (Go's `command` switch).
+/// The command each Codex skill launches.
 #[test]
 fn codex_skill_commands() {
     for (name, command) in [
@@ -283,7 +277,7 @@ fn codex_skill_commands() {
 }
 
 /// The embedded tree is `codex.md` plus one `SKILL.md` per name, nothing
-/// else (the file set Go's `internal/skills` held).
+/// else.
 #[test]
 fn embedded_files_are_codex_md_and_skill_md() {
     let mut got: Vec<String> = TREE
@@ -303,8 +297,7 @@ fn embedded_files_are_codex_md_and_skill_md() {
     assert_eq!(got, want);
 }
 
-/// The description and input of every Codex skill, as Go `codex.go` held
-/// them before the Go tree was removed.
+/// The description and input of every Codex skill, pinned as golden text.
 #[test]
 fn codex_skill_text_golden() {
     let review = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.";

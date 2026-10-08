@@ -1,6 +1,6 @@
 //! Test fixtures for the command workflows: a temp HOME and config, fake
-//! stdin, a fake provider (Go `fakeRun`) and a fake MR resolver (Go
-//! `fakeMR`). Nothing reads or mutates the process environment.
+//! stdin, a fake provider and a fake MR resolver. Nothing reads or mutates
+//! the process environment.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -109,7 +109,7 @@ impl Fixture {
         }
         let mut env: HashMap<String, String> = HashMap::new();
         env.insert("HOME".into(), home.path().to_str().unwrap().into());
-        // Go's os.UserHomeDir reads USERPROFILE on Windows: the same temp
+        // The home dir lookup reads USERPROFILE on Windows: the same temp
         // home, so no test sees the real profile. Tests that change the home
         // use paths::HOME_VAR.
         if cfg!(windows) {
@@ -131,17 +131,17 @@ impl Fixture {
         Fixture { home, cfg }
     }
 
-    /// Go `session.LoadAll()`.
+    /// Every saved session.
     pub fn sessions(&self) -> Vec<Session> {
         Session::load_all(self.cfg.paths())
     }
 }
 
-/// Go `withStdin`: stdin holds `data` (a regular file, so not a char device).
+/// Fake stdin: it holds `data` (a regular file, so not a char device).
 pub struct FakeStdin {
     pub data: Vec<u8>,
     pub char_device: bool,
-    /// Go `os.Stdin.Stat()` fails (closed fd 0).
+    /// The stat of stdin fails (closed fd 0).
     pub stat_failed: bool,
     pub read_error: Option<String>,
     /// Panics on read, to prove a workflow never reached it.
@@ -188,7 +188,7 @@ impl StdinSource for FakeStdin {
     }
 }
 
-/// Go `fakeRun`: records what the provider was handed and writes `log` as
+/// The fake provider: records what it was handed and writes `log` as
 /// its output.
 #[derive(Debug, Default)]
 pub struct FakeRun {
@@ -258,7 +258,7 @@ pub fn fake_spec(f: &SharedRun) -> ModelSpec {
     spec
 }
 
-/// Go `fakeMR`: the resolver returns a snapshot in a temp dir for MR
+/// The fake MR resolver: returns a snapshot in a temp dir for MR
 /// scopes and nothing otherwise; `calls` counts every call.
 pub struct FakeMr {
     pub _dir: tempfile::TempDir,
@@ -330,7 +330,7 @@ pub fn with_env(
     }
 }
 
-/// Go `runCommandWith`: `rival command codex --no-queue` with `input` on
+/// `rival command codex --no-queue` with `input` on
 /// stdin and the fake provider.
 pub fn run_command_with(
     fix: &Fixture,

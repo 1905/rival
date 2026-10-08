@@ -356,7 +356,8 @@ fn follow() {
 }
 
 // Swift: testFollow, its last steps. In the TUI "]" and "[" on a run of one
-// re-pick the member shown: follow and the scroll stay (Go reset both).
+// re-pick the member shown: follow and the scroll stay (the old TUI reset
+// both).
 #[test]
 fn reselecting_the_same_member_keeps_follow() {
     let h = harness();

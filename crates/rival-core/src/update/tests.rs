@@ -1,4 +1,4 @@
-//! Go `internal/update/check.go` behavior. No test touches the network: the
+//! Update check behavior. No test touches the network: the
 //! fetch is injected, and the HTTP client is only reached through
 //! `fetch_latest`, which no test calls.
 
@@ -52,7 +52,7 @@ fn normalize_version_pads_three_parts_with_zeros() {
 }
 
 #[test]
-fn notice_follows_go_string_ordering() {
+fn notice_compares_versions_as_strings() {
     let n = |c: &str, l: &str| notice(c, l);
     let text =
         |c: &str, l: &str| format!("\n  Update available: v{c} → v{l} — run 'rival update'\n\n");
@@ -116,7 +116,7 @@ fn cache_file_lives_in_the_rival_root() {
         cache_file_path(&p),
         PathBuf::from("/h/.rival/.update-check")
     );
-    // Go joins "" when the home is unknown: ".rival/.update-check".
+    // An unknown home joins "": ".rival/.update-check".
     let p = Paths::from_vars(None, None);
     assert_eq!(cache_file_path(&p), PathBuf::from("./.rival/.update-check"));
 }
@@ -162,7 +162,7 @@ fn load_cache_decodes_old_and_new_files() {
         c.checked_at.unwrap().to_rfc3339(),
         "2026-10-03T12:00:00+02:00"
     );
-    // A file from an older release: escapes and Go's fraction.
+    // A file from an older release: escapes and a 4-digit fraction.
     let c = load(r#"{"latest":"1\u003c","checked_at":"2026-10-03T12:00:00.1234Z"}"#).unwrap();
     assert_eq!(c.latest, "1<");
     assert_eq!(c.checked_at.unwrap().timestamp_subsec_nanos(), 123_400_000);
@@ -198,8 +198,8 @@ fn run_check(c: &Config, now: DateTime<FixedOffset>, answer: Result<&str, &str>)
     (String::from_utf8(out).unwrap(), calls.get())
 }
 
-/// Go reads `time.Now()` for the cache age before the fetch and again in
-/// `saveCache` after it: `checked_at` is the post-fetch time.
+/// The clock is read for the cache age before the fetch and again when the
+/// cache is saved after it: `checked_at` is the post-fetch time.
 #[test]
 fn check_reads_the_clock_before_and_after_the_fetch() {
     let tmp = tempfile::tempdir().unwrap();
@@ -364,7 +364,7 @@ impl Read for OneShot<'_> {
     }
 }
 
-/// Go's decoder returns after the first value; it never waits for EOF or
+/// The decoder returns after the first value; it never waits for EOF or
 /// trailing data. A body that stalls after the object must not block.
 #[test]
 fn parse_release_stops_at_the_end_of_the_first_value() {
@@ -411,7 +411,7 @@ fn release_builds_ignore_the_api_override() {
 }
 
 #[test]
-fn update_constants_match_go() {
+fn update_constants_values() {
     assert_eq!(CACHE_TTL, Duration::from_secs(86_400));
     assert_eq!(CACHE_TTL_DELTA.num_seconds(), 86_400);
     assert_eq!(HTTP_TIMEOUT, Duration::from_secs(2));

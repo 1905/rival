@@ -1,8 +1,8 @@
-//! pflag's `readAsCSV`: Go `encoding/csv` `Reader.Read` for the first record
-//! of a `StringSlice` flag value (comma `,`, strict quotes, no comments).
+//! CSV parsing of a string-slice flag value: the first record only (comma
+//! `,`, strict quotes, no comments).
 
-/// Go `readAsCSV(val)`. An empty value is an empty list. Errors carry Go's
-/// `*csv.ParseError` text (or `EOF` for a value of only line breaks).
+/// Splits a flag value as CSV. An empty value is an empty list. Errors carry
+/// the CSV parse error text (or `EOF` for a value of only line breaks).
 pub fn read_as_csv(val: &str) -> Result<Vec<String>, String> {
     if val.is_empty() {
         return Ok(Vec::new());
@@ -117,12 +117,12 @@ pub fn read_as_csv(val: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// Go's `\n` length helper.
+/// 1 if `b` ends in `\n`, else 0.
 fn nl_len(b: &[u8]) -> usize {
     usize::from(b.last() == Some(&b'\n'))
 }
 
-/// Go `Reader.readLine` over an in-memory value.
+/// Line reader over an in-memory value.
 struct Lines<'a> {
     rest: &'a [u8],
     num_line: usize,
@@ -154,7 +154,7 @@ impl Lines<'_> {
         Some(line)
     }
 
-    /// Go reports an unterminated quote at the last line it read.
+    /// An unterminated quote is reported at the last line read.
     fn line_of_eof(&self) -> usize {
         self.num_line
     }
@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn errors_match_go_parse_errors() {
+    fn errors_match_csv_parse_errors() {
         assert_eq!(read_as_csv("\n").unwrap_err(), "EOF");
         assert_eq!(
             read_as_csv("a\"b").unwrap_err(),

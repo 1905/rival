@@ -1,5 +1,5 @@
-//! Go `list_model_test.go` and `pagination_test.go` at the model level, and
-//! the list's golden frames.
+//! List model and pagination tests at the model level, and the list's
+//! golden frames.
 
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ fn selected_id(m: &Model) -> String {
         .unwrap_or_default()
 }
 
-/// Go `itemRows`: how many runs (not headers) pass the tab and the filter.
+/// How many runs (not headers) pass the tab and the filter.
 fn run_rows(m: &Model) -> usize {
     m.list.rows.iter().filter(|r| r.is_run()).count()
 }
@@ -40,7 +40,7 @@ fn at(m: &Model) -> (usize, String) {
     (m.list.page(), selected_id(m))
 }
 
-// --- Go list_model_test.go ---------------------------------------------------
+// --- list model ----------------------------------------------------------------
 
 #[test]
 fn list_keys_move_the_cursor() {
@@ -284,7 +284,7 @@ fn list_shows_no_prompt() {
     );
 }
 
-// --- Go pagination_test.go ---------------------------------------------------
+// --- pagination ----------------------------------------------------------------
 
 fn many_model(n: usize, width: u16, height: u16) -> Model {
     list_model(many_runs(n, fixed_now()), width, height)

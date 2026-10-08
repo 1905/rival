@@ -692,7 +692,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn look_path_follows_go_unix_rules() {
+    fn look_path_follows_unix_rules() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("bin");

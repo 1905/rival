@@ -30,10 +30,10 @@ public enum DaySection: String, CaseIterable, Sendable {
 
 /// Buckets `date` relative to `now` by local calendar day (TUI `sectionFor`).
 /// THIS WEEK is the five days before yesterday. Boundaries are calendar day
-/// starts, so a DST switch cannot shift them by an hour. Go's zero time is
-/// OLDER.
+/// starts, so a DST switch cannot shift them by an hour. The zero time
+/// 0001-01-01T00:00:00Z that older CLI versions wrote is OLDER.
 public func section(for date: Date, now: Date, calendar: Calendar) -> DaySection {
-    if date.isGoZero { return .older }
+    if date.isZeroTime { return .older }
     let today = calendar.startOfDay(for: now)
     func dayStart(_ offset: Int) -> Date {
         calendar.date(byAdding: .day, value: offset, to: today).map(calendar.startOfDay) ?? today

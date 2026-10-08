@@ -1,6 +1,6 @@
 //! PID liveness checks that are robust against PID reuse.
 //!
-//! Go: `internal/procinfo`. A PID is paired with its process start time. After
+//! A PID is paired with its process start time. After
 //! a process dies the OS may recycle its PID; comparing start times tells the
 //! original process from an unrelated one that later inherited the number.
 
@@ -166,8 +166,8 @@ fn start_nanos_impl(pid: i32) -> Option<i64> {
 }
 
 /// Windows: the creation time from `GetProcessTimes`, in Unix nanoseconds.
-/// Go's `start_other.go` reports none here; the Rust port needs it so the
-/// queue, the reaper and the TUI stop can tell a reused PID apart.
+/// The queue, the reaper and the TUI stop need it to tell a reused PID
+/// apart.
 #[cfg(windows)]
 fn start_nanos_impl(pid: i32) -> Option<i64> {
     windows::creation_nanos(&windows::open(pid, 0)?)
@@ -178,8 +178,8 @@ fn start_nanos_impl(_pid: i32) -> Option<i64> {
     None
 }
 
-/// The kernel USER_HZ. It is effectively always 100 on Linux; Go hardcodes it
-/// because cgo (`sysconf(_SC_CLK_TCK)`) is disabled there.
+/// The kernel USER_HZ. It is effectively always 100 on Linux, so it is
+/// hardcoded rather than read with `sysconf(_SC_CLK_TCK)`.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 const CLOCK_TICKS_PER_SEC: i64 = 100;
 
@@ -217,15 +217,15 @@ fn parse_stat_start(data: &[u8]) -> Option<i64> {
 mod tests {
     use super::*;
 
-    /// Go uses this PID as one that never exists (above every default pid_max).
+    /// A PID that never exists (above every default pid_max).
     const DEAD_PID: i32 = 1 << 24;
 
     fn self_pid() -> i32 {
         std::process::id() as i32
     }
 
-    /// Every supported platform (macOS, Linux, Windows) reads a start time;
-    /// the Go tests' skip for an unsupported platform never applies here.
+    /// Every supported platform (macOS, Linux, Windows) reads a start time,
+    /// so these tests never skip for an unsupported platform.
     fn self_start() -> i64 {
         let n = start_nanos(self_pid());
         match n {
@@ -290,7 +290,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn start_nanos_self_is_unix_wall_clock() {
-        // Go reports Unix nanoseconds on darwin; the test process started
+        // macOS reports Unix nanoseconds; the test process started
         // within the last day and not in the future.
         let start = start_nanos(self_pid()).unwrap();
         let now = std::time::SystemTime::now()
@@ -308,7 +308,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn start_nanos_can_inspect_launchd() {
-        // Go uses sysctl, which can inspect another user's process. proc_pidinfo
+        // sysctl can inspect another user's process. proc_pidinfo
         // cannot, so switching to it would silently change stop authorization.
         assert!(start_nanos(1).is_some_and(|n| n > 0));
     }

@@ -1,21 +1,21 @@
 //! The command tree, defined once in clap: names, flags, defaults, help and
 //! completion scripts. clap parses the command line.
 //!
-//! Go builds the tree with cobra and pflag. The clap settings below match
-//! the pflag rules rival relies on: value flags take the next word even
-//! when it starts with `-`, bools take only `--flag=value`, the last value
-//! wins, `--model` values append, and leaf commands accept stray words. A
-//! narrow adapter then applies the cobra rules clap has no setting for
-//! (help lookup, non-runnable commands, `NoArgs`) and rewrites clap errors
-//! into the exact cobra/pflag texts with exit code 1. Help prose and
-//! completion scripts may differ from Go; errors and accepted input may not.
+//! The clap settings below match the cobra/pflag rules rival relies on:
+//! value flags take the next word even when it starts with `-`, bools take
+//! only `--flag=value`, the last value wins, `--model` values append, and
+//! leaf commands accept stray words. A narrow adapter then applies the
+//! cobra rules clap has no setting for (help lookup, non-runnable commands,
+//! `NoArgs`) and rewrites clap errors into the exact cobra/pflag texts with
+//! exit code 1. Help prose and completion scripts may differ from cobra;
+//! errors and accepted input may not.
 
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use rival_core::duration;
 
-use crate::gocsv;
+use crate::csvflag;
 
 #[cfg(test)]
 mod tests;
@@ -107,7 +107,7 @@ impl CommandId {
     }
 }
 
-/// Values Go computes at package init, before `.env` loads.
+/// Values computed at startup, before `.env` loads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Defaults {
     /// `rival wait --timeout` default (`config.MaxRunWait()`), nanoseconds.
@@ -186,7 +186,7 @@ fn duration_flag(long: &'static str, default: i64, help: &'static str) -> Arg {
 fn model_flag(default: &'static str, help: &'static str) -> Arg {
     value_flag("model", "strings", default.to_string(), help)
         .short('m')
-        .value_parser(gocsv::read_as_csv)
+        .value_parser(csvflag::read_as_csv)
         .action(ArgAction::Append)
 }
 
@@ -236,9 +236,9 @@ fn shell(name: &'static str) -> Command {
     ))
 }
 
-/// The whole tree. Child order is Go's `AddCommand` order: the `init`
-/// functions run in file-name order, then cobra appends `help` and
-/// `completion`. That order decides the suggestion order.
+/// The whole tree. Child order is the old cobra registration order (by
+/// source file name), then `help` and `completion`. That order decides the
+/// suggestion order.
 pub fn build(defaults: &Defaults) -> Command {
     let command_cmd = with_args(command(
         "command",
@@ -611,7 +611,7 @@ fn levenshtein(s: &str, t: &str) -> usize {
     prev[s.len()]
 }
 
-/// Go `%q` of a shorthand byte: a quoted rune literal.
+/// A shorthand byte as a quoted character literal.
 fn quote_char(c: char) -> String {
     match c {
         '\'' => "'\\''".to_string(),
@@ -628,7 +628,8 @@ fn quote_char(c: char) -> String {
     }
 }
 
-/// Go `strconv.ParseBool`, with its error text.
+/// Parses a bool flag value (`1`, `t`, `true`, …), with a
+/// `strconv.ParseBool` error text.
 pub fn parse_bool(s: &str) -> Result<bool, String> {
     match s {
         "1" | "t" | "T" | "TRUE" | "true" | "True" => Ok(true),
@@ -640,7 +641,8 @@ pub fn parse_bool(s: &str) -> Result<bool, String> {
     }
 }
 
-/// Go `strconv.ParseInt(s, 0, 64)`, with its error text.
+/// Parses an i64 with base prefixes and underscores, with a `strconv.ParseInt`
+/// error text.
 pub fn parse_int(s0: &str) -> Result<i64, String> {
     let syntax = || format!("strconv.ParseInt: parsing {:?}: invalid syntax", s0);
     let range = || format!("strconv.ParseInt: parsing {:?}: value out of range", s0);
@@ -703,7 +705,7 @@ pub fn parse_int(s0: &str) -> Result<i64, String> {
     })
 }
 
-/// Go `strconv.underscoreOK`: underscores only between digits, or right
+/// Underscores only between digits, or right
 /// after a base prefix.
 fn underscore_ok(s: &str) -> bool {
     let b = s.as_bytes();

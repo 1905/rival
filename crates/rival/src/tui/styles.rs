@@ -1,6 +1,6 @@
 //! The dim-phosphor theme, the gradient logo and the header.
 //!
-//! Go: `internal/dashboard/styles.go`. The colour values match Rival.app's
+//! The colour values match Rival.app's
 //! `Theme.swift`. Colour marks state only: running amber, failed red;
 //! completed stays quiet.
 
@@ -113,7 +113,7 @@ impl Styles {
         }
     }
 
-    /// Go: `statusStyle`. An unknown status uses body text.
+    /// The style of a run status. An unknown status uses body text.
     pub fn status(&self, status: &str) -> Style {
         match status {
             "running" => self.running,
@@ -163,7 +163,7 @@ pub fn logo_color(x: usize, y: usize, w: usize, h: usize) -> Color {
     rgb(blend_hex(&LOGO_STOPS, (fx + fy) / 2.0))
 }
 
-/// The colour of cell `i` of `n` along the logo gradient (Go: `Blend1D`).
+/// The colour of cell `i` of `n` along the logo gradient.
 fn ramp_color(i: usize, n: usize) -> Color {
     let t = if n > 1 {
         i as f64 / (n - 1) as f64
@@ -217,7 +217,7 @@ pub fn logo_lines() -> &'static [Line<'static>] {
     })
 }
 
-/// Go: `gradientWord`. Each char of `word` along the logo gradient, bold.
+/// Each char of `word` along the logo gradient, bold.
 pub fn gradient_word(word: &str) -> Vec<Span<'static>> {
     let chars: Vec<char> = word.chars().collect();
     chars
@@ -234,8 +234,8 @@ pub fn gradient_word(word: &str) -> Vec<Span<'static>> {
         .collect()
 }
 
-/// Go: `gradientBar`. A `w`-cell progress bar: the filled part in the logo
-/// gradient across the whole bar, the rest dim.
+/// A `w`-cell progress bar: the filled part in the logo gradient across the
+/// whole bar, the rest dim.
 pub fn gradient_bar(w: usize, pct: f64, styles: &Styles) -> Line<'static> {
     if w == 0 {
         return Line::default();
@@ -268,7 +268,7 @@ pub struct HeaderStats {
 /// header, so short terminals keep their rows for runs.
 pub const COMPACT_HEADER_BELOW_HEIGHT: usize = 30;
 
-/// Go: `renderHeader`. Wide form: the gradient logo with the stats block
+/// The header. Wide form: the gradient logo with the stats block
 /// right-aligned beside it. Compact form: one line with "rival" in the
 /// gradient and the same stats. No line is wider than `w`.
 pub fn render_header(

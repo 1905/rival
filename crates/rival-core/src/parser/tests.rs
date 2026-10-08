@@ -1,4 +1,4 @@
-//! Go: `internal/parser/parser_test.go` and `parser_kimi_test.go`.
+//! Tests for the codex, grok and kimi argument parsers.
 
 use super::*;
 
@@ -168,7 +168,7 @@ fn every_surface_accepts_the_shared_ladder() {
     }
 }
 
-// parser_kimi_test.go
+// Kimi arguments.
 
 /// Every advertised effort must parse — the value is ignored downstream (K3
 /// runs max only), so rejecting "max"/"ultra" while the docs say "pinned to
@@ -202,10 +202,10 @@ fn parse_kimi_args_leaves_default_for_config_resolution() {
     );
 }
 
-// Rust-only: source-behavior pins.
+// Source-behavior pins.
 
 #[test]
-fn parse_args_token_joining_follows_go() {
+fn parse_args_token_joining_needs_single_spaces() {
     // -re needs a single space; anything else is a raw prompt.
     let r = parse_codex_args("-re\thigh hello").unwrap();
     assert_eq!(

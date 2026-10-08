@@ -1,6 +1,6 @@
 //! The tree against `cli-surface.md`, cobra lookup and pflag behavior, and
-//! the Go tree-metadata tests (`model_commands_test.go`,
-//! `grok_command_test.go`, `review_output_test.go`).
+//! the command metadata: which commands are public, model command flags
+//! and removed commands.
 
 use super::*;
 
@@ -183,8 +183,6 @@ fn other_commands_match_cli_surface() {
     );
 }
 
-// ---- Go TestClaudeCommandsArePublic / TestGrokCommandIsPublic / TestRunGrokCommandFlags ----
-
 #[test]
 fn model_commands_are_public_and_registered() {
     let r = root();
@@ -220,8 +218,6 @@ fn model_commands_are_public_and_registered() {
     }
 }
 
-// ---- Go TestModelCommandParentsRejectUnknownRunnerNames ----
-
 #[test]
 fn model_command_parents_reject_unknown_runner_names() {
     assert_eq!(
@@ -235,8 +231,6 @@ fn model_command_parents_reject_unknown_runner_names() {
     assert_eq!(parse_ok(&["run"]).id, CommandId::Run);
     assert_eq!(parse_ok(&["command"]).id, CommandId::Command);
 }
-
-// ---- Go TestRemovedReviewCommandsDoNotResolve ----
 
 /// Commands removed on 2026-09-26 must not resolve: `rival review`,
 /// `rival command megareview`, the Sol commands and the web dashboard.
@@ -552,7 +546,7 @@ fn flag_errors_have_pflag_text() {
 }
 
 #[test]
-fn durations_parse_like_go() {
+fn duration_flags_parse_signed_values_and_defaults() {
     let inv = parse_ok(&["wait", "--timeout", "1s", "--poll=100ms"]);
     assert_eq!(inv.duration("timeout"), 1_000_000_000);
     assert_eq!(inv.duration("poll"), 100_000_000);
@@ -656,7 +650,7 @@ fn ints_parse_like_strconv_base_zero() {
 }
 
 #[test]
-fn help_topic_quote_matches_go_sharp_q() {
+fn help_topic_quote_is_debug_quoted() {
     assert_eq!(quote_topic(&argv(&["foo"])), "[`foo`]");
     assert_eq!(quote_topic(&argv(&["a", "b c"])), "[`a` `b c`]");
     assert_eq!(quote_topic(&argv(&["a`b"])), "[\"a`b\"]");

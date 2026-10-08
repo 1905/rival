@@ -1,4 +1,4 @@
-//! User argument parsing. Go: `internal/parser`.
+//! User argument parsing.
 
 #[cfg(test)]
 mod tests;
@@ -7,12 +7,11 @@ use anyhow::{Result, bail};
 
 use crate::config::{self, VALID_EFFORTS, WHOLE_PROJECT};
 
-/// The parsed user arguments. Go `ParseResult`.
+/// The parsed user arguments.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ParseResult {
     pub effort: String,
-    /// Exact megareview roster selectors; empty means the configured default
-    /// (Go nil).
+    /// Exact megareview roster selectors; empty means the configured default.
     pub models: Vec<String>,
     pub is_review: bool,
     /// True when a review has no explicit scope (use git detection).

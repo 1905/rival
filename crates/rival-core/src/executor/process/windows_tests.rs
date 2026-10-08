@@ -1,4 +1,4 @@
-//! Native Windows checks of the overlapped pipe IO, the owner Job and Go's
+//! Native Windows checks of the overlapped pipe IO, the owner Job and the
 //! Windows `LookPath`. Every wait is bounded; a hang fails the test.
 
 use std::io::{Read, Write};
@@ -178,7 +178,7 @@ fn look(file: &str, path_env: &str) -> Result<PathBuf, LookPathError> {
 }
 
 #[test]
-fn look_path_follows_go_windows_rules() {
+fn look_path_follows_windows_rules() {
     let tmp = tempfile::tempdir().unwrap();
     // A directory with a space and a quoted `;` in %PATH%.
     let bin = tmp.path().join("npm bin;x");
@@ -225,7 +225,7 @@ fn look_path_follows_go_windows_rules() {
         windows::ERR_NOT_FOUND
     );
 
-    // The process-level entry point validates like Go.
+    // The process-level entry point validates the same way.
     assert_eq!(
         super::look_path("", None).unwrap_err().err,
         windows::ERR_NOT_FOUND
@@ -251,7 +251,7 @@ fn look_path_follows_go_windows_rules() {
 }
 
 #[test]
-fn path_ext_matches_go() {
+fn path_ext_defaults_and_parsing() {
     let ext = |v: &str| windows::path_ext(Some(std::ffi::OsStr::new(v)));
     assert_eq!(windows::path_ext(None), [".com", ".exe", ".bat", ".cmd"]);
     assert_eq!(ext(""), [".com", ".exe", ".bat", ".cmd"]);

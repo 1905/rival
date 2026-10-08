@@ -3,7 +3,8 @@
 //!
 //! This is the app's newer answer extraction (codex footer, hook lines,
 //! double-answer dedupe, unanswered-transcript rejection). It is separate from
-//! [`crate::review::parse`], which keeps Go's CLI behavior for output parity.
+//! [`crate::review::parse`], which keeps the CLI review parse behavior for
+//! output parity.
 
 use std::collections::HashMap;
 

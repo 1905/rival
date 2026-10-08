@@ -1,7 +1,7 @@
 //! Release check: queries GitHub for the latest release, caches the answer
 //! for a day, and prints a notice when a newer version exists.
 //!
-//! Go: `internal/update/check.go`. Versions compare as padded strings, not
+//! Versions compare as padded strings, not
 //! semver: `normalize_version` zero-pads three dot-separated parts to three
 //! runes, and anything else compares as written. So `9.9.9` sorts before
 //! `dev`, while a tag such as `vzzz` sorts after it.
@@ -22,20 +22,20 @@ use crate::paths::Paths;
 #[cfg(test)]
 mod tests;
 
-/// Go `releasesURL`, split into the API base and the release path.
+/// The latest-release URL, split into the API base and the release path.
 pub const GITHUB_API: &str = "https://api.github.com";
 pub const RELEASES_PATH: &str = "/repos/1905/rival/releases/latest";
-/// Go `cacheTTL`.
+/// How long a cached answer stays fresh.
 pub const CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
-/// Go `httpTimeout`: the whole request, like `http.Client.Timeout`.
+/// The budget for the whole request, not per read.
 pub const HTTP_TIMEOUT: Duration = Duration::from_secs(2);
-/// The test-only API base override. Rust-port addition: only debug builds
+/// The test-only API base override. Only debug builds
 /// read it, so a release build always asks GitHub.
 pub const API_OVERRIDE_VAR: &str = "RIVAL_UPDATE_API";
 /// Whether this build honours [`API_OVERRIDE_VAR`].
 pub const HONOURS_API_OVERRIDE: bool = cfg!(debug_assertions);
 
-/// Go `cache`: the last answer and when it was fetched. A cache without
+/// The cache file: the last answer and when it was fetched. A cache without
 /// `checked_at` is stale.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -46,14 +46,14 @@ pub struct Cache {
     pub checked_at: Option<DateTime<FixedOffset>>,
 }
 
-/// Go `FetchLatest` or a test stand-in: the latest tag without its `v`.
+/// [`fetch_latest`] or a test stand-in: the latest tag without its `v`.
 pub type Fetch<'a> = &'a dyn Fn() -> Result<String, String>;
 
-/// Go `time.Now` or a test clock.
+/// The wall clock or a test clock.
 pub type Clock<'a> = &'a dyn Fn() -> DateTime<FixedOffset>;
 
-/// Go `Check(currentVersion)`, with every input explicit. All errors are
-/// ignored. `out` is Go's `os.Stderr`. The clock is read twice, as in Go:
+/// The update check, with every input explicit. All errors are
+/// ignored. `out` is stderr in production. The clock is read twice:
 /// for the cache age before the fetch, and for `checked_at` after it.
 pub fn check(current: &str, cfg: &Config, now: Clock<'_>, fetch: Fetch<'_>, out: &mut dyn Write) {
     if skip_check(|key| cfg.getenv(key)) {
@@ -90,33 +90,33 @@ pub fn check_production(current: &str, cfg: &Config, out: &mut dyn Write) {
 
 const CACHE_TTL_DELTA: TimeDelta = TimeDelta::seconds(24 * 60 * 60);
 
-/// Go `time.Since(t)` for a parsed time (no monotonic reading), saturating.
+/// The time since `t` for a parsed time (no monotonic reading), saturating.
 fn since(now: DateTime<FixedOffset>, t: DateTime<FixedOffset>) -> TimeDelta {
     now.signed_duration_since(t)
 }
 
-/// Go `skipCheck`: `CI` or `RIVAL_NO_UPDATE_CHECK` set to anything but
-/// empty, `0` or `false`.
+/// Whether to skip the check: `CI` or `RIVAL_NO_UPDATE_CHECK` set to
+/// anything but empty, `0` or `false`.
 pub fn skip_check<'a>(getenv: impl Fn(&str) -> &'a str) -> bool {
     ["CI", "RIVAL_NO_UPDATE_CHECK"]
         .iter()
         .any(|key| !matches!(getenv(key), "" | "0" | "false"))
 }
 
-/// Go `cacheFilePath`: `<home>/.rival/.update-check`. The port puts it in the
-/// rival root, which is that path unless `RIVAL_HOME` moves the root.
+/// The cache file in the rival root: `<home>/.rival/.update-check` unless
+/// `RIVAL_HOME` moves the root.
 pub fn cache_file_path(paths: &Paths) -> PathBuf {
     paths.root.join(".update-check")
 }
 
-/// Go `loadCache`: reads and decodes the cache file.
+/// Reads and decodes the cache file.
 pub fn load_cache(path: &Path) -> Result<Cache, String> {
     let data = fs::read(path).map_err(|e| e.to_string())?;
     json::decode(&data).map_err(|e| e.to_string())
 }
 
-/// Go `saveCache`: `MkdirAll(dir, 0700)` (error ignored), then
-/// `WriteFile(path, json, 0600)`.
+/// Creates the parent dir `0700` (error ignored), then writes the JSON
+/// file `0600`.
 pub fn save_cache(path: &Path, latest: &str, now: DateTime<FixedOffset>) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         let mut b = DirBuilder::new();
@@ -154,7 +154,7 @@ pub fn releases_url_for(override_base: &str, honour_override: bool) -> String {
     format!("{base}{RELEASES_PATH}")
 }
 
-/// Go `FetchLatest`: GET with a 2 s budget for the whole request.
+/// The latest release tag: GET with a 2 s budget for the whole request.
 pub fn fetch_latest(url: &str) -> Result<String, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(HTTP_TIMEOUT))
@@ -169,7 +169,7 @@ pub fn fetch_latest(url: &str) -> Result<String, String> {
     if status != 200 {
         return Err(format!("status {status}"));
     }
-    // Unlimited, like Go's body; the global timeout bounds it.
+    // The body size is unlimited; the global timeout bounds it.
     parse_release_from(resp.body_mut().as_reader())
 }
 
@@ -178,7 +178,7 @@ pub fn parse_release(body: &[u8]) -> Result<String, String> {
     parse_release_from(body)
 }
 
-/// Go `json.NewDecoder(body).Decode(&release)` plus `TrimPrefix(tag, "v")`.
+/// The `tag_name` of the release JSON, without a leading `v`.
 /// Only the first JSON value is read: the decoder stops at its end and never
 /// waits for EOF. Errors carry serde_json's text.
 pub fn parse_release_from(body: impl Read) -> Result<String, String> {
@@ -204,14 +204,14 @@ pub fn parse_release_from(body: impl Read) -> Result<String, String> {
     Ok(tag.strip_prefix('v').unwrap_or(&tag).to_string())
 }
 
-/// Go `printIfNewer`.
+/// Prints the [`notice`], if any.
 pub fn print_if_newer(current: &str, latest: &str, out: &mut dyn Write) {
     if let Some(text) = notice(current, latest) {
         let _ = out.write_all(text.as_bytes());
     }
 }
 
-/// The notice `printIfNewer` would print, if any.
+/// The notice [`print_if_newer`] prints, if any.
 pub fn notice(current: &str, latest: &str) -> Option<String> {
     if latest.is_empty() {
         return None;
@@ -227,8 +227,8 @@ pub fn notice(current: &str, latest: &str) -> Option<String> {
     None
 }
 
-/// Go `normalizeVersion`: `fmt.Sprintf("%03s.%03s.%03s", ...)` for exactly
-/// three parts. Go zero-pads strings on the left, counting runes.
+/// `%03s.%03s.%03s` for exactly three parts: each part is zero-padded on
+/// the left to three chars, counting chars, not bytes.
 pub fn normalize_version(v: &str) -> String {
     let v = v.strip_prefix('v').unwrap_or(v);
     let parts: Vec<&str> = v.split('.').collect();

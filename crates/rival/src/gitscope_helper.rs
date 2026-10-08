@@ -1,5 +1,4 @@
-//! Git-scoped review prompts shared by the commands. Go:
-//! `cmd/gitscope_helper.go`.
+//! Git-scoped review prompts shared by the commands.
 
 use rival_core::config::{Config, DIFF_REVIEW_PREAMBLE, PromptKind, WHOLE_PROJECT};
 use rival_core::{gitscope, logging, review};

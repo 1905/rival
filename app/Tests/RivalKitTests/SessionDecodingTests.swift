@@ -91,7 +91,7 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertNil(s.groupID)
         XCTAssertNil(s.error)
         XCTAssertNil(s.pidStart)
-        XCTAssertTrue(s.startTime.isGoZero)
+        XCTAssertTrue(s.startTime.isZeroTime)
     }
 
     /// A file from an older release: the zero time for every unset time and
@@ -103,9 +103,9 @@ final class SessionDecodingTests: XCTestCase {
         """#
         let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
         XCTAssertEqual(s.groupID, "a<b&c>")
-        XCTAssertTrue(s.startTime.isGoZero)
-        XCTAssertTrue(s.queuedAt!.isGoZero)
-        XCTAssertTrue(s.endTime!.isGoZero)
+        XCTAssertTrue(s.startTime.isZeroTime)
+        XCTAssertTrue(s.queuedAt!.isZeroTime)
+        XCTAssertTrue(s.endTime!.isZeroTime)
     }
 
     /// A file from this release: unset times are not written, and `<`, `>`,
@@ -116,7 +116,7 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertEqual(s.groupID, "a<b&c>")
         XCTAssertEqual(s.error, "<stderr> & \u{2028}")
         XCTAssertEqual(s.status, "running")
-        XCTAssertTrue(s.startTime.isGoZero)
+        XCTAssertTrue(s.startTime.isZeroTime)
         XCTAssertNil(s.queuedAt)
         XCTAssertNil(s.endTime)
     }
@@ -125,7 +125,7 @@ final class SessionDecodingTests: XCTestCase {
         let json = #"{"id":"x","pid":"not-a-number","start_time":"garbage","output_lines":3}"#
         let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
         XCTAssertEqual(s.pid, 0)
-        XCTAssertTrue(s.startTime.isGoZero)
+        XCTAssertTrue(s.startTime.isZeroTime)
         XCTAssertEqual(s.outputLines, 3)
     }
 
@@ -179,7 +179,7 @@ final class SessionDecodingTests: XCTestCase {
             XCTAssertEqual(s.prompt, nonEmpty(raw.prompt), name)
             XCTAssertEqual(s.promptPreview, nonEmpty(raw.prompt_preview), name)
             XCTAssertEqual(s.status, raw.status ?? "", name)
-            XCTAssertEqual(s.startTime, time(raw.start_time, "start_time") ?? .goZero, name)
+            XCTAssertEqual(s.startTime, time(raw.start_time, "start_time") ?? .zeroTime, name)
             XCTAssertEqual(s.queuedAt, time(raw.queued_at, "queued_at"), name)
             XCTAssertEqual(s.queuePosition, raw.queue_position, name)
             XCTAssertEqual(s.endTime, time(raw.end_time, "end_time"), name)
@@ -207,7 +207,7 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertEqual(z.ownerPID, 2)
         XCTAssertEqual(z.ownerPIDStart, 1)
         // The writer omits unset times.
-        XCTAssertTrue(z.startTime.isGoZero)
+        XCTAssertTrue(z.startTime.isZeroTime)
         XCTAssertNil(z.queuedAt)
         XCTAssertNil(z.endTime)
         XCTAssertNil(z.groupID)
@@ -234,7 +234,7 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertEqual(parseRFC3339("1970-01-01T08:00:00+08:00")?.timeIntervalSince1970, 0)
         XCTAssertEqual(parseRFC3339("1969-12-31T19:00:00-05:00")?.timeIntervalSince1970, 0)
         XCTAssertEqual(parseRFC3339("2000-02-29T12:00:00.5Z")?.timeIntervalSince1970, 951_825_600.5)
-        XCTAssertEqual(parseRFC3339("0001-01-01T00:00:00Z"), Date.goZero)
+        XCTAssertEqual(parseRFC3339("0001-01-01T00:00:00Z"), Date.zeroTime)
         XCTAssertNil(parseRFC3339("2026-09-26"))
         XCTAssertNil(parseRFC3339("2026-09-26T10:00:00"))
         XCTAssertNil(parseRFC3339("2026-09-26T10:00:00.Z"))

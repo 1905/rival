@@ -15,7 +15,7 @@ fn write_log(content: &str) -> (tempfile::TempDir, PathBuf) {
     (dir, p)
 }
 
-// ---- Go: TestParseLogFile ----
+// ---- parse_log_file ----
 
 #[test]
 fn parse_log_file_cases() {
@@ -94,7 +94,7 @@ fn parse_log_file_cases() {
     }
 }
 
-/// Go `%q` of a printable path: only `\` and `"` are escaped, so a Windows
+/// A quoted printable path: only `\` and `"` are escaped, so a Windows
 /// path doubles its separators.
 fn quoted(path: &str) -> String {
     format!("\"{}\"", path.replace('\\', r"\\").replace('"', "\\\""))
@@ -177,7 +177,7 @@ fn parse_log_file_first_pid_wins_dedupes_by_first_occurrence() {
 
 #[test]
 fn parse_log_file_pid_edge_cases() {
-    // Sscanf overflow leaves pid 0; Go's \d is ASCII only.
+    // An overflowing pid parses as 0; the digit match is ASCII only.
     for content in [
         "rival: detached pid=99999999999999999999\n",
         "rival: detached pid=\u{0661}\u{0662}\n",
@@ -198,7 +198,7 @@ fn parse_log_file_pid_edge_cases() {
     assert!(parse_log_file_with(&p, |_| 0).unwrap().ids.is_empty());
 }
 
-// ---- Go: TestWaiterRun and friends ----
+// ---- Waiter::run ----
 
 fn status(st: &str, exit: Option<i64>, duration: &str, err: &str) -> SessionStatus {
     SessionStatus {
@@ -480,7 +480,7 @@ fn zero_or_negative_timeout_checks_status_and_liveness_first() {
     w.timeout = 0;
     assert_eq!(w.run(&Context::background()), WAIT_EXIT_CRASHED);
     drop(w);
-    // Alive and running: immediate timeout, Go duration text.
+    // Alive and running: immediate timeout, duration text like `1m30s`.
     for (timeout, text) in [(0, "0s"), (-SECOND, "-1s"), (90 * SECOND, "1m30s")] {
         let mut buf = Vec::new();
         let ticks = Rc::new(Cell::new(0i128));

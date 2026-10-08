@@ -1,5 +1,4 @@
-//! Go: `internal/review/review_format_test.go`, plus the formatter and echo
-//! cases of `prompt_test.go` and `TestDisplaySeverity` from `plan_test.go`.
+//! Review formatting, prompt-echo detection and severity display.
 
 use super::*;
 use crate::config::{CODEX_MODEL, PromptKind};
@@ -48,7 +47,6 @@ fn review_fixture() -> ReviewerOutput {
     }
 }
 
-/// Go: TestFormatReviewConsoleLayout.
 #[test]
 fn format_review_console_layout() {
     let got = format_review_console(
@@ -79,7 +77,6 @@ Log: /tmp/s.log
     assert_eq!(got, want);
 }
 
-/// Go: TestFormatReviewConsoleOrdersBySeverityThenConfidence.
 #[test]
 fn format_review_console_orders_by_severity_then_confidence() {
     let out = ReviewerOutput {
@@ -113,7 +110,6 @@ fn format_review_console_orders_by_severity_then_confidence() {
     );
 }
 
-/// Go: TestFormatReviewConsoleEmpty.
 #[test]
 fn format_review_console_empty() {
     let out = ReviewerOutput {
@@ -127,8 +123,8 @@ fn format_review_console_empty() {
     );
 }
 
-/// Go: TestFormatReviewConsoleOnlyLowConfidence. Low-confidence findings
-/// are shown, not dropped, and the main list says why it is empty.
+/// Low-confidence findings are shown, not dropped, and the main list says why
+/// it is empty.
 #[test]
 fn format_review_console_only_low_confidence() {
     let out = ReviewerOutput {
@@ -145,7 +141,6 @@ fn format_review_console_only_low_confidence() {
     }
 }
 
-/// Go: TestFormatReviewConsoleJoinsMultiLineScope.
 #[test]
 fn format_review_console_joins_multi_line_scope() {
     let out = ReviewerOutput {
@@ -160,7 +155,6 @@ fn format_review_console_joins_multi_line_scope() {
     assert_eq!(one_line("  a \n\n\t b\r\n"), "a, b");
 }
 
-/// Go: TestFormatReviewResultModelLine.
 #[test]
 fn format_review_result_model_line() {
     let got = format_review_result(
@@ -175,7 +169,6 @@ fn format_review_result_model_line() {
     assert!(got.contains("Model: codex (gpt-6-astra)\n"), "{got}");
 }
 
-/// Go: TestFormatReviewResultFallsBackToRawLog.
 #[test]
 fn format_review_result_falls_back_to_raw_log() {
     let (_home, cfg) = temp_config();
@@ -254,8 +247,8 @@ fn format_unusable_layout() {
     assert!(got.ends_with("Raw output follows.\n\n"), "{got:?}");
 }
 
-/// Go: TestBugHunterCleanReviewAfterEchoedPromptIsAccepted. Codex writes
-/// the whole prompt into its log; a genuine clean answer after it passes.
+/// Codex writes the whole prompt into its log; a genuine clean answer after
+/// it passes.
 #[test]
 fn bug_hunter_clean_review_after_echoed_prompt_is_accepted() {
     let (_home, cfg) = temp_config();
@@ -267,7 +260,6 @@ fn bug_hunter_clean_review_after_echoed_prompt_is_accepted() {
     validate_review_result(Some(&parsed), &raw).unwrap();
 }
 
-/// Go: TestBugHunterEchoOnlyIsRejected.
 #[test]
 fn bug_hunter_echo_only_is_rejected() {
     let (_home, cfg) = temp_config();
@@ -279,7 +271,6 @@ fn bug_hunter_echo_only_is_rejected() {
     assert!(validate_review_result(Some(&parsed), &raw).is_err());
 }
 
-/// Go: TestCleanReviewQuotingPromptMarkersIsNotAnEcho (prompt_test.go).
 #[test]
 fn clean_review_quoting_prompt_markers_is_not_an_echo() {
     let (_home, cfg) = temp_config();
@@ -297,7 +288,6 @@ fn clean_review_quoting_prompt_markers_is_not_an_echo() {
     }
 }
 
-/// Go: TestPromptEchoWithoutAnswerIsRejected (prompt_test.go).
 #[test]
 fn prompt_echo_without_answer_is_rejected() {
     let (_home, cfg) = temp_config();
@@ -313,7 +303,6 @@ fn prompt_echo_without_answer_is_rejected() {
     }
 }
 
-/// Go: TestFormattersShowScenarioOnlyWhenSet (prompt_test.go).
 #[test]
 fn formatters_show_scenario_only_when_set() {
     let with = |s: &str| ReviewerOutput {
@@ -347,7 +336,6 @@ fn formatters_show_scenario_only_when_set() {
     }
 }
 
-/// Go: TestSeverityTallyCountsUnknownAsLow.
 #[test]
 fn severity_tally_counts_unknown_as_low() {
     let fs = [
@@ -361,7 +349,6 @@ fn severity_tally_counts_unknown_as_low() {
     );
 }
 
-/// Go: TestSortedFindingsDoesNotMutateInput.
 #[test]
 fn sorted_findings_does_not_mutate_input() {
     let input = [
@@ -372,7 +359,6 @@ fn sorted_findings_does_not_mutate_input() {
     assert_eq!((input[0].title.as_str(), out[0].title.as_str()), ("l", "c"));
 }
 
-/// Go: TestDisplaySeverity (plan_test.go).
 #[test]
 fn display_severity_labels() {
     for (input, want) in [

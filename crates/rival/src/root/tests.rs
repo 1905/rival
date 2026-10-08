@@ -1,4 +1,4 @@
-//! Go: `cmd/root.go` behavior — pre-run order, background joins, exit codes
+//! Root command behavior: pre-run order, background joins, exit codes
 //! and the plain-stderr error contract. Every hook is a recorder; no real
 //! reap, update check, detach, provider or network runs.
 
@@ -249,7 +249,7 @@ fn tui_suppresses_logging_and_reaps_in_the_background() {
     assert_eq!((r.code, r.stdout.as_str(), r.stderr.as_str()), (0, "", ""));
 }
 
-/// Go `cmd/tui.go`: `fmt.Errorf("tui: %w", err)`, exit 1.
+/// A TUI error is printed as `tui: <err>`, exit 1.
 #[test]
 fn tui_errors_get_the_tui_prefix() {
     let fix = Fixture::new();
@@ -363,7 +363,7 @@ fn fast_update_check_finishes_before_exit() {
     assert!(r.events.contains(&"update".to_string()));
 }
 
-/// Go `TestWaitForUpdateCheckIsBounded`: a hung check holds the join for
+/// A hung check holds the join for
 /// its whole budget, and not much longer.
 #[test]
 fn wait_for_update_check_waits_out_its_budget_for_a_hung_check() {
@@ -384,7 +384,7 @@ fn wait_for_update_check_waits_out_its_budget_for_a_hung_check() {
     assert!(elapsed < limit + Duration::from_secs(1), "took {elapsed:?}");
 }
 
-/// Go `TestWaitForUpdateCheckWithoutStartReturnsImmediately`.
+/// With no update check started, the wait returns at once.
 #[test]
 fn wait_for_update_check_without_a_check_returns_at_once() {
     let mut bg = Background::default();
@@ -486,9 +486,8 @@ fn wait_summarizes_finished_sessions_from_the_configured_home() {
     assert_eq!(r.stderr, "rival wait: exit 2\n");
 }
 
-/// Go `main` defers `telemetry.Flush`, and `Execute` calls `os.Exit` on
-/// every error, so only a normal return reaches the flush. A detach parent
-/// exits inside the pre-run hook, also with `os.Exit`.
+/// The telemetry flush runs only on a normal return: every error exits the
+/// process first. A detach parent exits inside the pre-run hook.
 #[test]
 fn only_a_normal_return_reaches_the_telemetry_flush() {
     let fix = Fixture::new();
@@ -590,7 +589,7 @@ fn model_command_errors_reach_stderr_with_their_code() {
         &["command", "codex", "--no-queue"],
     );
     assert_eq!(r.code, 1);
-    // Go prints the parse error on stdout for the skill and on stderr from
+    // The parse error is printed on stdout for the skill and on stderr from
     // the root.
     assert!(!r.stdout.is_empty());
     assert_eq!(r.stdout, r.stderr);
@@ -700,16 +699,16 @@ fn run_fd_helper(close: &'static [i32]) -> String {
     std::fs::read_to_string(&out).unwrap()
 }
 
-/// Go's os.Stdin.Stat fails on a closed fd 0 and the read fails with EBADF;
-/// a closed fd 1 fails writes with EBADF. Rust reopened both on /dev/null,
+/// A closed fd 0 fails the stdin stat and the read with EBADF; a closed fd 1
+/// fails writes with EBADF. std would reopen both on /dev/null,
 /// where the stat says "character device" and writes succeed.
 #[cfg(unix)]
 #[test]
-fn closed_stdin_and_stdout_fail_like_go() {
+fn closed_stdin_and_stdout_fail_with_ebadf() {
     assert_eq!(
         run_fd_helper(&[]),
         "char_device=true\nread=ok:0\nwrite=ok:0",
-        "/dev/null stdin is a character device, as in Go"
+        "/dev/null stdin is a character device"
     );
     assert_eq!(
         run_fd_helper(&[0]),
@@ -732,7 +731,7 @@ const WIN_STDIN_TEST: &str = "root::tests::win_stdin_helper_child";
 
 /// Runs only inside the helper process: reports what the process stdin and
 /// stdout adapters see. Modes `invalid`/`nullhandle` first set the standard
-/// input slot to INVALID_HANDLE_VALUE (Go's `os.Stdin` is nil) or NULL (a
+/// input slot to INVALID_HANDLE_VALUE (no stdin at all) or NULL (a
 /// `File` on handle 0); `out-invalid`/`out-nullhandle` do that to stdout.
 #[cfg(windows)]
 #[test]
@@ -842,14 +841,14 @@ fn run_win_stdin_helper(mode: &str) -> String {
     std::fs::read_to_string(&out).unwrap()
 }
 
-/// Go on Windows: `NUL` is a character device (so it reads as no piped
-/// input), a pipe and a file are not. An INVALID_HANDLE_VALUE stdin makes
-/// `os.Stdin` nil: `Stat` fails and the read is the bare `invalid argument`.
+/// Windows: `NUL` is a character device (so it reads as no piped input), a
+/// pipe and a file are not. An INVALID_HANDLE_VALUE stdin means no stdin:
+/// `Stat` fails and the read is the bare `invalid argument`.
 /// A NULL stdin is a `File` on handle 0: `Stat` (GetFileType) fails and the
 /// read fails with ERROR_INVALID_HANDLE. std would read EOF from both.
 #[cfg(windows)]
 #[test]
-fn windows_stdin_kinds_match_go() {
+fn windows_stdin_kinds_and_missing_handles() {
     let ok_write = "write=ok:1";
     assert_eq!(
         run_win_stdin_helper("null"),
@@ -879,13 +878,13 @@ fn windows_stdin_kinds_match_go() {
     );
 }
 
-/// Go on Windows: an INVALID_HANDLE_VALUE stdout makes `os.Stdout` nil and a
-/// write fails with the bare `invalid argument`; a NULL stdout is a `File`
-/// whose WriteFile fails with ERROR_INVALID_HANDLE. std would report success
+/// Windows: an INVALID_HANDLE_VALUE stdout means no stdout, and a write
+/// fails with the bare `invalid argument`; a NULL stdout is a `File` whose
+/// WriteFile fails with ERROR_INVALID_HANDLE. std would report success
 /// for both.
 #[cfg(windows)]
 #[test]
-fn windows_stdout_missing_handles_fail_like_go() {
+fn windows_stdout_missing_handles_fail_writes() {
     let head = "char_device=true\nstat_failed=false\nread=ok:";
     assert_eq!(
         run_win_stdin_helper("out-invalid"),

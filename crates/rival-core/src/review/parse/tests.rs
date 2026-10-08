@@ -1,6 +1,5 @@
-//! Go: `internal/review/parse_test.go` (reviewer cases) and
-//! `TestParseReviewerOutputFailureScenario` from `prompt_test.go`, plus
-//! Rust-only pins of Go's decoder rules.
+//! Reviewer output parsing tests, the failure-scenario round trip, and pins
+//! of the decoder rules.
 
 use super::*;
 use crate::review::format_review_result;
@@ -156,7 +155,7 @@ fn tool_output_json_is_not_the_review() {
         "tool-output JSON accepted as the review"
     );
     assert!(parse_reviewer_log(raw).is_err());
-    // Without final_answer the tool's JSON would win (the Go gap this guards).
+    // Without final_answer the tool's JSON would win (the gap this guards).
     assert_eq!(
         parse_reviewer_output(raw).unwrap().summary,
         "Saved: nothing wrong."
@@ -183,7 +182,7 @@ fn final_answer_header_is_an_exact_line() {
     assert_eq!(final_answer("codex\r\nb"), "codex\r\nb");
 }
 
-/// Known Go gap 1: a log with no codex header (claude, opencode) is
+/// Known gap 1: a log with no codex header (claude, opencode) is
 /// scanned whole, so tool-printed JSON there can still win.
 #[test]
 fn known_gap_no_header_scans_whole_log() {
@@ -199,7 +198,7 @@ fn known_gap_no_header_scans_whole_log() {
     );
 }
 
-/// Known Go gap 2: a final answer that prints the same payload twice is not
+/// Known gap 2: a final answer that prints the same payload twice is not
 /// deduplicated; the last copy wins and nothing flags the repeat.
 #[test]
 fn known_gap_duplicate_answer_not_deduped() {
@@ -210,7 +209,8 @@ fn known_gap_duplicate_answer_not_deduped() {
     assert_eq!(json_objects(final_answer(&raw)).len(), 4);
 }
 
-/// Go: TestParseReviewerOutputFailureScenario (prompt_test.go).
+/// `failure_scenario` survives a JSON round trip; an old payload without it
+/// still parses.
 #[test]
 fn failure_scenario_round_trip() {
     let raw = r#"{"summary":"one bug","findings":[{"file":"a.go","line":3,"severity":"high","category":"bug","title":"t","body":"b","failure_scenario":"empty list → index panic","suggestion":"s","confidence":8}]}"#;

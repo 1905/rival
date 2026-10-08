@@ -23,7 +23,7 @@ func makeTempDir() throws -> URL {
     return url
 }
 
-/// The Go tests' `sess` helper.
+/// The rival CLI tests' `sess` helper.
 func sess(_ id: String, _ groupID: String, _ status: String, _ mode: String,
           _ cli: String, _ model: String, _ effort: String) -> Session {
     Session(id: id, groupID: groupID, cli: cli, mode: mode, model: model, effort: effort, status: status)

@@ -1,8 +1,8 @@
-//! Crash telemetry through Sentry. Go: `internal/telemetry/telemetry.go`.
+//! Crash telemetry through Sentry.
 //!
-//! The Go wiring never sends an event in practice: nothing calls a capture
-//! API, and `RecoverPanic` cannot recover (see [`Telemetry::recover_panic`]).
-//! The port keeps that: no panic hook, no automatic error events. Sentry's
+//! Telemetry never sends an event in practice: nothing calls a capture API,
+//! and [`Telemetry::recover_panic`] is a no-op. This is on purpose: no panic
+//! hook, no automatic error events. Sentry's
 //! built-in ureq transport sends on one background thread; [`Telemetry::flush`]
 //! waits at most [`FLUSH_TIMEOUT`] for it.
 
@@ -28,8 +28,8 @@ pub fn enabled<'a>(getenv: impl Fn(&str) -> &'a str) -> bool {
         .all(|key| matches!(getenv(key), "" | "0" | "false"))
 }
 
-/// Go `sentry.ClientOptions` of `Init`, without the transport. Proxies come
-/// from the environment, as Go's transport uses `http.ProxyFromEnvironment`.
+/// The Sentry client options, without the transport. Proxies come from the
+/// environment.
 pub fn client_options<'a>(version: &str, getenv: impl Fn(&str) -> &'a str) -> ClientOptions {
     let mut opts = ClientOptions::new();
     opts.dsn = Some(SENTRY_DSN.parse().expect("valid DSN"));
@@ -49,16 +49,15 @@ pub fn client_options<'a>(version: &str, getenv: impl Fn(&str) -> &'a str) -> Cl
     opts
 }
 
-/// The initialized client, if telemetry is enabled. Go keeps it in the
-/// global hub plus an `enabled` flag.
+/// The initialized client, if telemetry is enabled.
 #[derive(Default)]
 pub struct Telemetry {
     client: Option<Arc<Client>>,
 }
 
 impl Telemetry {
-    /// Go `Init(version)` with the real transport. Binds the client to the
-    /// main hub, as `sentry.Init` sets the global hub.
+    /// Initializes telemetry with the real transport. Binds the client to the
+    /// main hub.
     pub fn init<'a>(version: &str, getenv: impl Fn(&str) -> &'a str + Copy) -> Telemetry {
         let t = Self::init_with(
             version,
@@ -87,7 +86,7 @@ impl Telemetry {
         }
     }
 
-    /// Go's `enabled` flag: `Init` ran past the opt-out check.
+    /// Whether init ran past the opt-out check.
     pub fn is_enabled(&self) -> bool {
         self.client.is_some()
     }
@@ -104,11 +103,8 @@ impl Telemetry {
         }
     }
 
-    /// Go `RecoverPanic`, a deferred call to `sentry.Recover()`. Go's
-    /// `recover()` only stops a panic when the deferred function calls it
-    /// directly; `sentry.Recover` is one call deeper, so it returns nil and
-    /// nothing is captured or recovered. This port keeps the no-op: a panic
-    /// is never reported automatically.
+    /// A no-op on purpose: nothing is captured or recovered, and a panic is
+    /// never reported automatically.
     pub fn recover_panic(&self) {}
 
     /// An explicit capture through this client (tests and future callers).

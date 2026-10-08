@@ -113,7 +113,7 @@ public func infoRows(_ s: Session, now: Date, timeZone: TimeZone = .current) -> 
     f.timeZone = timeZone
     f.dateFormat = "yyyy-MM-dd HH:mm:ss"
     func ts(_ d: Date?) -> String {
-        guard let d, !d.isGoZero else { return "" }
+        guard let d, !d.isZeroTime else { return "" }
         return f.string(from: d)
     }
     let rows: [(String, String)] = [

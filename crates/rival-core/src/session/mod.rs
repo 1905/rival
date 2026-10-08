@@ -1,8 +1,8 @@
 //! Session records under `~/.rival/sessions`.
 //!
-//! Go: `internal/session`. Each run writes `<id>.json` (pretty JSON) and
-//! appends output to `<id>.log`. Several processes write the same
-//! record, so every save goes through a unique temp file and a rename.
+//! Each run writes `<id>.json` (pretty JSON) and appends output to
+//! `<id>.log`. Several processes write the same record, so every save goes
+//! through a unique temp file and a rename.
 
 pub mod reaper;
 pub mod summary;
@@ -41,7 +41,7 @@ pub fn is_task_mode(mode: &str) -> bool {
 }
 
 /// One run. The JSON keys keep the order and the omit rules of the record
-/// the Go release wrote. Empty strings and zero counters with an omit rule
+/// older releases wrote. Empty strings and zero counters with an omit rule
 /// are not written; `Option` fields are not written when `None`. Records
 /// decode through [`Session::from_json`]: a missing key or `null` gives the
 /// default, and unknown keys are ignored.
@@ -150,8 +150,8 @@ impl Outcome {
     }
 }
 
-/// Go: `time.Now()` — a wall-clock reading plus the monotonic reading Go
-/// keeps inside an in-process `time.Time`.
+/// The current time: a wall-clock reading plus a monotonic reading for
+/// in-process durations.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Now {
     pub(crate) wall: DateTime<FixedOffset>,
@@ -168,11 +168,11 @@ impl Now {
 }
 
 /// The monotonic reading taken with `start_time` when this process set it.
-/// Go's `now.Sub(StartTime)` uses the monotonic clock in that case, so a
-/// wall-clock step during a run does not change the duration. It applies
-/// only while `start_time` still holds the wall time it was taken with; a
-/// loaded record has none and uses wall time, as in Go. It is not serialized
-/// and always compares equal.
+/// The elapsed time uses the monotonic clock in that case, so a wall-clock
+/// step during a run does not change the duration. It applies only while
+/// `start_time` still holds the wall time it was taken with; a loaded record
+/// has none and uses wall time. It is not serialized and always compares
+/// equal.
 #[derive(Clone, Copy, Default)]
 pub struct MonoStart(Option<Now>);
 
@@ -202,8 +202,7 @@ fn is_zero(n: &i64) -> bool {
     *n == 0
 }
 
-/// The inputs of Go's `NewQueued(cli, mode, model, effort, workdir, prompt,
-/// reviewScope, groupID)`.
+/// The inputs of [`Session::new_queued`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NewSession<'a> {
     pub cli: &'a str,
@@ -216,7 +215,7 @@ pub struct NewSession<'a> {
     pub group_id: &'a str,
 }
 
-/// Go: `procinfo.StartNanos(pid)` with the error dropped.
+/// The start time of `pid` in nanoseconds; 0 when it cannot be read.
 fn pid_start_nanos(pid: i64) -> i64 {
     procinfo::start_nanos(proc_pid(pid)).unwrap_or(0)
 }
@@ -227,7 +226,7 @@ pub(crate) fn proc_pid(pid: i64) -> i32 {
     i32::try_from(pid).unwrap_or(0)
 }
 
-/// Go: `t.Sub(u)`, saturating at the `time.Duration` range.
+/// `t - u` in nanoseconds, saturating at the `i64` range.
 pub fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
     let d = t.signed_duration_since(u);
     d.num_nanoseconds().unwrap_or(if d > TimeDelta::zero() {
@@ -237,7 +236,7 @@ pub fn sub_nanos(t: DateTime<FixedOffset>, u: DateTime<FixedOffset>) -> i64 {
     })
 }
 
-/// Go: `time.Duration.Round(m)`. Halfway values round away from zero.
+/// Rounds `d` to a multiple of `m`. Halfway values round away from zero.
 fn round_duration(d: i64, m: i64) -> i64 {
     if m <= 0 {
         return d;
@@ -265,7 +264,7 @@ fn round_duration(d: i64, m: i64) -> i64 {
     i64::MAX
 }
 
-/// Go: `t.Sub(u)` for two monotonic readings, saturating.
+/// `t - u` in nanoseconds for two monotonic readings, saturating.
 fn mono_sub(t: Instant, u: Instant) -> i64 {
     match t.checked_duration_since(u) {
         Some(d) => i64::try_from(d.as_nanos()).unwrap_or(i64::MAX),
@@ -273,24 +272,24 @@ fn mono_sub(t: Instant, u: Instant) -> i64 {
     }
 }
 
-/// Go: `d.Round(time.Second).String()`.
+/// The duration rounded to the second, as text (for example `1m5s`).
 pub fn duration_text(nanos: i64) -> String {
     duration::format(round_duration(nanos, 1_000_000_000))
 }
 
-/// Go's `*PathError` text: `<op> <path>: <errno text>`.
+/// The text of a failed file operation: `<op> <path>: <errno text>`.
 pub(crate) fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
     format!("{op} {}: {}", path.display(), err)
 }
 
-/// An I/O error that prints as Go's `*PathError` and still downcasts to
+/// An I/O error that prints as [`path_error`] text and still downcasts to
 /// the `io::Error`.
 pub(crate) fn io_error(op: &str, path: &Path, err: io::Error) -> anyhow::Error {
     let text = path_error(op, path, &err);
     anyhow::Error::new(err).context(text)
 }
 
-/// Go: `os.ReadFile`.
+/// Reads the whole file; errors print as [`path_error`] text.
 pub(crate) fn read_file(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut f = std::fs::File::open(path).map_err(|e| io_error("open", path, e))?;
     let mut data = Vec::new();
@@ -299,8 +298,8 @@ pub(crate) fn read_file(path: &Path) -> anyhow::Result<Vec<u8>> {
     Ok(data)
 }
 
-/// Go: `os.CreateTemp(dir, pattern)` with a trailing `*`: the random part
-/// is the decimal form of a random u32, and the file is created 0600.
+/// Creates a temp file `<prefix><random>` in `dir`: the random part is the
+/// decimal form of a random u32, and the file is created 0600.
 fn create_temp(dir: &Path, prefix: &str) -> Result<(File, std::path::PathBuf), String> {
     let pattern = format!("{prefix}*");
     if prefix
@@ -335,9 +334,9 @@ fn create_temp(dir: &Path, prefix: &str) -> Result<(File, std::path::PathBuf), S
 }
 
 impl Session {
-    /// Go: `NewQueued`. Creates a session in "queued" state — visible in the
-    /// TUI while the process waits for a queue slot. Call [`Session::mark_running`]
-    /// when the slot is acquired.
+    /// Creates a session in "queued" state — visible in the TUI while the
+    /// process waits for a queue slot. Call [`Session::mark_running`] when
+    /// the slot is acquired.
     pub fn new_queued(paths: &Paths, input: NewSession<'_>) -> anyhow::Result<Session> {
         Self::create(paths, input, "queued")
     }
@@ -471,9 +470,9 @@ impl Session {
         Ok(())
     }
 
-    /// Go: `now.Sub(s.StartTime)` — monotonic while `start_time` is the
-    /// reading this process took, wall time otherwise. An unset start
-    /// saturates, as the distant unset time of older releases did.
+    /// Time since `start_time`: monotonic while `start_time` is the reading
+    /// this process took, wall time otherwise. An unset start saturates, as
+    /// the distant unset time of older releases did.
     fn elapsed(&self, now: Now) -> i64 {
         match (self.start_mono.0, self.start_time) {
             (Some(start), Some(t)) if start.wall == t => mono_sub(now.mono, start.mono),
@@ -538,7 +537,7 @@ impl Session {
 
     /// Reads and returns all sessions, sorted newest first.
     pub fn load_all(paths: &Paths) -> Vec<Session> {
-        // Go: filepath.Glob(dir/*.json), which returns names in sorted order.
+        // Every `*.json` in the dir, in sorted name order.
         let Ok(entries) = fs::read_dir(paths.sessions_dir()) else {
             return Vec::new();
         };
@@ -566,8 +565,8 @@ impl Session {
         sessions
     }
 
-    /// Reads one complete session record by id. A read error prints as Go's
-    /// `*PathError` and downcasts to `io::Error`.
+    /// Reads one complete session record by id. A read error prints as
+    /// [`path_error`] text and downcasts to `io::Error`.
     pub fn load(paths: &Paths, id: &str) -> anyhow::Result<Session> {
         let path = crate::paths::clean(&paths.sessions_dir().join(format!("{id}.json")));
         Session::from_json(&read_file(&path)?)
@@ -584,7 +583,7 @@ impl Session {
 }
 
 /// Newest `start_time` first. Rust's stable sort keeps the name order for
-/// ties; Go's `sort.Slice` may not for more than 12 sessions.
+/// ties.
 pub(crate) fn sort_newest_first<S: Borrow<Session>>(sessions: &mut [S]) {
     sessions.sort_by_key(|s| std::cmp::Reverse(s.borrow().start_time));
 }

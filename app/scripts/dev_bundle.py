@@ -160,7 +160,7 @@ def make_fixture(root: Path, many: int = 0) -> None:
 
 
 def finish(root: Path, sid: str, status: str) -> None:
-    """Rewrites one session like the Go CLI's Save: tmp file, then rename."""
+    """Rewrites one session like the rival CLI's session writer: tmp file, then rename."""
     if not (root / FIXTURE_MARK).is_file():
         sys.exit(f"{root} is not a dev_bundle.py fixture; refusing to touch it")
     path = root / "sessions" / f"{sid}.json"

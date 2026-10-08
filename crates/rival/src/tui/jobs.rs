@@ -69,7 +69,7 @@ pub enum JobOutput {
     Msg(Msg),
     /// A log copy handed to the viewer, for the runtime's [`LogViews`].
     Opened(OpenedLog),
-    /// Nothing to deliver (a log that could not be opened, as in Go).
+    /// Nothing to deliver (a log that could not be opened).
     Nothing,
 }
 
@@ -89,19 +89,17 @@ impl JobOutput {
 /// [`launch_viewer`].
 pub type Launch = fn(&Path) -> io::Result<Option<Child>>;
 
-/// The opener program. Go runs `exec.Command("open", path)`, the macOS
-/// opener, on every platform. Rust uses `open` on macOS and `xdg-open` on
-/// the other unix hosts; where it is not installed the launch fails and the
-/// copy is removed again, as for any failed launch. Windows has no opener
+/// The opener program: `open` on macOS and `xdg-open` on the other unix
+/// hosts. Where it is not installed the launch fails and the copy is removed
+/// again, as for any failed launch. Windows has no opener
 /// program: [`launch_viewer`] asks the shell (`ShellExecuteW`) instead.
 #[cfg(target_os = "macos")]
 pub const VIEWER: &str = "open";
 #[cfg(all(unix, not(target_os = "macos")))]
 pub const VIEWER: &str = "xdg-open";
 
-/// A command whose stdin, stdout and stderr are the null device, as Go's
-/// `exec.Cmd` leaves them: it can neither read the TUI's keys nor print over
-/// the screen. Unix only: the Windows viewer starts no command.
+/// A command whose stdin, stdout and stderr are the null device: it can
+/// neither read the TUI's keys nor print over the screen. Unix only: the Windows viewer starts no command.
 #[cfg(unix)]
 pub fn quiet_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
@@ -189,7 +187,7 @@ pub fn shell_open(
     }
 }
 
-/// How long an opened log copy lives while the TUI runs (Go: 10 minutes).
+/// How long an opened log copy lives while the TUI runs.
 pub const LOG_VIEW_TTL: Duration = Duration::from_secs(10 * 60);
 
 /// A log copy "o" handed to the viewer, and the launcher to reap. It owns
@@ -243,8 +241,7 @@ impl OpenedLog {
     /// exits. A copy younger than [`LOG_VIEW_TTL`] stays in the temp dir even
     /// when its launcher is done or there was none: plain `open` returns once
     /// LaunchServices has the request, before the app reads the path. Only an
-    /// expired copy is removed. Go left every copy behind on exit, as its
-    /// 10-minute timer died with the process.
+    /// expired copy is removed.
     fn release(&mut self, now: Instant) {
         if self.settled {
             return;
@@ -270,8 +267,7 @@ impl Drop for OpenedLog {
 /// [`LOG_VIEW_TTL`]. On exit [`LogViews::close`] (also run on drop) applies
 /// the exit policy of `OpenedLog::release` to every copy still held. Known
 /// limit: no process outlives the TUI to finish the TTL, so every copy
-/// younger than the TTL at exit stays in the temp dir for the OS to clean,
-/// as every copy did in Go.
+/// younger than the TTL at exit stays in the temp dir for the OS to clean.
 #[derive(Debug, Default)]
 pub struct LogViews {
     views: Vec<OpenedLog>,
@@ -363,7 +359,7 @@ impl JobEnv {
         }
     }
 
-    /// Go: `loadPrompts` for the members the summaries left without one.
+    /// Loads the prompts of the members the summaries left without one.
     fn load_prompts(&self, req: PromptsRequest) -> PromptsResult {
         let prompts = req
             .ids
@@ -379,8 +375,8 @@ impl JobEnv {
         }
     }
 
-    /// Go: `openLog` / `openGroupLogs` / `openLogPath`. A copy the viewer
-    /// cannot be started for is removed again; errors are dropped, as in Go.
+    /// Opens a run's log, or a group's logs, in the viewer. A copy the viewer
+    /// cannot be started for is removed again; errors are dropped.
     fn open_log(&self, req: &OpenLogRequest) -> Option<OpenedLog> {
         let view = if req.group {
             create_group_log_view(&self.temp_dir, &req.sessions)

@@ -91,7 +91,7 @@ pub enum ResultOutcome {
         state: Option<FileState>,
         result: Arc<RunResult>,
     },
-    /// The log could not be read; Go's error text.
+    /// The log could not be read; the read error text.
     Failed(String),
 }
 

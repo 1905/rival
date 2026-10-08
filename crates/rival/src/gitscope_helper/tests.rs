@@ -190,9 +190,8 @@ fn no_changes_gives_an_empty_preamble() {
     );
 }
 
-/// Go: cmd TestSecurityPromptIsAlwaysTheSecurityLens and
-/// TestSecurityAutoScopeFallsBackToWholeProject, through `lens_prompt` (the
-/// `securityScopeAndPrompt` wrapper lands with the command in P3).
+/// The security prompt is always the security lens, and an empty scope
+/// falls back to the whole project, through `lens_prompt`.
 #[test]
 fn lens_prompt_renders_the_selected_lens() {
     let fx = Fixture::new();

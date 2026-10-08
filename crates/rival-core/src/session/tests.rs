@@ -72,7 +72,7 @@ fn at(
         .unwrap()
 }
 
-// ---- session_test.go ----
+// ---- group order and modes ----
 
 #[test]
 fn sort_group_members_uses_creation_order_and_puts_judge_last() {
@@ -215,7 +215,7 @@ fn retired_antislop_mode_loads_as_a_plain_run() {
     assert!(!is_task_mode(&s.mode));
 }
 
-// ---- save_test.go ----
+// ---- save ----
 
 // Concurrent writers of one
 // session (owner, TUI stop, reaper, the Mac app) must never share a temp file.
@@ -316,14 +316,14 @@ fn save_rejects_an_id_with_a_path_separator() {
 }
 
 #[test]
-fn save_without_sessions_dir_reports_go_style_error() {
+fn save_without_sessions_dir_reports_open_path_error() {
     let (_home, paths) = temp_paths();
     let s = Session {
         id: "a".into(),
         ..Session::default()
     };
     let err = format!("{:#}", s.save(&paths).unwrap_err());
-    // Go os.CreateTemp joins with the host separator; the sessions dir is
+    // The temp name joins with the host separator; the sessions dir is
     // a missing parent (ERROR_PATH_NOT_FOUND on Windows).
     let prefix = format!(
         "create session tmp: open {}{}a.json.tmp-",
@@ -663,7 +663,7 @@ fn complete_and_fail_record_the_outcome() {
 }
 
 #[test]
-fn run_duration_mirrors_go_round_and_string() {
+fn run_duration_rounds_to_seconds_and_formats() {
     let base = at(0, 2026, 1, 1, 0, 0, 0, 0);
     let cases = [
         (0, "0s"),
@@ -681,7 +681,7 @@ fn run_duration_mirrors_go_round_and_string() {
         let end = base + Duration::nanoseconds(nanos);
         assert_eq!(duration_text(sub_nanos(end, base)), want, "{nanos}ns");
     }
-    // A start in year 1 saturates like Go's time.Sub.
+    // A start in year 1 saturates at the i64 nanosecond range.
     assert_eq!(
         duration_text(sub_nanos(base, at(0, 1, 1, 1, 0, 0, 0, 0))),
         "2562047h47m16.854775807s"
@@ -693,7 +693,7 @@ fn run_duration_mirrors_go_round_and_string() {
 }
 
 #[test]
-fn round_duration_saturates_like_go() {
+fn round_duration_saturates() {
     let s = 1_000_000_000;
     assert_eq!(round_duration(i64::MAX, s), i64::MAX);
     assert_eq!(round_duration(i64::MIN, s), i64::MIN);
@@ -756,7 +756,7 @@ fn preview_line(paths: &Paths, id: &str) -> String {
         .split(|&b| b == b'\n')
         .find(|l| l.starts_with(b"  \"prompt_preview\": "))
         .expect("prompt_preview line");
-    String::from_utf8(line.to_vec()).expect("Go writes valid UTF-8")
+    String::from_utf8(line.to_vec()).expect("session files hold valid UTF-8")
 }
 
 #[test]
@@ -848,7 +848,7 @@ fn complete_and_fail_use_the_monotonic_clock_in_process() {
 }
 
 #[test]
-fn loaded_or_reassigned_start_time_uses_wall_time_like_go() {
+fn loaded_or_reassigned_start_time_uses_wall_time() {
     let (_home, paths) = temp_paths();
     let mut s = queued(&paths, "p");
     let start = s.start_mono.0.unwrap();
@@ -867,7 +867,7 @@ fn loaded_or_reassigned_start_time_uses_wall_time_like_go() {
 }
 
 #[test]
-fn mono_sub_is_signed_like_go_sub() {
+fn mono_sub_is_signed() {
     let t = Instant::now();
     let later = t + StdDuration::from_secs(2);
     assert_eq!(mono_sub(later, t), 2_000_000_000);
@@ -953,7 +953,7 @@ fn from_json_rejects_wrong_types_and_bad_times() {
 // ---- load errors ----
 
 #[test]
-fn load_errors_read_like_go_and_downcast_to_io() {
+fn load_errors_name_the_path_and_downcast_to_io() {
     let (_home, paths) = temp_paths();
     let dir = paths.sessions_dir();
     // The sessions dir does not exist yet: a missing parent.
@@ -966,7 +966,7 @@ fn load_errors_read_like_go_and_downcast_to_io() {
         err.downcast_ref::<io::Error>().unwrap().kind(),
         io::ErrorKind::NotFound
     );
-    // filepath.Join cleans the path.
+    // The joined path is cleaned.
     let err = Session::load(&paths, "a/../b").unwrap_err();
     assert_eq!(err.to_string(), open_missing("b.json", NO_SUCH_PATH));
 
@@ -988,7 +988,7 @@ fn load_errors_read_like_go_and_downcast_to_io() {
         "invalid type: string \"x\", expected i64 at line 1 column 10"
     );
 
-    // The summary reader keeps Go's path errors too.
+    // The summary reader keeps the path errors too.
     let missing = dir.join("gone.json");
     let err = load_summary_file(&missing, 10).unwrap_err();
     assert_eq!(err.to_string(), open_missing("gone.json", NO_SUCH_FILE));
@@ -1047,8 +1047,9 @@ fn record_line(s: &Session) -> String {
     )
 }
 
-/// Every file in `testdata/sessions/` (written by Go or Rust v4) loads with
-/// the field values recorded before the serde reader replaced the Go one.
+/// Every file in `testdata/sessions/` (written by older releases or by v4)
+/// loads with the field values recorded before the serde reader replaced
+/// the older one.
 #[test]
 fn testdata_sessions_load_with_recorded_values() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/sessions");

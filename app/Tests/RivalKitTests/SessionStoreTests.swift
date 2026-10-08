@@ -30,7 +30,7 @@ final class SessionStoreTests: XCTestCase {
         return "{\n  " + fields.joined(separator: ",\n  ") + "\n}\n"
     }
 
-    /// Writes like the Go CLI: tmp file, then rename.
+    /// Writes like the rival CLI: tmp file, then rename.
     func save(_ id: String, _ body: String) throws {
         let tmp = dir.appendingPathComponent(id + ".json.tmp")
         try Data(body.utf8).write(to: tmp)

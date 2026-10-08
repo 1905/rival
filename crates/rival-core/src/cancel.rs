@@ -264,7 +264,7 @@ mod tests {
     use std::thread;
 
     #[test]
-    fn errors_print_go_text() {
+    fn errors_print_their_text() {
         assert_eq!(ContextError::Canceled.to_string(), "context canceled");
         assert_eq!(
             ContextError::DeadlineExceeded.to_string(),

@@ -1,6 +1,4 @@
 //! Dashboard buckets and the group reducers.
-//!
-//! Go: `internal/sessionview/group.go`.
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -278,7 +276,7 @@ mod tests {
         }
     }
 
-    // Not in the Go suite: security precedes every other kind.
+    // Security precedes every other kind.
     #[test]
     fn kind_security_wins() {
         let sessions = [
@@ -353,7 +351,7 @@ mod tests {
     }
 
     // The injected `now`
-    // makes the queued span exact instead of Go's 9m..12m window.
+    // makes the queued span exact instead of a 9m..12m window.
     #[test]
     fn elapsed_uses_duration_fallback_and_queued_at() {
         let base = base();
@@ -386,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn elapsed_edges_follow_go() {
+    fn elapsed_edge_cases() {
         let base = base();
         // An earlier queued_at replaces start_time; running extends to now.
         let running = [Session {
@@ -418,7 +416,7 @@ mod tests {
         }];
         assert_eq!(elapsed_at(&bad_duration, base), "-");
 
-        // Rounds to whole seconds, as Go's Round(time.Second).
+        // Rounds to the nearest whole second.
         let fractional = [Session {
             id: "a".into(),
             status: "completed".into(),

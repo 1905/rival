@@ -29,7 +29,7 @@ pub const RETIRED_SKILL_NAME_HASHES: [&str; 2] = [
     "75160929d947197a4444be684d0c9a67784cc4ebd84b45cd1de2234a6981056a",
 ];
 
-/// Go `codexInstalled`'s system applications directory.
+/// The system applications directory checked for an installed Codex app.
 const SYSTEM_APPLICATIONS: &str = "/Applications";
 
 /// `rival install [--force] [--target auto|claude|codex|all]`.
@@ -42,7 +42,7 @@ pub fn install_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdE
     )
 }
 
-/// Go `runInstall`, with the system applications directory injected.
+/// Runs the install, with the system applications directory injected.
 fn run_install(
     env: &mut CmdEnv<'_>,
     force: bool,
@@ -290,7 +290,7 @@ fn sha256_hex(data: &[u8]) -> String {
         .collect()
 }
 
-/// Go `os.RemoveAll` for a path that exists: a symlink is removed, never
+/// Removes a path that exists: a symlink is removed, never
 /// followed.
 fn remove_all(path: &Path) -> io::Result<()> {
     let removed = match fs::symlink_metadata(path) {
@@ -311,7 +311,7 @@ fn read_embedded_skill(name: &str) -> Result<(Vec<u8>, String), String> {
     Ok((content.to_vec(), version))
 }
 
-/// Go `os.ReadFile`, with its `*PathError` text.
+/// Reads a file; the error is [`path_error`] text.
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
     let mut file = std::fs::File::open(path).map_err(|e| path_error("open", path, &e))?;
     let mut data = Vec::new();
@@ -326,8 +326,7 @@ fn write_skill(dir: &Path, file: &Path, content: &[u8]) -> Result<(), String> {
     write_file(file, content).map_err(|e| format!("write {}: {e}", file.display()))
 }
 
-/// Go `os.MkdirAll(dir, 0o755)`. Go's error may name the parent that
-/// failed; this one always names `dir`.
+/// Creates `dir` and its parents (mode 0o755). The error always names `dir`.
 fn mkdir_all(dir: &Path) -> io::Result<()> {
     match fs::metadata(dir) {
         Ok(meta) if meta.is_dir() => return Ok(()),
@@ -341,7 +340,7 @@ fn mkdir_all(dir: &Path) -> io::Result<()> {
     builder.create(dir)
 }
 
-/// Go `os.WriteFile(file, content, 0o644)`, with its `*PathError` text.
+/// Writes a file (mode 0o644); the error is [`path_error`] text.
 fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
     let mut opts = OpenOptions::new();
     opts.write(true).create(true).truncate(true);
@@ -352,7 +351,7 @@ fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
         .map_err(|e| path_error("write", path, &e))
 }
 
-/// Go `*fs.PathError` text: `<op> <path>: <errno text>`.
+/// Error text: `<op> <path>: <errno text>`.
 fn path_error(op: &str, path: &Path, err: &io::Error) -> String {
     format!("{op} {}: {}", path.display(), err)
 }

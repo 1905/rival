@@ -335,10 +335,10 @@ fn missing_and_null_fields_default() {
     assert_eq!(fs, [&want]);
 }
 
-// Go parity (rival/internal/review/parse_test.go, plan_test.go)
+// Reviewer and plan parser cases
 
 #[test]
-fn go_reviewer_ignores_echoed_schema_example() {
+fn reviewer_ignores_echoed_schema_example() {
     let raw = r#"OpenAI Codex
 user
 Review scope: rival/
@@ -363,7 +363,7 @@ tokens used 1234"#;
 }
 
 #[test]
-fn go_bare_object_with_prose() {
+fn bare_object_with_prose() {
     assert_eq!(
         parse_run_result(r#"prefix noise {"summary":"ok","findings":[]} trailing"#),
         empty_findings("ok", None)
@@ -371,7 +371,7 @@ fn go_bare_object_with_prose() {
 }
 
 #[test]
-fn go_no_payload() {
+fn no_payload_is_markdown() {
     assert_eq!(
         parse_run_result("no json here at all"),
         markdown("no json here at all")
@@ -379,7 +379,7 @@ fn go_no_payload() {
 }
 
 #[test]
-fn go_rejects_only_schema_example() {
+fn rejects_only_schema_example() {
     let reviewer = concat!(
         "```json\n",
         r#"{"summary":"1-3 sentence reviewer summary","findings":[{"file":"path/to/file","line":42,"severity":"critical|high|medium|low","title":"brief title","confidence":8}]}"#,
@@ -395,7 +395,7 @@ fn go_rejects_only_schema_example() {
 }
 
 #[test]
-fn go_accepts_clean_review_and_plan() {
+fn accepts_clean_review_and_plan() {
     assert_eq!(
         parse_run_result(r#"prose {"summary": "No issues found.", "findings": []} prose"#),
         empty_findings("No issues found.", None)
@@ -407,7 +407,7 @@ fn go_accepts_clean_review_and_plan() {
 }
 
 #[test]
-fn go_drops_only_placeholder_findings() {
+fn drops_only_placeholder_findings() {
     let raw = concat!(
         r#"{"summary":"real","findings":["#,
         r#"{"file":"path/to/file","line":42,"severity":"critical|high|medium|low","title":"brief title","confidence":8},"#,
@@ -418,13 +418,13 @@ fn go_drops_only_placeholder_findings() {
 }
 
 #[test]
-fn go_nested_inside_invalid_region() {
+fn nested_inside_invalid_region() {
     let raw = r#"wrapper { not valid json but balanced: {"summary":"nested real","findings":[{"file":"a.go","line":1,"severity":"high","confidence":8}]} }"#;
     assert_eq!(findings(&parse_run_result(raw)).0, "nested real");
 }
 
 #[test]
-fn go_accepts_real_finding_discussing_enum() {
+fn accepts_real_finding_discussing_enum() {
     let raw = r#"{"summary":"real review","findings":[{"file":"rival/internal/review/parse.go","line":84,"severity":"high","category":"bug","title":"placeholder check","body":"isPlaceholderFinding compares against critical|high|medium|low which is fine","confidence":9}]}"#;
     let r = parse_run_result(raw);
     let severities: Vec<&str> = findings(&r).2.iter().map(|f| f.severity.as_str()).collect();
@@ -432,7 +432,7 @@ fn go_accepts_real_finding_discussing_enum() {
 }
 
 #[test]
-fn go_unbalanced_brace_before_answer() {
+fn unbalanced_brace_before_answer() {
     let raw = r#"{"summary":"schema","findings":[{"file":"path/to/file","line":42}]}
 exec: showing code
 func New() {           // <- unbalanced brace, never closes as JSON
@@ -446,7 +446,7 @@ codex
 }
 
 #[test]
-fn go_keeps_dual_category_and_drops_retired_slop_echo() {
+fn keeps_dual_category_and_drops_retired_slop_echo() {
     let dual = r#"{"summary":"real","rating":6,"findings":[{"file":"a.go","line":3,"severity":"high","category":"bug|security","title":"real dual-category finding","body":"b","confidence":8}]}"#;
     let r = parse_run_result(dual);
     let titles: Vec<&str> = findings(&r).2.iter().map(|f| f.title.as_str()).collect();
@@ -462,12 +462,12 @@ fn go_keeps_dual_category_and_drops_retired_slop_echo() {
 }
 
 #[test]
-fn go_plan_rejects_unrelated_json() {
+fn plan_rejects_unrelated_json() {
     failed(&parse_run_result(r#"{"event":"done","ok":true}"#));
 }
 
 #[test]
-fn go_real_captured_log() {
+fn real_captured_log() {
     let raw = fake_log("consilium_echoed_schema.log");
     let r = parse_run_result(&raw);
     let (summary, _, fs) = findings(&r);

@@ -198,9 +198,9 @@ final class ResultParserTests: XCTestCase {
         XCTAssertEqual(r.findings, [Finding(file: "a.go")])
     }
 
-    // MARK: - Go parity (rival/internal/review/parse_test.go, plan_test.go)
+    // MARK: - CLI parity (the rival CLI's review and plan parser tests)
 
-    func testGoReviewerIgnoresEchoedSchemaExample() {
+    func testReviewerIgnoresEchoedSchemaExample() {
         let raw = """
         OpenAI Codex
         user
@@ -225,47 +225,47 @@ final class ResultParserTests: XCTestCase {
         XCTAssertEqual(r.findings.map(\.file), ["rival/main.go"])
     }
 
-    func testGoBareObjectWithProse() {
+    func testBareObjectWithProse() {
         XCTAssertEqual(parseRunResult(raw: #"prefix noise {"summary":"ok","findings":[]} trailing"#),
                        .findings(summary: "ok", rating: nil, findings: []))
     }
 
-    func testGoNoPayload() {
+    func testNoPayload() {
         XCTAssertEqual(parseRunResult(raw: "no json here at all"), .markdown("no json here at all"))
     }
 
-    func testGoRejectsOnlySchemaExample() {
+    func testRejectsOnlySchemaExample() {
         let reviewer = "```json\n" + #"{"summary":"1-3 sentence reviewer summary","findings":[{"file":"path/to/file","line":42,"severity":"critical|high|medium|low","title":"brief title","confidence":8}]}"# + "\n```"
         XCTAssertNotNil(failed(parseRunResult(raw: reviewer)))
         let plan = "```json\n" + #"{"summary":"1-3 sentence overall assessment of the plan","rating":7,"findings":[{"file":"section or heading the issue is in (or the filename)","line":0,"severity":"critical|high|medium|low","category":"bug|gap|ambiguity|scope|verification","title":"one-line description of the issue","confidence":8}]}"# + "\n```"
         XCTAssertNotNil(failed(parseRunResult(raw: plan)))
     }
 
-    func testGoAcceptsCleanReviewAndPlan() {
+    func testAcceptsCleanReviewAndPlan() {
         XCTAssertEqual(parseRunResult(raw: #"prose {"summary": "No issues found.", "findings": []} prose"#),
                        .findings(summary: "No issues found.", rating: nil, findings: []))
         XCTAssertEqual(parseRunResult(raw: #"prose {"summary":"Airtight.","rating":9,"findings":[]} prose"#),
                        .findings(summary: "Airtight.", rating: 9, findings: []))
     }
 
-    func testGoDropsOnlyPlaceholderFindings() {
+    func testDropsOnlyPlaceholderFindings() {
         let raw = #"{"summary":"real","findings":["# +
             #"{"file":"path/to/file","line":42,"severity":"critical|high|medium|low","title":"brief title","confidence":8},"# +
             #"{"file":"real.go","line":7,"severity":"high","category":"bug","title":"real","body":"b","confidence":9}]}"#
         XCTAssertEqual(findings(parseRunResult(raw: raw))?.findings.map(\.file), ["real.go"])
     }
 
-    func testGoNestedInsideInvalidRegion() {
+    func testNestedInsideInvalidRegion() {
         let raw = #"wrapper { not valid json but balanced: {"summary":"nested real","findings":[{"file":"a.go","line":1,"severity":"high","confidence":8}]} }"#
         XCTAssertEqual(findings(parseRunResult(raw: raw))?.summary, "nested real")
     }
 
-    func testGoAcceptsRealFindingDiscussingEnum() {
+    func testAcceptsRealFindingDiscussingEnum() {
         let raw = #"{"summary":"real review","findings":[{"file":"rival/internal/review/parse.go","line":84,"severity":"high","category":"bug","title":"placeholder check","body":"isPlaceholderFinding compares against critical|high|medium|low which is fine","confidence":9}]}"#
         XCTAssertEqual(findings(parseRunResult(raw: raw))?.findings.map(\.severity), ["high"])
     }
 
-    func testGoUnbalancedBraceBeforeAnswer() {
+    func testUnbalancedBraceBeforeAnswer() {
         let raw = """
         {"summary":"schema","findings":[{"file":"path/to/file","line":42}]}
         exec: showing code
@@ -279,7 +279,7 @@ final class ResultParserTests: XCTestCase {
         XCTAssertEqual(r.findings.map(\.file), ["real.go"])
     }
 
-    func testGoKeepsDualCategoryAndDropsRetiredSlopEcho() {
+    func testKeepsDualCategoryAndDropsRetiredSlopEcho() {
         let dual = #"{"summary":"real","rating":6,"findings":[{"file":"a.go","line":3,"severity":"high","category":"bug|security","title":"real dual-category finding","body":"b","confidence":8}]}"#
         XCTAssertEqual(findings(parseRunResult(raw: dual))?.findings.map(\.title), ["real dual-category finding"])
         let echo = #"{"summary":"lean enough","rating":9,"findings":["# +
@@ -288,11 +288,11 @@ final class ResultParserTests: XCTestCase {
         XCTAssertEqual(findings(parseRunResult(raw: echo))?.findings.map(\.title), ["real finding"])
     }
 
-    func testGoPlanRejectsUnrelatedJSON() {
+    func testPlanRejectsUnrelatedJSON() {
         XCTAssertNotNil(failed(parseRunResult(raw: #"{"event":"done","ok":true}"#)))
     }
 
-    func testGoRealCapturedLog() throws {
+    func testRealCapturedLog() throws {
         let raw = try String(contentsOf: fixturesDir.appendingPathComponent("logs/consilium_echoed_schema.log"), encoding: .utf8)
         guard let r = findings(parseRunResult(raw: raw)) else { return }
         XCTAssertFalse(r.findings.isEmpty)

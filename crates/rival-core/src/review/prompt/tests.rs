@@ -1,5 +1,5 @@
-//! Go: `internal/review/prompt_test.go` (prompt cases) and the prompt cases
-//! of `cmd/command_security_test.go`, plus byte pins of every prompt text.
+//! Reviewer, plan and security prompt tests, plus byte pins of every prompt
+//! text.
 
 use std::fs;
 
@@ -9,8 +9,7 @@ use crate::review::testutil::{config_in, temp_config};
 
 const KINDS: [PromptKind; 2] = [PromptKind::BugHunter, PromptKind::Security];
 
-/// Go: TestReviewerPromptsCarryRubricAndFailureScenario. Both code-review
-/// lenses carry the one rubric, the field and the drop rule.
+/// Both code-review lenses carry the one rubric, the field and the drop rule.
 #[test]
 fn reviewer_prompts_carry_rubric_and_failure_scenario() {
     let (_home, cfg) = temp_config();
@@ -38,8 +37,8 @@ fn reviewer_prompts_carry_rubric_and_failure_scenario() {
     );
 }
 
-/// Go: TestReviewerContractOrdersFailureScenario. The field sits between
-/// body and suggestion in the contract.
+/// The `failure_scenario` field sits between body and suggestion in the
+/// contract.
 #[test]
 fn reviewer_contract_orders_failure_scenario() {
     let c = REVIEWER_JSON_CONTRACT;
@@ -58,9 +57,8 @@ fn write_user_config(home: &std::path::Path, yaml: &str) {
     fs::write(dir.join("config.yaml"), yaml).unwrap();
 }
 
-/// Go: TestBugHunterOverrideKeepsContractWithoutRubric. A user override
-/// replaces the lens text but still gets the contract, and the rubric is
-/// not injected into it.
+/// A user override replaces the lens text but still gets the contract, and
+/// the rubric is not injected into it.
 #[test]
 fn bug_hunter_override_keeps_contract_without_rubric() {
     let home = tempfile::tempdir().unwrap();
@@ -85,8 +83,8 @@ fn bug_hunter_override_keeps_contract_without_rubric() {
     );
 }
 
-/// Rust-only: each lens reads only its own role key, and a blank override
-/// falls through to the built-in text (Go `strings.TrimSpace(override) != ""`).
+/// Each lens reads only its own role key, and a blank (whitespace-only)
+/// override falls through to the built-in text.
 #[test]
 fn overrides_are_per_lens_and_blank_falls_through() {
     let home = tempfile::tempdir().unwrap();
@@ -111,7 +109,6 @@ fn overrides_are_per_lens_and_blank_falls_through() {
     );
 }
 
-/// Go: TestNoPromptUsesAPersona.
 #[test]
 fn no_prompt_uses_a_persona() {
     let (_home, cfg) = temp_config();
@@ -137,7 +134,6 @@ fn no_prompt_uses_a_persona() {
     }
 }
 
-/// Go: TestPlanPromptVerifiesCodeClaims.
 #[test]
 fn plan_prompt_verifies_code_claims() {
     assert!(
@@ -150,7 +146,6 @@ fn plan_prompt_verifies_code_claims() {
     );
 }
 
-/// Go: cmd TestSecurityPromptCoversEveryVulnerabilityClass.
 #[test]
 fn security_prompt_covers_every_vulnerability_class() {
     let (_home, cfg) = temp_config();
@@ -176,7 +171,6 @@ fn security_prompt_covers_every_vulnerability_class() {
     }
 }
 
-/// Go: cmd TestBugHunterPromptUnchangedByTheSecurityLens.
 #[test]
 fn bug_hunter_prompt_unchanged_by_the_security_lens() {
     let (_home, cfg) = temp_config();
@@ -226,9 +220,7 @@ fn sha256_hex(s: &str) -> String {
         .collect()
 }
 
-/// Pins the prompt bytes independently of the Go tree: byte length and
-/// SHA-256 of each Go text, evaluated from `prompt.go`. This stays when the
-/// Go tree is removed.
+/// Pins the prompt bytes: byte length and SHA-256 of each prompt text.
 #[test]
 fn prompts_sha256_golden() {
     let want = [

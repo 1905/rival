@@ -18,8 +18,7 @@ const QUOTA_SIGNATURES: [&str; 8] = [
 ];
 
 /// Reports whether the captured CLI output indicates the provider rejected
-/// the request due to a quota/rate limit. Lowercasing is Go's per-rune
-/// `strings.ToLower`.
+/// the request due to a quota/rate limit. The match ignores case.
 pub fn is_quota_exhausted(output: &str) -> bool {
     let lower = output.to_lowercase();
     QUOTA_SIGNATURES.iter().any(|sig| lower.contains(sig))

@@ -1,6 +1,6 @@
-//! Go: `cmd/command_security_test.go`, plus the `commandSecurityAction`
-//! branches with a fake opencode adapter. No provider runs; `--which`
-//! looks up a never-executed `opencode` stub on a private PATH.
+//! `rival command security`, plus the `command_security_action` branches with
+//! a fake opencode adapter. No provider runs; `--which` looks up a
+//! never-executed `opencode` stub on a private PATH.
 
 use super::*;
 

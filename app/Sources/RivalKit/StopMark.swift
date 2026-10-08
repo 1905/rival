@@ -39,7 +39,7 @@ public func performStop(
 /// The file is re-read first. A session whose on-disk status is no longer
 /// running or queued (its owner finished it meanwhile) is left alone. The
 /// write goes through a unique `<id>.json.tmp-XXXXXX` file, then rename, like
-/// Go's `Save`, so two writers never share a temp file. A missing or
+/// the CLI's session writer, so two writers never share a temp file. A missing or
 /// unreadable file is skipped. Returns the ids written.
 @discardableResult
 public func markStopped(sessionIDs: [String], root: URL, now: Date = Date()) -> [String] {
@@ -56,9 +56,9 @@ public func markStopped(sessionIDs: [String], root: URL, now: Date = Date()) -> 
         obj["exit_code"] = 1
         obj["error"] = "killed (process already dead)"
         obj["end_time"] = formatRFC3339(now)
-        if let start = (obj["start_time"] as? String).flatMap(parseRFC3339), !start.isGoZero {
+        if let start = (obj["start_time"] as? String).flatMap(parseRFC3339), !start.isZeroTime {
             let secs = Int(now.timeIntervalSince(start).rounded(.toNearestOrAwayFromZero))
-            obj["duration"] = formatGoDuration(seconds: secs)
+            obj["duration"] = formatDuration(seconds: secs)
         }
 
         guard let out = try? JSONSerialization.data(
@@ -97,7 +97,7 @@ private func writeUniqueTemp(_ data: Data, dir: URL, prefix: String) -> String? 
     return path
 }
 
-/// RFC 3339 with milliseconds in UTC, which Go's `time.Time` JSON decoding
+/// RFC 3339 with milliseconds in UTC, which the CLI's session reader
 /// and `parseRFC3339` both accept.
 func formatRFC3339(_ date: Date) -> String {
     let f = ISO8601DateFormatter()

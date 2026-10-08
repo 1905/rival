@@ -88,6 +88,20 @@ jobs:
           git status --porcelain -- testdata/
           test -z "$(git status --porcelain -- testdata/)"
 
+      # rival is Rust-only. Allowed: release history, plans, captured
+      # review text in fixtures, and the retired skill names that install
+      # must keep deleting.
+      - name: No Go, STE or antislop names
+        if: runner.os == 'Linux'
+        run: |
+          ! git grep -n -I -E '\bGo\b|gostd|gojson|winpath|\bgo_[a-z]|[a-z]_go\b|_go_|\bGO_|\bste_|ste100|antislop' -- . \
+            ':!plans' ':!CHANGELOG.md' ':!.github/workflows/ci.yml' \
+            ':!testdata/logs/consilium_echoed_schema.log' \
+            ':!crates/rival-core/src/review/testdata/consilium_echoed_schema.log' \
+            ':!app/Tests/Fixtures' \
+            ':!crates/rival-core/src/skills.rs' ':!crates/rival-core/src/skills/tests.rs' \
+            ':!crates/rival-core/src/session/tests.rs'
+
       - name: E2E runner self-tests
         if: runner.os != 'Windows'
         run: python3 -m unittest discover -s e2e -p 'test_*.py'

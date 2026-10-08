@@ -1,10 +1,9 @@
-//! The Go `os` and `os/exec` calls the provider preflights make outside
-//! [`super::run_subprocess`]: one-shot commands (`exec.Command` with
-//! `Run`/`CombinedOutput`), `os.TempDir` and `os.CreateTemp`.
+//! The OS calls the provider preflights make outside
+//! [`super::run_subprocess`]: one-shot commands (spawn, then wait or
+//! capture the combined output), the temp dir and temp files.
 //!
 //! Everything reads the injected [`Config`]: the binary is looked up in its
-//! `$PATH` and the child gets its `environ()`, as Go's `exec.Command` with a
-//! nil `Env` passes `os.Environ()`.
+//! `$PATH` and the child gets its `environ()` as the full environment.
 
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
@@ -16,13 +15,13 @@ use super::process;
 use super::subprocess::{dedup_env, getenv, io_text};
 use crate::config::Config;
 
-/// The `$PATH` that Go's `exec.LookPath` reads: the first `PATH=` entry of
+/// The `$PATH` that [`look_path`] reads: the first `PATH=` entry of
 /// the inherited env.
 pub(crate) fn path_env(cfg: &Config) -> Option<&OsStr> {
     getenv(cfg.environ(), "PATH")
 }
 
-/// Go `exec.LookPath(name)` against `cfg`'s `$PATH`.
+/// Looks up `name` in `cfg`'s `$PATH`.
 pub(crate) fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::LookPathError> {
     process::look_path(name, path_env(cfg))
 }
@@ -30,14 +29,14 @@ pub(crate) fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::Lo
 /// Where a one-shot command's stdout and stderr go.
 #[derive(Clone, Copy)]
 pub(crate) enum Output {
-    /// Go's nil `Stdout`/`Stderr`: the null device.
+    /// The null device.
     Discard,
     /// Both streams into one buffer.
     Combined,
     Stderr,
 }
 
-/// Go `exec.Command(name, args...)` plus `Run` or `CombinedOutput`. Returns
+/// Runs `name` with `args` and waits for it. Returns
 /// the captured output (empty unless [`Output::Combined`]) and the error
 /// text: the `LookPath` error, `start <path>: <io error>`, or the exit
 /// status (`exit status: 1`). stdin is the null device.
@@ -107,10 +106,10 @@ pub(crate) fn run(
     (captured, result)
 }
 
-/// Go `exec.Command(name, args...)` up to `Start`, for callers that pick the
-/// child's stdio themselves. A bare name is looked up in `cfg`'s `$PATH`; a
-/// name with a separator is used as-is, as Go skips `LookPath` for it (on
-/// Windows it still gets its `PATHEXT` extension, Go's `lookExtensions`).
+/// Builds the command for `name` with `args`, for callers that pick the
+/// child's stdio and spawn it themselves. A bare name is looked up in
+/// `cfg`'s `$PATH`; a name with a separator is used as-is, with no `$PATH`
+/// lookup (on Windows it still gets its `PATHEXT` extension).
 /// The child gets `cfg`'s env. Returns the command and the program path for
 /// [`fork_error`].
 pub fn command(cfg: &Config, name: &str, args: &[&str]) -> Result<(Command, PathBuf), String> {
@@ -136,8 +135,8 @@ fn command_path(cfg: &Config, name: &str) -> Result<PathBuf, String> {
     if is_bare_name(name) {
         return look_path(cfg, name).map_err(|e| e.to_string());
     }
-    // Go resolves a relative name against cmd.Dir at Start; callers here
-    // leave Dir unset, so the current directory applies.
+    // A relative name resolves against the child's working directory;
+    // callers here leave it unset, so the current directory applies.
     look_extensions(name, "", &LookEnv::process()).map_err(|e| e.to_string())
 }
 
@@ -174,8 +173,8 @@ pub(crate) fn temp_dir(cfg: &Config) -> String {
     }
 }
 
-/// Go `os.TempDir()` on Windows. A [`Config::load`] config (production)
-/// asks the OS, as Go does: [`os_temp_dir`]. Its snapshot is this
+/// The temp dir on Windows. A [`Config::load`] config (production)
+/// asks the OS: [`os_temp_dir`]. Its snapshot is this
 /// process's environment, which the OS call reads. A [`Config::new`] config
 /// (tests, embedders) has an injected environment that the OS cannot see,
 /// so it gets the lexical model [`windows_temp_dir`] of that environment.
@@ -187,11 +186,11 @@ pub(crate) fn temp_dir(cfg: &Config) -> String {
     windows_temp_dir(|key| cfg.getenv(key))
 }
 
-/// Go `os.tempDir` on Windows: `GetTempPath2W` when kernel32 has it, else
+/// The OS temp dir on Windows: `GetTempPath2W` when kernel32 has it, else
 /// `GetTempPathW`, then [`trim_temp_path`]. The API reads this process's
 /// `TMP`, `TEMP`, `USERPROFILE`, makes a relative value full, and gives a
-/// SYSTEM process `C:\Windows\SystemTemp`. Go probes `GetTempPath2W` at run
-/// time; so does this, so an older Windows without it still starts.
+/// SYSTEM process `C:\Windows\SystemTemp`. `GetTempPath2W` is probed at run
+/// time, so an older Windows without it still starts.
 #[cfg(windows)]
 pub fn os_temp_dir() -> String {
     use std::os::windows::ffi::OsStringExt;
@@ -226,14 +225,14 @@ pub fn os_temp_dir() -> String {
             buf.resize(n, 0);
             continue;
         }
-        // Go ignores the error; a failure (n = 0) reads as "".
+        // The error is ignored; a failure (n = 0) reads as "".
         buf.truncate(n);
         let dir = std::ffi::OsString::from_wide(&buf);
         return trim_temp_path(&dir.to_string_lossy());
     }
 }
 
-/// Go's trim of a `GetTempPath` result: one trailing `\` goes, except for
+/// The trim of a `GetTempPath` result: one trailing `\` goes, except for
 /// a drive root like `C:\`.
 pub fn trim_temp_path(dir: &str) -> String {
     let b = dir.as_bytes();
@@ -282,7 +281,7 @@ fn join_temp(dir: &str, name: &str) -> String {
 
 /// The last `*` becomes a random
 /// number; the file is created `0600` with `O_EXCL`. Returns the open file
-/// and its name. The error text is Go's: `open <name>: <errno>`, or
+/// and its name. The error text is `open <name>: <errno>`, or
 /// `createtemp <dir>/<prefix>*<suffix>: file already exists` after 10000
 /// collisions.
 pub(crate) fn create_temp(cfg: &Config, pattern: &str) -> Result<(File, String), String> {
@@ -307,12 +306,12 @@ pub(crate) fn create_temp(cfg: &Config, pattern: &str) -> Result<(File, String),
     Err(format!("createtemp {prefix}*{suffix}: file already exists"))
 }
 
-/// Go `os.MkdirTemp("", pattern)` on Unix: the last `*` becomes a random
+/// Makes a temp directory on Unix: the last `*` of `pattern` becomes a random
 /// number; the directory is created `0700`. Returns its name. The error text
-/// is Go's: `mkdir <name>: <errno>`, `stat <dir>: <errno>` when the temp dir
+/// is `mkdir <name>: <errno>`, `stat <dir>: <errno>` when the temp dir
 /// itself is missing, or after 10000 collisions
-/// `mkdirtemp <dir>/<dir>/<prefix>*<suffix>: file already exists` (Go
-/// repeats the dir there).
+/// `mkdirtemp <dir>/<dir>/<prefix>*<suffix>: file already exists` (the dir
+/// is repeated there on purpose).
 pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> {
     if pattern.contains(is_separator) {
         return Err(format!(
@@ -350,7 +349,7 @@ pub(crate) fn mkdir_temp(cfg: &Config, pattern: &str) -> Result<String, String> 
     ))
 }
 
-/// Go `os.Stat`'s `*PathError` op for a missing path.
+/// The error op of a stat on a missing path.
 const STAT_OP: &str = if cfg!(windows) {
     "GetFileAttributesEx"
 } else {
@@ -383,8 +382,8 @@ mod tests {
         )
     }
 
-    /// Go reports `exec format error` for an executable text file without a
-    /// shebang; it never falls back to `/bin/sh` the way `execvp` does.
+    /// An executable text file without a shebang is `exec format error`
+    /// (os error 8); it never falls back to `/bin/sh` the way `execvp` does.
     #[cfg(unix)]
     #[test]
     fn executable_without_shebang_is_exec_format_error() {
@@ -407,13 +406,13 @@ mod tests {
         assert!(!marker.exists(), "the file ran through a shell");
     }
 
-    /// Go's `execve` image: argv[0] is the bare name, empty arguments stay,
+    /// The `execve` image: argv[0] is the bare name, empty arguments stay,
     /// and the deduped env goes through byte for byte, in order, including
     /// an entry without `=` and a non-UTF-8 value. A NUL in an argument is
     /// EINVAL before the spawn.
     #[cfg(unix)]
     #[test]
-    fn run_execs_go_argv_and_env() {
+    fn run_execs_bare_argv_and_deduped_env() {
         use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
 
@@ -484,13 +483,13 @@ mod tests {
         );
     }
 
-    /// The host's temp-dir variable: Go reads `TMPDIR` on Unix and `TMP`
+    /// The host's temp-dir variable: `TMPDIR` on Unix and `TMP`
     /// first on Windows.
     const TMP_VAR: &str = if cfg!(windows) { "TMP" } else { "TMPDIR" };
 
     #[cfg(not(windows))]
     #[test]
-    fn temp_dir_follows_go_unix() {
+    fn temp_dir_reads_tmpdir_on_unix() {
         assert_eq!(temp_dir(&cfg(&[])), "/tmp");
         assert_eq!(temp_dir(&cfg(&[("TMPDIR", "/x/y/")])), "/x/y/");
     }
@@ -521,7 +520,7 @@ mod tests {
         assert_eq!(windows_temp_dir(env(&[])), r"C:\Windows");
         #[cfg(windows)]
         assert_eq!(temp_dir(&cfg(&[("TMP", r"D:\t\")])), r"D:\t");
-        // Go's trim of the API result.
+        // The trim of the API result.
         assert_eq!(
             trim_temp_path(r"C:\Users\me\AppData\Local\Temp\"),
             r"C:\Users\me\AppData\Local\Temp"
@@ -554,7 +553,7 @@ mod tests {
         }
     }
 
-    /// The real `GetTempPath2W`/`GetTempPathW` answer, trimmed like Go; std
+    /// The real `GetTempPath2W`/`GetTempPathW` answer, trimmed; std
     /// asks the same API and keeps the trailing `\`.
     #[cfg(windows)]
     #[test]
@@ -638,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn create_temp_names_and_errors_match_go() {
+    fn create_temp_names_and_errors() {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         let (file, name) = create_temp(&cfg(&[(TMP_VAR, d)]), "rival-grok-*.md").unwrap();
@@ -677,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    fn mkdir_temp_names_and_errors_match_go() {
+    fn mkdir_temp_names_and_errors() {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path().to_str().unwrap();
         let name = mkdir_temp(&cfg(&[(TMP_VAR, d)]), "rival-mr-*").unwrap();
@@ -735,7 +734,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn run_reports_go_errors_and_combined_output() {
+    fn run_reports_errors_and_combined_output() {
         let bin = tempfile::tempdir().unwrap();
         let path = bin.path().to_str().unwrap();
         let c = cfg(&[("PATH", path)]);

@@ -1,8 +1,8 @@
 import XCTest
 @testable import RivalKit
 
-/// Parity with rival/internal/sessionview/group_test.go and the TUI row helpers
-/// in rival/internal/dashboard/session_list_test.go + parity_test.go.
+/// Parity with the rival CLI's session grouping tests and the TUI row helper
+/// tests in its dashboard.
 final class GroupingTests: XCTestCase {
     // TestGroupBucketsAndKeys
     func testGroupBucketsAndKeys() {
@@ -274,20 +274,20 @@ final class ElapsedTests: XCTestCase {
         XCTAssertEqual(runTimeLabel(q, now: now), "#2 1m5s")
     }
 
-    func testGoDurationParseAndFormat() {
-        XCTAssertEqual(parseGoDuration("1m23s"), 83)
-        XCTAssertEqual(parseGoDuration("1h2m3s"), 3723)
-        XCTAssertEqual(parseGoDuration("1.5h"), 5400)
-        XCTAssertEqual(parseGoDuration("0"), 0)
-        XCTAssertEqual(parseGoDuration("-2s"), -2)
-        XCTAssertEqual(parseGoDuration("300ms")!, 0.3, accuracy: 1e-9)
-        XCTAssertEqual(parseGoDuration("5µs")!, 5e-6, accuracy: 1e-12)
-        XCTAssertNil(parseGoDuration(""))
-        XCTAssertNil(parseGoDuration("3"))
-        XCTAssertNil(parseGoDuration("3x"))
-        XCTAssertEqual(formatGoDuration(seconds: 0), "0s")
-        XCTAssertEqual(formatGoDuration(seconds: 45), "45s")
-        XCTAssertEqual(formatGoDuration(seconds: 420), "7m0s")
-        XCTAssertEqual(formatGoDuration(seconds: 3600), "1h0m0s")
+    func testDurationParseAndFormat() {
+        XCTAssertEqual(parseDuration("1m23s"), 83)
+        XCTAssertEqual(parseDuration("1h2m3s"), 3723)
+        XCTAssertEqual(parseDuration("1.5h"), 5400)
+        XCTAssertEqual(parseDuration("0"), 0)
+        XCTAssertEqual(parseDuration("-2s"), -2)
+        XCTAssertEqual(parseDuration("300ms")!, 0.3, accuracy: 1e-9)
+        XCTAssertEqual(parseDuration("5µs")!, 5e-6, accuracy: 1e-12)
+        XCTAssertNil(parseDuration(""))
+        XCTAssertNil(parseDuration("3"))
+        XCTAssertNil(parseDuration("3x"))
+        XCTAssertEqual(formatDuration(seconds: 0), "0s")
+        XCTAssertEqual(formatDuration(seconds: 45), "45s")
+        XCTAssertEqual(formatDuration(seconds: 420), "7m0s")
+        XCTAssertEqual(formatDuration(seconds: 3600), "1h0m0s")
     }
 }

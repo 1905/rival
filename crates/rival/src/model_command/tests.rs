@@ -1,5 +1,5 @@
-//! Go: `cmd/review_output_test.go` (command surface), `cmd/mr_guard_test.go`,
-//! plus failure-path and ordering cases for `runModelCommand`.
+//! `rival command <model>`: review output, the MR guard, and failure-path
+//! and ordering cases for `run_model_command`.
 
 use super::*;
 
@@ -18,8 +18,6 @@ fn tmp() -> tempfile::TempDir {
 fn s(p: &Path) -> &str {
     p.to_str().unwrap()
 }
-
-// ---- Go TestCommandReviewPrintsFormattedReview ----
 
 #[test]
 fn command_review_prints_formatted_review() {
@@ -63,8 +61,6 @@ fn command_review_prints_formatted_review() {
     assert_eq!(f.status_during_run, "running");
 }
 
-// ---- Go TestCommandReviewProseFallsBackToLog ----
-
 #[test]
 fn command_review_prose_falls_back_to_log() {
     let fix = Fixture::new();
@@ -85,8 +81,6 @@ fn command_review_prose_falls_back_to_log() {
     }
 }
 
-// ---- Go TestCommandRawPromptPrintsLog ----
-
 #[test]
 fn command_raw_prompt_prints_log() {
     let fix = Fixture::new();
@@ -105,11 +99,9 @@ fn command_raw_prompt_prints_log() {
     let sessions = fix.sessions();
     assert_eq!(sessions[0].status, "completed");
     assert_eq!(sessions[0].mode, "raw");
-    // The path as given (cleaned, symlinks kept), like Go's filepath.Abs.
+    // The path as given (cleaned, symlinks kept).
     assert_eq!(sessions[0].work_dir, s(wd.path()));
 }
-
-// ---- Go TestCommandReviewFailureKeepsLogAndExitCode ----
 
 #[test]
 fn command_review_failure_keeps_log_and_exit_code() {
@@ -132,8 +124,6 @@ fn command_review_failure_keeps_log_and_exit_code() {
     assert_eq!(sess.exit_code, Some(2));
     assert_eq!(sess.error_msg, "codex exited with code 2");
 }
-
-// ---- Go TestCommandMRReviewRunsInSnapshot ----
 
 #[test]
 fn command_mr_review_runs_in_snapshot() {
@@ -179,8 +169,6 @@ fn command_mr_review_runs_in_snapshot() {
     assert_eq!(sess.review_scope, TEST_MR_URL);
 }
 
-// ---- Go TestCommandPlainScopeSkipsMRResolver ----
-
 #[test]
 fn command_plain_scope_skips_mr_resolver() {
     let fix = Fixture::new();
@@ -194,8 +182,6 @@ fn command_plain_scope_skips_mr_resolver() {
     assert_eq!(f.workdir, s(caller.path()));
     assert_eq!(f.cred_workdir, s(caller.path()));
 }
-
-// ---- Go TestModelCommandRejectsMRInRawPrompt ----
 
 /// A raw prompt cannot pin an MR checkout, so an MR URL in one is rejected
 /// before any reviewer starts, with a pointer to the review path that can.
@@ -233,8 +219,6 @@ fn model_command_rejects_mr_in_raw_prompt() {
     assert_eq!(out.stdout, "");
 }
 
-// ---- Go TestCommandReviewQuotaOrEmptyFailsTheRun ----
-
 /// A zero exit is not a review: a run that only hit a quota or wrote
 /// nothing fails.
 #[test]
@@ -260,7 +244,7 @@ fn command_review_quota_or_empty_fails_the_run() {
             !out.stdout.contains("═══ RIVAL REVIEW ═══"),
             "{name}: a failed run printed a review"
         );
-        // The log is still printed, as Go does.
+        // The log is still printed.
         assert_eq!(out.stdout, log, "{name}");
         let sess = &fix.sessions()[0];
         assert_eq!(sess.status, "failed", "{name}");
@@ -478,8 +462,8 @@ fn run_timeout_is_reported_on_the_session() {
     );
 }
 
-/// A panic inside the provider still leaves no session running (Go's
-/// deferred interrupted check) and removes the MR checkout.
+/// A panic inside the provider still leaves no session running (the session
+/// is marked interrupted) and removes the MR checkout.
 #[test]
 fn panic_marks_the_session_interrupted_and_cleans_up() {
     let fix = Fixture::new();
@@ -526,7 +510,7 @@ fn claude_records_the_configured_subscription() {
     assert_eq!(fix.sessions()[0].account, "");
 }
 
-/// Go's final stdout write error is reported (a closed fd 1 gives EBADF,
+/// The final stdout write error is reported (a closed fd 1 gives EBADF,
 /// a closed Windows handle `ERROR_INVALID_HANDLE`); the session is already
 /// complete.
 #[test]

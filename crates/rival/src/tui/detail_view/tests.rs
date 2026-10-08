@@ -21,7 +21,6 @@ fn texts(lines: &[Line<'static>]) -> String {
         .join("\n")
 }
 
-// Go: TestFindMatches.
 #[test]
 fn find_matches_ignores_case_and_styling() {
     let red = Style::new().fg(ratatui::style::Color::Red);
@@ -34,12 +33,12 @@ fn find_matches_ignores_case_and_styling() {
     ];
     assert_eq!(find_matches(&lines, "fingerPRINT"), [1, 3, 4]);
     assert!(find_matches(&lines, "").is_empty(), "empty query matched");
-    // Go lowers rune by rune: İ matches i.
+    // Lowercasing is per char: İ matches i.
     assert_eq!(find_matches(&[Line::raw("İstanbul")], "istanbul"), [0]);
 }
 
-// Go: the highlight half of TestDetailSearch. Every hit gets the match
-// style; the line keeps its text and width, and the rest keeps its style.
+// Every search hit gets the match style; the line keeps its text and width,
+// and the rest keeps its style.
 #[test]
 fn highlight_line_paints_hits_only() {
     let red = Style::new().fg(ratatui::style::Color::Red);
@@ -69,7 +68,6 @@ fn highlight_line_paints_hits_only() {
     assert_eq!(hl.spans[1].content, "a");
 }
 
-// Go: TestInfoLinesListEveryField.
 #[test]
 fn info_lines_list_every_field() {
     let start = DateTime::parse_from_rfc3339("2026-09-26T11:40:00+02:00").unwrap();

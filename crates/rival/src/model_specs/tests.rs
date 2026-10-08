@@ -1,6 +1,5 @@
-//! Go: `cmd/model_spec_test.go`, `cmd/model_commands_test.go`,
-//! `cmd/grok_command_test.go` (spec, effort and usage cases; the tree
-//! metadata cases live in `tree/tests.rs`).
+//! Model spec, effort and usage cases; the tree metadata cases live in
+//! `tree/tests.rs`.
 
 use super::*;
 
@@ -12,8 +11,6 @@ use crate::testutil::{FakeStdin, Fixture, fake_run, fake_spec, no_mr, with_env};
 fn cfg() -> Config {
     Fixture::new().cfg
 }
-
-// ---- Go TestSpecLabelsAndCommandNames ----
 
 /// The command word and the display label differ for K3, so one field
 /// cannot serve both. Error text and logs use the label; the tree uses the
@@ -37,8 +34,6 @@ fn spec_labels_and_command_names() {
     assert_eq!(grok_spec().model, config::GROK_MODEL);
 }
 
-// ---- Go TestK3EffortIsPinnedToMax ----
-
 #[test]
 fn k3_effort_is_pinned_to_max() {
     let cfg = cfg();
@@ -51,8 +46,6 @@ fn k3_effort_is_pinned_to_max() {
     }
 }
 
-// ---- Go TestGrokEffortClampsToItsOwnMenu ----
-
 #[test]
 fn grok_effort_clamps_to_its_own_menu() {
     let cfg = cfg();
@@ -60,8 +53,6 @@ fn grok_effort_clamps_to_its_own_menu() {
         assert_eq!(grok_spec().resolve_effort(&cfg, requested).unwrap(), "high");
     }
 }
-
-// ---- Go TestCodexEffortIsNotAliased ----
 
 /// Codex receives the level verbatim: ultra is its own level, not an xhigh
 /// alias.
@@ -77,7 +68,7 @@ fn codex_effort_is_not_aliased() {
 }
 
 /// Defaults come from the config constants: codex xhigh, claude medium,
-/// grok high; a configured effort wins; an invalid one is Go's error.
+/// grok high; a configured effort wins; an invalid one is an error.
 #[test]
 fn defaults_configured_efforts_and_invalid_efforts() {
     let cfg = cfg();
@@ -114,8 +105,6 @@ fn defaults_configured_efforts_and_invalid_efforts() {
     assert_eq!(codex_spec().resolve_effort(&cfg, " HIGH ").unwrap(), "high");
 }
 
-// ---- Go TestOnlyClaudeReportsAnAuthHint ----
-
 #[test]
 fn only_claude_reports_an_auth_hint() {
     let cfg = cfg();
@@ -137,15 +126,11 @@ fn only_claude_reports_an_auth_hint() {
     assert_eq!(hint, executor::claude_auth_hint(&cfg, Path::new(log)));
 }
 
-// ---- Go TestSessionModeNamesTheRun ----
-
 #[test]
 fn session_mode_names_the_run() {
     assert_eq!(session_mode(true), "review");
     assert_eq!(session_mode(false), "raw");
 }
-
-// ---- Go TestRunModelRunValidatesEffortBeforeAnythingElse ----
 
 /// An invalid effort must fail before the workflow touches the provider or
 /// blocks on stdin. Ordering this wrong hides the real error behind an auth
@@ -183,16 +168,12 @@ fn run_model_run_validates_effort_before_anything_else() {
     assert!(fix.sessions().is_empty());
 }
 
-// ---- Go TestClaudeCommandsArePublic (usage half) ----
-
 #[test]
 fn claude_usage_names_the_public_command_and_effort_fallback() {
     let lower = CLAUDE_USAGE.to_lowercase();
     assert!(lower.contains("/rival-claude"), "{lower}");
     assert!(lower.contains("built-in default: medium"), "{lower}");
 }
-
-// ---- Go TestGrokSessionModeDrivesReviewSandbox ----
 
 /// The sandbox is selected by the review boolean handed to the grok
 /// adapter, so a review-mode session that reported raw would run grok
@@ -225,8 +206,6 @@ fn grok_session_mode_drives_review_sandbox() {
     }
 }
 
-// ---- Go TestGrokUsesConfiguredGrokEffortDefault ----
-
 #[test]
 fn grok_uses_configured_grok_effort_default() {
     let parsed = (grok_spec().parse)("review").unwrap();
@@ -239,8 +218,6 @@ fn grok_uses_configured_grok_effort_default() {
         .unwrap();
     assert_eq!(effort, "high");
 }
-
-// ---- Go TestGrokEffortRecordedAfterClamp ----
 
 /// The session must record the effort grok is actually handed. rival's
 /// ladder goes past what grok exposes, so an ultra request lands as high.
@@ -258,8 +235,6 @@ fn grok_effort_recorded_after_clamp() {
     }
 }
 
-// ---- Go TestGrokResolvedUltraEffortIsSentAsHigh ----
-
 /// ResolveEffort feeding straight into the clamp is the exact chain both
 /// `rival command grok` and `rival run grok` use before the session.
 #[test]
@@ -271,8 +246,6 @@ fn grok_resolved_ultra_effort_is_sent_as_high() {
     assert_eq!(grok_spec().resolve_effort(&cfg(), "ultra").unwrap(), "high");
 }
 
-// ---- Go TestGrokUsageUsesOnlyPublicNaming ----
-
 #[test]
 fn grok_usage_uses_only_public_naming() {
     let lower = GROK_USAGE.to_lowercase();
@@ -280,9 +253,9 @@ fn grok_usage_uses_only_public_naming() {
     assert!(lower.contains("built-in: high"), "{lower}");
 }
 
-/// The usage texts are Go's, byte for byte (spot checks on each).
+/// The usage texts are pinned byte for byte (spot checks on each).
 #[test]
-fn usage_texts_match_go() {
+fn usage_texts_are_pinned() {
     assert!(CODEX_USAGE.starts_with(
         "Usage:\n  /rival-codex 'explain the auth flow' — run any prompt with Codex\n"
     ));

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The app's dim-phosphor palette. Same token names as the TUI's
-/// `rival/internal/dashboard/styles.go`, but softer values: the TUI's neon
+/// The app's dim-phosphor palette. Same token names as the rival TUI's
+/// dashboard styles, but softer values: the TUI's neon
 /// greens on a large window were too bright (user, 2026-09-29). Colour marks
 /// state only: running amber, failed red; completed stays quiet.
 public enum Theme {

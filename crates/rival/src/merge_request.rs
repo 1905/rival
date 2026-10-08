@@ -1,4 +1,4 @@
-//! GitLab MR review targets for the commands. Go: `cmd/merge_request.go`.
+//! GitLab MR review targets for the commands.
 
 use std::io::Write;
 
@@ -25,7 +25,7 @@ pub struct ReviewTarget {
 }
 
 impl ReviewTarget {
-    /// Go `reviewTarget.close`: removes the MR checkout and logs a failure;
+    /// Removes the MR checkout and logs a failure;
     /// a no-op otherwise, and on every later call.
     pub fn close(&mut self) {
         if let Some(mut snapshot) = self.snapshot.take()
@@ -49,7 +49,7 @@ impl Drop for ReviewTarget {
     dead_code,
     reason = "commands inject the resolver; kept for Task 3.2 callers"
 )]
-/// Go `prepareReviewTarget` with the real resolver
+/// [`prepare_review_target_with`] with the real resolver
 /// ([`mergerequest::prepare`]) and stdout.
 pub fn prepare_review_target(
     ctx: &Context,
@@ -67,10 +67,10 @@ pub fn prepare_review_target(
     )
 }
 
-/// Go `prepareReviewTarget`: pins a GitLab MR scope to a snapshot checkout
+/// Pins a GitLab MR scope to a snapshot checkout
 /// and prints its identity line first on `out`, followed by a blank line.
 /// Any other scope passes through unchanged and `prepare` is not called.
-/// `prepare` is Go's `prepareMR` package var, which tests replace.
+/// `prepare` is the MR resolver, which tests replace.
 pub fn prepare_review_target_with(
     ctx: &Context,
     cfg: &Config,
@@ -91,7 +91,7 @@ pub fn prepare_review_target_with(
     let Some(snapshot) = prepare(ctx, cfg, scope, workdir)? else {
         return Ok(plain());
     };
-    // Go: fmt.Fprintln(os.Stdout, snapshot.Identity+"\n"), error ignored.
+    // The identity, a blank line; a write error is ignored.
     let _ = writeln!(out, "{}\n", snapshot.identity);
     Ok(ReviewTarget {
         scope: snapshot.scope.clone(),
@@ -101,7 +101,7 @@ pub fn prepare_review_target_with(
     })
 }
 
-/// Go `rejectUnresolvedMR`. Raw prompts cannot resolve remote identity
+/// Raw prompts cannot resolve remote identity
 /// inside a network-isolated model, so MR URLs are rejected before any
 /// reviewer starts, with a pointer to the review path, which pins the
 /// checkout first.

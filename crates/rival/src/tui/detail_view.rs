@@ -1,6 +1,5 @@
 //! The full-screen view of one run: tabs, group members, a follow-able
-//! viewport, search and the stop confirm. Go:
-//! `internal/dashboard/detail_view.go`.
+//! viewport, search and the stop confirm.
 //!
 //! The pane never reads a file. The Raw tab shows what its [`LogSlot`]
 //! holds; [`DetailPane::reload`] returns the read a worker should make, and
@@ -41,7 +40,7 @@ use super::viewport::Viewport;
 pub enum DetailTab {
     /// The parsed answer of a finished member.
     Result,
-    /// The raw log (Go: Output).
+    /// The raw log.
     #[default]
     Raw,
     Prompt,
@@ -771,8 +770,8 @@ pub fn prompt_lines(
     lines
 }
 
-/// A stored time in the local zone, Go layout "2006-01-02 15:04:05"; empty
-/// for no time.
+/// A stored time in the local zone as `YYYY-MM-DD HH:MM:SS`; empty for no
+/// time.
 fn local_stamp(t: Option<chrono::DateTime<chrono::FixedOffset>>, zone: Zone) -> String {
     match t {
         Some(t) => t
@@ -855,8 +854,8 @@ fn plain(line: &Line<'_>) -> String {
 }
 
 /// The indexes of the lines that contain `query`,
-/// ignoring case (Go's per-rune lowering) and styling. An empty query
-/// matches nothing.
+/// ignoring case (per-char lowering) and styling. An empty query matches
+/// nothing.
 pub fn find_matches(lines: &[Line<'static>], query: &str) -> Vec<usize> {
     let q = lower_chars(query);
     if q.is_empty() {

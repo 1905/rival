@@ -1,13 +1,13 @@
 import Foundation
 
 /// Reads one session file for the list, without its prompt: the Swift twin of
-/// Go's `session.LoadSummaryFile`.
+/// the rival CLI's summary loader.
 ///
-/// Go's `MarshalIndent` writes one field per line, and the prompt is the one
+/// The CLI writes indented JSON with one field per line, and the prompt is the one
 /// long line. So a file over `lineScanMin` is not JSON-decoded whole: the known
 /// metadata lines are picked out and only they are decoded, which skips
 /// parsing the prompt. Over 2 × `edgeBytes` only the first and last
-/// `edgeBytes` are even read (Go does the same). On real data (~315 MB of
+/// `edgeBytes` are even read (the CLI does the same). On real data (~315 MB of
 /// session JSON, avg 105 KB) this is most of the startup cost. A file whose
 /// lines hold no usable metadata is decoded whole, as before.
 enum SessionSummary {
@@ -68,7 +68,7 @@ enum SessionSummary {
 
     /// Picks `"key": value,` lines whose key is in `fields` and whose value is
     /// valid JSON. A line cut by an edge fails one of the checks. Later
-    /// matches (the suffix) win, as in Go. Lines are found with `memchr`, so
+    /// matches (the suffix) win, as in the CLI. Lines are found with `memchr`, so
     /// the long prompt line costs one scan and no parsing.
     private static func collect(_ data: Data, into raw: inout [String: Data]) {
         data.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in

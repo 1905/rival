@@ -1,5 +1,4 @@
-//! Security review validation and rendering. Go:
-//! `internal/review/security.go`.
+//! Security review validation and rendering.
 
 use anyhow::anyhow;
 
@@ -61,9 +60,9 @@ fn security_echo(out: &ReviewerOutput, raw: &str) -> bool {
 }
 
 /// The echo check for bug-hunter reviews. Codex writes the whole prompt into
-/// its log, and a reviewer may quote prompt.go (security markers included)
-/// in tool output, so no marker is evidence. The output is an echo only
-/// when no reviewer payload follows the last copy of the prompt's clean
+/// its log, and a reviewer may quote the prompt source (security markers
+/// included) in tool output, so no marker is evidence. The output is an echo
+/// only when no reviewer payload follows the last copy of the prompt's clean
 /// example.
 pub(crate) fn bug_hunter_echo(out: &ReviewerOutput, raw: &str) -> bool {
     if !is_clean_example(out) {

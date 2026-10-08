@@ -1,8 +1,8 @@
 mod command_plan;
 mod command_security;
+mod csvflag;
 mod detach;
 mod gitscope_helper;
-mod gocsv;
 mod install;
 mod merge_request;
 mod mirror;

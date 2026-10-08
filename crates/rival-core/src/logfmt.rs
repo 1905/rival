@@ -1,9 +1,9 @@
 //! Makes raw CLI logs safe to display.
 //!
-//! Go: `internal/logfmt`. Runtime logs are captured verbatim, so they carry ANSI
-//! escapes, carriage-return progress frames and stray control bytes that neither
-//! a terminal pane nor a browser renders sensibly. The TUI uses [`sanitize`] and
-//! then expands tabs, because a tab is one rune but many terminal cells.
+//! Runtime logs are captured verbatim, so they carry ANSI escapes,
+//! carriage-return progress frames and stray control bytes that neither a
+//! terminal pane nor a browser renders sensibly. The TUI uses [`sanitize`]
+//! and then expands tabs, because a tab is one rune but many terminal cells.
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -109,7 +109,7 @@ pub fn read_tail(path: &Path, max_bytes: i64) -> io::Result<(Vec<u8>, bool)> {
     Ok((to_valid_utf8(&data), truncated))
 }
 
-/// Go's `strings.ToValidUTF8(s, "")`: drops every invalid byte sequence.
+/// Drops every invalid byte sequence.
 fn to_valid_utf8(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(data.len());
     for chunk in data.utf8_chunks() {

@@ -43,7 +43,7 @@ impl Env {
         let work = tempfile::tempdir().unwrap();
         let mut vars = HashMap::new();
         vars.insert("HOME".to_string(), path_str(home.path()));
-        // Go's os.UserHomeDir reads USERPROFILE on Windows: the same temp
+        // The home dir lookup reads USERPROFILE on Windows: the same temp
         // home, so no test sees the real profile.
         if cfg!(windows) {
             vars.insert("USERPROFILE".to_string(), path_str(home.path()));
@@ -88,7 +88,7 @@ impl Env {
         write_exe(&self.bin.path().join(name), script)
     }
 
-    /// A fake that `LookPath` finds but no test runs. Go's Windows
+    /// A fake that `LookPath` finds but no test runs. The Windows
     /// `LookPath` needs a `PATHEXT` extension, so there it is `<name>.exe`.
     pub fn fake_on_path(&self, name: &str) -> PathBuf {
         let file = if cfg!(windows) {
@@ -99,7 +99,7 @@ impl Env {
         self.fake(&file, "#!/bin/sh\nexit 0\n")
     }
 
-    /// A queued session in a temp home, as Go's `session.NewQueued`.
+    /// A queued session in a temp home, as `Session::new_queued` makes it.
     pub fn session(&self, cli: &str, mode: &str, model: &str, workdir: &str) -> Session {
         Session::new_queued(
             &self.paths(),

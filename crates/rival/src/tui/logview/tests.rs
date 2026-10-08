@@ -78,7 +78,7 @@ fn wrap_log_lines_empty_and_missing() {
     assert_eq!(
         lines(missing, 80, 0),
         Err(format!("open {missing}: {}", crate::testutil::NO_SUCH_FILE)),
-        "Go's *PathError text"
+        "the path error text"
     );
 }
 

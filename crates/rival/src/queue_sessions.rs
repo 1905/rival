@@ -1,5 +1,4 @@
 //! `rival queue`, `rival queue clear` and `rival sessions`.
-//! Go: `cmd/queue.go`, `cmd/sessions.go`.
 
 use std::io::Write;
 
@@ -16,10 +15,10 @@ use crate::tree::Invocation;
 mod tests;
 
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
-/// Go's 30-minute "stale?" threshold for a waiting ticket.
+/// The 30-minute "stale?" threshold for a waiting ticket.
 const STALE_NANOS: i64 = 30 * 60 * NANOS_PER_SECOND;
 
-/// `rival queue`: Go `queueListAction`.
+/// `rival queue`: lists the queue tickets.
 pub fn queue_list_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
     let entries = manager(env.cfg)
         .list()
@@ -28,7 +27,7 @@ pub fn queue_list_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
     Ok(())
 }
 
-/// `rival queue clear [--force]`: Go `queueClearAction`.
+/// `rival queue clear [--force]`: removes queue tickets.
 pub fn queue_clear_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     let force = inv.bool("force");
     let removed = manager(env.cfg)
@@ -95,7 +94,7 @@ pub fn clear_message(removed: usize, force: bool) -> String {
     }
 }
 
-/// Go `time.Time.Sub`: nanoseconds, saturating at the int64 range.
+/// `a - b` in nanoseconds, saturating at the int64 range.
 fn sub(a: DateTime<FixedOffset>, b: DateTime<FixedOffset>) -> i64 {
     let d = a.signed_duration_since(b);
     d.num_nanoseconds().unwrap_or(if d.num_seconds() < 0 {
@@ -105,8 +104,7 @@ fn sub(a: DateTime<FixedOffset>, b: DateTime<FixedOffset>) -> i64 {
     })
 }
 
-/// Go `time.Duration.Round(time.Second)`: halves round away from zero,
-/// overflow saturates.
+/// Rounds to whole seconds: halves round away from zero, overflow saturates.
 fn round_seconds(d: i64) -> i64 {
     let m = NANOS_PER_SECOND;
     let mut r = d % m;
@@ -123,7 +121,7 @@ fn round_seconds(d: i64) -> i64 {
     d.checked_add(m - r).unwrap_or(i64::MAX)
 }
 
-/// `rival sessions [--active] [--recent N]`: Go `sessionsAction`.
+/// `rival sessions [--active] [--recent N]`: lists sessions.
 pub fn sessions_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     let all = Session::load_all(env.cfg.paths());
     write_sessions(env.stdout, all, inv.bool("active"), inv.int("recent"));
@@ -148,7 +146,7 @@ pub fn write_sessions(out: &mut dyn Write, all: Vec<Session>, active: bool, rece
         if dur.is_empty() && s.status == "running" {
             dur = "running...".to_string();
         }
-        // Go slices the first 8 bytes.
+        // The first 8 bytes of the id.
         let id = if s.id.len() > 8 {
             String::from_utf8_lossy(&s.id.as_bytes()[..8]).into_owned()
         } else {

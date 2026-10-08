@@ -19,7 +19,7 @@ use std::process::{Child, Command, Stdio};
 
 use rival_core::executor::process;
 
-/// Marks the re-exec'd child so it does not detach again. Same name as Go.
+/// Marks the re-exec'd child so it does not detach again.
 pub const DETACHED_ENV: &str = "RIVAL_DETACHED";
 
 /// What the caller does after [`detach_if_requested`].
@@ -27,11 +27,11 @@ pub const DETACHED_ENV: &str = "RIVAL_DETACHED";
 pub enum DetachOutcome {
     /// Not requested, or this is already the detached child: run the command.
     Continue,
-    /// The parent is done: exit the process with this code (Go: `os.Exit`).
+    /// The parent is done: exit the process with this code.
     Exit(i32),
 }
 
-/// Go: `detachIfRequested`. Called from the root pre-run before any session
+/// Called from the root pre-run before any session
 /// or queue side effects. Reads `RIVAL_DETACHED`, the executable path and the
 /// process args, and prints to the real stderr. Never exits the process.
 pub fn detach_if_requested(detach: bool) -> DetachOutcome {
@@ -55,9 +55,9 @@ pub fn detach_if_requested(detach: bool) -> DetachOutcome {
     }
 }
 
-/// Go hands fds 0-2 to the child as they are. When one was closed at
-/// startup, `StartProcess` fails with EBADF before any child runs, and the
-/// parent exits 1. Rust reopened that fd on /dev/null before `main`, so
+/// The child gets fds 0-2 as they are. When one was closed at startup, the
+/// spawn fails with EBADF before any child runs, and the parent exits 1.
+/// Rust reopened that fd on /dev/null before `main`, so
 /// `std_fd_closed` is the state the loader constructor recorded.
 pub fn spawn_unless_std_fd_closed(
     exe: &Path,
@@ -77,8 +77,8 @@ pub fn spawn_unless_std_fd_closed(
     spawn_detached(exe, args, stderr)
 }
 
-/// Go: `!detach || os.Getenv(detachedEnv) == "1"` negated. `marker` is the
-/// current `RIVAL_DETACHED` value.
+/// `detach` is set and this is not already the detached child. `marker` is
+/// the current `RIVAL_DETACHED` value.
 pub fn requested(detach: bool, marker: Option<&OsStr>) -> bool {
     detach && marker != Some(OsStr::new("1"))
 }
@@ -209,7 +209,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn requested_follows_the_go_guard() {
+    fn requested_unless_already_detached() {
         assert!(requested(true, None));
         assert!(requested(true, Some(OsStr::new(""))));
         assert!(requested(true, Some(OsStr::new("0"))));
@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn spawn_failure_prints_go_path_error() {
+    fn spawn_failure_prints_path_error() {
         let dir = tempfile::tempdir().unwrap();
         let exe = dir.path().join("missing-rival");
         let mut err = Vec::new();
@@ -264,7 +264,7 @@ mod unix_tests {
     const HELPER_TEST: &str = "detach::unix_tests::detach_helper_child";
 
     #[test]
-    fn closed_std_fd_at_startup_fails_like_go_start_without_a_child() {
+    fn closed_std_fd_at_startup_fails_without_a_child() {
         let mut err = Vec::new();
         // /bin/sleep would print a pid line if anything were spawned.
         let out = spawn_unless_std_fd_closed(

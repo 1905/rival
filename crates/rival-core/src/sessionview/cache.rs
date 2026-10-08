@@ -1,6 +1,4 @@
 //! Incremental session summary cache.
-//!
-//! Go: `internal/sessionview/cache.go`.
 
 use std::collections::{BTreeMap, HashSet};
 use std::ffi::OsString;
@@ -71,11 +69,11 @@ impl Cache {
     ) -> (Vec<Arc<Session>>, u64) {
         let mut st = self.lock();
 
-        // Go: os.ReadDir, which sorts by name and fails on any read error.
+        // Fails on any read error; entries are sorted by name below.
         let entries =
             match fs::read_dir(&self.dir).and_then(|rd| rd.collect::<io::Result<Vec<_>>>()) {
                 Ok(entries) => entries,
-                // Go returns nil here and keeps the cache and revision as they are.
+                // Return nothing and keep the cache and revision as they are.
                 Err(e) if e.kind() == io::ErrorKind::NotFound => return (Vec::new(), st.revision),
                 Err(_) => return (cached_session_values(&st.files), st.revision),
             };
@@ -100,7 +98,7 @@ impl Cache {
             let name = entry.file_name();
             seen.insert(name.clone());
 
-            // Go: DirEntry.Info, an lstat.
+            // An lstat: symlinks are not followed.
             let Ok(info) = entry.metadata() else {
                 continue;
             };
@@ -153,16 +151,14 @@ impl Cache {
     }
 }
 
-/// Newest `start_time` first. Go iterates a map and uses the unstable
-/// `sort.Slice`, so equal start times come in no fixed order there; here
-/// they keep file-name order.
+/// Newest `start_time` first; equal start times keep file-name order.
 fn cached_session_values(files: &BTreeMap<OsString, CachedSession>) -> Vec<Arc<Session>> {
     let mut sessions: Vec<_> = files.values().map(|c| Arc::clone(&c.session)).collect();
     session::sort_newest_first(&mut sessions);
     sessions
 }
 
-/// Go: `ModTime().UnixNano()`.
+/// Nanoseconds since the Unix epoch.
 fn unix_nanos(t: SystemTime) -> i64 {
     match t.duration_since(UNIX_EPOCH) {
         Ok(d) => i64::try_from(d.as_nanos()).unwrap_or(i64::MAX),
@@ -355,8 +351,8 @@ mod tests {
         );
     }
 
-    // Go keeps the cache and revision when the directory disappears, and
-    // returns nil; a later load with the directory back sees no change.
+    // The cache and revision stay when the directory disappears, and the
+    // load returns nothing; a later load with the directory back sees no change.
     #[test]
     fn cache_absent_directory_after_load_keeps_state() {
         let tmp = tempfile::tempdir().unwrap();
@@ -371,7 +367,7 @@ mod tests {
         let (sessions, second) = cache.load();
         assert!(sessions.is_empty());
         assert_eq!(second, first);
-        assert!(cache.get("a").is_some(), "Go keeps the cached entries");
+        assert!(cache.get("a").is_some(), "the cache keeps its entries");
 
         fs::rename(&moved, &dir).unwrap();
         let (sessions, third) = cache.load();
@@ -384,7 +380,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let file = tmp.path().join("not-a-dir");
         fs::write(&file, "x").unwrap();
-        // ENOTDIR is not "not exist": Go returns the cached values.
+        // ENOTDIR is not "not exist": the cached values are returned.
         let (sessions, rev) = Cache::new(&file).load();
         assert!(sessions.is_empty());
         assert_eq!(rev, 0);
@@ -393,7 +389,7 @@ mod tests {
     /// Windows `SystemTime` counts 100 ns ticks, so the portable case uses
     /// a whole tick; Unix keeps single nanoseconds.
     #[test]
-    fn unix_nanos_matches_go() {
+    fn unix_nanos_before_and_after_epoch() {
         assert_eq!(
             unix_nanos(UNIX_EPOCH + Duration::new(2, 500)),
             2_000_000_500

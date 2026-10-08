@@ -1,4 +1,4 @@
-//! The terminal dashboard. Go: `internal/dashboard`.
+//! The terminal dashboard.
 //!
 //! [`model::Model`] owns the state and routes [`model::Msg`]s by
 //! [`keys::Mode`]; it renders through ratatui and never touches the terminal

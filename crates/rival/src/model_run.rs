@@ -1,5 +1,4 @@
-//! `rival run <model>`: the terminal-facing workflow. Go:
-//! `cmd/model_run.go`.
+//! `rival run <model>`: the terminal-facing workflow.
 
 use std::io::Write;
 

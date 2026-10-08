@@ -1,6 +1,5 @@
-//! Go: `internal/review/plan_test.go`, the plan cases
-//! of `parse_test.go`, and the parse half of
-//! `TestAssemblePlanResults_ParsesFinalAnswerNotToolOutput` (planrun_test.go).
+//! Plan output parsing, plan console formatting, and the parse half of
+//! assembling plan results.
 
 use super::*;
 use crate::config::CODEX_MODEL;
@@ -35,7 +34,6 @@ codex
 tokens used 4321
 "#;
 
-/// Go: TestParsePlanOutput_IgnoresEchoedSchemaExample.
 #[test]
 fn ignores_echoed_schema_example() {
     let out = parse_plan_output(CODEX_STYLE_PLAN_LOG).unwrap();
@@ -45,7 +43,6 @@ fn ignores_echoed_schema_example() {
     assert_eq!(out.findings[0].title, "no rollback step");
 }
 
-/// Go: TestParsePlanOutput_RejectsOnlySchemaExample.
 #[test]
 fn rejects_only_schema_example() {
     let schema_only = concat!(
@@ -57,7 +54,6 @@ fn rejects_only_schema_example() {
     assert_eq!(err.to_string(), "no plan JSON payload found in output");
 }
 
-/// Go: TestParsePlanOutput_RejectsUnrelatedJSON.
 #[test]
 fn rejects_unrelated_json() {
     // Has neither findings nor rating.
@@ -66,7 +62,6 @@ fn rejects_unrelated_json() {
     assert!(parse_plan_output(r#"{"summary":"x","findings":[]}"#).is_err());
 }
 
-/// Go: TestParsePlanOutput_AcceptsCleanPlan.
 #[test]
 fn accepts_clean_plan() {
     let out = parse_plan_output(r#"prose {"summary":"Airtight.","rating":9,"findings":[]} prose"#)
@@ -77,7 +72,6 @@ fn accepts_clean_plan() {
     );
 }
 
-/// Go: TestParsePlanOutput_DropsOnlyPlaceholderFindings.
 #[test]
 fn drops_only_placeholder_findings() {
     let raw = concat!(
@@ -90,7 +84,6 @@ fn drops_only_placeholder_findings() {
     assert_eq!(out.findings[0].title, "real gap");
 }
 
-/// Go: TestParsePlanOutput_KeepsRealDualCategoryFinding (parse_test.go).
 #[test]
 fn keeps_real_dual_category_finding() {
     let raw = concat!(
@@ -103,8 +96,6 @@ fn keeps_real_dual_category_finding() {
     assert_eq!(out.findings[0].title, "real dual-category finding");
 }
 
-/// Go: TestParsePlanOutput_DropsPartiallyEchoedSlopExample
-/// (parse_test.go).
 #[test]
 fn drops_partially_echoed_slop_example() {
     let raw = concat!(
@@ -120,7 +111,7 @@ fn drops_partially_echoed_slop_example() {
     assert_eq!(out.findings[0].title, "real finding");
 }
 
-/// Rust-only: a rating outside 1-10 skips the candidate; a decode error is
+/// A rating outside 1-10 skips the candidate; a decode error is
 /// reported with serde_json's text.
 #[test]
 fn rating_bounds_and_decode_errors() {
@@ -160,7 +151,6 @@ fn codex_tool_plan_transcript(final_answer: &str) -> String {
     )
 }
 
-/// Go: TestAssemblePlanResults_ParsesFinalAnswerNotToolOutput, parse half.
 /// A plan assessment printed by a tool is never the model's review.
 #[test]
 fn parses_final_answer_not_tool_output() {
@@ -186,7 +176,6 @@ fn finding(file: &str, line: i64, severity: &str, title: &str, confidence: i64) 
     }
 }
 
-/// Go: TestFormatPlanConsole_NumbersAndOrdersBySeverity.
 #[test]
 fn format_plan_console_numbers_and_orders_by_severity() {
     let out = PlanOutput {
@@ -216,7 +205,6 @@ fn format_plan_console_numbers_and_orders_by_severity() {
     );
 }
 
-/// Go: TestFormatPlanConsole_CleanPlan.
 #[test]
 fn format_plan_console_clean_plan() {
     let out = PlanOutput {
@@ -230,7 +218,7 @@ fn format_plan_console_clean_plan() {
     );
 }
 
-/// Rust-only: a volunteered failure_scenario never prints in a doc review.
+/// A volunteered failure_scenario never prints in a doc review.
 #[test]
 fn format_plan_body_drops_failure_scenario() {
     let out = PlanOutput {
@@ -264,7 +252,7 @@ fn plan(summary: &str, rating: i64) -> PlanOutput {
     }
 }
 
-/// Rust-only: the empty, single-unparsed and multi layouts byte for byte.
+/// The empty, single-unparsed and multi layouts byte for byte.
 #[test]
 fn format_plan_result_layouts() {
     assert_eq!(format_plan_result(None, "f"), "No plan review output.\n");

@@ -10,8 +10,8 @@ final class SessionSummaryTests: XCTestCase {
         return d
     }()
 
-    /// Go's MarshalIndent layout: prompt right after effort.
-    func goJSON(prompt: String, error: String = "boom \"quoted\" \\ back") -> String {
+    /// The CLI's indented JSON layout: prompt right after effort.
+    func cliJSON(prompt: String, error: String = "boom \"quoted\" \\ back") -> String {
         let p = String(decoding: try! JSONEncoder().encode(prompt), as: UTF8.self)
         let e = String(decoding: try! JSONEncoder().encode(error), as: UTF8.self)
         return """
@@ -57,19 +57,19 @@ final class SessionSummaryTests: XCTestCase {
     }
 
     func testSmallFile() throws {
-        try assertMatchesFullDecode(goJSON(prompt: "short"))
+        try assertMatchesFullDecode(cliJSON(prompt: "short"))
     }
 
     func testMidFileLineScan() throws {
         // Over lineScanMin, under the edge threshold; a quote-laden prompt
         // with "key": lookalikes must not leak into the summary.
         let prompt = String(repeating: "\n  \"status\": \"running\",\n", count: 400)
-        try assertMatchesFullDecode(goJSON(prompt: prompt))
+        try assertMatchesFullDecode(cliJSON(prompt: prompt))
     }
 
     func testBigFileReadsEdges() throws {
         let prompt = String(repeating: "x", count: 3 * SessionSummary.edgeBytes)
-        try assertMatchesFullDecode(goJSON(prompt: prompt))
+        try assertMatchesFullDecode(cliJSON(prompt: prompt))
     }
 
     func testCompactJSONFallsBackToFullDecode() throws {
@@ -86,7 +86,7 @@ final class SessionSummaryTests: XCTestCase {
     func testPromptLineIsNeverParsed() throws {
         for count in [5_000, 3 * SessionSummary.edgeBytes] {
             let half = String(repeating: "z", count: count / 2)
-            let body = goJSON(prompt: half + "TAB" + half).replacingOccurrences(of: "TAB", with: #"" garbage ""#)
+            let body = cliJSON(prompt: half + "TAB" + half).replacingOccurrences(of: "TAB", with: #"" garbage ""#)
             XCTAssertThrowsError(try decoder.decode(Session.self, from: Data(body.utf8)))
             let (path, size) = try write(body)
             let s = try XCTUnwrap(SessionSummary.load(path: path, size: size, decoder: decoder), "size \(count)")

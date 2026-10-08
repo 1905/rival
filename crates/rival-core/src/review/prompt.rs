@@ -1,7 +1,6 @@
-//! Reviewer prompts. Go: `internal/review/prompt.go`.
+//! Reviewer prompts.
 //!
-//! The texts started as byte copies of the Go constants. Tests pin them by
-//! length and SHA-256.
+//! Tests pin the texts by length and SHA-256.
 
 use crate::config::{Config, PromptKind};
 
@@ -79,18 +78,18 @@ macro_rules! clean_review_example_line {
     };
 }
 
-/// Go: `severityRubric`. Production code splices the macro.
+/// The severity rubric. Production code splices the macro.
 #[cfg(test)]
 const SEVERITY_RUBRIC: &str = severity_rubric!();
 
-/// Go: `failureScenarioRule`. Production code splices the macro.
+/// The failure-scenario rule. Production code splices the macro.
 #[cfg(test)]
 const FAILURE_SCENARIO_RULE: &str = failure_scenario_rule!();
 
-/// Go: `cleanReviewExampleLine`.
+/// The example line of a clean review.
 pub(crate) const CLEAN_REVIEW_EXAMPLE_LINE: &str = clean_review_example_line!();
 
-/// Go: `bugHunterInstructions()`.
+/// The bug-hunter reviewer instructions.
 pub(crate) const BUG_HUNTER_INSTRUCTIONS: &str = concat!(
     r#"## Role: Implementation Bug Hunter
 
@@ -136,9 +135,9 @@ Optimize for true positives, not completeness.
 "#
 );
 
-/// Go: `securityInstructions()`, the vulnerability-hunting lens. It shares
-/// the JSON contract with the bug hunter so one parser and one formatter
-/// serve both.
+/// The security reviewer instructions, the vulnerability-hunting lens. It
+/// shares the JSON contract with the bug hunter so one parser and one
+/// formatter serve both.
 ///
 /// The twelve classes below are the taxonomy the plan review settled on.
 /// Each is asserted by a test, because a prompt that quietly loses a class
@@ -198,7 +197,7 @@ Rules:
     "\n"
 );
 
-/// Go: `reviewerJSONContract()`.
+/// The JSON output contract shared by the reviewers.
 pub(crate) const REVIEWER_JSON_CONTRACT: &str = concat!(
     r#"## Output Format
 

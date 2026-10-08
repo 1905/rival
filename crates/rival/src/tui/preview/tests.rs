@@ -15,7 +15,7 @@ fn ctx() -> Ctx<'static> {
     }
 }
 
-/// Go `previewPane.refresh`: asks for the tail, runs the read on this thread
+/// Asks for the tail, runs the read on this thread
 /// and takes the result.
 fn refresh(p: &mut PreviewPane, env: &JobEnv, item: &DisplayItem, w: usize, h: usize, force: bool) {
     let ctx = ctx();
@@ -25,7 +25,7 @@ fn refresh(p: &mut PreviewPane, env: &JobEnv, item: &DisplayItem, w: usize, h: u
     }
 }
 
-/// Go `previewLines`: the pane's rows, checked to be exactly `h` rows of
+/// The pane's rows, checked to be exactly `h` rows of
 /// exactly `w` cells.
 fn view(p: &PreviewPane, item: &DisplayItem, w: u16, h: u16) -> Vec<String> {
     let area = Rect::new(0, 0, w, h);
@@ -71,7 +71,6 @@ fn single_run(h: &Harness) -> DisplayItem {
     })
 }
 
-// Go: TestPreviewSingleRun.
 #[test]
 fn preview_single_run() {
     let h = harness();
@@ -101,7 +100,6 @@ fn preview_single_run() {
     assert_eq!(rows[rows.len() - 2].trim_end(), "log line x", "{rows:?}");
 }
 
-// Go: TestPreviewGroupListsEveryMember.
 #[test]
 fn preview_group_lists_every_member() {
     let h = harness();
@@ -174,7 +172,6 @@ fn preview_group_lists_every_member() {
     );
 }
 
-// Go: TestPreviewGroupWithoutJudgeTailsLastMember.
 #[test]
 fn preview_group_without_judge_tails_last_member() {
     let h = harness();
@@ -201,7 +198,6 @@ fn preview_group_without_judge_tails_last_member() {
     );
 }
 
-// Go: TestPreviewMissingLog.
 #[test]
 fn preview_missing_log() {
     let h = harness();
@@ -225,7 +221,6 @@ fn preview_missing_log() {
     assert!(text.contains('…'), "the error is cut to the width: {text}");
 }
 
-// Go: TestPreviewLinesFitEveryWidth.
 #[test]
 fn preview_lines_fit_every_width() {
     let h = harness();
@@ -260,7 +255,6 @@ fn preview_lines_fit_every_width() {
     }
 }
 
-// Go: TestPreviewRefreshSkipsRereadForFinishedRun.
 #[test]
 fn preview_refresh_skips_reread_for_unchanged_log() {
     let h = harness();

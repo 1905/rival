@@ -1,5 +1,5 @@
-//! Go `cmd/queue.go` and `cmd/sessions.go` output. Go has no tests for these
-//! commands; the expectations come from the format strings.
+//! `rival queue` and `rival sessions` output. The expectations come from the
+//! format strings.
 
 use super::*;
 
@@ -46,7 +46,7 @@ fn empty_queue_says_so() {
 }
 
 #[test]
-fn queue_table_matches_go_format() {
+fn queue_table_format() {
     let entries = [
         Entry {
             ticket: ticket("running", "review", 4242, 0, Some(60_000), "/w/a"),
@@ -80,7 +80,7 @@ fn queue_table_matches_go_format() {
 }
 
 #[test]
-fn running_without_start_uses_creation_and_future_times_go_negative() {
+fn running_without_start_uses_creation_and_future_times_are_negative() {
     let entries = [Entry {
         ticket: ticket("running", "review", 1, 10_000, None, "/w"),
         position: 0,
@@ -90,7 +90,7 @@ fn running_without_start_uses_creation_and_future_times_go_negative() {
         "{}",
         table(&entries, 0)
     );
-    // Exactly 30 minutes is not stale: Go uses >.
+    // Exactly 30 minutes is not stale: the check is strictly greater.
     let entries = [Entry {
         ticket: ticket("waiting", "review", 1, 0, None, "/w"),
         position: 1,
@@ -100,7 +100,7 @@ fn running_without_start_uses_creation_and_future_times_go_negative() {
 }
 
 #[test]
-fn round_seconds_matches_go_duration_round() {
+fn round_seconds_rounds_half_away_from_zero() {
     let s = NANOS_PER_SECOND;
     for (d, want) in [
         (0, 0),
@@ -167,7 +167,7 @@ fn sample() -> Vec<Session> {
 }
 
 #[test]
-fn sessions_list_matches_go_format() {
+fn sessions_list_format() {
     let codex = config::engine_label("codex", rival_core::config::CODEX_MODEL);
     let claude = config::engine_label("claude", rival_core::config::CLAUDE_MODEL);
     let retired = config::engine_label("mystery", "old");

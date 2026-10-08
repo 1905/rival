@@ -1,6 +1,6 @@
 //! Bounded review executions across independent rival processes.
 //!
-//! Go: `internal/queue`. Ticket files in `~/.rival/queue/` are guarded by an
+//! Ticket files in `~/.rival/queue/` are guarded by an
 //! exclusive lock on `<dir>/.lock`. No daemon: each process scans, reaps dead
 //! tickets, and promotes itself when a slot is free, all inside one locked
 //! critical section. Queue ordering depends only on ticket files; the
@@ -14,7 +14,7 @@
 //! dead. On a platform where start time is unreadable, the check degrades to
 //! a bare existence test.
 //!
-//! As in Go, [`Manager::enqueue`] and [`Manager::release`] do not take the
+//! [`Manager::enqueue`] and [`Manager::release`] do not take the
 //! lock: a ticket is created and removed with single atomic file operations
 //! (temp file + rename, unlink), and only scans and promotion are serialized.
 
@@ -47,35 +47,34 @@ use crate::procinfo;
 use crate::session::{path_error, proc_pid};
 use ticket::{ticket_filename, write_ticket};
 
-/// Go: the text of `ErrQueueTimeout`.
+/// The text of a queue timeout error.
 pub const ERR_QUEUE_TIMEOUT: &str = "queue timeout";
 
 /// How old (strictly more than) an unparseable `.json` or leftover `.tmp`
 /// must be before scanners delete it; younger ones may be writes in flight.
 const STALE_FILE_AGE: Duration = Duration::from_secs(60);
 
-/// A wall clock, injectable for tests. Go: `Manager.Now`.
+/// A wall clock, injectable for tests.
 pub type Clock = Arc<dyn Fn() -> DateTime<FixedOffset> + Send + Sync>;
 
-/// Reports whether a session is "running" with a live PID. Go:
-/// `Manager.SessionLive`.
+/// Reports whether a session is "running" with a live PID.
 pub type SessionLiveFn = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
 /// Why [`Manager::wait_for_slot`] gave up.
 #[derive(Debug)]
 pub enum WaitError {
-    /// Go: `errors.New("WaitForSlot called before Enqueue")`.
+    /// `wait_for_slot` was called before `enqueue`.
     NotEnqueued,
-    /// Go: `fmt.Errorf("%w after %s", ErrQueueTimeout, m.Timeout)`.
+    /// No slot came free within the timeout.
     Timeout(Duration),
-    /// Go: `ctx.Err()`.
+    /// The context was cancelled or hit its deadline.
     Context(ContextError),
-    /// A lock or ticket write failure, passed through unwrapped as in Go.
+    /// A lock or ticket write failure, passed through unwrapped.
     Io(anyhow::Error),
 }
 
 impl WaitError {
-    /// Go: `errors.Is(err, ErrQueueTimeout)`.
+    /// Whether the wait ended on the queue timeout.
     pub fn is_queue_timeout(&self) -> bool {
         matches!(self, WaitError::Timeout(_))
     }
@@ -113,8 +112,8 @@ pub struct Manager {
     pub poll_interval: Duration,
     /// Zero waits forever.
     pub timeout: Duration,
-    /// `None` is the real clock (Go's `time.Now`, with its monotonic reading
-    /// for the timeout deadline).
+    /// `None` is the real clock, with a monotonic reading for the timeout
+    /// deadline.
     pub now: Option<Clock>,
     /// `None` treats every referenced session as dead.
     pub session_live: Option<SessionLiveFn>,
@@ -148,7 +147,7 @@ fn duration_nanos(d: Duration) -> i64 {
 }
 
 impl Manager {
-    /// Go: `queue.New()`. Production settings from `config` and its env.
+    /// Production settings from `config` and its env.
     pub fn new(paths: &Paths, config: &Config) -> Manager {
         let sessions = paths.sessions_dir();
         Manager {
@@ -163,8 +162,7 @@ impl Manager {
     }
 
     /// A manager with explicit settings, the real clock and no session
-    /// liveness (Go: a `&Manager{...}` literal leaving `Now` and
-    /// `SessionLive` nil).
+    /// liveness.
     pub fn with_settings(
         dir: PathBuf,
         max_concurrent: usize,
@@ -264,7 +262,7 @@ impl Manager {
                     return write_ticket(&self.dir, t);
                 };
                 (pos, total) = (idx + 1, waiting.len());
-                // Go: idx < m.MaxConcurrent-runningCount, in signed ints.
+                // idx < max_concurrent - running_count, in signed ints.
                 if (idx as i128) < self.max_concurrent as i128 - running_count as i128 {
                     let now = self.now_wall();
                     let t = self.ticket.as_mut().expect("enqueued");
@@ -385,7 +383,7 @@ impl Manager {
         })
     }
 
-    /// Go: `m.now().After(deadline)`.
+    /// Whether the clock is past `deadline`.
     fn past(&self, deadline: &Deadline) -> bool {
         match deadline {
             Deadline::Mono(d) => Instant::now() > *d,
@@ -444,7 +442,7 @@ impl Manager {
             fs::read_dir(&self.dir).map_err(|e| anyhow!(path_error("open", &self.dir, &e)))?;
         let mut files = Vec::new();
         for entry in entries {
-            // Go's ReadDir error discards the partial listing too.
+            // A read error discards the partial listing too.
             let entry = entry.map_err(|e| anyhow!(path_error("readdirent", &self.dir, &e)))?;
             let name = entry.file_name();
             let bytes = name.as_encoded_bytes();
@@ -454,7 +452,7 @@ impl Manager {
                 self.remove_if_stale(&name, &entry);
             }
         }
-        // Byte order, as Go's sort.Strings.
+        // Byte order.
         files.sort_by(|a, b| a.as_encoded_bytes().cmp(b.as_encoded_bytes()));
         Ok(files)
     }
@@ -491,7 +489,7 @@ impl Manager {
         }
     }
 
-    /// Go: `m.now().Sub(info.ModTime()) > staleFileAge`.
+    /// Whether the file is older than `STALE_FILE_AGE` (strictly).
     fn is_stale(&self, meta: &fs::Metadata) -> bool {
         let Ok(mtime) = meta.modified() else {
             return false;
@@ -503,7 +501,7 @@ impl Manager {
         let now = self.now_wall();
         let now_nanos =
             i128::from(now.timestamp()) * 1_000_000_000 + i128::from(now.timestamp_subsec_nanos());
-        // Go's Sub saturates at the Duration range.
+        // The age saturates at the i64 nanosecond range.
         let age = (now_nanos - mtime_nanos).clamp(i128::from(i64::MIN), i128::from(i64::MAX));
         age > STALE_FILE_AGE.as_nanos() as i128
     }
@@ -523,7 +521,7 @@ impl Manager {
     }
 }
 
-/// Go: `os.MkdirAll(dir, 0700)` with the queue's error wrapping.
+/// `mkdir -p` with mode 0700 and the queue's error wrapping.
 fn mkdir_all(dir: &Path) -> anyhow::Result<()> {
     let mut builder = DirBuilder::new();
     builder.recursive(true);

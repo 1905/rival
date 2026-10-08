@@ -1,5 +1,4 @@
 //! The dashboard model: state, message routing and the frame.
-//! Go: `internal/dashboard/model.go`.
 //!
 //! The model never touches the terminal, the session files, the processes
 //! or the clock on its own. The runtime (Task 4.5) feeds it [`Msg`]s from
@@ -294,7 +293,7 @@ impl Model {
         self.sync_preview(refresh);
     }
 
-    /// Go: `syncPreview`. The detail screen hides the preview, so nothing is
+    /// The detail screen hides the preview, so nothing is
     /// read there.
     fn sync_preview(&mut self, refresh: bool) {
         if !self.preview_shown() {
@@ -343,7 +342,7 @@ impl Model {
         }
     }
 
-    /// Go: the end of `updateConfirmKey`. The stop wrote the targets as
+    /// The end of a confirmed stop. The stop wrote the targets as
     /// failed; the rows on screen copy what was stored, the header counts
     /// them now, and the open detail redraws.
     fn apply_stop(&mut self, res: StopResult) {
@@ -530,7 +529,7 @@ impl Model {
         self.detail.close();
     }
 
-    /// Go: `syncDetail`. Resizes the detail viewport and reloads its content
+    /// Resizes the detail viewport and reloads its content
     /// for the current selection. `reset` puts the scroll back to the tab's
     /// start (the tail for Raw); otherwise follow decides.
     fn sync_detail(&mut self, reset: bool) {
@@ -623,7 +622,7 @@ impl Model {
         Vec::new()
     }
 
-    /// Go: `updateDetailKey`. Drives the detail screen while it has focus.
+    /// Drives the detail screen while it has focus.
     fn detail_key(&mut self, key: &str) -> Vec<Cmd> {
         let k = self.keys;
         self.detail.notice.clear();
@@ -646,7 +645,7 @@ impl Model {
         } else if k.prev_tab.matches(key) {
             self.set_detail_tab(self.detail.tab.cycle(-1));
         } else if k.next_member.matches(key) || k.prev_member.matches(key) {
-            // Go resets the view even when the member stays; the app keeps
+            // The view is not reset when the member stays; the app keeps
             // the reader's place, and so does this.
             let delta = if k.next_member.matches(key) { 1 } else { -1 };
             if self.detail.cycle_member(self.list.selected(), delta) {
@@ -745,7 +744,7 @@ impl Model {
         Vec::new()
     }
 
-    /// Go: `updateConfirmKey`. Every key closes the bar, and only y stops, so
+    /// Handles a key while the stop bar is open. Every key closes the bar, and only y stops, so
     /// a stray key press can never kill a run. The targets are re-checked
     /// against the current snapshot first; the stop itself runs as a job,
     /// which checks each process identity again right before its signal.

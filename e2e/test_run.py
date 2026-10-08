@@ -1019,7 +1019,7 @@ class ScenarioFilesTest(unittest.TestCase):
         "queue-empty": "Queue is empty.\n",
     }
 
-    def test_initial_scenarios_match_committed_go_output(self):
+    def test_initial_scenarios_match_committed_output(self):
         for name, stdout in self.EXPECTED_STDOUT.items():
             with self.subTest(name):
                 sc = run.load_scenario(os.path.join(run.SCENARIOS_DIR, name + ".yaml"))

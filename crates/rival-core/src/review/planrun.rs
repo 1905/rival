@@ -1,4 +1,4 @@
-//! Plan and doc review runs. Go: `internal/review/planrun.go`.
+//! Plan and doc review runs.
 //!
 //! Each requested model runs at once under one queue ticket. Results come
 //! back in the requested order, whatever order the models finish in.
@@ -26,10 +26,10 @@ fn build_plan_prompt(abs_path: &str) -> String {
     config::PLAN_REVIEW_PROMPT.replace("{FILE}", abs_path)
 }
 
-/// Go `config.WithRunTimeout(ctx, mult)`: a child of `ctx` bounded by
+/// A child of `ctx` bounded by
 /// `mult × RIVAL_RUN_TIMEOUT`. With the timeout disabled or `mult <= 0` the
-/// child has no deadline of its own (Go returns `ctx` and a no-op cancel;
-/// cancelling this child never touches `ctx`). Call the returned cancel when
+/// child has no deadline of its own (cancelling this child never touches
+/// `ctx`). Call the returned cancel when
 /// the run ends.
 pub fn with_run_timeout(ctx: &Context, cfg: &Config, mult: i32) -> (Context, CancelFunc) {
     match cfg.run_timeout_budget(mult) {
@@ -101,7 +101,7 @@ struct PlanCLIRun {
     model: String,
     raw: String,
     exit_code: i64,
-    /// Go's `Err`: the error text, `None` when the run returned no error.
+    /// The error text, `None` when the run returned no error.
     err: Option<String>,
     /// A human-readable failure reason set on the error path (a
     /// `RIVAL_RUN_TIMEOUT` message or the provider's own error), so a skipped
@@ -117,8 +117,7 @@ type RunFn<'a> = dyn Fn(&Context, &mut Session, &str, &str, &str, &str) -> anyho
     + Sync
     + 'a;
 
-/// The preflight and run steps, as fields so tests inject fakes. Go:
-/// `planExecutor`.
+/// The preflight and run steps, as fields so tests inject fakes.
 struct PlanExecutor<'a> {
     preflight: Box<PreflightFn<'a>>,
     run: Box<RunFn<'a>>,
@@ -148,7 +147,7 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
                 }
                 _ => bail!("unsupported plan cli: {cli}"),
             };
-            // `{e}`, not `{e:#}`: the error already prints as Go's *PathError.
+            // `{e}`, not `{e:#}`: the error already prints as `op path: reason`.
             let raw = session::read_file(Path::new(&sess.log_file))
                 .map_err(|e| anyhow!("read log: {e}"))?;
             Ok((raw, result.exit_code))
@@ -170,8 +169,7 @@ pub struct ReviewBatch<'a> {
     pub clis: &'a [String],
 }
 
-/// What a doc review runs. Go: the `mode, prompt, target, fallbackEffort`
-/// arguments of `RunDocReview`.
+/// What a doc review runs: the mode, prompt, target and fallback effort.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DocReview<'a> {
     /// The session mode and the queue ticket label ("plan").
@@ -241,8 +239,7 @@ fn run_plan_review_with(
     run_doc_review_with(ctx, cfg, ex, &doc, batch, stderr)
 }
 
-/// Fails every session still "queued" (never started) when dropped. Go: the
-/// deferred cleanup in `runDocReview`.
+/// Fails every session still "queued" (never started) when dropped.
 struct QueuedCleanup<'a> {
     paths: &'a Paths,
     sessions: Vec<Session>,
@@ -278,7 +275,7 @@ fn run_doc_review_with(
 
     // Created BEFORE the creation loop so an error mid-loop still cleans up
     // the sessions already created, not just the ones that started. Declared
-    // before the slot guard, so the slot is released first, as in Go.
+    // before the slot guard, so the slot is released first.
     let mut created = QueuedCleanup {
         paths: cfg.paths(),
         sessions: Vec::new(),
@@ -364,7 +361,7 @@ fn run_doc_review_with(
     // Bound the run once a slot is held: a hung CLI must not keep the slot
     // (and the detached rival) alive forever. Single phase → mult 1. The
     // guard cancels the run context on every exit, after assembly and before
-    // the slot is released, as Go's deferred cancel does.
+    // the slot is released.
     let (run_ctx, cancel_run) = with_run_timeout(ctx, cfg, 1);
     let _cancel_run = CancelOnDrop(cancel_run);
 
@@ -399,8 +396,7 @@ fn run_doc_review_with(
     assemble_plan_results(runs, skipped)
 }
 
-/// Cancels the run context when dropped, also on unwind. Go: `defer
-/// cancelRun()`.
+/// Cancels the run context when dropped, also on unwind.
 struct CancelOnDrop(CancelFunc);
 
 impl Drop for CancelOnDrop {
@@ -410,8 +406,7 @@ impl Drop for CancelOnDrop {
 }
 
 /// Fails the session with "interrupted" when dropped while it is still
-/// running or queued, also on unwind. Go: the deferred finalizer in
-/// `runPlanCLI`.
+/// running or queued, also on unwind.
 struct FailUnfinished<'a> {
     paths: &'a Paths,
     sess: &'a mut Session,
@@ -490,7 +485,7 @@ fn run_plan_cli_inner(
             };
         }
     };
-    // Go counts the log's bytes; the text is decoded lossily for parsing.
+    // The output size counts the log's bytes; the text is decoded lossily for parsing.
     let output_bytes = i64::try_from(raw.len()).unwrap_or(i64::MAX);
     let raw = String::from_utf8(raw)
         .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());

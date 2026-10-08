@@ -22,9 +22,8 @@ pub mod skills;
 pub mod telemetry;
 pub mod update;
 
-/// Build version: `RIVAL_VERSION` at compile time, else `"dev"` like Go's
-/// `var version = "dev"`. GoReleaser sets it to the tag without the `v`, as
-/// the Go build's `-X main.version={{.Version}}` did.
+/// Build version: `RIVAL_VERSION` at compile time, else `"dev"`. GoReleaser
+/// sets it to the tag without the `v`.
 pub const VERSION: &str = version_or_dev(option_env!("RIVAL_VERSION"));
 
 /// An unset or empty `RIVAL_VERSION` is a development build.

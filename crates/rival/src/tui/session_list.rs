@@ -1,5 +1,5 @@
 //! The run list: status tabs, filter input, day sections, pages and the
-//! cursor. Go: `internal/dashboard/session_list.go`.
+//! cursor.
 //!
 //! The grouping rules (status, kind, effort, elapsed) live in
 //! `rival_core::sessionview`; only presentation stays here.
@@ -141,7 +141,7 @@ fn windows_base_name(path: &str) -> String {
         .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned())
 }
 
-/// Go: `filepath.Base` on Unix: only `/` separates, so a backslash is an
+/// The last path element on Unix: only `/` separates, so a backslash is an
 /// ordinary name byte.
 #[cfg_attr(windows, allow(dead_code))]
 fn base_name(path: &str) -> &str {
@@ -161,19 +161,19 @@ fn base_name(path: &str) -> &str {
 pub const SECTION_ORDER: [&str; 4] = ["TODAY", "YESTERDAY", "THIS WEEK", "OLDER"];
 
 /// The local time zone as a lookup: the UTC offset in force at a UTC
-/// instant. Go: `Location.lookup`. Tests inject a fixed or a switching zone.
+/// instant. Tests inject a fixed or a switching zone.
 pub type Zone = fn(NaiveDateTime) -> FixedOffset;
 
-/// The system time zone. Go: `time.Local`.
+/// The system time zone.
 pub fn local_zone(utc: NaiveDateTime) -> FixedOffset {
     Local.offset_from_utc_datetime(&utc)
 }
 
-/// It guesses the offset at the
-/// wall time read as UTC, then uses the offset in force at the guessed
-/// instant. Each midnight gets its own offset, so a DST switch between two
-/// boundaries moves neither. A midnight the switch skips or repeats
-/// resolves as in Go.
+/// The local midnight that starts `day` in `zone`. It guesses the offset
+/// at the wall time read as UTC, then uses the offset in force at the
+/// guessed instant. Each midnight gets its own offset, so a DST switch
+/// between two boundaries moves neither. A midnight the switch skips or
+/// repeats resolves through the same two lookups.
 fn midnight(zone: Zone, day: NaiveDate) -> DateTime<FixedOffset> {
     let wall = day.and_time(NaiveTime::MIN);
     let at = |offset: FixedOffset| wall.checked_sub_offset(offset).unwrap_or(wall);
@@ -366,8 +366,8 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
     b
 }
 
-/// Go: `id[:8]`, the first 8 bytes. A cut inside a multi-byte char keeps
-/// its stray bytes as U+FFFD.
+/// The first 8 bytes of the id. A cut inside a multi-byte char keeps its
+/// stray bytes as U+FFFD.
 pub fn short_id(id: &str) -> Cow<'_, str> {
     if id.len() > 8 {
         String::from_utf8_lossy(&id.as_bytes()[..8])
@@ -513,8 +513,8 @@ pub fn layout_columns(width: usize) -> Columns {
     c
 }
 
-/// Go: `joinCells` without styles. Lays cells out per the column widths,
-/// dropping zero-width columns.
+/// Lays cells out per the column widths, without styles, dropping zero-width
+/// columns.
 pub fn join_cells(c: &Columns, cells: [&str; 6]) -> String {
     let mut out = String::from(" ");
     let mut first = true;
@@ -531,8 +531,8 @@ pub fn join_cells(c: &Columns, cells: [&str; 6]) -> String {
     out
 }
 
-/// Go: `joinCells` with styles. Each cell is fitted first and then styled,
-/// so styling cannot change the width.
+/// Lays cells out per the column widths, with styles. Each cell is fitted
+/// first and then styled, so styling cannot change the width.
 fn join_styled_cells(c: &Columns, cells: [&str; 6], styles: [Style; 6]) -> Line<'static> {
     let mut spans = vec![Span::raw(" ")];
     let mut first = true;

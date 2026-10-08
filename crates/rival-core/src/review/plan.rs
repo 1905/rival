@@ -1,6 +1,5 @@
-//! Plan output parsing and rendering. Go: the pure half of
-//! `internal/review/plan.go`, plus the `PlanRunResult` record from
-//! `planrun.go`. Running the reviews is not here.
+//! Plan output parsing and rendering, plus the [`PlanRunResult`] record.
+//! Running the reviews is not here.
 
 use std::fmt::Write as _;
 
@@ -83,7 +82,6 @@ pub fn parse_plan_output(raw: &str) -> anyhow::Result<PlanOutput> {
 }
 
 /// Parses a provider log: [`parse_plan_output`] of its [`final_answer`].
-/// Go call sites spell this out as `ParsePlanOutput(FinalAnswer(raw))`.
 pub fn parse_plan_log(raw: &str) -> anyhow::Result<PlanOutput> {
     parse_plan_output(final_answer(raw))
 }
@@ -133,7 +131,7 @@ fn format_plan_body(out: &PlanOutput, sb: &mut String, rating_label: &str, empty
 }
 
 /// The outcome of a plan run: one result per model that ran,
-/// plus the models that were skipped. Go: `PlanRunResult` in `planrun.go`.
+/// plus the models that were skipped.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlanRunResult {
     pub results: Vec<PlanCLIResult>,

@@ -6,6 +6,16 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 
 ## [Unreleased]
 
+### Removed
+- `rival-antislop`, the code-slop review. `rival install` deletes an installed copy.
+- The Go license file in release archives. No Go code ships.
+
+### Changed
+- Error messages use the operating system's own wording, for example `No such file or directory (os error 2)` and `exit status: 1`.
+- Session, queue and cache files are written as plain JSON: `<`, `>` and `&` are no longer escaped, and unset times are omitted. Files from older versions still load.
+- A duration that overflows (for example in `RIVAL_RUN_TIMEOUT`) is now an error. Before, it wrapped to 0 and turned the run timeout off.
+- The end-to-end scenarios moved from `parity/` to `e2e/`.
+
 ## [v5.0.0] — 2026-10-07
 
 The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 84 end-to-end scenarios check them on macOS and Linux.

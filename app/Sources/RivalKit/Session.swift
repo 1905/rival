@@ -1,13 +1,13 @@
 import Foundation
 
-/// One review run as the Go CLI stores it in `<root>/sessions/<id>.json`
-/// (`rival/internal/session/session.go`, struct `Session`).
+/// One review run as the rival CLI stores it in `<root>/sessions/<id>.json`
+/// (the CLI's session record).
 ///
 /// Decoding is tolerant: unknown keys are ignored, and a missing or mistyped
 /// key takes its default. Only `id` is required, because a record without one
-/// cannot be selected or grouped. Go's `omitempty` fields map to optionals, and
-/// an empty string or a zero `pid_start` decodes as `nil`, the same meaning Go
-/// gives them.
+/// cannot be selected or grouped. Fields the CLI may omit map to optionals, and
+/// an empty string or a zero `pid_start` decodes as `nil`, the same meaning the
+/// CLI gives them.
 public struct Session: Decodable, Identifiable, Hashable, Sendable {
     public let id: String
     public let groupID: String?
@@ -17,14 +17,14 @@ public struct Session: Decodable, Identifiable, Hashable, Sendable {
     public let effort: String
     public let reviewScope: String?
     /// The full prompt. `SessionStore` drops it from list snapshots to keep
-    /// memory flat (the Go summaries do the same); load it with
+    /// memory flat (the CLI's summaries do the same); load it with
     /// `Session.load(from:)` for the Prompt tab.
     public let prompt: String?
     public let promptPreview: String?
     public let status: String
-    /// Unset decodes as `Date.goZero`: current releases omit the key, older
+    /// Unset decodes as `Date.zeroTime`: current releases omit the key, older
     /// ones wrote the zero time `0001-01-01T00:00:00Z`. Check it with
-    /// `Date.isGoZero`, never against `nil`.
+    /// `Date.isZeroTime`, never against `nil`.
     public let startTime: Date
     public let queuedAt: Date?
     public let queuePosition: Int?
@@ -39,9 +39,9 @@ public struct Session: Decodable, Identifiable, Hashable, Sendable {
     /// The provider account the run used, when rival recorded one.
     public let account: String?
     public let pid: Int32
-    /// Process start time of `pid` in Unix nanoseconds (Go `procinfo.StartNanos`).
+    /// Process start time of `pid` in Unix nanoseconds.
     public let pidStart: Int64?
-    /// The rival process that drives this run (Go `OwnerPID`). It finalizes
+    /// The rival process that drives this run (`owner_pid`). It finalizes
     /// the session itself; nil for records from older releases.
     public let ownerPID: Int32?
     /// Start time of `ownerPID` in Unix nanoseconds.
@@ -58,7 +58,7 @@ public struct Session: Decodable, Identifiable, Hashable, Sendable {
         prompt: String? = nil,
         promptPreview: String? = nil,
         status: String = "",
-        startTime: Date = .goZero,
+        startTime: Date = .zeroTime,
         queuedAt: Date? = nil,
         queuePosition: Int? = nil,
         endTime: Date? = nil,
@@ -147,7 +147,7 @@ public struct Session: Decodable, Identifiable, Hashable, Sendable {
             prompt: skipPrompt ? nil : str(.prompt),
             promptPreview: str(.promptPreview),
             status: str(.status) ?? "",
-            startTime: date(.startTime) ?? .goZero,
+            startTime: date(.startTime) ?? .zeroTime,
             queuedAt: date(.queuedAt),
             queuePosition: int(.queuePosition),
             endTime: date(.endTime),
@@ -180,15 +180,15 @@ extension Optional where Wrapped == String {
 }
 
 extension Date {
-    /// Go's zero `time.Time`: 0001-01-01T00:00:00Z.
-    public static let goZero = Date(timeIntervalSince1970: -62_135_596_800)
+    /// The zero time 0001-01-01T00:00:00Z that older CLI versions wrote.
+    public static let zeroTime = Date(timeIntervalSince1970: -62_135_596_800)
 
-    /// True for Go's zero time (or anything before it), the "unset" value.
-    public var isGoZero: Bool { self <= Date.goZero }
+    /// True for the zero time (or anything before it), the "unset" value.
+    public var isZeroTime: Bool { self <= Date.zeroTime }
 }
 
-/// Parses Go's `time.Time` JSON form (RFC 3339 with 0-9 fractional digits and
-/// a `Z` or `±hh:mm` offset). The calendar math is done by hand so year 1 (Go's
+/// Parses the CLI's JSON time form (RFC 3339 with 0-9 fractional digits and
+/// a `Z` or `±hh:mm` offset). The calendar math is done by hand so year 1 (the
 /// zero time) and nanosecond fractions round-trip without a formatter.
 public func parseRFC3339(_ s: String) -> Date? {
     let b = Array(s.utf8)

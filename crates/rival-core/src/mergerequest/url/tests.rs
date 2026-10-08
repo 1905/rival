@@ -1,5 +1,4 @@
-//! Acceptance and fields derived from Go 1.25.14 `net/url/url.go` and
-//! `net/netip/netip.go` (read, not run).
+//! Which URLs parse, and the fields they parse to.
 
 use super::*;
 
@@ -56,7 +55,7 @@ fn opaque_and_relative_forms_have_no_host() {
 }
 
 #[test]
-fn go_parse_errors_reject() {
+fn malformed_urls_reject() {
     for raw in [
         &b"://x"[..],     // missing protocol scheme
         b"https://h/\n",  // control character

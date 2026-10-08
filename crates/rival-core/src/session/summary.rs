@@ -22,7 +22,7 @@ pub fn load_all_summaries(paths: &Paths) -> Vec<Session> {
     let Ok(entries) = fs::read_dir(&dir) else {
         return Vec::new();
     };
-    // Go: os.ReadDir returns entries sorted by name.
+    // Process entries sorted by name.
     let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
     entries.sort_by_key(|e| e.file_name());
 
@@ -74,8 +74,8 @@ pub fn load_summary_file(path: &Path, size: i64) -> anyhow::Result<Session> {
     Session::from_json(&serde_json::to_vec(&raw_fields)?)
 }
 
-/// Go: `io.ReadFull` where a short read is accepted (`ErrUnexpectedEOF`) but
-/// reading nothing at all is a bare `EOF` error.
+/// Fills `buf` as far as the file allows: a short read is accepted, but
+/// reading nothing at all is an `EOF` error.
 fn read_full(f: &mut File, path: &Path, buf: &mut [u8]) -> anyhow::Result<usize> {
     let mut total = 0;
     while total < buf.len() {
@@ -148,7 +148,7 @@ fn collect_summary_fields(dst: &mut BTreeMap<String, Box<RawValue>>, data: &[u8]
     }
 }
 
-/// Go: `bytes.TrimSpace` — trims Unicode white space; an invalid UTF-8 byte
+/// Trims Unicode white space from both ends; an invalid UTF-8 byte
 /// stops the trim.
 fn trim_space(mut s: &[u8]) -> &[u8] {
     while let Some(c) = first_char(s) {
@@ -218,7 +218,6 @@ mod tests {
         (path, data.len() as i64)
     }
 
-    // Go: TestLoadSummaryFileSkipsLargePrompt.
     #[test]
     fn load_summary_file_skips_large_prompt() {
         let tmp = tempfile::tempdir().unwrap();
@@ -342,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn trim_space_matches_go() {
+    fn trim_space_trims_unicode_space_and_stops_at_invalid_utf8() {
         assert_eq!(trim_space(b" \t\x0b\x0c\r\n x \n"), b"x");
         assert_eq!(trim_space("\u{a0}\u{85}x\u{2003}".as_bytes()), b"x");
         assert_eq!(trim_space(b"\xff x \xfe"), b"\xff x \xfe");

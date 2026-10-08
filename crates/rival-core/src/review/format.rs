@@ -1,5 +1,4 @@
-//! Console rendering shared by the review, security and plan output. Go:
-//! `internal/review/review_format.go`.
+//! Console rendering shared by the review, security and plan output.
 
 use std::fmt::Write as _;
 

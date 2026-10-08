@@ -1,5 +1,5 @@
 //! The right-hand pane: the selected run's meta block plus the tail of its
-//! log. Go: `internal/dashboard/preview.go`.
+//! log.
 //!
 //! The meta block is cheap and built on every draw from the item and the
 //! clock. The log tail comes from a [`LogSlot`] that a worker fills, so

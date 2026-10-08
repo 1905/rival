@@ -1,5 +1,4 @@
-//! Reviewer payload types and their JSON decoding. Go:
-//! `internal/review/types.go`.
+//! Reviewer payload types and their JSON decoding.
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};

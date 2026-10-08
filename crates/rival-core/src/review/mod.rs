@@ -1,6 +1,5 @@
-//! Reviewer prompts, output parsing and console formatting. Go:
-//! `internal/review/{types,prompt,parse,review_format,slots,security}.go`
-//! and `plan.go`, plus plan and doc review runs (`planrun.go`).
+//! Reviewer prompts, output parsing and console formatting, plus plan and
+//! doc review runs.
 //!
 //! Every caller that parses a provider log passes it through
 //! [`final_answer`] first ([`parse_reviewer_log`], [`parse_plan_log`]), so

@@ -104,7 +104,7 @@ pub(crate) fn run_kimi_with(
 /// one run by session mode. Review keeps the zero-value read-only reviewer
 /// defaults; only the API key differs (Moonshot, read from `cred_workdir`).
 /// Every mode other than "review" — raw, and also the task modes plan
-/// and security — gets the full-auto profile, as in Go.
+/// and security — gets the full-auto profile.
 pub(crate) fn kimi_run_opts(cfg: &Config, mode: &str, cred_workdir: &str) -> OpencodeRunOpts {
     let mut opts = OpencodeRunOpts {
         api_key: cfg.kimi_api_key_from(Path::new(cred_workdir)),

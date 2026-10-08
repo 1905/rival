@@ -1,11 +1,11 @@
-//! Go: `cmd/workdir_test.go`, `cmd/workdir_session_test.go`.
+//! `--workdir` resolution tests.
 
 use super::*;
 
 use crate::testutil::{Fixture, fake_run, no_mr, run_command_with};
 
 /// A root with `v3/` and `plain.txt`; `cwd` is the root as a canonical
-/// path (Go's `os.Getwd` after `t.Chdir`, with macOS /var resolved).
+/// path (with macOS /var resolved).
 fn layout() -> (tempfile::TempDir, std::path::PathBuf) {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir(root.path().join("v3")).unwrap();
@@ -13,8 +13,6 @@ fn layout() -> (tempfile::TempDir, std::path::PathBuf) {
     let cwd = root.path().canonicalize().unwrap();
     (root, cwd)
 }
-
-// ---- Go TestResolveWorkdir ----
 
 #[test]
 fn resolve_workdir_cases() {
@@ -32,7 +30,7 @@ fn resolve_workdir_cases() {
         ("dot", ".", s(cwd.clone())),
         ("unclean relative", "./v3/../v3", s(cwd.join("v3"))),
         ("absolute", abs_v3.as_str(), abs_v3.clone()),
-        // pflag accepts an empty value; Go's filepath.Abs("") is the cwd.
+        // pflag accepts an empty value; an empty path resolves to the cwd.
         ("empty", "", s(cwd.clone())),
         ("unclean absolute", unclean_abs.as_str(), abs_v3.clone()),
     ];
@@ -53,7 +51,7 @@ fn resolve_workdir_cases() {
                 cwd.join("plain.txt").display()
             ),
         ),
-        // ENOTDIR is not "not exist" in Go: the stat error is kept. Windows
+        // ENOTDIR is not "not exist": the stat error is kept. Windows
         // reports ERROR_PATH_NOT_FOUND, which is.
         (
             "through a file",
@@ -95,7 +93,8 @@ fn resolve_workdir_nul_is_invalid_argument() {
 
 /// `|` is a legal Unix name, so the path is just missing. On Windows both
 /// GetFileAttributesEx and the CreateFile fallback fail with
-/// ERROR_INVALID_NAME, which is not "not exist": Go reports CreateFile.
+/// ERROR_INVALID_NAME, which is not "not exist": the CreateFile error is
+/// reported.
 #[test]
 fn resolve_workdir_invalid_windows_name() {
     let (_root, cwd) = layout();
@@ -136,8 +135,6 @@ fn or_exit_prints_to_stdout_and_exits_one() {
     assert_eq!(err, CmdError::exit(1, want.clone()));
     assert_eq!(String::from_utf8(out).unwrap(), format!("{want}\n"));
 }
-
-// ---- Go TestCommandRelativeWorkdirStoresAbsolutePath ----
 
 /// A relative --workdir is resolved once at the command entry: the provider
 /// gets an absolute dir (so codex -C / opencode --dir / grok --cwd cannot

@@ -52,7 +52,7 @@ fn assert_frame_exact(m: &Model, label: &str) {
     );
 }
 
-// --- Go loader_test.go -------------------------------------------------------
+// --- Loader ------------------------------------------------------------------
 
 #[test]
 fn loader_shows_before_first_snapshot() {

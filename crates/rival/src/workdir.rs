@@ -1,5 +1,4 @@
-//! `--workdir` resolution shared by every command that takes it. Go:
-//! `cmd/workdir.go`.
+//! `--workdir` resolution shared by every command that takes it.
 
 use std::io::Write;
 use std::path::Path;
@@ -20,8 +19,8 @@ mod tests;
 /// ("v3/" -> v3/v3/), and sessions would record "." instead of the project
 /// path. Relative paths resolve against `cfg`'s working directory.
 pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
-    // Go filepath.Abs on Windows always calls syscall.FullPath, whose
-    // UTF16PtrFromString rejects a NUL with EINVAL.
+    // On Windows a NUL in the path is rejected with EINVAL before
+    // absolutizing.
     if cfg!(windows) && raw.contains('\0') {
         return Err(format!("resolve workdir {:?}: invalid argument", raw));
     }
@@ -29,8 +28,8 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
         return Err(format!("resolve workdir {:?}: {}", raw, getwd_error()));
     };
     let shown = abs.to_string_lossy().into_owned();
-    // Go os.Stat on Unix: BytePtrFromString rejects a NUL with EINVAL
-    // before the syscall (std's own error has no errno).
+    // On Unix a NUL in the path is rejected with EINVAL before the stat
+    // syscall (std's own error has no errno).
     if shown.contains('\0') {
         return Err(format!(
             "cannot read workdir {shown}: {STAT_OP} {shown}: invalid argument"
@@ -50,15 +49,14 @@ pub fn resolve_workdir(cfg: &Config, raw: &str) -> Result<String, String> {
     }
 }
 
-/// The `PathError` op of a failed Go `os.Stat` that is not "not exist".
-/// On Windows (`os/stat_windows.go`) such a `GetFileAttributesEx` error
-/// falls through to `CreateFile`, whose error is returned; std's
-/// `metadata` returns the error of its own `CreateFileW`. Go's rarer
-/// `FindFirstFile`, `GetFileType` and `GetFileInformationByHandle` ops
+/// The error op of a failed stat that is not "not exist". On Windows a
+/// `GetFileAttributesEx` error falls through to `CreateFile`, whose error
+/// is returned; std's `metadata` returns the error of its own
+/// `CreateFileW`. The rarer `FindFirstFile`, `GetFileType` and `GetFileInformationByHandle` ops
 /// are not distinguished.
 const STAT_OP: &str = if cfg!(windows) { "CreateFile" } else { "stat" };
 
-/// Go `os.Getwd`'s error, re-read: the config snapshot keeps only the
+/// The current directory error, re-read: the config snapshot keeps only the
 /// failure.
 pub(crate) fn getwd_error() -> String {
     match std::env::current_dir() {

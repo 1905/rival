@@ -1,12 +1,12 @@
-//! Rival's state directory, Go path semantics, and `.env` files.
+//! Rival's state directory, lexical path handling, and `.env` files.
 //!
-//! Go: `config.SessionDirPath` / `QueueDirPath` join `.rival/...` onto
-//! `os.UserHomeDir()` and fall back to a relative `.rival` when the home
-//! directory is unknown. `RIVAL_HOME` is a Rust-port addition: when set, it is
-//! the rival root itself (no `.rival` appended).
+//! The session and queue directories join `.rival/...` onto the home
+//! directory and fall back to a relative `.rival` when the home directory is
+//! unknown. `RIVAL_HOME`, when set, is the rival root itself (no `.rival`
+//! appended).
 //!
 //! The `.env` reader is a direct port of `github.com/joho/godotenv` v1.5.1
-//! (`parser.go`), which Go uses both at startup and for API-key lookup.
+//! (`parser.go`). It is used both at startup and for API-key lookup.
 
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
@@ -18,7 +18,7 @@ use regex::{Captures, Regex};
 
 const ROOT_DIR: &str = ".rival";
 
-/// The variable Go's `os.UserHomeDir` reads.
+/// The variable that names the home directory.
 pub const HOME_VAR: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
 
 /// The Rust-port override for the rival root. Process environment only.
@@ -42,8 +42,8 @@ impl Paths {
         Self::from_vars(std::env::var_os(STATE_ROOT_VAR), std::env::var_os(HOME_VAR))
     }
 
-    /// Pure form of [`Paths::from_env`]. Empty values count as unset, like
-    /// Go's `os.UserHomeDir` erroring on an empty `$HOME`.
+    /// Pure form of [`Paths::from_env`]. Empty values count as unset: an
+    /// empty `$HOME` is no home directory.
     pub fn from_vars(rival_home: Option<OsString>, home: Option<OsString>) -> Self {
         if let Some(root) = rival_home.filter(|v| !v.is_empty()) {
             return Paths {
@@ -211,7 +211,7 @@ pub fn abs(cwd: Option<&Path>, path: &Path) -> Option<PathBuf> {
     Some(clean(&joined))
 }
 
-/// Go: `os.Getwd` on Unix. An absolute `$PWD` naming the current directory
+/// The current directory on Unix. An absolute `$PWD` naming the current directory
 /// wins (so symlinked paths stay as the shell spelled them); otherwise the
 /// kernel's answer.
 pub fn getwd(pwd: Option<&OsStr>) -> Option<PathBuf> {
@@ -249,7 +249,7 @@ impl fmt::Display for DotenvError {
 
 impl std::error::Error for DotenvError {}
 
-/// Go: `godotenv.Read(path)`. The whole file parses or nothing is returned.
+/// Reads a `.env` file. The whole file parses or nothing is returned.
 /// A key assigned twice keeps its last value. `$VAR` expansion sees only
 /// keys assigned earlier in the same file, never the process environment.
 pub fn read_dotenv(path: &Path) -> Result<HashMap<String, String>, DotenvError> {
@@ -257,20 +257,20 @@ pub fn read_dotenv(path: &Path) -> Result<HashMap<String, String>, DotenvError> 
     parse_dotenv(&String::from_utf8_lossy(&data))
 }
 
-/// Go: `godotenv.Unmarshal`.
+/// Parses `.env` text.
 pub fn parse_dotenv(src: &str) -> Result<HashMap<String, String>, DotenvError> {
     let mut out = HashMap::new();
     parse_into(src, &mut out).map_err(DotenvError::Parse)?;
     Ok(out)
 }
 
-/// Go: `_ = godotenv.Load()`. Reads `./.env` only (no parent search); a
+/// Loads `./.env` into the process environment. Reads `./.env` only (no parent search); a
 /// missing or unparseable file is silently ignored, and existing process
 /// variables win, even when empty.
 ///
-/// Port addition: `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to
-/// the reviewed repository, and Go had no such variable for it to move
-/// rival's state with. Only the process environment can set it.
+/// `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to the reviewed
+/// repository, so it must not move rival's state. Only the process
+/// environment can set it.
 ///
 /// # Safety
 ///
@@ -286,10 +286,10 @@ pub unsafe fn load_dotenv() {
     );
 }
 
-/// Testable core of [`load_dotenv`]: Go's `loadFile(filename, false)`.
-/// `is_set` answers for the environment as it was before loading. Entries Go's
-/// `os.Setenv` would reject (empty key, `=` or NUL in the key, NUL in the
-/// value) are skipped, as Go ignores that error.
+/// Testable core of [`load_dotenv`]: existing variables are not overridden.
+/// `is_set` answers for the environment as it was before loading. Entries the
+/// OS would reject (empty key, `=` or NUL in the key, NUL in the value) are
+/// skipped silently.
 pub fn load_dotenv_with(path: &Path, is_set: impl Fn(&str) -> bool, set: impl FnMut(&str, &str)) {
     load_dotenv_for(path, cfg!(windows), is_set, set);
 }
@@ -366,7 +366,7 @@ fn locate_key_name(src: &str) -> Result<(String, &str), String> {
 
     let mut key = "";
     let mut offset = 0;
-    // Go ranges over bytes here and widens each byte to a rune.
+    // Ranges over bytes and widens each byte to a char, not over UTF-8.
     for (i, &b) in src.as_bytes().iter().enumerate() {
         let c = char::from(b);
         if is_space(c) {
@@ -464,8 +464,8 @@ fn expand_escapes(s: &str) -> String {
     UNESCAPE_RE.replace_all(&out, "${1}").into_owned()
 }
 
-/// godotenv `expandVariables`. Go also tests `submatch[2] == "("`, which can
-/// never hold (group 2 is always `$`), so `$(NAME` expands like `$NAME`.
+/// godotenv `expandVariables`. The original also tests `submatch[2] == "("`,
+/// which can never hold (group 2 is always `$`), so `$(NAME` expands like `$NAME`.
 fn expand_variables(v: &str, vars: &HashMap<String, String>) -> String {
     EXPAND_VAR_RE
         .replace_all(v, |caps: &Captures| {
@@ -500,7 +500,7 @@ mod tests {
                 Some("/h"),
                 "/h/.rival",
             ),
-            ("no home: relative .rival like Go", None, None, "./.rival"),
+            ("no home: relative .rival", None, None, "./.rival"),
             ("empty HOME: relative .rival", None, Some(""), "./.rival"),
         ];
         for (name, rival_home, home, want) in cases {
@@ -510,18 +510,17 @@ mod tests {
     }
 
     #[test]
-    fn subpaths_match_go_layout() {
+    fn subpaths_use_the_rival_layout() {
         let tmp = tempfile::tempdir().unwrap();
         let p = Paths::from_home(tmp.path());
-        // Go: filepath.Join(home, ".rival/sessions") and ".rival/queue".
         assert_eq!(p.sessions_dir(), tmp.path().join(".rival/sessions"));
         assert_eq!(p.queue_dir(), tmp.path().join(".rival/queue"));
         assert_eq!(p.config_file(), tmp.path().join(".rival/config.yaml"));
     }
 
-    // Cases from Go's path/filepath TestClean (Unix).
+    // Lexical clean cases for Unix paths.
     #[test]
-    fn clean_matches_go_filepath_clean() {
+    fn clean_resolves_dots_and_separators() {
         let cases = [
             ("abc", "abc"),
             ("abc/def", "abc/def"),
@@ -1056,7 +1055,7 @@ mod tests {
                 "A=1\nB=$A\nA=2\nC=$A",
                 &[("A", "2"), ("B", "1"), ("C", "2")],
             ),
-            // Go's dead `submatch[2] == "("` check: `$(NAME` expands.
+            // The dead `submatch[2] == "("` check: `$(NAME` expands.
             ("A=1\nB=$(A)", &[("A", "1"), ("B", "1)")]),
         ];
         for &(input, want) in cases {
@@ -1098,7 +1097,7 @@ mod tests {
         ] {
             assert!(parse_dotenv(input).is_err(), "{input:?}");
         }
-        // A trailing key with no '=' parses under the empty key, like Go.
+        // A trailing key with no '=' parses under the empty key.
         assert_eq!(parsed("A=1\nFOO"), map(&[("A", "1"), ("", "FOO")]));
     }
 
@@ -1161,7 +1160,7 @@ mod tests {
         let file = "RIVAL_HOME=./.rival-dev\nA=1\nHOME=/repo-home\n";
         for windows in [false, true] {
             // Unset: the file's value is dropped; other keys, HOME included,
-            // still load like Go.
+            // still load.
             let env = load_on(windows, file, &[]);
             assert_eq!(
                 env,
@@ -1213,7 +1212,7 @@ mod tests {
 
     /// The Windows host loader, with the OS name comparison: no spelling of
     /// `RIVAL_HOME` loads, exported values (empty ones included) stay, and
-    /// near names and ordinary keys load like Go. The native child test in
+    /// near names and ordinary keys load. The native child test in
     /// `subprocess::windows_tests` checks the rule against the OS lookup.
     #[cfg(windows)]
     #[test]

@@ -1,4 +1,4 @@
-//! Go `cmd/update_test.go`, plus the error branches of `updateToVersion`.
+//! `rival update` tests, including the error branches of the update.
 //! Every brew and rival here is a shell script in a temp dir; `PATH` holds
 //! only that dir. No real Homebrew, network or install target is touched.
 //!
@@ -72,7 +72,7 @@ fn update(fix: &Fixture, apps: &Path, current: &str, latest: &str) -> Out {
     })
 }
 
-/// Go `TestUpdateInstallsFromSelectedBinary`.
+/// The update installs skills with the binary brew selected.
 #[cfg(unix)]
 #[test]
 fn update_installs_from_selected_binary() {
@@ -173,8 +173,8 @@ const BREW_OK: &str = "#!/bin/sh\ncase \"$1\" in\nupgrade) exit 0;;\n--prefix) p
 #[cfg_attr(not(unix), allow(dead_code))]
 const NEW_RIVAL: &str = "#!/bin/sh\nprintf 'new release skills\\n'\n";
 
-/// Go `TestUpdateUsesHomebrewBinaryNotOldEmbeddedSkills`, with the whole
-/// transcript.
+/// The update uses the Homebrew binary, not the old embedded skills; the
+/// test checks the whole transcript.
 #[cfg(unix)]
 #[test]
 fn update_uses_homebrew_binary_not_old_embedded_skills() {
@@ -188,8 +188,8 @@ fn update_uses_homebrew_binary_not_old_embedded_skills() {
     assert_eq!(o.stderr, "");
 }
 
-/// Go leaves brew's Stdin nil (the null device) and gives the upgraded
-/// installer `cmd.InOrStdin()`: brew must not eat the installer's input.
+/// brew gets the null device as stdin and the upgraded installer gets the
+/// command's stdin: brew must not eat the installer's input.
 #[cfg(unix)]
 #[test]
 fn brew_gets_no_stdin_and_the_installer_gets_the_commands() {
@@ -259,7 +259,7 @@ fn update_error_branches() {
     let o = update(&b.fix, &b.apps, "1", "2");
     assert_eq!(o.result, Err("install skills: exit status: 7".to_string()));
 
-    // A prefix without bin/rival: Go skips LookPath for a path and fails at
+    // A prefix without bin/rival: a path skips the PATH lookup and fails at
     // the exec.
     let b = brew(BREW_OK, NEW_RIVAL);
     std::fs::remove_file(b.prefix.join("bin").join("rival")).unwrap();
@@ -281,7 +281,7 @@ fn update_error_branches() {
     );
 }
 
-/// Go `TestCurrentVersionRefreshesSkillsForNewCodexInstall`.
+/// On the current version, a new Codex install still gets its skills.
 #[test]
 fn current_version_refreshes_skills_for_new_codex_install() {
     let fix = Fixture::new();

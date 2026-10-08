@@ -1,6 +1,4 @@
 //! Queue ticket records.
-//!
-//! Go: `internal/queue/ticket.go`.
 
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
@@ -20,8 +18,8 @@ pub const STATE_RUNNING: &str = "running";
 /// `<unixnano>-<pid>-<id8>.json` so a plain filename sort yields FIFO order.
 /// A ticket is written exactly twice in its life (created as waiting,
 /// promoted to running) and removed once — there are no post-promotion
-/// writes. The JSON keys keep the order and the omit rules of the Go
-/// release's ticket.
+/// writes. The JSON keys keep the order and the omit rules of the ticket
+/// format that older releases wrote.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ticket {
@@ -83,7 +81,7 @@ pub(crate) fn write_ticket(dir: &Path, t: &Ticket) -> anyhow::Result<()> {
     let data = t.to_json()?;
     let tmp = dir.join(format!("{}.tmp", t.file));
     let fin = dir.join(&t.file);
-    // Go: os.WriteFile(tmp, data, 0600).
+    // Write the temp file with mode 0600.
     let mut opts = OpenOptions::new();
     opts.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -110,7 +108,7 @@ pub(crate) fn write_ticket(dir: &Path, t: &Ticket) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Go: `t.UnixNano()`, wrapping outside the representable range as Go does.
+/// Unix nanoseconds of `t`, wrapping outside the representable range.
 fn unix_nano(t: &DateTime<FixedOffset>) -> i64 {
     t.timestamp()
         .wrapping_mul(1_000_000_000)
@@ -120,9 +118,9 @@ fn unix_nano(t: &DateTime<FixedOffset>) -> i64 {
 /// `<unixnano>-<pid>-<id8>.json`. The nano part is zero-padded so a
 /// lexicographic filename sort is chronological FIFO.
 ///
-/// Go slices the first 8 bytes of the id; a non-ASCII id cut inside a rune
-/// keeps its stray bytes there, which a Rust `String` cannot hold, so they
-/// become U+FFFD. Rival's ids are UUIDs.
+/// The id8 is the first 8 bytes of the id; a non-ASCII id cut inside a
+/// char has stray bytes there, which a `String` cannot hold, so they become
+/// U+FFFD. Rival's ids are UUIDs.
 pub(crate) fn ticket_filename(now: &DateTime<FixedOffset>, pid: i64, id: &str) -> String {
     let short = if id.len() > 8 {
         String::from_utf8_lossy(&id.as_bytes()[..8])

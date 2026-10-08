@@ -104,7 +104,7 @@ pub fn pad_line(line: Line<'static>, w: usize) -> Line<'static> {
     line
 }
 
-/// Go: `fitCell` on a styled string. Cuts a styled line to `w` cells with an
+/// Cuts a styled line to `w` cells with an
 /// ellipsis and pads it to exactly `w`, keeping every span's style.
 pub fn fit_cell_line(line: Line<'static>, w: usize) -> Line<'static> {
     if w == 0 {
@@ -118,8 +118,8 @@ pub fn fit_cell_line(line: Line<'static>, w: usize) -> Line<'static> {
     pad_line(cut, w)
 }
 
-/// Go: `ansi.Truncate(s, w, tail)` on a styled line. `tail` is added, unstyled,
-/// only when the line was cut, and counts against `w`.
+/// Truncates a styled line to `w` cells. `tail` is added, unstyled, only
+/// when the line was cut, and counts against `w`.
 pub fn truncate_line(line: Line<'static>, w: usize, tail: &str) -> Line<'static> {
     if line_width(&line) <= w {
         return line;
@@ -135,10 +135,9 @@ pub fn truncate_line(line: Line<'static>, w: usize, tail: &str) -> Line<'static>
     cut
 }
 
-/// Go: `ansi.Hardwrap(s, limit, true)` on plain text. Breaks every line at
-/// `limit` cells and keeps leading spaces. A cluster wider than the room left
-/// moves to the next line whole, even when that leaves an empty line, as in
-/// Go.
+/// Hard-wraps plain text. Breaks every line at `limit` cells and keeps
+/// leading spaces. A cluster wider than the room left moves to the next line
+/// whole, even when that leaves an empty line.
 pub fn hardwrap(s: &str, limit: usize) -> String {
     if limit == 0 {
         return s.to_string();
@@ -162,10 +161,9 @@ pub fn hardwrap(s: &str, limit: usize) -> String {
     out
 }
 
-/// Go: `ansi.Wordwrap(s, limit, "")` on plain text. Breaks at spaces and
-/// hyphens, never inside a word; a word longer than `limit` stays long for
-/// [`hardwrap`] to break. Pending spaces count in bytes, as Go's buffer
-/// length does.
+/// Word-wraps plain text. Breaks at spaces and hyphens, never inside a
+/// word; a word longer than `limit` stays long for [`hardwrap`] to break.
+/// Pending spaces count in bytes, not cells.
 pub fn wordwrap(s: &str, limit: usize) -> String {
     if limit == 0 {
         return s.to_string();
@@ -392,7 +390,7 @@ mod tests {
     // x/ansi v0.11.7 TestHardwrap, the plain-text cases with
     // preserveSpace = true.
     #[test]
-    fn hardwrap_go_cases() {
+    fn hardwrap_ansi_upstream_cases() {
         let cases: &[(&str, &str, usize, &str)] = &[
             ("empty string", "", 0, ""),
             ("passthrough", "foobar\n ", 0, "foobar\n "),
@@ -414,7 +412,7 @@ mod tests {
     // x/ansi v0.11.7 TestWordwrap, the plain-text cases (a hyphen is always
     // a breakpoint, so the "-" cases need no breakpoint argument).
     #[test]
-    fn wordwrap_go_cases() {
+    fn wordwrap_ansi_upstream_cases() {
         let cases: &[(&str, &str, usize, &str)] = &[
             ("empty string", "", 0, ""),
             ("passthrough", "foobar\n ", 0, "foobar\n "),

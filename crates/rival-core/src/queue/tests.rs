@@ -1,5 +1,5 @@
-//! Go: `internal/queue/queue_test.go`, plus Rust-only checks of the record
-//! bytes, the decoder and the injected clock.
+//! Queue tests, plus checks of the record bytes, the decoder and the
+//! injected clock.
 
 use super::*;
 use crate::cancel::Context;
@@ -274,8 +274,8 @@ fn queue_timeout() {
 // slot.
 #[test]
 fn pid_reuse_guard_reaps_recycled_holder() {
-    // Go skips where the start time is unsupported. macOS, Linux and Windows
-    // (GetProcessTimes) all support it, so here the case always runs.
+    // macOS, Linux and Windows (GetProcessTimes) all support the start
+    // time, so the case always runs.
     assert!(
         proc_start_ok(),
         "process start time must be readable on this platform"
@@ -317,7 +317,7 @@ fn self_heal_after_ticket_removed() {
     fs::remove_file(dir.path().join(&holder)).unwrap();
     let (r, m) = recv(&done, "waiter");
     r.unwrap_or_else(|e| panic!("waiter did not recover from removed ticket: {e}"));
-    // Rust-only: the healed ticket kept its id under a new tail filename.
+    // The healed ticket kept its id under a new tail filename.
     let healed = m.ticket().unwrap();
     assert_eq!(healed.id, tk.id);
     assert_ne!(healed.file, tk.file);
@@ -374,7 +374,7 @@ fn clear_force_and_dead_only() {
     assert_eq!(m.clear(true).unwrap(), 1, "force clear removed");
 }
 
-// ---- Rust-only checks ----
+// ---- record, decoder, clock and lock checks ----
 
 /// The bytes of a waiting and a promoted ticket (UTC and +03:00 zones).
 /// `<`, `>` and `&` are written as they are.
@@ -414,9 +414,9 @@ fn ticket_json_bytes() {
     assert_eq!(Ticket::from_json(&full.to_json().unwrap()).unwrap(), full);
 }
 
-/// Go `fmt.Sprintf("%019d-%d-%s.json", ...)`, including a negative nano.
+/// `%019d-%d-%s.json` of nano, pid and id8, including a negative nano.
 #[test]
-fn ticket_filename_matches_go() {
+fn ticket_filename_pads_nano_pid_and_id8() {
     let id = "6f1c2e7a-0000-4000-8000-000000000001";
     assert_eq!(
         ticket_filename(&unix(1_790_000_000_123_456_789), 4242, id),
@@ -433,8 +433,8 @@ fn ticket_filename_matches_go() {
 }
 
 /// Exact keys, `null` as missing, unknown keys ignored; any error (a
-/// duplicate key too) skips the file. A Go ticket with escapes or the old unset time
-/// still loads.
+/// duplicate key too) skips the file. A ticket with escapes or the old unset
+/// time still loads.
 #[test]
 fn ticket_from_json_rules() {
     let t = Ticket::from_json(
@@ -482,7 +482,7 @@ fn ticket_from_json_rules() {
 }
 
 #[test]
-fn enqueue_writes_go_record_and_release_is_idempotent() {
+fn enqueue_writes_ticket_record_and_release_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
     let qdir = dir.path().join("nested/queue");
     let mut m = Manager::with_settings(qdir.clone(), 1, Duration::from_millis(5), Duration::ZERO);
@@ -538,7 +538,7 @@ fn wait_before_enqueue_errors() {
     assert_eq!(err.to_string(), "WaitForSlot called before Enqueue");
 }
 
-/// Go checks the context only after a scan, so a cancelled context still
+/// The context is checked only after a scan, so a cancelled context still
 /// promotes into a free slot, and is reported only when the slot is held.
 #[test]
 fn promotion_runs_before_cancellation_check() {
@@ -598,7 +598,7 @@ fn injected_clock_drives_timeout_and_staleness() {
     fs::write(&tmp, "").unwrap();
     let mtime =
         DateTime::<Local>::from(fs::metadata(&tmp).unwrap().modified().unwrap()).fixed_offset();
-    // Exactly 60s old on the injected clock: kept (Go uses a strict >).
+    // Exactly 60s old on the injected clock: kept (the age check is strict >).
     *offset.lock().unwrap() = mtime - base + TimeDelta::seconds(60);
     m.list().unwrap();
     assert!(tmp.exists(), "a .tmp exactly 60s old must stay");
@@ -728,12 +728,12 @@ fn lock_is_exclusive_and_released_on_panic() {
     assert!(r.is_err());
 
     let (held_tx, held_rx) = mpsc::channel();
-    let (go_tx, go_rx) = mpsc::channel::<()>();
+    let (start_tx, start_rx) = mpsc::channel::<()>();
     let d2 = d.clone();
     let holder = thread::spawn(move || {
         with_lock(&d2, || {
             held_tx.send(()).unwrap();
-            go_rx.recv().unwrap();
+            start_rx.recv().unwrap();
             Ok(())
         })
         .unwrap();
@@ -749,7 +749,7 @@ fn lock_is_exclusive_and_released_on_panic() {
         got_rx.recv_timeout(Duration::from_millis(100)).is_err(),
         "second locker entered while the first held the lock"
     );
-    go_tx.send(()).unwrap();
+    start_tx.send(()).unwrap();
     holder.join().unwrap();
     recv(&got_rx, "second locker");
 }

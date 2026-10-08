@@ -924,10 +924,10 @@ fn grace_starts_at_cancel_not_at_leader_exit() {
     );
     assert!(holder.proc.alive());
     // The leader exited 0 before the cancel, so the group holds only its
-    // unreaped zombie. Go's Wait then reports the Cancel result: macOS
+    // unreaped zombie. The wait then reports the cancel result: macOS
     // kill(-pgid) answers EPERM (seen here); Linux delivers to the zombie and
-    // Go reports ctx.Err() (from the kernel source, not run here); ESRCH
-    // would be a clean exit.
+    // the run reports the context error (from the kernel source, not run
+    // here); ESRCH would be a clean exit.
     let text = res.as_ref().map_err(|e| e.to_string());
     if cfg!(target_os = "macos") {
         assert_eq!(
@@ -974,8 +974,7 @@ fn cancel_unblocks_prompt_writer_without_grace() {
 }
 
 /// The leader closes every pipe but keeps running: the drain ends at once,
-/// and the reap (Go's cmd.Wait) still waits for it until the cancel kills
-/// the group.
+/// and the reap still waits for it until the cancel kills the group.
 #[test]
 fn leader_outliving_its_pipes_is_killed_on_cancel() {
     let mut fx = Fixture::new();
@@ -1006,7 +1005,7 @@ fn leader_outliving_its_pipes_is_killed_on_cancel() {
 }
 
 #[test]
-fn grace_log_event_matches_go_fields() {
+fn grace_log_event_fields() {
     use chrono::TimeZone;
     let t = chrono::FixedOffset::east_opt(0)
         .unwrap()
@@ -1071,8 +1070,8 @@ fn stdout_counts_lines_and_bytes_stderr_goes_to_log_only() {
     }
 }
 
-/// Go's `ReadBytes('\n')` emits whole lines however the reads split them,
-/// and emits each line as soon as it is complete.
+/// The reader emits whole lines however the reads split them, and emits each
+/// line as soon as it is complete.
 #[test]
 fn partial_lines_join_across_reads_and_stream_in_time() {
     let mut fx = Fixture::new();
@@ -1156,7 +1155,7 @@ fn no_mirror_still_counts_and_logs() {
 fn exit_codes_and_signals() {
     let mut fx = Fixture::new();
     assert_eq!(run_sh(&mut fx, "exit 3", "", None).unwrap().exit_code, 3);
-    // Go's ExitCode() is -1 for a signal, not 128+n.
+    // A signal gives exit code -1, not 128+n.
     assert_eq!(
         run_sh(&mut fx, "kill -TERM $$", "", None)
             .unwrap()
@@ -1242,7 +1241,7 @@ fn short_mirror_write_counts_its_n_once_per_line() {
 }
 
 #[test]
-fn tee_line_returns_go_multiwriter_count_and_error() {
+fn tee_line_returns_multiwriter_count_and_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("log");
     let open = |read_only: bool| SyncLog {
@@ -1368,8 +1367,8 @@ fn child_gets_exactly_the_filtered_env() {
     );
 }
 
-/// Unix env names are case-sensitive, as in Go: mixed-case variants of the
-/// blocked prefixes and dropped names reach the child unchanged.
+/// Unix env names are case-sensitive: mixed-case variants of the blocked
+/// prefixes and dropped names reach the child unchanged.
 #[test]
 fn unix_child_keeps_mixed_case_names() {
     let mut fx = Fixture::new();
@@ -1460,7 +1459,7 @@ fn start_error(fx: &mut Fixture, ctx: &Context, binary: &str, base: &[OsString])
 }
 
 #[test]
-fn start_errors_match_go() {
+fn start_errors_have_exec_style_text() {
     let mut fx = Fixture::new();
     let bg = Context::background();
     let base = environ(&[PATH_ENTRY]);
@@ -1504,14 +1503,14 @@ fn start_errors_match_go() {
         format!("start {missing}: start {missing}: No such file or directory (os error 2)")
     );
 
-    // A missing workdir fails inside the child, as with Go's Setpgid start.
+    // A missing workdir fails inside the child, as with a Setpgid start.
     fx.sess.work_dir = fx.work.path().join("gone").to_str().unwrap().to_string();
     assert_eq!(
         start_error(&mut fx, &bg, "/bin/sh", &base),
         "start /bin/sh: start /bin/sh: No such file or directory (os error 2)"
     );
 
-    // Go's dedupEnv rejects a NUL.
+    // An env entry with a NUL is rejected.
     let mut fx = Fixture::new();
     let env = strings(&["A=\0"]);
     let req = Request {
@@ -1556,8 +1555,8 @@ fn open_log_error_comes_before_start() {
     );
 }
 
-/// Go's argv: argv[0] is the bare name the caller gave, not the resolved
-/// path, and empty arguments stay. A NUL in an argument is EINVAL.
+/// argv[0] is the bare name the caller gave, not the resolved path, and empty
+/// arguments stay. A NUL in an argument is EINVAL.
 #[test]
 fn argv0_is_the_bare_name_and_empty_args_stay() {
     let mut fx = Fixture::new();
