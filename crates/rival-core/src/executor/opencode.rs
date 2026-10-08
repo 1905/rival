@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
@@ -13,7 +14,6 @@ use super::oscmd;
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config, SecurityModel};
-use crate::gojson::quote_bytes;
 use crate::gostd::quote;
 use crate::session::Session;
 
@@ -328,31 +328,19 @@ pub(crate) fn opencode_run_env_with(
 }
 
 /// Go `opencodeProviderConfig`: the in-memory provider config for one
-/// registry entry, as Go's `json.Marshal` of nested `map[string]any` writes
-/// it (keys sorted by bytes, HTML-safe string escapes). An empty key is
+/// registry entry as compact JSON, keys sorted by bytes. An empty key is
 /// rejected.
 pub(crate) fn opencode_provider_config(entry: &SecurityModel, key: &str) -> String {
     if key.is_empty() {
         return String::new();
     }
-    let mut options = vec![("apiKey", quote_bytes(key.as_bytes()))];
+    let mut options = BTreeMap::from([("apiKey", key)]);
     if !entry.base_url.is_empty() {
-        options.push(("baseURL", quote_bytes(entry.base_url.as_bytes())));
+        options.insert("baseURL", entry.base_url);
     }
-    let provider = go_object(vec![("options", go_object(options))]);
-    go_object(vec![
-        ("$schema", quote_bytes(b"https://opencode.ai/config.json")),
-        ("provider", go_object(vec![(entry.provider, provider)])),
-    ])
-}
-
-/// A Go `map[string]any` JSON object from already-encoded values: keys in
-/// byte order, as `encoding/json` sorts map keys.
-fn go_object(mut members: Vec<(&str, String)>) -> String {
-    members.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-    let body: Vec<String> = members
-        .into_iter()
-        .map(|(k, v)| format!("{}:{v}", quote_bytes(k.as_bytes())))
-        .collect();
-    format!("{{{}}}", body.join(","))
+    let config = serde_json::json!({
+        "$schema": "https://opencode.ai/config.json",
+        "provider": BTreeMap::from([(entry.provider, BTreeMap::from([("options", options)]))]),
+    });
+    config.to_string()
 }

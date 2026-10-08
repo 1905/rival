@@ -11,14 +11,13 @@ use anyhow::anyhow;
 use serde_json::value::RawValue;
 
 use super::{Session, io_error, is_session_file, read_file, sort_newest_first};
-use crate::gojson;
 use crate::paths::Paths;
 
 const SUMMARY_EDGE_BYTES: i64 = 64 << 10;
 
 /// The same newest-first session index as [`Session::load_all`] without
 /// retaining embedded prompts. Large legacy files are read only at their
-/// edges, where `MarshalIndent` places the metadata around the prompt line.
+/// edges, where the pretty writer places the metadata around the prompt line.
 pub fn load_all_summaries(paths: &Paths) -> Vec<Session> {
     let dir = paths.sessions_dir();
     let Ok(entries) = fs::read_dir(&dir) else {
@@ -72,7 +71,7 @@ pub fn load_summary_file(path: &Path, size: i64) -> anyhow::Result<Session> {
     if raw_fields.is_empty() {
         return Err(anyhow!("session metadata not found"));
     }
-    // Go marshals the collected fields into one object and decodes that.
+    // The collected fields form one object, which decodes like a whole file.
     Session::from_json(&serde_json::to_vec(&raw_fields)?)
 }
 
@@ -143,7 +142,7 @@ fn collect_summary_fields(dst: &mut BTreeMap<String, Box<RawValue>>, data: &[u8]
         }
         let value = trim_space(&line[colon + 1..]);
         let value = value.strip_suffix(b",").unwrap_or(value);
-        let Some(value) = gojson::valid_value(value) else {
+        let Ok(value) = serde_json::from_slice::<Box<RawValue>>(value) else {
             continue;
         };
         dst.insert(key, value);
@@ -202,7 +201,7 @@ mod tests {
             prompt,
             prompt_preview: "large prompt preview".into(),
             status: "running".into(),
-            start_time: Local::now().fixed_offset(),
+            start_time: Some(Local::now().fixed_offset()),
             work_dir: "/tmp/work".into(),
             log_file: "/tmp/internal.log".into(),
             pid: 123,
@@ -214,7 +213,7 @@ mod tests {
     }
 
     fn write(dir: &Path, s: &Session) -> (std::path::PathBuf, i64) {
-        let data = gojson::marshal_indent(s).unwrap();
+        let data = s.to_json().unwrap();
         let path = dir.join("session.json");
         fs::write(&path, &data).unwrap();
         (path, data.len() as i64)
@@ -277,9 +276,9 @@ mod tests {
         let mut stored = stored("x".repeat(200_000));
         stored.review_scope = "diff".into();
         stored.prompt_hash = "abc".into();
-        stored.queued_at = Some(gojson::zero_time());
+        stored.queued_at = stored.start_time;
         stored.queue_position = 3;
-        stored.end_time = Some(stored.start_time);
+        stored.end_time = stored.start_time;
         stored.exit_code = Some(0);
         stored.duration = "1m2s".into();
         stored.output_bytes = 9;
@@ -308,21 +307,23 @@ mod tests {
     }
 
     #[test]
-    fn load_summary_file_large_record_decodes_like_go() {
+    fn load_summary_file_large_record_reads_exact_keys_and_the_last_line() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("s.json");
         let mut data = Vec::new();
         data.extend_from_slice(b"{\n  \"ID\": \"upper\",\n  \"id\": \"x\",\n  \"prompt\": \"");
         data.extend(std::iter::repeat_n(b'z', 200_000));
         data.extend_from_slice(b"\",\n  \"prompt_preview\": \"\xe6\x97\",\n  \"status\": \"a\",\n");
-        data.extend_from_slice(b"  \"status\": \"b\",\n  \"queued_at\": null\n}");
+        data.extend_from_slice(b"  \"status\": \"b\",\n  \"queued_at\": null,\n");
+        data.extend_from_slice(b"  \"start_time\": \"0001-01-01T00:00:00Z\"\n}");
         fs::write(&path, &data).unwrap();
 
         let got = load_summary_file(&path, data.len() as i64).unwrap();
         // Only exact summary keys are collected, so "ID" is skipped.
         assert_eq!(got.id, "x");
-        // Invalid UTF-8 passes json.Valid and decodes to U+FFFD.
-        assert_eq!(got.prompt_preview, "\u{FFFD}\u{FFFD}");
+        // A line with invalid UTF-8 is not valid JSON and is skipped.
+        assert_eq!(got.prompt_preview, "");
+        assert_eq!(got.start_time, None);
         // A later line overwrites an earlier one.
         assert_eq!(got.status, "b");
         assert_eq!(got.queued_at, None);
@@ -359,7 +360,7 @@ mod tests {
         fs::create_dir_all(dir.join("d.json")).unwrap();
         let mut a = stored("p".into());
         a.id = "a".into();
-        fs::write(dir.join("a.json"), gojson::marshal_indent(&a).unwrap()).unwrap();
+        fs::write(dir.join("a.json"), a.to_json().unwrap()).unwrap();
         fs::write(dir.join("a.json.tmp"), br#"{"id":"tmp"}"#).unwrap();
         fs::write(dir.join("b.json"), b"not json").unwrap();
 

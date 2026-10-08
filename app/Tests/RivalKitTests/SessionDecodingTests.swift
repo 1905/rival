@@ -94,6 +94,33 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertTrue(s.startTime.isGoZero)
     }
 
+    /// A file from an older release: the zero time for every unset time and
+    /// `\u003c`-style escapes. The zero time still means "unset".
+    func testOldFileZeroTimesAndEscapes() throws {
+        let json = #"""
+        {"id":"x","group_id":"a\u003cb\u0026c\u003e","start_time":"0001-01-01T00:00:00Z",
+         "queued_at":"0001-01-01T00:00:00Z","end_time":"0001-01-01T00:00:00Z"}
+        """#
+        let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
+        XCTAssertEqual(s.groupID, "a<b&c>")
+        XCTAssertTrue(s.startTime.isGoZero)
+        XCTAssertTrue(s.queuedAt!.isGoZero)
+        XCTAssertTrue(s.endTime!.isGoZero)
+    }
+
+    /// A file from this release: unset times are not written, and `<`, `>`,
+    /// `&`, U+2028 are raw characters.
+    func testNewFileOmittedTimesAndRawHTMLCharacters() throws {
+        let json = "{\"id\":\"x\",\"group_id\":\"a<b&c>\",\"error\":\"<stderr> & \u{2028}\",\"status\":\"running\"}"
+        let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
+        XCTAssertEqual(s.groupID, "a<b&c>")
+        XCTAssertEqual(s.error, "<stderr> & \u{2028}")
+        XCTAssertEqual(s.status, "running")
+        XCTAssertTrue(s.startTime.isGoZero)
+        XCTAssertNil(s.queuedAt)
+        XCTAssertNil(s.endTime)
+    }
+
     func testMistypedFieldFallsBackToDefault() throws {
         let json = #"{"id":"x","pid":"not-a-number","start_time":"garbage","output_lines":3}"#
         let s = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
@@ -179,9 +206,10 @@ final class SessionDecodingTests: XCTestCase {
         XCTAssertEqual(z.pidStart, Int64.max)
         XCTAssertEqual(z.ownerPID, 2)
         XCTAssertEqual(z.ownerPIDStart, 1)
+        // The writer omits unset times.
         XCTAssertTrue(z.startTime.isGoZero)
-        XCTAssertEqual(z.queuedAt, Date.goZero)
-        XCTAssertEqual(z.endTime, Date.goZero)
+        XCTAssertNil(z.queuedAt)
+        XCTAssertNil(z.endTime)
         XCTAssertNil(z.groupID)
         XCTAssertNil(z.prompt)
 

@@ -1,7 +1,7 @@
 //! Session records under `~/.rival/sessions`.
 //!
-//! Go: `internal/session`. Each run writes `<id>.json` (Go `MarshalIndent`
-//! bytes) and appends output to `<id>.log`. Several processes write the same
+//! Go: `internal/session`. Each run writes `<id>.json` (pretty JSON) and
+//! appends output to `<id>.log`. Several processes write the same
 //! record, so every save goes through a unique temp file and a rename.
 
 pub mod reaper;
@@ -19,13 +19,12 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset, Local, TimeDelta};
-use serde::Serialize;
-use serde_json::value::RawValue;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config;
-use crate::gojson::{self, GoString, TypeMismatch};
 use crate::gostd;
+use crate::json;
 use crate::paths::Paths;
 use crate::procinfo;
 
@@ -41,53 +40,77 @@ pub fn is_task_mode(mode: &str) -> bool {
     mode == MODE_PLAN || mode == MODE_SECURITY
 }
 
-/// One run. Field order and `omitempty` rules match the Go struct, so the
-/// JSON bytes match too. Go `int` fields are `i64`. Value fields with
-/// `omitempty` skip their zero value; Go pointer fields are `Option` and
-/// skip only `None`. Records decode through [`Session::from_json`].
-#[derive(Debug, Clone, PartialEq, Serialize)]
+/// One run. The JSON keys keep the order and the omit rules of the record
+/// the Go release wrote. Empty strings and zero counters with an omit rule
+/// are not written; `Option` fields are not written when `None`. Records
+/// decode through [`Session::from_json`]: a missing key or `null` gives the
+/// default, and unknown keys are ignored.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Session {
+    #[serde(deserialize_with = "json::nullable")]
     pub id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub group_id: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub cli: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub mode: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub model: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub effort: String,
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub review_scope: String,
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub prompt: String,
-    /// The first 100 bytes of the prompt. A rune split at byte 100 keeps its
-    /// stray bytes, which Go writes as `\ufffd` escapes.
-    #[serde(skip_serializing_if = "GoString::is_empty")]
-    pub prompt_preview: GoString,
+    /// The first 100 bytes of the prompt. Each stray byte of a rune split at
+    /// byte 100 becomes U+FFFD.
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub prompt_preview: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub prompt_hash: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub status: String,
-    #[serde(with = "gojson::time")]
-    pub start_time: DateTime<FixedOffset>,
-    #[serde(skip_serializing_if = "Option::is_none", with = "gojson::opt_time")]
+    /// `None` only in a damaged record: every writer sets it.
+    #[serde(skip_serializing_if = "Option::is_none", with = "json::opt_time")]
+    pub start_time: Option<DateTime<FixedOffset>>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "json::opt_time")]
     pub queued_at: Option<DateTime<FixedOffset>>,
     #[serde(skip_serializing_if = "is_zero")]
+    #[serde(deserialize_with = "json::nullable")]
     pub queue_position: i64,
-    #[serde(skip_serializing_if = "Option::is_none", with = "gojson::opt_time")]
+    #[serde(skip_serializing_if = "Option::is_none", with = "json::opt_time")]
     pub end_time: Option<DateTime<FixedOffset>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i64>,
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub duration: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub work_dir: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub log_file: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub output_bytes: i64,
+    #[serde(deserialize_with = "json::nullable")]
     pub output_lines: i64,
     #[serde(rename = "error", skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub error_msg: String,
     #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
     pub account: String,
+    #[serde(deserialize_with = "json::nullable")]
     pub pid: i64,
     /// Start time of `pid` (Unix ns); guards against PID reuse.
     #[serde(skip_serializing_if = "is_zero")]
+    #[serde(deserialize_with = "json::nullable")]
     pub pid_start: i64,
     /// The rival process driving this session. `pid` is overwritten with the
     /// provider child's PID once the subprocess starts, so without this field
@@ -95,12 +118,36 @@ pub struct Session {
     /// final status" (a normal end-of-run window) from "everything is dead".
     /// Sessions written by older releases have 0 here.
     #[serde(skip_serializing_if = "is_zero")]
+    #[serde(deserialize_with = "json::nullable")]
     pub owner_pid: i64,
     #[serde(skip_serializing_if = "is_zero")]
+    #[serde(deserialize_with = "json::nullable")]
     pub owner_pid_start: i64,
     /// Not in the record: the monotonic clock behind `start_time`.
     #[serde(skip)]
     pub start_mono: MonoStart,
+}
+
+/// The outcome fields of a record, for readers that must not fail on an
+/// unrelated bad field (a wrong prompt type, a bad time). Same decode rules
+/// as [`Session::from_json`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct Outcome {
+    #[serde(deserialize_with = "json::nullable")]
+    pub status: String,
+    pub exit_code: Option<i64>,
+    #[serde(deserialize_with = "json::nullable")]
+    pub duration: String,
+    #[serde(rename = "error", deserialize_with = "json::nullable")]
+    pub error_msg: String,
+}
+
+impl Outcome {
+    /// Decodes the outcome fields of a record; other keys are not read.
+    pub fn from_json(data: &[u8]) -> anyhow::Result<Outcome> {
+        Ok(json::decode(data)?)
+    }
 }
 
 /// Go: `time.Now()` — a wall-clock reading plus the monotonic reading Go
@@ -151,92 +198,8 @@ impl fmt::Debug for MonoStart {
     }
 }
 
-/// The JSON names, for Go's field lookup.
-const JSON_FIELDS: [&str; 27] = [
-    "id",
-    "group_id",
-    "cli",
-    "mode",
-    "model",
-    "effort",
-    "review_scope",
-    "prompt",
-    "prompt_preview",
-    "prompt_hash",
-    "status",
-    "start_time",
-    "queued_at",
-    "queue_position",
-    "end_time",
-    "exit_code",
-    "duration",
-    "work_dir",
-    "log_file",
-    "output_bytes",
-    "output_lines",
-    "error",
-    "account",
-    "pid",
-    "pid_start",
-    "owner_pid",
-    "owner_pid_start",
-];
-
-/// A decode target: a field and its Go type.
-enum Slot<'a> {
-    Str(&'a mut String),
-    Bytes(&'a mut GoString),
-    Int(&'a mut i64, &'static str),
-    OptInt(&'a mut Option<i64>),
-    Time(&'a mut DateTime<FixedOffset>),
-    OptTime(&'a mut Option<DateTime<FixedOffset>>),
-}
-
-/// Go: decoding into a string field; `null` keeps the value.
-fn set_string<T: From<String>>(dst: &mut T, raw: &RawValue) -> Result<(), TypeMismatch> {
-    if let Some(v) = gojson::decode_string(raw)? {
-        *dst = T::from(v);
-    }
-    Ok(())
-}
-
 fn is_zero(n: &i64) -> bool {
     *n == 0
-}
-
-impl Default for Session {
-    fn default() -> Self {
-        Session {
-            id: String::new(),
-            group_id: String::new(),
-            cli: String::new(),
-            mode: String::new(),
-            model: String::new(),
-            effort: String::new(),
-            review_scope: String::new(),
-            prompt: String::new(),
-            prompt_preview: GoString::default(),
-            prompt_hash: String::new(),
-            status: String::new(),
-            start_time: gojson::zero_time(),
-            queued_at: None,
-            queue_position: 0,
-            end_time: None,
-            exit_code: None,
-            duration: String::new(),
-            work_dir: String::new(),
-            log_file: String::new(),
-            output_bytes: 0,
-            output_lines: 0,
-            error_msg: String::new(),
-            account: String::new(),
-            pid: 0,
-            pid_start: 0,
-            owner_pid: 0,
-            owner_pid_start: 0,
-            start_mono: MonoStart::default(),
-        }
-    }
 }
 
 /// The inputs of Go's `NewQueued(cli, mode, model, effort, workdir, prompt,
@@ -395,10 +358,10 @@ impl Session {
         let id = uuid::Uuid::new_v4().to_string();
         let log_file = dir.join(format!("{id}.log"));
 
-        // Go slices the prompt at a byte offset; encoding/json then writes each
-        // byte of a split rune as a \ufffd escape.
+        // The preview is a byte slice of the prompt. Each stray byte of a
+        // rune split at the end becomes U+FFFD.
         let bytes = input.prompt.as_bytes();
-        let preview = GoString::from_bytes(&bytes[..bytes.len().min(config::PROMPT_PREVIEW_LEN)]);
+        let preview = lossy_per_byte(&bytes[..bytes.len().min(config::PROMPT_PREVIEW_LEN)]);
 
         let hash: String = Sha256::digest(input.prompt.as_bytes())
             .iter()
@@ -419,7 +382,7 @@ impl Session {
             prompt_preview: preview,
             prompt_hash: hash,
             status: status.to_string(),
-            start_time: now.wall,
+            start_time: Some(now.wall),
             start_mono: MonoStart::at(now),
             work_dir: input.workdir.to_string(),
             log_file: log_file.to_string_lossy().into_owned(),
@@ -452,7 +415,7 @@ impl Session {
 
     pub(crate) fn mark_running_at(&mut self, paths: &Paths, now: Now) -> anyhow::Result<()> {
         self.status = "running".to_string();
-        self.start_time = now.wall;
+        self.start_time = Some(now.wall);
         self.start_mono = MonoStart::at(now);
         self.queue_position = 0;
         self.save(paths)
@@ -468,9 +431,9 @@ impl Session {
         self.save(paths)
     }
 
-    /// Go: `json.MarshalIndent(s, "", "  ")`.
+    /// The record bytes: pretty JSON with a two-space indent.
     pub fn to_json(&self) -> anyhow::Result<Vec<u8>> {
-        gojson::marshal_indent(self).map_err(|e| anyhow!("marshal session: {e}"))
+        serde_json::to_vec_pretty(self).map_err(|e| anyhow!("marshal session: {e}"))
     }
 
     /// Writes the session JSON atomically: a unique `<id>.json.tmp-*` file,
@@ -509,11 +472,13 @@ impl Session {
     }
 
     /// Go: `now.Sub(s.StartTime)` — monotonic while `start_time` is the
-    /// reading this process took, wall time otherwise.
+    /// reading this process took, wall time otherwise. An unset start
+    /// saturates, as the distant unset time of older releases did.
     fn elapsed(&self, now: Now) -> i64 {
-        match self.start_mono.0 {
-            Some(start) if start.wall == self.start_time => mono_sub(now.mono, start.mono),
-            _ => sub_nanos(now.wall, self.start_time),
+        match (self.start_mono.0, self.start_time) {
+            (Some(start), Some(t)) if start.wall == t => mono_sub(now.mono, start.mono),
+            (_, Some(t)) => sub_nanos(now.wall, t),
+            (_, None) => i64::MAX,
         }
     }
 
@@ -565,92 +530,10 @@ impl Session {
         self.save(paths)
     }
 
-    /// Go: `json.Unmarshal(data, &s)` into a zero `Session`. Keys match
-    /// exactly, else case-insensitively; duplicate keys assign in order;
-    /// `null` leaves a value field alone and clears a pointer field; invalid
-    /// UTF-8 in strings becomes U+FFFD; unknown keys are ignored.
+    /// Decodes a record. A missing key or `null` gives the field's default,
+    /// unknown keys are ignored, and the old unset time reads as `None`.
     pub fn from_json(data: &[u8]) -> anyhow::Result<Session> {
-        let mut s = Session::default();
-        s.merge_json(data).map_err(anyhow::Error::msg)?;
-        Ok(s)
-    }
-
-    /// Assigns each member in document order. A type mismatch is kept (the
-    /// first one wins) while decoding goes on; a time error stops at once.
-    fn merge_json(&mut self, data: &[u8]) -> Result<(), String> {
-        let mut saved = None;
-        for (key, raw) in gojson::decode_object(data, "session.Session")? {
-            let Some(name) = gojson::match_field(&JSON_FIELDS, &key) else {
-                continue;
-            };
-            let mismatch = match self.slot(name) {
-                Slot::Str(dst) => set_string(dst, &raw).err().map(|m| (m, "string")),
-                Slot::Bytes(dst) => set_string(dst, &raw).err().map(|m| (m, "string")),
-                Slot::Int(dst, go_type) => gojson::decode_int(&raw)
-                    .map(|v| {
-                        if let Some(v) = v {
-                            *dst = v;
-                        }
-                    })
-                    .err()
-                    .map(|m| (m, go_type)),
-                Slot::OptInt(dst) => gojson::decode_int(&raw)
-                    .map(|v| *dst = v)
-                    .err()
-                    .map(|m| (m, "int")),
-                Slot::Time(dst) => {
-                    if let Some(t) = gojson::decode_time(&raw)? {
-                        *dst = t;
-                    }
-                    None
-                }
-                Slot::OptTime(dst) => {
-                    *dst = gojson::decode_time(&raw)?;
-                    None
-                }
-            };
-            if let Some((TypeMismatch(value), go_type)) = mismatch
-                && saved.is_none()
-            {
-                saved = Some(format!(
-                    "json: cannot unmarshal {value} into Go struct field Session.{name} of type {go_type}"
-                ));
-            }
-        }
-        saved.map_or(Ok(()), Err)
-    }
-
-    fn slot(&mut self, name: &str) -> Slot<'_> {
-        match name {
-            "id" => Slot::Str(&mut self.id),
-            "group_id" => Slot::Str(&mut self.group_id),
-            "cli" => Slot::Str(&mut self.cli),
-            "mode" => Slot::Str(&mut self.mode),
-            "model" => Slot::Str(&mut self.model),
-            "effort" => Slot::Str(&mut self.effort),
-            "review_scope" => Slot::Str(&mut self.review_scope),
-            "prompt" => Slot::Str(&mut self.prompt),
-            "prompt_preview" => Slot::Bytes(&mut self.prompt_preview),
-            "prompt_hash" => Slot::Str(&mut self.prompt_hash),
-            "status" => Slot::Str(&mut self.status),
-            "start_time" => Slot::Time(&mut self.start_time),
-            "queued_at" => Slot::OptTime(&mut self.queued_at),
-            "queue_position" => Slot::Int(&mut self.queue_position, "int"),
-            "end_time" => Slot::OptTime(&mut self.end_time),
-            "exit_code" => Slot::OptInt(&mut self.exit_code),
-            "duration" => Slot::Str(&mut self.duration),
-            "work_dir" => Slot::Str(&mut self.work_dir),
-            "log_file" => Slot::Str(&mut self.log_file),
-            "output_bytes" => Slot::Int(&mut self.output_bytes, "int64"),
-            "output_lines" => Slot::Int(&mut self.output_lines, "int"),
-            "error" => Slot::Str(&mut self.error_msg),
-            "account" => Slot::Str(&mut self.account),
-            "pid" => Slot::Int(&mut self.pid, "int"),
-            "pid_start" => Slot::Int(&mut self.pid_start, "int64"),
-            "owner_pid" => Slot::Int(&mut self.owner_pid, "int"),
-            "owner_pid_start" => Slot::Int(&mut self.owner_pid_start, "int64"),
-            _ => unreachable!("{name} is not in JSON_FIELDS"),
-        }
+        Ok(json::decode(data)?)
     }
 
     /// Reads and returns all sessions, sorted newest first.
@@ -704,6 +587,26 @@ impl Session {
 /// ties; Go's `sort.Slice` may not for more than 12 sessions.
 pub(crate) fn sort_newest_first<S: Borrow<Session>>(sessions: &mut [S]) {
     sessions.sort_by_key(|s| std::cmp::Reverse(s.borrow().start_time));
+}
+
+/// The bytes as text, with each byte of an invalid UTF-8 sequence replaced
+/// by its own U+FFFD.
+fn lossy_per_byte(mut bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len());
+    loop {
+        match std::str::from_utf8(bytes) {
+            Ok(s) => {
+                out.push_str(s);
+                return out;
+            }
+            Err(e) => {
+                let valid = e.valid_up_to();
+                out.push_str(std::str::from_utf8(&bytes[..valid]).expect("valid prefix"));
+                out.push('\u{FFFD}');
+                bytes = &bytes[valid + 1..];
+            }
+        }
+    }
 }
 
 /// Reports whether name is a save temp file: the legacy `<id>.json.tmp` or

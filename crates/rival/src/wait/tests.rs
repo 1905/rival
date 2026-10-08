@@ -667,7 +667,7 @@ fn polls_until_rival_dies() {
 // ---- session status decoding ----
 
 #[test]
-fn decode_session_status_matches_go_anonymous_struct() {
+fn decode_session_status_reads_four_fields() {
     let ok = |json: &str| decode_session_status(json.as_bytes());
     // Unrelated malformed fields do not matter.
     let got = ok(r#"{"id":5,"prompt":{"x":[1]},"created_at":"not a time","status":"completed","exit_code":0,"duration":"3s","error":""}"#).unwrap();
@@ -681,19 +681,13 @@ fn decode_session_status_matches_go_anonymous_struct() {
             ..SessionStatus::default()
         }
     );
-    // Case-insensitive keys; duplicate keys: last wins; null pointer resets.
-    let got = ok(r#"{"STATUS":"running","Status":"failed","exit_code":2,"Exit_Code":null,"ERROR":"x","error":null}"#).unwrap();
+    // Exact keys; null reads as the default.
+    let got =
+        ok(r#"{"STATUS":"running","status":"failed","exit_code":null,"ERROR":"x","error":null}"#)
+            .unwrap();
     assert_eq!(got.status, "failed");
     assert_eq!(got.exit_code, None);
-    assert_eq!(got.error_msg, "x", "null leaves a string unchanged");
-    // Top-level null decodes to the zero struct, which counts as found.
-    assert_eq!(
-        ok("null"),
-        Some(SessionStatus {
-            found: true,
-            ..SessionStatus::default()
-        })
-    );
+    assert_eq!(got.error_msg, "");
     for bad in [
         r#"{"status":5}"#,
         r#"{"exit_code":"0"}"#,
@@ -702,7 +696,9 @@ fn decode_session_status_matches_go_anonymous_struct() {
         r#"{"exit_code":99999999999999999999}"#,
         r#"{"duration":true}"#,
         r#"{"status":"completed","error":["a"]}"#,
+        r#"{"status":"a","status":"b"}"#,
         r#"[]"#,
+        "null",
         r#""s""#,
         r#"{"status":"completed""#,
         "",

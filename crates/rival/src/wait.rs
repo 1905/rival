@@ -22,7 +22,7 @@ use regex::Regex;
 use regex::bytes::Regex as BytesRegex;
 use rival_core::cancel::Context;
 use rival_core::paths::Paths;
-use rival_core::{gojson, gostd, procinfo};
+use rival_core::{gostd, procinfo, session};
 
 /// All watched sessions completed.
 pub const WAIT_EXIT_COMPLETED: i32 = 0;
@@ -448,41 +448,18 @@ pub fn load_session_status(sessions_dir: &Path, id: &str) -> SessionStatus {
     decode_session_status(&data).unwrap_or_default()
 }
 
-/// Go: `json.Unmarshal` into the anonymous struct
-/// `{Status string; ExitCode *int; Duration string; ErrorMsg string}`.
+/// Decodes only the four fields wait needs. A missing key or `null` gives
+/// the default; a wrong type in one of them is an error.
 fn decode_session_status(data: &[u8]) -> Option<SessionStatus> {
-    const FIELDS: [&str; 4] = ["status", "exit_code", "duration", "error"];
-    let members = gojson::decode_object(data, "struct { Status string ...}").ok()?;
-    let mut s = SessionStatus {
+    let o = session::Outcome::from_json(data).ok()?;
+    Some(SessionStatus {
+        status: o.status,
+        exit_code: o.exit_code,
+        duration: o.duration,
+        error_msg: o.error_msg,
         found: true,
         ..SessionStatus::default()
-    };
-    let mut failed = false;
-    for (key, raw) in &members {
-        let Some(field) = gojson::match_field(&FIELDS, key) else {
-            continue;
-        };
-        // Go keeps decoding after a type mismatch but still returns an error.
-        let target = match field {
-            "status" => &mut s.status,
-            "duration" => &mut s.duration,
-            "error" => &mut s.error_msg,
-            _ => {
-                match gojson::decode_int(raw) {
-                    // A JSON null makes a pointer nil.
-                    Ok(v) => s.exit_code = v,
-                    Err(_) => failed = true,
-                }
-                continue;
-            }
-        };
-        match gojson::decode_string(raw) {
-            Ok(Some(v)) => *target = v,
-            Ok(None) => {} // null leaves a string unchanged
-            Err(_) => failed = true,
-        }
-    }
-    (!failed).then_some(s)
+    })
 }
 
 /// Go: `os.ReadFile`, with its `*PathError` text (`open <path>: <errno>`,

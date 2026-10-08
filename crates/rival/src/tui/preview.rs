@@ -12,7 +12,6 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 
-use rival_core::gojson;
 use rival_core::session::Session;
 
 use super::logview::{LogKey, LogPane, LogRequest, LogResult, LogSlot, PREVIEW_TAIL_LINES};
@@ -43,15 +42,15 @@ pub fn join_meta(parts: Vec<Span<'static>>, ctx: &Ctx) -> Line<'static> {
 /// Go: `startedLine`. "started 11:40 · pid 81233"; a run from another day
 /// gets its date too. Times are local in `zone`.
 pub fn started_line(
-    t: DateTime<FixedOffset>,
+    t: Option<DateTime<FixedOffset>>,
     pid: i64,
     now: DateTime<FixedOffset>,
     zone: Zone,
 ) -> String {
     let mut line = "started -".to_string();
-    if t != gojson::zero_time() {
+    if let Some(t) = t {
         let local = t.with_timezone(&zone(t.naive_utc()));
-        let layout = if section_for(t, now, zone) == "TODAY" {
+        let layout = if section_for(Some(t), now, zone) == "TODAY" {
             "%H:%M"
         } else {
             "%b %d %H:%M"

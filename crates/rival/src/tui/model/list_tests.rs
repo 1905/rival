@@ -510,6 +510,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
         Arc::new(Session {
             queue_position: 2,
             queued_at: Some(ago(1)),
+            start_time: None,
             ..run(
                 "g0000002-wait",
                 "opencode",
@@ -517,7 +518,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
                 "review",
                 "high",
                 "queued",
-                rival_core::gojson::zero_time(),
+                ago(1),
                 "/src/ledger",
             )
         }),

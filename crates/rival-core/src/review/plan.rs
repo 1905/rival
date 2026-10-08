@@ -5,6 +5,7 @@
 use std::fmt::Write as _;
 
 use anyhow::anyhow;
+use serde::Deserialize;
 
 use super::format::{severity_tally, sorted_findings, write_finding, write_summary};
 use super::parse::{drop_placeholder_reviewer_findings, final_answer, has_json_key, json_objects};
@@ -18,10 +19,14 @@ mod tests;
 /// The structured JSON a plan reviewer emits. It mirrors
 /// [`super::ReviewerOutput`] but carries a 1-10 rating and is parsed
 /// independently.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
 pub struct PlanOutput {
+    #[serde(deserialize_with = "crate::json::nullable")]
     pub summary: String,
+    #[serde(deserialize_with = "crate::json::nullable")]
     pub rating: i64,
+    #[serde(deserialize_with = "super::types::findings")]
     pub findings: Vec<ReviewerFinding>,
 }
 
@@ -50,7 +55,7 @@ pub fn parse_plan_output(raw: &str) -> anyhow::Result<PlanOutput> {
         {
             continue;
         }
-        let out = match decode_payload(c, "PlanOutput", &["summary", "rating", "findings"]) {
+        let out: PlanOutput = match decode_payload(c) {
             Ok(out) => out,
             Err(e) => {
                 last_err = Some(e);

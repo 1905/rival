@@ -16,7 +16,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde_json::value::RawValue;
+use serde::Deserialize;
 
 use crate::cancel::{CancelFunc, Context};
 use crate::config::Config;
@@ -24,8 +24,8 @@ use crate::executor::oscmd::{self, exit_status_text, look_path};
 use crate::executor::process::{self, set_exec};
 use crate::executor::subprocess::{dedup_env, io_text, spawn_error_text};
 use crate::gitscope;
-use crate::gojson::{self, TypeMismatch};
 use crate::gostd;
+use crate::json;
 use crate::paths;
 
 mod url;
@@ -83,9 +83,28 @@ fn project_path(path: &[u8]) -> Vec<u8> {
 
 /// Go `unicode.IsSpace` for one decoded rune; an invalid byte is not space.
 fn space_at(s: &[u8]) -> (bool, usize) {
-    match gojson::decode_rune(s) {
+    match decode_rune(s) {
         (Some(c), n) => (c.is_whitespace(), n),
         (None, n) => (false, n.max(1)),
+    }
+}
+
+/// Decodes the rune at the start of `s` the way Go's `utf8.DecodeRune` does:
+/// `None` with width 1 for an invalid byte, `None` with width 0 for empty input.
+fn decode_rune(s: &[u8]) -> (Option<char>, usize) {
+    let Some(&lead) = s.first() else {
+        return (None, 0);
+    };
+    let width = match lead {
+        0x00..=0x7f => 1,
+        0xc2..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf4 => 4,
+        _ => return (None, 1),
+    };
+    match s.get(..width).and_then(|b| std::str::from_utf8(b).ok()) {
+        Some(text) => (text.chars().next(), width),
+        None => (None, 1),
     }
 }
 
@@ -213,112 +232,46 @@ struct Metadata {
     head: String,
 }
 
-const METADATA_FIELDS: [&str; 6] = [
-    "iid",
-    "web_url",
-    "sha",
-    "source_branch",
-    "target_branch",
-    "diff_refs",
-];
-const DIFF_REFS_FIELDS: [&str; 2] = ["base_sha", "head_sha"];
-/// Go's `reflect.Type.String()` of the anonymous `DiffRefs` struct.
-const DIFF_REFS_TYPE: &str =
-    r#"struct { Base string "json:\"base_sha\""; Head string "json:\"head_sha\"" }"#;
-
-/// Keeps the first error, as Go's `d.saveError` does. An anonymous struct
-/// has no name, so Go prints `.diff_refs.base_sha` for its fields.
-fn save(saved: &mut Option<String>, m: TypeMismatch, go_struct: &str, field: &str, ty: &str) {
-    saved.get_or_insert_with(|| {
-        format!(
-            "json: cannot unmarshal {} into Go struct field {go_struct}.{field} of type {ty}",
-            m.0
-        )
-    });
+/// The MR API response as it is decoded: keys match exactly, unknown keys
+/// are ignored, and `null` reads as the default.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct MetadataJson {
+    #[serde(deserialize_with = "json::nullable")]
+    iid: i64,
+    #[serde(deserialize_with = "json::nullable")]
+    web_url: String,
+    #[serde(deserialize_with = "json::nullable")]
+    sha: String,
+    #[serde(deserialize_with = "json::nullable")]
+    source_branch: String,
+    #[serde(deserialize_with = "json::nullable")]
+    target_branch: String,
+    diff_refs: Option<json::Object<DiffRefsJson>>,
 }
 
-fn set_string(dst: &mut String, raw: &RawValue) -> Result<(), TypeMismatch> {
-    if let Some(v) = gojson::decode_string(raw)? {
-        *dst = v;
-    }
-    Ok(())
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct DiffRefsJson {
+    #[serde(deserialize_with = "json::nullable")]
+    base_sha: String,
+    #[serde(deserialize_with = "json::nullable")]
+    head_sha: String,
 }
 
-/// Go `json.Unmarshal(raw, &mr)`: keys match exactly, else
-/// case-insensitively; duplicates assign in order; unknown keys and `null`
-/// are skipped; the first type mismatch is returned after the whole document.
-/// Syntax errors carry serde_json's text, not Go's.
+/// Decodes GitLab's MR API response. Errors carry serde_json's text.
 fn decode_metadata(data: &[u8]) -> Result<Metadata, String> {
-    let mut mr = Metadata::default();
-    let mut saved = None;
-    for (key, raw) in gojson::decode_object(data, "mergerequest.metadata")? {
-        let (result, name, ty) = match gojson::match_field(&METADATA_FIELDS, &key) {
-            Some("iid") => (
-                gojson::decode_int(&raw).map(|v| {
-                    if let Some(v) = v {
-                        mr.iid = v;
-                    }
-                }),
-                "iid",
-                "int",
-            ),
-            Some("web_url") => (set_string(&mut mr.web_url, &raw), "web_url", "string"),
-            Some("sha") => (set_string(&mut mr.sha, &raw), "sha", "string"),
-            Some("source_branch") => (
-                set_string(&mut mr.source_branch, &raw),
-                "source_branch",
-                "string",
-            ),
-            Some("target_branch") => (
-                set_string(&mut mr.target_branch, &raw),
-                "target_branch",
-                "string",
-            ),
-            Some("diff_refs") => {
-                decode_diff_refs(&mut mr, &raw, &mut saved);
-                continue;
-            }
-            _ => continue,
-        };
-        if let Err(m) = result {
-            save(&mut saved, m, "metadata", name, ty);
-        }
-    }
-    saved.map_or(Ok(mr), Err)
-}
-
-fn decode_diff_refs(mr: &mut Metadata, raw: &RawValue, saved: &mut Option<String>) {
-    let kind = match raw.get().as_bytes().first() {
-        Some(b'n') => return,
-        Some(b'{') => None,
-        Some(b'"') => Some("string"),
-        Some(b'[') => Some("array"),
-        Some(b't' | b'f') => Some("bool"),
-        _ => Some("number"),
-    };
-    if let Some(kind) = kind {
-        let m = TypeMismatch(kind.to_string());
-        save(saved, m, "metadata", "diff_refs", DIFF_REFS_TYPE);
-        return;
-    }
-    let members = match gojson::decode_object(raw.get().as_bytes(), "struct") {
-        Ok(members) => members,
-        Err(e) => {
-            // Unreachable: the document already parsed.
-            saved.get_or_insert(e);
-            return;
-        }
-    };
-    for (key, raw) in members {
-        let (result, name) = match gojson::match_field(&DIFF_REFS_FIELDS, &key) {
-            Some("base_sha") => (set_string(&mut mr.base, &raw), "base_sha"),
-            Some("head_sha") => (set_string(&mut mr.head, &raw), "head_sha"),
-            _ => continue,
-        };
-        if let Err(m) = result {
-            save(saved, m, "", &format!("diff_refs.{name}"), "string");
-        }
-    }
+    let m: MetadataJson = json::decode(data).map_err(|e| e.to_string())?;
+    let diff_refs = m.diff_refs.unwrap_or_default().0;
+    Ok(Metadata {
+        iid: m.iid,
+        web_url: m.web_url,
+        sha: m.sha,
+        source_branch: m.source_branch,
+        target_branch: m.target_branch,
+        base: diff_refs.base_sha,
+        head: diff_refs.head_sha,
+    })
 }
 
 /// Go `commitSHA`: `^[0-9a-f]{40}$`.

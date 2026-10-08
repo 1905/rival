@@ -121,7 +121,7 @@ fn drops_partially_echoed_slop_example() {
 }
 
 /// Rust-only: a rating outside 1-10 skips the candidate; a decode error is
-/// reported with Go's text.
+/// reported with serde_json's text.
 #[test]
 fn rating_bounds_and_decode_errors() {
     for rating in ["0", "11", "-3"] {
@@ -136,19 +136,19 @@ fn rating_bounds_and_decode_errors() {
     let err = parse_plan_output(r#"{"summary":"s","rating":"7","findings":[]}"#).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "no valid plan JSON payload (last decode error: json: cannot unmarshal string into Go struct field PlanOutput.rating of type int)"
+        "no valid plan JSON payload (last decode error: invalid type: string \"7\", expected i64 at line 1 column 27)"
     );
     let err =
         parse_plan_output(r#"{"summary":"s","rating":7,"findings":[{"line":true}]}"#).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "no valid plan JSON payload (last decode error: json: cannot unmarshal bool into Go struct field ReviewerFinding.findings.line of type int)"
+        "no valid plan JSON payload (last decode error: invalid type: boolean `true`, expected i64 at line 1 column 50)"
     );
     // A null rating stays 0 and is skipped; keys are exact.
     assert!(parse_plan_output(r#"{"summary":"s","rating":null,"findings":[]}"#).is_err());
     assert!(parse_plan_output(r#"{"summary":"s","Rating":7,"findings":[]}"#).is_err());
     let out = parse_plan_output(r#"{"summary":"s","rating":1,"RATING":7,"findings":[]}"#).unwrap();
-    assert_eq!(out.rating, 7);
+    assert_eq!(out.rating, 1);
 }
 
 /// A codex log where an `exec` tool printed a valid plan assessment and the

@@ -12,12 +12,12 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Local, TimeDelta};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::config::Config;
 use crate::paths::Paths;
-use crate::{gojson, gostd};
+use crate::{gostd, json};
 
 #[cfg(test)]
 mod tests;
@@ -35,12 +35,15 @@ pub const API_OVERRIDE_VAR: &str = "RIVAL_UPDATE_API";
 /// Whether this build honours [`API_OVERRIDE_VAR`].
 pub const HONOURS_API_OVERRIDE: bool = cfg!(debug_assertions);
 
-/// Go `cache`: the last answer and when it was fetched.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+/// Go `cache`: the last answer and when it was fetched. A cache without
+/// `checked_at` is stale.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Cache {
+    #[serde(deserialize_with = "json::nullable")]
     pub latest: String,
-    #[serde(with = "gojson::time")]
-    pub checked_at: DateTime<FixedOffset>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "json::opt_time")]
+    pub checked_at: Option<DateTime<FixedOffset>>,
 }
 
 /// Go `FetchLatest` or a test stand-in: the latest tag without its `v`.
@@ -58,7 +61,8 @@ pub fn check(current: &str, cfg: &Config, now: Clock<'_>, fetch: Fetch<'_>, out:
     }
     let cache_file = cache_file_path(cfg.paths());
     if let Ok(c) = load_cache(&cache_file)
-        && since(now(), c.checked_at) < CACHE_TTL_DELTA
+        && let Some(checked_at) = c.checked_at
+        && since(now(), checked_at) < CACHE_TTL_DELTA
     {
         print_if_newer(current, &c.latest, out);
         return;
@@ -105,46 +109,10 @@ pub fn cache_file_path(paths: &Paths) -> PathBuf {
     paths.root.join(".update-check")
 }
 
-/// Go `loadCache`: `os.ReadFile` plus `json.Unmarshal` into `cache`.
+/// Go `loadCache`: reads and decodes the cache file.
 pub fn load_cache(path: &Path) -> Result<Cache, String> {
     let data = fs::read(path).map_err(|e| e.to_string())?;
-    let mut c = Cache {
-        latest: String::new(),
-        checked_at: gojson::zero_time(),
-    };
-    let mut first_err = None;
-    for (key, raw) in gojson::decode_object(&data, "update.cache")? {
-        let result = match gojson::match_field(&["latest", "checked_at"], &key) {
-            Some("latest") => match gojson::decode_string(&raw) {
-                Ok(Some(v)) => {
-                    c.latest = v;
-                    Ok(())
-                }
-                Ok(None) => Ok(()),
-                Err(m) => Err(format!(
-                    "json: cannot unmarshal {} into Go struct field cache.latest of type string",
-                    m.0
-                )),
-            },
-            Some(_) => match gojson::decode_time(&raw) {
-                Ok(Some(t)) => {
-                    c.checked_at = t;
-                    Ok(())
-                }
-                Ok(None) => Ok(()),
-                Err(e) => Err(e),
-            },
-            None => Ok(()),
-        };
-        // Go keeps decoding after a type mismatch and reports the first one.
-        if let Err(e) = result {
-            first_err.get_or_insert(e);
-        }
-    }
-    match first_err {
-        Some(e) => Err(e),
-        None => Ok(c),
-    }
+    json::decode(&data).map_err(|e| e.to_string())
 }
 
 /// Go `saveCache`: `MkdirAll(dir, 0700)` (error ignored), then
@@ -157,9 +125,9 @@ pub fn save_cache(path: &Path, latest: &str, now: DateTime<FixedOffset>) -> io::
         std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
         let _ = b.create(dir);
     }
-    let data = gojson::marshal(&Cache {
+    let data = serde_json::to_vec(&Cache {
         latest: latest.to_string(),
-        checked_at: now,
+        checked_at: Some(now),
     })
     .unwrap_or_default();
     let mut opts = OpenOptions::new();
@@ -212,9 +180,14 @@ pub fn parse_release(body: &[u8]) -> Result<String, String> {
 
 /// Go `json.NewDecoder(body).Decode(&release)` plus `TrimPrefix(tag, "v")`.
 /// Only the first JSON value is read: the decoder stops at its end and never
-/// waits for EOF. Read and syntax errors carry serde_json's text, not Go's.
+/// waits for EOF. Errors carry serde_json's text.
 pub fn parse_release_from(body: impl Read) -> Result<String, String> {
-    const GO_TYPE: &str = "struct { TagName string \"json:\\\"tag_name\\\"\" }";
+    #[derive(Deserialize, Default)]
+    #[serde(default)]
+    struct Release {
+        #[serde(deserialize_with = "json::nullable")]
+        tag_name: String,
+    }
     let first = serde_json::Deserializer::from_reader(BufReader::new(body))
         .into_iter::<Box<RawValue>>()
         .next();
@@ -224,26 +197,10 @@ pub fn parse_release_from(body: impl Read) -> Result<String, String> {
         Some(Err(e)) => return Err(e.to_string()),
         Some(Ok(raw)) => raw,
     };
-    let mut tag = String::new();
-    let mut first_err = None;
-    for (key, value) in gojson::decode_object(raw.get().as_bytes(), GO_TYPE)? {
-        if gojson::match_field(&["tag_name"], &key).is_none() {
-            continue;
-        }
-        match gojson::decode_string(&value) {
-            Ok(Some(v)) => tag = v,
-            Ok(None) => {}
-            Err(m) => {
-                first_err.get_or_insert(format!(
-                    "json: cannot unmarshal {} into Go struct field .tag_name of type string",
-                    m.0
-                ));
-            }
-        }
-    }
-    if let Some(e) = first_err {
-        return Err(e);
-    }
+    // A `null` document has no tag.
+    let release: Option<json::Object<Release>> =
+        serde_json::from_str(raw.get()).map_err(|e| e.to_string())?;
+    let tag = release.unwrap_or_default().0.tag_name;
     Ok(tag.strip_prefix('v').unwrap_or(&tag).to_string())
 }
 

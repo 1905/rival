@@ -1124,11 +1124,11 @@ fn trim_space_and_fields_follow_go_unicode_space() {
 }
 
 #[test]
-fn decode_metadata_follows_go_json() {
+fn decode_metadata_reads_exact_keys_and_null_as_empty() {
     let mr = decode_metadata(
-        br#"{"IID":42,"Web_URL":"u","SHA":"s","Source_Branch":"f","target_branch":"m",
-            "DIFF_REFS":{"BASE_SHA":"b","Head_Sha":"h","x":1},"unknown":[1],
-            "sha":null,"iid":null}"#,
+        br#"{"iid":42,"web_url":"u","SHA":"s","source_branch":"f","target_branch":"m",
+            "diff_refs":{"base_sha":"b","head_sha":"h","x":1},"unknown":[1],
+            "sha":null}"#,
     )
     .unwrap();
     assert_eq!(
@@ -1136,46 +1136,49 @@ fn decode_metadata_follows_go_json() {
         Metadata {
             iid: 42,
             web_url: "u".into(),
-            sha: "s".into(),
+            sha: String::new(),
             source_branch: "f".into(),
             target_branch: "m".into(),
             base: "b".into(),
             head: "h".into(),
         }
     );
-    assert_eq!(decode_metadata(b"null").unwrap(), Metadata::default());
     assert_eq!(
-        decode_metadata(br#"{"sha":"a","sha":"b"}"#).unwrap().sha,
-        "b"
+        decode_metadata(br#"{"diff_refs":null}"#).unwrap(),
+        Metadata::default()
     );
     for (input, want) in [
         (
-            &br#"[]"#[..],
-            "json: cannot unmarshal array into Go value of type mergerequest.metadata",
+            &b"null"[..],
+            "invalid type: null, expected a JSON object at line 1 column 4",
+        ),
+        (
+            br#"[]"#,
+            "invalid type: sequence, expected a JSON object at line 1 column 0",
         ),
         (
             br#"{"iid":"42"}"#,
-            "json: cannot unmarshal string into Go struct field metadata.iid of type int",
+            "invalid type: string \"42\", expected i64 at line 1 column 11",
         ),
         (
             br#"{"iid":4.2}"#,
-            "json: cannot unmarshal number 4.2 into Go struct field metadata.iid of type int",
+            "invalid type: floating point `4.2`, expected i64 at line 1 column 10",
         ),
         (
             br#"{"web_url":1}"#,
-            "json: cannot unmarshal number into Go struct field metadata.web_url of type string",
+            "invalid type: integer `1`, expected a string at line 1 column 12",
         ),
         (
             br#"{"diff_refs":"x"}"#,
-            r#"json: cannot unmarshal string into Go struct field metadata.diff_refs of type struct { Base string "json:\"base_sha\""; Head string "json:\"head_sha\"" }"#,
+            "invalid type: string \"x\", expected a JSON object at line 1 column 16",
         ),
         (
             br#"{"diff_refs":{"base_sha":1}}"#,
-            "json: cannot unmarshal number into Go struct field .diff_refs.base_sha of type string",
+            "invalid type: integer `1`, expected a string at line 1 column 26",
         ),
         (
-            br#"{"iid":true,"sha":1}"#,
-            "json: cannot unmarshal bool into Go struct field metadata.iid of type int",
+            br#"{"sha":"a","sha":"b"}"#,
+            "duplicate field `sha` at line 1 column 16",
         ),
     ] {
         assert_eq!(

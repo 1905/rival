@@ -40,7 +40,6 @@ use chrono::{DateTime, FixedOffset, Local, TimeDelta};
 
 use crate::cancel::{Context, ContextError};
 use crate::config::{self, Config};
-use crate::gojson;
 use crate::gostd;
 use crate::logging;
 use crate::paths::{self, Paths};
@@ -211,7 +210,7 @@ impl Manager {
             pid,
             pid_start,
             state: STATE_WAITING.to_string(),
-            created_at: now,
+            created_at: Some(now),
             started_at: None,
             work_dir: workdir.to_string(),
             file: String::new(),
@@ -256,7 +255,7 @@ impl Manager {
                     // loop.
                     let now = self.now_wall();
                     let t = self.ticket.as_mut().expect("enqueued");
-                    t.created_at = now;
+                    t.created_at = Some(now);
                     t.file = ticket_filename(&now, t.pid, &t.id);
                     healed = true;
                     logging::warn()
@@ -564,28 +563,23 @@ pub fn session_live(sessions_dir: &Path, id: &str) -> bool {
     let Ok(data) = fs::read(path) else {
         return false;
     };
-    let Ok(members) = gojson::decode_object(&data, "struct") else {
+    #[derive(serde::Deserialize, Default)]
+    #[serde(default)]
+    struct Live {
+        #[serde(deserialize_with = "crate::json::nullable")]
+        status: String,
+        #[serde(deserialize_with = "crate::json::nullable")]
+        pid: i64,
+        #[serde(deserialize_with = "crate::json::nullable")]
+        pid_start: i64,
+    }
+    let Ok(Live {
+        status,
+        pid,
+        pid_start,
+    }) = crate::json::decode::<Live>(&data)
+    else {
         return false;
     };
-    const FIELDS: [&str; 3] = ["status", "pid", "pid_start"];
-    let (mut status, mut pid, mut pid_start) = (String::new(), 0i64, 0i64);
-    let mut ok = true;
-    for (key, raw) in members {
-        match gojson::match_field(&FIELDS, &key) {
-            Some("status") => match gojson::decode_string(&raw) {
-                Ok(v) => status = v.unwrap_or(status),
-                Err(_) => ok = false,
-            },
-            Some("pid") => match gojson::decode_int(&raw) {
-                Ok(v) => pid = v.unwrap_or(pid),
-                Err(_) => ok = false,
-            },
-            Some("pid_start") => match gojson::decode_int(&raw) {
-                Ok(v) => pid_start = v.unwrap_or(pid_start),
-                Err(_) => ok = false,
-            },
-            _ => {}
-        }
-    }
-    ok && status == "running" && procinfo::alive(proc_pid(pid), pid_start)
+    status == "running" && procinfo::alive(proc_pid(pid), pid_start)
 }

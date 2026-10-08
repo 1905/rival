@@ -405,7 +405,7 @@ pub fn list_fixture() -> Vec<Arc<Session>> {
             mode: mode.into(),
             effort: effort.into(),
             status: status.into(),
-            start_time: start,
+            start_time: Some(start),
             work_dir: workdir.into(),
             ..Session::default()
         })
@@ -473,7 +473,7 @@ pub fn run(
         mode: mode.into(),
         effort: effort.into(),
         status: status.into(),
-        start_time: start,
+        start_time: Some(start),
         work_dir: workdir.into(),
         ..Session::default()
     }

@@ -12,7 +12,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gojson;
 use rival_core::gostd;
 use rival_core::session::{self, Session};
 use rival_core::sessionview;
@@ -46,7 +45,12 @@ pub fn format_elapsed(s: &Session, now: DateTime<FixedOffset>) -> String {
         return s.duration.clone();
     }
     if s.status == "running" {
-        return session::duration_text(session::sub_nanos(now, s.start_time));
+        // An unset start saturates, as the distant unset time of older
+        // releases did.
+        let nanos = s
+            .start_time
+            .map_or(i64::MAX, |t| session::sub_nanos(now, t));
+        return session::duration_text(nanos);
     }
     if s.status == "queued"
         && let Some(queued_at) = s.queued_at
@@ -202,11 +206,12 @@ impl DayBounds {
         }
     }
 
-    /// `t`'s index in [`SECTION_ORDER`].
-    fn section_index(&self, t: DateTime<FixedOffset>) -> usize {
-        if t == gojson::zero_time() {
-            3
-        } else if t >= self.today {
+    /// `t`'s index in [`SECTION_ORDER`]. No time sorts with the oldest.
+    fn section_index(&self, t: Option<DateTime<FixedOffset>>) -> usize {
+        let Some(t) = t else {
+            return 3;
+        };
+        if t >= self.today {
             0
         } else if t >= self.yesterday {
             1
@@ -220,7 +225,7 @@ impl DayBounds {
 
 /// Buckets `t` relative to `now` by calendar day in `zone`.
 pub fn section_for(
-    t: DateTime<FixedOffset>,
+    t: Option<DateTime<FixedOffset>>,
     now: DateTime<FixedOffset>,
     zone: Zone,
 ) -> &'static str {
@@ -229,14 +234,9 @@ pub fn section_for(
 
 /// When a run appeared: its start, or its queue time when it has not
 /// started yet.
-pub fn item_time(item: &DisplayItem) -> DateTime<FixedOffset> {
-    let Some(s) = item.primary() else {
-        return gojson::zero_time();
-    };
-    match s.queued_at {
-        Some(queued_at) if s.start_time == gojson::zero_time() => queued_at,
-        _ => s.start_time,
-    }
+pub fn item_time(item: &DisplayItem) -> Option<DateTime<FixedOffset>> {
+    let s = item.primary()?;
+    s.start_time.or(s.queued_at)
 }
 
 // --- status -----------------------------------------------------------------
@@ -344,7 +344,7 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
     b.push('\n');
     b.push_str(&kind_label(item));
     for s in &item.sessions {
-        let preview = s.prompt_preview.to_str_lossy();
+        let preview = s.prompt_preview.as_str();
         let project = project_name(&s.work_dir);
         let id = short_id(&s.id);
         for f in [
@@ -352,7 +352,7 @@ pub fn filter_haystack(item: &DisplayItem) -> String {
             model_name(s),
             s.effort.as_str(),
             project.as_str(),
-            &*preview,
+            preview,
             s.review_scope.as_str(),
             &*id,
         ] {

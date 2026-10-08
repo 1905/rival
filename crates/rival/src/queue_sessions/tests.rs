@@ -28,7 +28,7 @@ fn ticket(
     t.mode = mode.into();
     t.pid = pid;
     t.state = state.into();
-    t.created_at = t0() + TimeDelta::milliseconds(created);
+    t.created_at = Some(t0() + TimeDelta::milliseconds(created));
     t.started_at = started.map(|s| t0() + TimeDelta::milliseconds(s));
     t.work_dir = wd.into();
     t

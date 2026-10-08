@@ -1,12 +1,13 @@
 //! Reviewer output parsing. Go: `internal/review/parse.go`.
 
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use anyhow::anyhow;
 use regex::Regex;
+use serde::de::IgnoredAny;
 
 use super::types::{ReviewerFinding, ReviewerOutput, decode_payload};
-use crate::gojson;
 
 #[cfg(test)]
 mod tests;
@@ -29,7 +30,7 @@ pub fn parse_reviewer_output(raw: &str) -> anyhow::Result<ReviewerOutput> {
         if !has_json_key(c, "summary") || !has_json_key(c, "findings") {
             continue;
         }
-        let out = match decode_payload(c, "ReviewerOutput", &["summary", "findings"]) {
+        let out: ReviewerOutput = match decode_payload(c) {
             Ok(out) => out,
             Err(e) => {
                 last_err = Some(e); // a payload-shaped candidate that failed to decode
@@ -62,12 +63,11 @@ pub fn parse_reviewer_log(raw: &str) -> anyhow::Result<ReviewerOutput> {
 /// Reports whether `candidate` is a JSON object with the given top-level key
 /// actually present (not merely defaulting to a zero value on decode). This
 /// rejects unrelated JSON such as a `{"event":"done"}` tool/telemetry line.
-/// The key match is exact, unlike the case-insensitive struct decoding.
+/// The key match is exact, as in the payload decoding.
 pub(crate) fn has_json_key(candidate: &str, key: &str) -> bool {
-    // Go: json.Unmarshal into map[string]json.RawMessage. A non-object
-    // (including null) fails or leaves the map empty.
-    gojson::decode_object(candidate.as_bytes(), "map[string]json.RawMessage")
-        .is_ok_and(|members| members.iter().any(|(k, _)| k == key))
+    // A non-object (including null) has no keys.
+    serde_json::from_str::<BTreeMap<String, IgnoredAny>>(candidate)
+        .is_ok_and(|members| members.contains_key(key))
 }
 
 /// Matches the schema example summary from the prompt contract
@@ -113,7 +113,7 @@ pub(crate) fn drop_placeholder_reviewer_findings(
 /// It is a single forward pass using an explicit stack of '{' indices (no
 /// recursion, so adversarial deep nesting can't overflow the stack; and no
 /// per-brace re-scan). Every time a brace closes, the span it delimits is
-/// tested with Go's `json.Valid` rules, so:
+/// tested for valid JSON, so:
 ///   - a lone/unbalanced brace from a grep/tool line never hides a later
 ///     payload (the payload's own brace pair is still tested when it
 ///     closes), and
@@ -164,7 +164,7 @@ pub(crate) fn json_objects(s: &str) -> Vec<&str> {
                 let start = stack.pop().expect("stack is non-empty");
                 // Both ends are ASCII braces, so the span is on char boundaries.
                 let candidate = &s[start..=i];
-                if gojson::valid_value(candidate.as_bytes()).is_some() {
+                if serde_json::from_str::<IgnoredAny>(candidate).is_ok() {
                     out.push(candidate);
                 }
             }

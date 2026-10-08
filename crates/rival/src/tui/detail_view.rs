@@ -16,7 +16,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use rival_core::gojson;
 use rival_core::gostd;
 use rival_core::session::Session;
 
@@ -759,7 +758,7 @@ pub fn prompt_lines(
     let mut lines: Vec<Line<'static>> = if s.prompt_preview.is_empty() {
         Vec::new()
     } else {
-        wrap_cells(&sanitize_log(&s.prompt_preview.to_str_lossy()), width)
+        wrap_cells(&sanitize_log(&s.prompt_preview), width)
             .into_iter()
             .map(Line::raw)
             .collect()
@@ -777,11 +776,11 @@ pub fn prompt_lines(
 /// for no time.
 fn local_stamp(t: Option<chrono::DateTime<chrono::FixedOffset>>, zone: Zone) -> String {
     match t {
-        Some(t) if t != gojson::zero_time() => t
+        Some(t) => t
             .with_timezone(&zone(t.naive_utc()))
             .format("%Y-%m-%d %H:%M:%S")
             .to_string(),
-        _ => String::new(),
+        None => String::new(),
     }
 }
 
@@ -825,11 +824,7 @@ pub fn info_lines(s: &Session, width: usize, ctx: &Ctx) -> Vec<Line<'static>> {
     add("mode", s.mode.clone(), st.text);
     add("status", s.status.clone(), st.status(&s.status));
     add("exit", exit, st.text);
-    add(
-        "started",
-        local_stamp(Some(s.start_time), ctx.zone),
-        st.text,
-    );
+    add("started", local_stamp(s.start_time, ctx.zone), st.text);
     add("ended", local_stamp(s.end_time, ctx.zone), st.text);
     add("duration", format_elapsed(s, ctx.now), st.text);
     add("queued at", local_stamp(s.queued_at, ctx.zone), st.text);

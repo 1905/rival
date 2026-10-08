@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, FixedOffset, Local, TimeDelta};
 
-use crate::gojson;
 use crate::gostd;
 use crate::session::{self, Session};
 
@@ -105,20 +104,18 @@ pub fn elapsed<S: Borrow<Session>>(sessions: &[S]) -> String {
 /// extends the span to `now`. A queued member counts from `queued_at`. It
 /// returns "-" when no member has started.
 pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>) -> String {
-    // Go uses the zero time.Time as the "unset" sentinel for both bounds.
-    let zero = gojson::zero_time();
-    let (mut earliest, mut latest) = (zero, zero);
+    let mut earliest: Option<DateTime<FixedOffset>> = None;
+    let mut latest: Option<DateTime<FixedOffset>> = None;
     for s in sessions {
         let s = s.borrow();
-        let mut start = s.start_time;
-        if let Some(queued_at) = s.queued_at
-            && (start == zero || queued_at < start)
-        {
-            start = queued_at;
-        }
-        if start == zero {
+        // An earlier queued_at replaces start_time.
+        let start = match (s.start_time, s.queued_at) {
+            (Some(start), Some(queued_at)) => Some(start.min(queued_at)),
+            (start, queued_at) => start.or(queued_at),
+        };
+        let Some(start) = start else {
             continue;
-        }
+        };
 
         let mut end = start;
         if s.status == "running" || s.status == "queued" {
@@ -135,17 +132,15 @@ pub fn elapsed_at<S: Borrow<Session>>(sessions: &[S], now: DateTime<FixedOffset>
         if end < start {
             end = start;
         }
-        if earliest == zero || start < earliest {
-            earliest = start;
-        }
-        if latest == zero || end > latest {
-            latest = end;
-        }
+        earliest = Some(earliest.map_or(start, |e| e.min(start)));
+        latest = Some(latest.map_or(end, |l| if end > l { end } else { l }));
     }
-    if earliest != zero && latest > earliest {
-        return session::duration_text(session::sub_nanos(latest, earliest));
+    match (earliest, latest) {
+        (Some(earliest), Some(latest)) if latest > earliest => {
+            session::duration_text(session::sub_nanos(latest, earliest))
+        }
+        _ => "-".to_string(),
     }
-    "-".to_string()
 }
 
 #[cfg(test)]
@@ -325,14 +320,14 @@ mod tests {
             Session {
                 id: "a".into(),
                 status: "completed".into(),
-                start_time: base,
+                start_time: Some(base),
                 end_time: Some(base + minutes(4)),
                 ..Session::default()
             },
             Session {
                 id: "b".into(),
                 status: "completed".into(),
-                start_time: base + minutes(4),
+                start_time: Some(base + minutes(4)),
                 end_time: Some(base + minutes(7)),
                 ..Session::default()
             },
@@ -347,14 +342,14 @@ mod tests {
             Session {
                 id: "a".into(),
                 status: "completed".into(),
-                start_time: base,
+                start_time: Some(base),
                 end_time: Some(base + minutes(10)),
                 ..Session::default()
             },
             Session {
                 id: "b".into(),
                 status: "completed".into(),
-                start_time: base + minutes(2),
+                start_time: Some(base + minutes(2)),
                 end_time: Some(base + minutes(5)),
                 ..Session::default()
             },
@@ -370,7 +365,7 @@ mod tests {
         let with_duration = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             duration: "3m0s".into(),
             ..Session::default()
         }];
@@ -403,7 +398,7 @@ mod tests {
         let running = [Session {
             id: "a".into(),
             status: "running".into(),
-            start_time: base + minutes(5),
+            start_time: Some(base + minutes(5)),
             queued_at: Some(base),
             ..Session::default()
         }];
@@ -413,7 +408,7 @@ mod tests {
         let backwards = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             end_time: Some(base - minutes(1)),
             ..Session::default()
         }];
@@ -423,7 +418,7 @@ mod tests {
         let bad_duration = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             duration: "soon".into(),
             ..Session::default()
         }];
@@ -433,7 +428,7 @@ mod tests {
         let fractional = [Session {
             id: "a".into(),
             status: "completed".into(),
-            start_time: base,
+            start_time: Some(base),
             end_time: Some(base + TimeDelta::milliseconds(1500)),
             ..Session::default()
         }];

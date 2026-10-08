@@ -62,7 +62,7 @@ fn single_run(h: &Harness) -> DisplayItem {
         effort: "xhigh".into(),
         status: "completed".into(),
         duration: "1m31s".into(),
-        start_time: start,
+        start_time: Some(start),
         pid: 81233,
         work_dir: "/src/orbit-web".into(),
         review_scope: "plans/2026-09-26-service-identity".into(),
@@ -114,7 +114,7 @@ fn preview_group_lists_every_member() {
             model: model.into(),
             mode: mode.into(),
             status: status.into(),
-            start_time: now,
+            start_time: Some(now),
             work_dir: "/src/mathquest".into(),
             log_file: h.log(&format!("{id}.log"), body),
             ..Session::default()
@@ -237,7 +237,7 @@ fn preview_lines_fit_every_width() {
         mode: "review".into(),
         effort: "ultra".into(),
         status: "running".into(),
-        start_time: fixed_now(),
+        start_time: Some(fixed_now()),
         pid: 1,
         work_dir: "/src/日本語のプロジェクト名前はとても長い".into(),
         review_scope: "scope/path/that/is/long ".repeat(20),
@@ -347,16 +347,13 @@ fn tail_key_caps_the_lines() {
 #[test]
 fn started_line_dates_other_days_in_the_zone() {
     let now = fixed_now();
+    assert_eq!(started_line(None, 0, now, fixed_zone), "started -");
     assert_eq!(
-        started_line(gojson::zero_time(), 0, now, fixed_zone),
-        "started -"
-    );
-    assert_eq!(
-        started_line(now - TimeDelta::minutes(20), 81233, now, fixed_zone),
+        started_line(Some(now - TimeDelta::minutes(20)), 81233, now, fixed_zone),
         "started 11:40 · pid 81233"
     );
     assert_eq!(
-        started_line(now - TimeDelta::days(2), 0, now, fixed_zone),
+        started_line(Some(now - TimeDelta::days(2)), 0, now, fixed_zone),
         "started Oct 01 12:00"
     );
     // A UTC start time shows in the local zone.
@@ -368,7 +365,7 @@ fn started_line_dates_other_days_in_the_zone() {
                 .unwrap(),
         )
         .fixed_offset();
-    assert_eq!(started_line(utc, 0, now, fixed_zone), "started 10:05");
+    assert_eq!(started_line(Some(utc), 0, now, fixed_zone), "started 10:05");
 }
 
 /// The zone is looked up per instant, so a start before a DST switch shows
@@ -393,7 +390,7 @@ fn started_line_uses_the_offset_of_its_own_instant() {
         )
         .fixed_offset();
     assert_eq!(
-        started_line(before, 0, now, switching),
+        started_line(Some(before), 0, now, switching),
         "started Sep 20 10:00"
     );
 }

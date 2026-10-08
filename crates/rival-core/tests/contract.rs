@@ -66,7 +66,7 @@ struct Fields {
     prompt_preview: String,
     prompt_hash: String,
     status: String,
-    start_time: Time,
+    start_time: Option<Time>,
     queued_at: Option<Time>,
     queue_position: i64,
     end_time: Option<Time>,
@@ -150,7 +150,7 @@ fn session_of(f: &Fields) -> Session {
         prompt_preview: f.prompt_preview.as_str().into(),
         prompt_hash: f.prompt_hash.clone(),
         status: f.status.clone(),
-        start_time: time_of(&f.start_time),
+        start_time: f.start_time.as_ref().map(time_of),
         queued_at: f.queued_at.as_ref().map(time_of),
         queue_position: f.queue_position,
         end_time: f.end_time.as_ref().map(time_of),
@@ -186,7 +186,7 @@ fn fields_of(s: &Session) -> Fields {
             .expect("a decoded prompt_preview is valid UTF-8"),
         prompt_hash: s.prompt_hash.clone(),
         status: s.status.clone(),
-        start_time: parts_of(&s.start_time),
+        start_time: s.start_time.as_ref().map(parts_of),
         queued_at: s.queued_at.as_ref().map(parts_of),
         queue_position: s.queue_position,
         end_time: s.end_time.as_ref().map(parts_of),
@@ -374,9 +374,8 @@ fn contract_fixture_load_save_matches_golden() {
     }
 }
 
-/// Load a golden record, save it, load that again. A split rune's bytes
-/// were written as `�` escapes; they load as a valid U+FFFD, which the
-/// next save writes literally.
+/// Load a golden record, save it, load that again: the same fields and the
+/// same bytes.
 #[test]
 fn contract_golden_load_save_load() {
     let exp = expected();
@@ -414,18 +413,17 @@ fn contract_golden_load_save_load() {
 }
 
 #[test]
-fn contract_split_preview_bytes_are_go_escapes_then_literal() {
-    let split = read_golden("preview-split-4byte.json");
+fn contract_split_preview_bytes_are_literal_replacement_chars() {
     let line = |data: &[u8]| -> Vec<u8> {
         data.split(|&b| b == b'\n')
             .find(|l| l.starts_with(b"  \"prompt_preview\""))
             .expect("prompt_preview line")
             .to_vec()
     };
-    let first = line(&split);
+    let first = line(&read_golden("preview-split-4byte.json"));
     assert!(
-        first.ends_with(b"x\\ufffd\\ufffd\","),
-        "first save escapes each stray byte: {}",
+        first.ends_with("x\u{FFFD}\u{FFFD}\",".as_bytes()),
+        "each stray byte is one U+FFFD: {}",
         first.escape_ascii()
     );
     assert!(
@@ -434,11 +432,35 @@ fn contract_split_preview_bytes_are_go_escapes_then_literal() {
         first.escape_ascii()
     );
     let resaved = line(&read_golden("preview-split-4byte.resaved.json"));
+    assert_eq!(resaved, first, "a load and save keeps the bytes");
+}
+
+/// A record from an older release: HTML characters as `\u003c`-style
+/// escapes and the zero time for "unset". It loads with the same values as
+/// the new form, and the next save writes the new form.
+#[test]
+fn contract_old_escapes_and_zero_times_load_like_the_new_form() {
+    let old = br#"{
+  "id": "d0000000-0002-4000-8000-000000000002",
+  "group_id": "a\u003cb\u0026c\u003e",
+  "cli": "codex",
+  "status": "running",
+  "start_time": "0001-01-01T00:00:00Z",
+  "queued_at": "0001-01-01T00:00:00Z",
+  "end_time": "0001-01-01T00:00:00Z",
+  "pid": 1
+}"#;
+    let s = decode("old", old);
+    assert_eq!(s.group_id, "a<b&c>");
+    assert_eq!((s.start_time, s.queued_at, s.end_time), (None, None, None));
+    let new = write(&s);
+    let text = String::from_utf8(new.clone()).expect("UTF-8");
+    assert!(text.contains(r#""group_id": "a<b&c>""#), "{text}");
     assert!(
-        resaved.ends_with("x\u{FFFD}\u{FFFD}\",".as_bytes()),
-        "a loaded U+FFFD is written literally: {}",
-        resaved.escape_ascii()
+        !text.contains("_time") && !text.contains("queued_at"),
+        "{text}"
     );
+    assert_eq!(decode("new", &new), s);
 }
 
 /// Rewrites `testdata/written/` from the typed values. Run on purpose only.

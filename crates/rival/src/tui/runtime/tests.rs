@@ -92,7 +92,7 @@ fn finished_sessions() -> Vec<Arc<Session>> {
         cli: "codex".into(),
         model: "gpt-6-astra".into(),
         status: "completed".into(),
-        start_time: fixed_now(),
+        start_time: Some(fixed_now()),
         ..Session::default()
     })]
 }

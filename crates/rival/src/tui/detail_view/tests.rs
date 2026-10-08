@@ -83,7 +83,7 @@ fn info_lines_list_every_field() {
         mode: "review".into(),
         status: "failed".into(),
         exit_code: Some(1),
-        start_time: start,
+        start_time: Some(start),
         end_time: Some(start + TimeDelta::seconds(90)),
         duration: "1m30s".into(),
         queued_at: Some(start - TimeDelta::minutes(1)),
@@ -135,7 +135,10 @@ fn info_lines_list_every_field() {
     let lines = info_lines(&bare, 40, &ctx());
     let got = texts(&lines);
     assert!(got.contains("group id    -"), "{got}");
-    assert!(got.contains("started     -"), "zero time is empty: {got}");
+    assert!(
+        got.contains("started     -"),
+        "no start time is empty: {got}"
+    );
     let workdir = lines
         .iter()
         .position(|l| l.to_string().starts_with("workdir"))

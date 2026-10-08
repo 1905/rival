@@ -254,7 +254,7 @@ fn detail_selection_survives_reorder() {
     );
     assert_eq!(selected_id(&m), watched.id);
     other.status = "running".into();
-    other.start_time = now;
+    other.start_time = Some(now);
     drive(
         &mut m,
         &h.env,
@@ -549,7 +549,7 @@ fn detail_prompt_tab() {
     let summary = Session {
         prompt: String::new(),
         pid: 0,
-        start_time: fixed_now() - TimeDelta::minutes(1),
+        start_time: Some(fixed_now() - TimeDelta::minutes(1)),
         ..stored
     };
     let missing = Session {

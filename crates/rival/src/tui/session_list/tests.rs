@@ -313,15 +313,19 @@ fn section_for_buckets_by_calendar_day() {
         (at(20, 0, 0, 0), "THIS WEEK"),
         (at(19, 23, 59, 59), "OLDER"),
         (now - TimeDelta::days(30), "OLDER"),
-        (rival_core::gojson::zero_time(), "OLDER"),
         // A future start (clock skew) is today.
         (now + TimeDelta::days(2), "TODAY"),
     ] {
-        assert_eq!(section_for(t, now, fixed_zone), want, "{t}");
+        assert_eq!(section_for(Some(t), now, fixed_zone), want, "{t}");
     }
+    // No time is the oldest.
+    assert_eq!(section_for(None, now, fixed_zone), "OLDER");
     // The same instant written in another offset buckets by the zone's day.
     let utc = (at(26, 0, 30, 0)).with_timezone(&FixedOffset::east_opt(0).unwrap());
-    assert_eq!(section_for(utc.fixed_offset(), now, fixed_zone), "TODAY");
+    assert_eq!(
+        section_for(Some(utc.fixed_offset()), now, fixed_zone),
+        "TODAY"
+    );
 }
 
 fn hours(h: i32) -> FixedOffset {
@@ -455,7 +459,7 @@ fn section_for_follows_dst_per_boundary() {
     let wrong: Vec<String> = cases
         .iter()
         .filter_map(|&(name, now, t, want)| {
-            let got = section_for(t, now, berlin);
+            let got = section_for(Some(t), now, berlin);
             (got != want).then(|| format!("{name}: {t} at {now} is {got}, want {want}"))
         })
         .collect();
@@ -511,11 +515,11 @@ fn midnight_resolves_skipped_and_repeated_midnights_as_go() {
     // already counts as the new day, as in Go.
     let now = wall(-4, 2026, 3, 8, 12, 0);
     assert_eq!(
-        section_for(wall(-5, 2026, 3, 7, 23, 30), now, havana),
+        section_for(Some(wall(-5, 2026, 3, 7, 23, 30)), now, havana),
         "TODAY"
     );
     assert_eq!(
-        section_for(wall(-5, 2026, 3, 7, 22, 59), now, havana),
+        section_for(Some(wall(-5, 2026, 3, 7, 22, 59)), now, havana),
         "YESTERDAY"
     );
 }
@@ -538,11 +542,11 @@ fn local_zone_switches_offset_at_dst() {
         assert_eq!(local_zone(utc(2026, 10, 25, 1, 0)), hours(1));
         let now = wall(2, 2026, 3, 30, 9, 0);
         assert_eq!(
-            section_for(wall(1, 2026, 3, 29, 0, 10), now, local_zone),
+            section_for(Some(wall(1, 2026, 3, 29, 0, 10)), now, local_zone),
             "YESTERDAY"
         );
         assert_eq!(
-            section_for(wall(1, 2026, 3, 28, 23, 30), now, local_zone),
+            section_for(Some(wall(1, 2026, 3, 28, 23, 30)), now, local_zone),
             "THIS WEEK"
         );
         println!("{DONE}");
@@ -641,7 +645,7 @@ fn build_rows() {
     let now = fixed_now();
     let items = filter_fixture(now);
     assert_eq!(
-        section_for(now - TimeDelta::days(1), now, fixed_zone),
+        section_for(Some(now - TimeDelta::days(1)), now, fixed_zone),
         "YESTERDAY"
     );
     let cases: [(&str, StatusTab, &str, &[&str]); 7] = [
@@ -773,7 +777,7 @@ fn rendered_rows_fill_exactly_the_pane_width() {
     let queued_at = now - TimeDelta::minutes(1);
     let items = vec![
         solo(Session {
-            prompt_preview: "長い prompt ".repeat(30).into(),
+            prompt_preview: "長い prompt ".repeat(30),
             ..run(
                 "a1",
                 "claude",
@@ -787,7 +791,7 @@ fn rendered_rows_fill_exactly_the_pane_width() {
         }),
         solo(Session {
             duration: "6m24s".into(),
-            prompt_preview: "p".repeat(300).into(),
+            prompt_preview: "p".repeat(300),
             ..run(
                 "b2",
                 "codex",
@@ -802,15 +806,9 @@ fn rendered_rows_fill_exactly_the_pane_width() {
         solo(Session {
             queue_position: 3,
             queued_at: Some(queued_at),
+            start_time: None,
             ..run(
-                "c3",
-                "codex",
-                "gpt-5.5",
-                "review",
-                "",
-                "queued",
-                rival_core::gojson::zero_time(),
-                "/x",
+                "c3", "codex", "gpt-5.5", "review", "", "queued", queued_at, "/x",
             )
         }),
         items_of(vec![
@@ -1128,16 +1126,8 @@ fn time_cell_uses_the_injected_clock() {
     let queued = solo(Session {
         queue_position: 2,
         queued_at: Some(now - TimeDelta::milliseconds(4500)),
-        ..run(
-            "b",
-            "codex",
-            "m",
-            "review",
-            "",
-            "queued",
-            rival_core::gojson::zero_time(),
-            "/p",
-        )
+        start_time: None,
+        ..run("b", "codex", "m", "review", "", "queued", now, "/p")
     });
     assert_eq!(
         row_time(&queued, now),
@@ -1152,6 +1142,9 @@ fn time_cell_uses_the_injected_clock() {
     let unknown = solo(run("d", "codex", "m", "review", "", "killed", now, "/p"));
     assert_eq!(row_time(&unknown, now), "-");
     // A queued run sorts by its queue time until it starts.
-    assert_eq!(item_time(&queued), now - TimeDelta::milliseconds(4500));
-    assert_eq!(item_time(&finished), now);
+    assert_eq!(
+        item_time(&queued),
+        Some(now - TimeDelta::milliseconds(4500))
+    );
+    assert_eq!(item_time(&finished), Some(now));
 }

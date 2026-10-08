@@ -64,12 +64,15 @@ pub fn write_queue(out: &mut dyn Write, entries: &[Entry], now: DateTime<FixedOf
         };
         // Running tickets show time since promotion, waiting since creation.
         let since = match (&t.started_at, t.state.as_str()) {
-            (Some(started), queue::STATE_RUNNING) => *started,
+            (Some(started), queue::STATE_RUNNING) => Some(*started),
             _ => t.created_at,
         };
-        let wait = gostd::format_duration(round_seconds(sub(now, since)));
+        // An unset time saturates, as the distant unset time of older
+        // releases did.
+        let age = |t: Option<DateTime<FixedOffset>>| t.map_or(i64::MAX, |t| sub(now, t));
+        let wait = gostd::format_duration(round_seconds(age(since)));
         // A waiting ticket far past the default timeout is suspect.
-        let state = if t.state == queue::STATE_WAITING && sub(now, t.created_at) > STALE_NANOS {
+        let state = if t.state == queue::STATE_WAITING && age(t.created_at) > STALE_NANOS {
             "stale?"
         } else {
             t.state.as_str()

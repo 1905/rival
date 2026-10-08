@@ -122,7 +122,7 @@ fn cache_file_lives_in_the_rival_root() {
 }
 
 #[test]
-fn save_cache_writes_go_json_with_private_modes() {
+fn save_cache_writes_compact_json_with_private_modes() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("deep/.rival/.update-check");
     let t = FixedOffset::east_opt(0)
@@ -133,7 +133,7 @@ fn save_cache_writes_go_json_with_private_modes() {
     save_cache(&path, "1.2.3<&>", t).unwrap();
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
-        "{\"latest\":\"1.2.3\\u003c\\u0026\\u003e\",\"checked_at\":\"2026-10-03T12:00:00.123456Z\"}"
+        "{\"latest\":\"1.2.3<&>\",\"checked_at\":\"2026-10-03T12:00:00.123456Z\"}"
     );
     #[cfg(unix)]
     {
@@ -148,7 +148,7 @@ fn save_cache_writes_go_json_with_private_modes() {
 }
 
 #[test]
-fn load_cache_decodes_like_go() {
+fn load_cache_decodes_old_and_new_files() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("c");
     let load = |text: &str| {
@@ -156,19 +156,29 @@ fn load_cache_decodes_like_go() {
         load_cache(&path)
     };
     assert!(load_cache(&tmp.path().join("missing")).is_err());
-    let c = load(r#"{"LATEST":"2.0.0","Checked_At":"2026-10-03T12:00:00+02:00","x":1}"#).unwrap();
+    let c = load(r#"{"latest":"2.0.0","checked_at":"2026-10-03T12:00:00+02:00","x":1}"#).unwrap();
     assert_eq!(c.latest, "2.0.0");
-    assert_eq!(c.checked_at.to_rfc3339(), "2026-10-03T12:00:00+02:00");
-    // Missing fields keep Go's zero values; null keeps them too.
+    assert_eq!(
+        c.checked_at.unwrap().to_rfc3339(),
+        "2026-10-03T12:00:00+02:00"
+    );
+    // A file from an older release: escapes and Go's fraction.
+    let c = load(r#"{"latest":"1\u003c","checked_at":"2026-10-03T12:00:00.1234Z"}"#).unwrap();
+    assert_eq!(c.latest, "1<");
+    assert_eq!(c.checked_at.unwrap().timestamp_subsec_nanos(), 123_400_000);
+    // Keys match exactly.
+    assert_eq!(load(r#"{"LATEST":"2.0.0"}"#).unwrap().latest, "");
+    // Missing fields and null give the defaults; the old unset time is None.
     let c = load(r#"{"latest":null}"#).unwrap();
     assert_eq!(c.latest, "");
-    assert_eq!(c.checked_at, gojson::zero_time());
-    // The last duplicate wins.
-    assert_eq!(load(r#"{"latest":"1","latest":"2"}"#).unwrap().latest, "2");
+    assert_eq!(c.checked_at, None);
+    let c = load(r#"{"checked_at":"0001-01-01T00:00:00Z"}"#).unwrap();
+    assert_eq!(c.checked_at, None);
     for bad in [
         "",
         "{",
         "[]",
+        r#"{"latest":"1","latest":"2"}"#,
         r#"{"latest":1}"#,
         r#"{"checked_at":"yesterday"}"#,
     ] {
@@ -211,7 +221,7 @@ fn check_reads_the_clock_before_and_after_the_fetch() {
     check("1.0.0", &c, &clock, &fetch, &mut out);
     assert_eq!(fetched_after.get(), 1, "one clock read before the fetch");
     assert_eq!(reads.get(), 2);
-    assert_eq!(load_cache(&file).unwrap().checked_at, at(86_400 + 10));
+    assert_eq!(load_cache(&file).unwrap().checked_at, Some(at(86_400 + 10)));
     assert_eq!(String::from_utf8(out).unwrap(), NOTICE_2);
     // A failed fetch reads the clock once and saves nothing.
     reads.set(0);
@@ -229,7 +239,7 @@ fn check_fetches_saves_and_prints_when_the_cache_is_missing() {
     assert_eq!(run_check(&c, at(0), Ok("2.0.0")), (NOTICE_2.to_string(), 1));
     let saved = load_cache(&tmp.path().join(".update-check")).unwrap();
     assert_eq!(saved.latest, "2.0.0");
-    assert_eq!(saved.checked_at, at(0));
+    assert_eq!(saved.checked_at, Some(at(0)));
 }
 
 #[test]
@@ -261,10 +271,13 @@ fn check_refetches_after_the_ttl() {
     save_cache(&file, "0.9.0", at(0)).unwrap();
     let stale = at(24 * 60 * 60);
     assert_eq!(run_check(&c, stale, Ok("2.0.0")), (NOTICE_2.to_string(), 1));
-    assert_eq!(load_cache(&file).unwrap().checked_at, stale);
+    assert_eq!(load_cache(&file).unwrap().checked_at, Some(stale));
     // An unreadable cache counts as stale.
     fs::write(&file, "{").unwrap();
     assert_eq!(run_check(&c, stale, Ok("2.0.0")), (NOTICE_2.to_string(), 1));
+    // So does a cache without checked_at.
+    fs::write(&file, r#"{"latest":"2.0.0"}"#).unwrap();
+    assert_eq!(run_check(&c, at(0), Ok("2.0.0")), (NOTICE_2.to_string(), 1));
 }
 
 #[test]
@@ -309,11 +322,11 @@ fn check_saves_an_empty_tag_and_prints_nothing() {
 }
 
 #[test]
-fn parse_release_reads_the_first_value_like_go_decoder() {
+fn parse_release_reads_the_first_value_only() {
     assert_eq!(parse_release(br#"{"tag_name":"v1.2.3"}"#).unwrap(), "1.2.3");
     assert_eq!(parse_release(br#"{"tag_name":"1.2.3"}"#).unwrap(), "1.2.3");
     assert_eq!(parse_release(br#"{"tag_name":"vv1"}"#).unwrap(), "v1");
-    assert_eq!(parse_release(br#"{"TAG_NAME":"vzzz"}"#).unwrap(), "zzz");
+    assert_eq!(parse_release(br#"{"TAG_NAME":"vzzz"}"#).unwrap(), "");
     assert_eq!(parse_release(br#"{"name":"x"}"#).unwrap(), "");
     assert_eq!(parse_release(br#"{"tag_name":null}"#).unwrap(), "");
     assert_eq!(parse_release(b"null").unwrap(), "");
@@ -330,11 +343,11 @@ fn parse_release_reads_the_first_value_like_go_decoder() {
     );
     assert_eq!(
         parse_release(b"[]").unwrap_err(),
-        "json: cannot unmarshal array into Go value of type struct { TagName string \"json:\\\"tag_name\\\"\" }"
+        "invalid type: sequence, expected a JSON object at line 1 column 0"
     );
     assert_eq!(
         parse_release(br#"{"tag_name":1}"#).unwrap_err(),
-        "json: cannot unmarshal number into Go struct field .tag_name of type string"
+        "invalid type: integer `1`, expected a string at line 1 column 13"
     );
 }
 

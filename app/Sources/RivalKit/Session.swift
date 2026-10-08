@@ -22,7 +22,8 @@ public struct Session: Decodable, Identifiable, Hashable, Sendable {
     public let prompt: String?
     public let promptPreview: String?
     public let status: String
-    /// Go writes the zero time `0001-01-01T00:00:00Z` when unset. Check it with
+    /// Unset decodes as `Date.goZero`: current releases omit the key, older
+    /// ones wrote the zero time `0001-01-01T00:00:00Z`. Check it with
     /// `Date.isGoZero`, never against `nil`.
     public let startTime: Date
     public let queuedAt: Date?
