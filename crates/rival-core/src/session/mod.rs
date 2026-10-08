@@ -574,12 +574,17 @@ impl Session {
 
     /// Opens the session log file for appending.
     pub fn open_log(&self) -> io::Result<File> {
-        let mut opts = OpenOptions::new();
-        opts.create(true).append(true);
-        #[cfg(unix)]
-        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-        opts.open(&self.log_file)
+        open_append(Path::new(&self.log_file))
     }
+}
+
+/// Opens a log file to append, creating it with mode 0600 on Unix.
+pub(crate) fn open_append(path: &Path) -> io::Result<File> {
+    let mut opts = OpenOptions::new();
+    opts.create(true).append(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    opts.open(path)
 }
 
 /// Newest `start_time` first. Rust's stable sort keeps the name order for
