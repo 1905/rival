@@ -103,7 +103,29 @@ fn clean_windows(path: &Path) -> PathBuf {
             _ => parts.push(c),
         }
     }
-    let out: PathBuf = parts.iter().collect();
+    let mut out = PathBuf::new();
+    for c in parts {
+        match c {
+            // The prefix keeps its spelling in std (`//host/share`). Write it
+            // with backslashes, as every other separator in the result.
+            Component::Prefix(p) => {
+                use std::os::windows::ffi::{OsStrExt, OsStringExt};
+                let wide: Vec<u16> = p
+                    .as_os_str()
+                    .encode_wide()
+                    .map(|u| {
+                        if u == u16::from(b'/') {
+                            u16::from(b'\\')
+                        } else {
+                            u
+                        }
+                    })
+                    .collect();
+                out.push(std::ffi::OsString::from_wide(&wide));
+            }
+            other => out.push(other),
+        }
+    }
     if out.as_os_str().is_empty() {
         return PathBuf::from(".");
     }
@@ -670,15 +692,23 @@ mod tests {
     #[test]
     fn windows_clean_folds_std_components() {
         let got = |p: &str| clean(Path::new(p)).into_os_string();
+        // Collect every mismatch, so one run shows all of them.
+        let mut bad = Vec::new();
+        let mut check = |input: &str, want: &str| {
+            for i in [input, want] {
+                let g = got(i);
+                if g != OsString::from(want) {
+                    bad.push(format!("clean({i:?}) = {g:?}, want {want:?}"));
+                }
+            }
+        };
         for &(input, want) in CLEAN_PORTABLE {
-            let want = want.replace('/', r"\");
-            assert_eq!(got(input), OsString::from(&want), "clean({input:?})");
-            assert_eq!(got(&want), OsString::from(&want), "clean({want:?})");
+            check(input, &want.replace('/', r"\"));
         }
         for &(input, want) in CLEAN_WINDOWS {
-            assert_eq!(got(input), OsString::from(want), "clean({input:?})");
-            assert_eq!(got(want), OsString::from(want), "clean({want:?})");
+            check(input, want);
         }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
     }
 
     /// Several elements join two at a time, as callers do.
@@ -743,17 +773,18 @@ mod tests {
             // `\.\??\a`).
             (&[r"\", r"??\a"], r"\??\a"),
         ];
+        let mut bad = Vec::new();
         for &(elems, want) in cases {
             let got = elems
                 .iter()
-                .fold(PathBuf::new(), |acc, e| join(&acc, Path::new(e)));
+                .fold(PathBuf::new(), |acc, e| join(&acc, Path::new(e)))
+                .into_os_string();
             let want = want.replace('/', r"\");
-            assert_eq!(
-                got.into_os_string(),
-                OsString::from(want),
-                "join({elems:?})"
-            );
+            if got != OsString::from(&want) {
+                bad.push(format!("join({elems:?}) = {got:?}, want {want:?}"));
+            }
         }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
     }
 
     #[cfg(windows)]
