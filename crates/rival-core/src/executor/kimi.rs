@@ -64,6 +64,7 @@ pub(crate) const KIMI_DROP_ENV: [&str; 9] = [
 /// `cred_workdir` is where the Moonshot key is looked up. It differs from
 /// `workdir` only for a GitLab MR review, which runs in a temporary checkout
 /// that has no project .env; the key still comes from the caller's project.
+#[allow(clippy::too_many_arguments)]
 pub fn run_kimi(
     ctx: &Context,
     cfg: &Config,
@@ -71,11 +72,18 @@ pub fn run_kimi(
     prompt: &str,
     workdir: &str,
     cred_workdir: &str,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
-    run_kimi_with(cfg, sess, prompt, workdir, cred_workdir, |sess, req| {
-        run_subprocess(ctx, cfg.paths(), sess, req, mirror)
-    })
+    run_kimi_with(
+        cfg,
+        sess,
+        prompt,
+        workdir,
+        cred_workdir,
+        log,
+        |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
+    )
 }
 
 /// [`run_kimi`] with the spawn step injected.
@@ -85,6 +93,7 @@ pub(crate) fn run_kimi_with(
     prompt: &str,
     workdir: &str,
     cred_workdir: &str,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     let opts = kimi_run_opts(cfg, &sess.mode, cred_workdir);
@@ -96,6 +105,7 @@ pub(crate) fn run_kimi_with(
         workdir,
         config::KIMI_MODEL,
         &opts,
+        log,
         spawn,
     )
 }

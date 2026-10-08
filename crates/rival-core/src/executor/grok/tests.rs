@@ -178,6 +178,7 @@ fn run_grok_model_threads_model_to_argv() {
             &work,
             model,
             true,
+            None,
             |_, req| {
                 let file = arg_value(req.args, "--prompt-file").to_string();
                 let content = std::fs::read_to_string(&file).unwrap();
@@ -237,6 +238,7 @@ fn run_grok_sends_default_model() {
                 "high",
                 &work,
                 false,
+                None,
                 Some(&mut out),
             )
         },
@@ -261,10 +263,20 @@ fn run_grok_model_errors_remove_the_prompt_file() {
     let cfg = env.config();
     let mut sess = Session::default();
     let mut spawned = false;
-    let err = run_grok_model_with(&cfg, &mut sess, "p", "turbo", "/repo", "", true, |_, _| {
-        spawned = true;
-        Ok(RunResult::default())
-    })
+    let err = run_grok_model_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "turbo",
+        "/repo",
+        "",
+        true,
+        None,
+        |_, _| {
+            spawned = true;
+            Ok(RunResult::default())
+        },
+    )
     .unwrap_err();
     assert_eq!(
         format!("{err:#}"),
@@ -274,11 +286,21 @@ fn run_grok_model_errors_remove_the_prompt_file() {
     assert!(tmp_is_empty(&tmp));
 
     // A spawn error is wrapped once.
-    let err = run_grok_model_with(&cfg, &mut sess, "p", "low", "/repo", "", false, |_, _| {
-        Err(anyhow!(
-            "start grok: exec: \"grok\": executable file not found in $PATH"
-        ))
-    })
+    let err = run_grok_model_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        "/repo",
+        "",
+        false,
+        None,
+        |_, _| {
+            Err(anyhow!(
+                "start grok: exec: \"grok\": executable file not found in $PATH"
+            ))
+        },
+    )
     .unwrap_err();
     assert_eq!(
         format!("{err:#}"),
@@ -298,6 +320,7 @@ fn run_grok_model_errors_remove_the_prompt_file() {
         "",
         "",
         false,
+        None,
         |_, _| Ok(RunResult::default()),
     )
     .unwrap_err()
@@ -343,5 +366,31 @@ fn grok_preflight_branches() {
     assert_eq!(
         grok_preflight(&env.config()).unwrap_err().to_string(),
         "grok authentication is unavailable: $HOME is not defined; run `grok login`"
+    );
+}
+
+/// The adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_grok_model_forwards_the_log_file() {
+    let (env, _tmp) = tmp_env();
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = Session::default();
+    let mut seen = None;
+    run_grok_model_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        &work,
+        "",
+        true,
+        Some("/home/s/sessions/x.log.repair.log"),
+        crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
     );
 }

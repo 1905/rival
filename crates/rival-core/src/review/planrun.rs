@@ -141,9 +141,10 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
                     workdir,
                     plan_model_for_cli(cli),
                     None,
+                    None,
                 )?,
                 "claude" => {
-                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, None)?
+                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, None, None)?
                 }
                 _ => bail!("unsupported plan cli: {cli}"),
             };

@@ -113,6 +113,7 @@ pub(crate) fn run_claude_docker_with(
     workdir: &str,
     model: &str,
     read_only: bool,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if model != config::CLAUDE_MODEL {
@@ -175,6 +176,7 @@ pub(crate) fn run_claude_docker_with(
         prompt: &full_prompt,
         drop_env: &[],
         environ: cfg.environ(),
+        log,
     };
     let result = spawn(sess, &req);
     // Exit 0 means the container ended and `--rm` removed it. Anything else

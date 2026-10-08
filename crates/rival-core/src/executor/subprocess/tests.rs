@@ -517,6 +517,7 @@ fn child_env_filters_drops_then_appends_and_dedup_keeps_last() {
         prompt: "",
         drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
         environ: &base,
+        log: None,
     };
     let child = child_env(&req);
     assert_eq!(
@@ -561,6 +562,7 @@ fn context_timeout_kills_child() {
         prompt: "",
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     let start = Instant::now();
     // sleep would run 5s; the 100ms deadline must cut it short.
@@ -822,6 +824,7 @@ fn spawn_run<'s, 'e: 's>(
             prompt,
             drop_env: &[],
             environ: base,
+            log: None,
         };
         let res = fx.run(ctx, &req, None);
         tx.send((Instant::now(), res)).unwrap();
@@ -961,6 +964,7 @@ fn cancel_unblocks_prompt_writer_without_grace() {
         prompt: &prompt,
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     let start = Instant::now();
     let res = fx.run(&ctx, &req, None).unwrap();
@@ -988,6 +992,7 @@ fn leader_outliving_its_pipes_is_killed_on_cancel() {
         prompt: "",
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     let start = Instant::now();
     let res = fx.run(&ctx, &req, None).unwrap();
@@ -1034,6 +1039,7 @@ fn run_sh(
         prompt,
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     fx.run(&Context::background(), &req, mirror)
 }
@@ -1149,6 +1155,50 @@ fn no_mirror_still_counts_and_logs() {
     let res = run_sh(&mut fx, &format!("{DRAIN}echo one; echo two"), "", None).unwrap();
     assert_eq!((res.output_lines, res.output_bytes), (2, 8));
     assert_eq!(fx.log(), b"one\ntwo\n");
+}
+
+/// A request with its own log file writes the child output there; the
+/// session log and the saved session record stay as they were.
+#[test]
+fn request_log_writes_child_output_to_that_file_only() {
+    let mut fx = Fixture::new();
+    let before = fs::read(&fx.sess.log_file).unwrap_or_default();
+    let log_path = fx.work.path().join("session.log.repair.log");
+    let log_name = log_path.to_str().unwrap().to_string();
+    fs::write(&log_path, b"old\n").unwrap();
+    let base = environ(&[PATH_ENTRY]);
+    let args = sh_args(&format!("{DRAIN}echo one; echo err >&2"));
+    let req = Request {
+        binary: "sh",
+        args: &args,
+        env: &[],
+        prompt: "",
+        drop_env: &[],
+        environ: &base,
+        log: Some(&log_name),
+    };
+    let res = fx.run(&Context::background(), &req, None).unwrap();
+    assert_eq!((res.exit_code, res.output_lines), (0, 1));
+
+    let got = fs::read(&log_path).unwrap();
+    assert!(got.starts_with(b"old\n"), "{got:?}");
+    assert_eq!(got.len(), 12);
+    assert!(contains(&got, b"one\n") && contains(&got, b"err\n"));
+    // A new log file is created with mode 0600, as the session log is.
+    let fresh = fx.work.path().join("fresh.log");
+    let fresh_name = fresh.to_str().unwrap().to_string();
+    let req = Request {
+        log: Some(&fresh_name),
+        ..req
+    };
+    fx.run(&Context::background(), &req, None).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    let mode = fs::metadata(&fresh).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600);
+
+    assert_eq!(fs::read(&fx.sess.log_file).unwrap_or_default(), before);
+    let saved = Session::load(&fx.paths, &fx.sess.id).unwrap();
+    assert_eq!(saved.log_file, fx.sess.log_file);
 }
 
 #[test]
@@ -1342,6 +1392,7 @@ fn child_gets_exactly_the_filtered_env() {
         prompt: "some prompt",
         drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
         environ: &base,
+        log: None,
     };
     let mut mirror = Recorder::default();
     fx.run(&Context::background(), &req, Some(&mut mirror))
@@ -1389,6 +1440,7 @@ fn unix_child_keeps_mixed_case_names() {
         prompt: "some prompt",
         drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
         environ: &base,
+        log: None,
     };
     let mut mirror = Recorder::default();
     fx.run(&Context::background(), &req, Some(&mut mirror))
@@ -1454,6 +1506,7 @@ fn start_error(fx: &mut Fixture, ctx: &Context, binary: &str, base: &[OsString])
         prompt: "",
         drop_env: &[],
         environ: base,
+        log: None,
     };
     fx.run(ctx, &req, None).unwrap_err().to_string()
 }
@@ -1520,6 +1573,7 @@ fn start_errors_have_exec_style_text() {
         prompt: "",
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     assert_eq!(
         fx.run(&bg, &req, None).unwrap_err().to_string(),
@@ -1586,6 +1640,7 @@ fn argv0_is_the_bare_name_and_empty_args_stay() {
         prompt: "",
         drop_env: &[],
         environ: &base,
+        log: None,
     };
     let mut mirror = Recorder::default();
     fx.run(&Context::background(), &req, Some(&mut mirror))
@@ -1629,6 +1684,7 @@ fn executable_without_shebang_is_exec_format_error() {
         prompt: "",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let err = crate::executor::testutil::retry_busy(
         || fx.run(&Context::background(), &req, None),

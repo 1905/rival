@@ -70,6 +70,7 @@ impl SecurityExecutor<'static> {
                     entry,
                     &OpencodeRunOpts::default(),
                     None,
+                    None,
                 )
             }),
         }

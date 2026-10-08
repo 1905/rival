@@ -198,6 +198,7 @@ fn owner(report: &Path) {
         prompt: "the prompt",
         drop_env: &[],
         environ: &environ,
+        log: None,
     };
     // Blocks until this owner is terminated by the test.
     let _ = run_subprocess(&Context::background(), &paths, &mut sess, &req, None);

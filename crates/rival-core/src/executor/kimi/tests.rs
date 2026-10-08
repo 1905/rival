@@ -182,6 +182,7 @@ fn run_kimi_request_per_mode() {
             "look",
             &work,
             &cred,
+            None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap();
@@ -256,6 +257,7 @@ fn kimi_child_env_per_mode() {
                     "p",
                     &work,
                     &work,
+                    None,
                     Some(&mut out),
                 )
             },
@@ -277,4 +279,28 @@ fn kimi_child_env_per_mode() {
         assert!(has(&format!("OPENCODE_PERMISSION={permission}")), "{mode}");
         assert!(text.contains(r#""apiKey":"sk-env""#), "{mode}");
     }
+}
+
+/// The adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_kimi_forwards_the_log_file() {
+    let env = Env::new();
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("opencode", "review", config::KIMI_MODEL, &work);
+    let mut seen = None;
+    run_kimi_with(
+        &cfg,
+        &mut sess,
+        "p",
+        &work,
+        &work,
+        Some("/home/s/sessions/x.log.repair.log"),
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
+    );
 }

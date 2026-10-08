@@ -117,6 +117,7 @@ pub fn run_opencode(
     effort: &str,
     workdir: &str,
     model: &str,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_opencode_with(
@@ -128,6 +129,7 @@ pub fn run_opencode(
         workdir,
         model,
         &OpencodeRunOpts::default(),
+        log,
         mirror,
     )
 }
@@ -146,6 +148,7 @@ pub fn run_opencode_with(
     workdir: &str,
     model: &str,
     opts: &OpencodeRunOpts,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_opencode_model_with(
@@ -156,6 +159,7 @@ pub fn run_opencode_with(
         workdir,
         model,
         opts,
+        log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
 }
@@ -170,6 +174,7 @@ pub(crate) fn run_opencode_model_with(
     workdir: &str,
     model: &str,
     opts: &OpencodeRunOpts,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     let model = if model.is_empty() {
@@ -180,7 +185,7 @@ pub(crate) fn run_opencode_model_with(
     let Some(entry) = config::open_code_entry_for(model) else {
         bail!("unsupported OpenCode model {:?}", model);
     };
-    run_opencode_entry_with(cfg, sess, prompt, effort, workdir, &entry, opts, spawn)
+    run_opencode_entry_with(cfg, sess, prompt, effort, workdir, &entry, opts, log, spawn)
 }
 
 /// Runs one registry entry. Everything
@@ -197,6 +202,7 @@ pub fn run_opencode_entry(
     workdir: &str,
     entry: &SecurityModel,
     opts: &OpencodeRunOpts,
+    log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
     run_opencode_entry_with(
@@ -207,6 +213,7 @@ pub fn run_opencode_entry(
         workdir,
         entry,
         opts,
+        log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
 }
@@ -221,6 +228,7 @@ pub(crate) fn run_opencode_entry_with(
     workdir: &str,
     entry: &SecurityModel,
     opts: &OpencodeRunOpts,
+    log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     let args = opencode_run_args(entry, effort, workdir);
@@ -249,6 +257,7 @@ pub(crate) fn run_opencode_entry_with(
         prompt: &full_prompt,
         drop_env: &drop,
         environ: cfg.environ(),
+        log,
     };
     spawn(sess, &req)
 }

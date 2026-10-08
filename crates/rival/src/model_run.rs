@@ -150,6 +150,7 @@ pub fn run_model_run(
         workdir: &run_workdir,
         cred_workdir: &workdir,
         review: opts.is_review,
+        log: None,
         out: Some(&mut *stdout),
     });
     let result = match result {

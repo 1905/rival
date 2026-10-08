@@ -430,6 +430,7 @@ fn owner_race(report: &Path) {
         prompt: "",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let res = run_subprocess(&Context::background(), &fx.paths, &mut fx.sess, &req, None);
     // Unreachable: the barrier never returns.
@@ -452,6 +453,7 @@ fn owner_exit(report: &Path) {
         prompt: "ping",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let res = run_subprocess(&Context::background(), &fx.paths, &mut fx.sess, &req, None);
     // A process left in the owner Job when the owner exits normally.
@@ -516,6 +518,7 @@ fn owner_timeout_kills_launcher_and_grandchild() {
         prompt: "prompt",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let tree = watch_tree(report);
     let (ctx, _cancel) = Context::background().with_timeout(Duration::from_secs(10));
@@ -567,6 +570,7 @@ fn concurrent_providers_cancel_independently() {
                 prompt: "",
                 drop_env: &[],
                 environ: &env,
+                log: None,
             };
             run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).map(|r| r.exit_code)
         });
@@ -732,6 +736,7 @@ fn cmd_shim_keeps_argv_and_redirected_stdio() {
         prompt: "the prompt",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let (ctx, _cancel) = Context::background().with_timeout(BOUND);
     let res = run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).unwrap();
@@ -781,6 +786,7 @@ fn child_env_drops_mixed_case_inherited_names() {
         prompt: "",
         drop_env: &["ANTHROPIC_API_KEY", "AWS_"],
         environ: &env,
+        log: None,
     };
     let (ctx, _cancel) = Context::background().with_timeout(BOUND);
     let res = run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).unwrap();
@@ -853,6 +859,7 @@ fn env_child(
         prompt: "",
         drop_env,
         environ: &env,
+        log: None,
     };
     let (ctx, _cancel) = Context::background().with_timeout(BOUND);
     let res = run_subprocess(&ctx, &fx.paths, &mut fx.sess, &req, None).unwrap();
@@ -1024,6 +1031,7 @@ fn exe_provider_round_trip() {
         prompt: "hello",
         drop_env: &[],
         environ: &env,
+        log: None,
     };
     let res = run_subprocess(&Context::background(), &fx.paths, &mut fx.sess, &req, None).unwrap();
     assert_eq!(res.exit_code, 0);

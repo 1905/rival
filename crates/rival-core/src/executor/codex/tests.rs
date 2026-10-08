@@ -67,6 +67,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
             "high",
             "/repo",
             model,
+            None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap_err();
@@ -98,6 +99,7 @@ fn run_codex_model_builds_the_exact_request() {
         "xhigh",
         &work,
         config::CODEX_MODEL,
+        None,
         recorder(&mut seen, Ok(want)),
     )
     .unwrap();
@@ -118,6 +120,7 @@ fn run_codex_model_builds_the_exact_request() {
             environ: cfg.environ().to_vec(),
             mode: "review".into(),
             account: String::new(),
+            log: None,
         }
     );
 }
@@ -136,6 +139,7 @@ fn run_codex_model_wraps_errors_with_the_public_label() {
         "high",
         "/repo",
         config::CODEX_MODEL,
+        None,
         recorder(
             &mut seen,
             Err(anyhow!("start codex: OpenAI Codex failed for gpt-6-astra")),
@@ -210,6 +214,7 @@ fn run_codex_model_runs_the_fake_with_argv_and_prompt() {
                 "ultra",
                 &work,
                 config::CODEX_MODEL,
+                None,
                 Some(&mut out),
             )
         },
@@ -220,4 +225,29 @@ fn run_codex_model_runs_the_fake_with_argv_and_prompt() {
     let mut want = argv("ultra", &work).join("\n");
     want.push_str("\nlast line\n");
     assert_eq!(String::from_utf8(out).unwrap(), want);
+}
+
+/// The adapter hands the caller's log file to the spawn step.
+#[test]
+fn run_codex_model_forwards_the_log_file() {
+    let env = Env::new();
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("codex", "review", config::CODEX_MODEL, &work);
+    let mut seen = None;
+    run_codex_model_with(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        &work,
+        config::CODEX_MODEL,
+        Some("/home/s/sessions/x.log.repair.log"),
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    assert_eq!(
+        seen.unwrap().log.as_deref(),
+        Some("/home/s/sessions/x.log.repair.log")
+    );
 }

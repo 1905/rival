@@ -138,6 +138,7 @@ pub fn run_model_command(
         workdir: &run_workdir,
         cred_workdir: &workdir,
         review: parsed.is_review,
+        log: None,
         out: None,
     });
     let result = match result {
