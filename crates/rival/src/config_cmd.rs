@@ -1,5 +1,5 @@
 //! `rival config`: show and change `~/.rival/config.yaml` and the proxy
-//! key, and list the proxy's models. Bare `rival config` opens the TUI (the
+//! key, list the proxy's models, and check each model with a live call. Bare `rival config` opens the TUI (the
 //! config window comes later).
 
 use std::collections::HashSet;
@@ -14,6 +14,7 @@ use rival_core::config::{
 use rival_core::proxy;
 use serde_json::{Value as Json, json};
 
+use crate::check;
 use crate::root::{CmdEnv, CmdError};
 use crate::tree::Invocation;
 
@@ -355,4 +356,60 @@ pub fn models_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdEr
         }
     }
     Ok(())
+}
+
+/// Where a `--config-stdin` draft's errors say it came from.
+const DRAFT_NAME: &str = "<stdin>";
+
+/// `rival config check [-m LIST|all] [--json] [--config-stdin]`: one live
+/// call to each model (see [`crate::check`]). Text: the proxy line, one row
+/// per model in model order, then `N of M ok`. `--json`: one line per row as
+/// it finishes, then the summary line. `--config-stdin` checks a draft
+/// config read from stdin, validated like `config.yaml`, instead of the
+/// saved file. Exit 1 when a model fails.
+pub fn check_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
+    let draft;
+    let cfg: &Config = if inv.bool("config-stdin") {
+        let data = env.stdin.read_all().map_err(CmdError::plain)?;
+        let text = String::from_utf8(data)
+            .map_err(|_| CmdError::plain(format!("parse {DRAFT_NAME}: the config is not UTF-8")))?;
+        let user = config::parse_user_config(&text, std::path::Path::new(DRAFT_NAME))
+            .map_err(|e| CmdError::plain(e.to_string()))?;
+        draft = env.cfg.clone().with_user_config(Some(user));
+        &draft
+    } else {
+        env.cfg
+    };
+    let targets = check::targets(cfg, &inv.strings("model")).map_err(CmdError::plain)?;
+    let (ctx, _signals) = env.signal_context()?;
+    let as_json = inv.bool("json");
+    let out = std::sync::Mutex::new(&mut *env.stdout);
+    let write_line = |line: &str| {
+        let mut out = out.lock().unwrap_or_else(|e| e.into_inner());
+        let _ = writeln!(out, "{line}");
+        let _ = out.flush();
+    };
+    let on_row = |row: &check::CheckRow| {
+        if as_json {
+            write_line(&row.to_json().to_string());
+        }
+    };
+    let report = check::run_check(&ctx, cfg, &targets, &on_row);
+    if as_json {
+        write_line(&report.summary_json().to_string());
+    } else {
+        let mut out = out.lock().unwrap_or_else(|e| e.into_inner());
+        let _ = out.write_all(report.text().as_bytes());
+    }
+    if report.all_ok() {
+        return Ok(());
+    }
+    let failed = report.rows.len() - report.passed();
+    Err(CmdError::exit(
+        1,
+        format!(
+            "config check: {failed} of {} models failed",
+            report.rows.len()
+        ),
+    ))
 }

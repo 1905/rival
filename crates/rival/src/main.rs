@@ -1,3 +1,4 @@
+mod check;
 mod command_plan;
 mod command_security;
 mod config_cmd;

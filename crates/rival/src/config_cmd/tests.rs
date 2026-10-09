@@ -387,3 +387,177 @@ fn bare_config_opens_the_tui_and_key_prints_help() {
     assert_eq!(code, 1);
     assert_eq!(err, "unknown command \"bogus\" for \"rival config\"\n");
 }
+
+// ---- config check ----
+
+/// A temp `PATH` dir with a fake `codex` that replies `reply` to `exec` and
+/// records `RIVAL_PROXY_KEY` (present or not) in `seen-key`. Only this dir
+/// is on `PATH`, so no real CLI (and no docker) can answer.
+#[cfg(unix)]
+fn fake_codex_bin(reply: &str) -> tempfile::TempDir {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = tempfile::tempdir().unwrap();
+    let script = dir.path().join("codex");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\nwhile IFS= read -r l; do :; done\nprintf '%s' \"${{RIVAL_PROXY_KEY:+set}}\" > '{}/seen-key'\nprintf '{reply}\\n'\n",
+            dir.path().display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    dir
+}
+
+const CODEX_PROXY_YAML: &str = "proxy:\n  codex:\n    enabled: true\n";
+
+#[cfg(unix)]
+#[test]
+fn check_json_prints_one_line_per_model_then_the_summary() {
+    let (url, seen) = fake_proxy(200, MODEL_LIST);
+    let bin = fake_codex_bin("ok");
+    let fix = Fixture::with_config_and_env(
+        CODEX_PROXY_YAML,
+        &[
+            ("PATH", bin.path().to_str().unwrap()),
+            ("RIVAL_PROXY_URL", url.as_str()),
+            ("RIVAL_PROXY_KEY", SECRET),
+        ],
+    );
+    let (code, out, err) = run(&fix, "", &["config", "check", "-m", "codex", "--json"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    assert!(!out.contains(SECRET), "{out}");
+    let lines: Vec<serde_json::Value> = out
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines.len(), 2, "{out}");
+    let row = &lines[0];
+    assert_eq!(
+        (
+            &row["name"],
+            &row["runtime"],
+            &row["route"],
+            &row["wire_model"],
+            &row["ok"],
+            &row["reply"],
+            &row["unexpected"],
+        ),
+        (
+            &serde_json::json!("codex"),
+            &serde_json::json!("codex"),
+            &serde_json::json!("proxy"),
+            &serde_json::json!("gpt-6-astra"),
+            &serde_json::json!(true),
+            &serde_json::json!("ok"),
+            &serde_json::json!(false),
+        )
+    );
+    assert_eq!(
+        lines[1]["summary"],
+        serde_json::json!({"ok": 1, "total": 1})
+    );
+    assert_eq!(lines[1]["proxy"]["state"], "up");
+    assert_eq!(*seen.lock().unwrap(), vec![format!("Bearer {SECRET}")]);
+    assert_eq!(
+        fs::read_to_string(bin.path().join("seen-key")).unwrap(),
+        "set"
+    );
+    assert!(fix.sessions().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn check_text_and_exit_1_on_a_failed_model() {
+    let bin = fake_codex_bin("Sure, ok");
+    let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
+    let (code, out, err) = run(&fix, "", &["config", "check", "-m", "codex,opus,k3"]);
+    assert_eq!(
+        (code, err.as_str()),
+        (1, "config check: 2 of 3 models failed\n"),
+        "{out}"
+    );
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0], "proxy  off");
+    assert_eq!(lines[1], "");
+    assert!(
+        lines[2].starts_with("  ✓ codex   direct  gpt-6-astra         ")
+            && lines[2].ends_with("s  Sure, ok  (not ok)"),
+        "{out}"
+    );
+    assert_eq!(
+        lines[3],
+        "  ✗ claude  direct  claude-opus-5-5     —     not installed"
+    );
+    assert_eq!(
+        lines[4],
+        "  ✗ k3      direct  moonshotai/kimi-k3  —     not installed"
+    );
+    assert_eq!(&lines[5..], ["", "1 of 3 ok"]);
+}
+
+#[test]
+fn check_rejects_an_unknown_model() {
+    let fix = Fixture::new();
+    let (code, _, err) = run(&fix, "", &["config", "check", "-m", "gpt"]);
+    assert_eq!(code, 1);
+    assert!(
+        err.starts_with("unknown model \"gpt\" for config check"),
+        "{err}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn check_config_stdin_uses_the_draft_not_the_saved_file() {
+    let (url, _) = fake_proxy(200, MODEL_LIST);
+    let bin = fake_codex_bin("ok");
+    // The saved file is invalid: only the draft is read.
+    let fix = Fixture::with_config_and_env(
+        "efforts:\n  codex: bogus\n",
+        &[
+            ("PATH", bin.path().to_str().unwrap()),
+            ("RIVAL_PROXY_KEY", SECRET),
+        ],
+    );
+    let draft = format!("proxy:\n  url: {url}/v1\n  codex:\n    enabled: true\n");
+    let (code, out, err) = run(
+        &fix,
+        &draft,
+        &["config", "check", "-m", "codex", "--json", "--config-stdin"],
+    );
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    let row: serde_json::Value = serde_json::from_str(out.lines().next().unwrap()).unwrap();
+    assert_eq!(
+        (&row["route"], &row["ok"]),
+        (&serde_json::json!("proxy"), &serde_json::json!(true))
+    );
+    assert_eq!(
+        fs::read_to_string(bin.path().join("seen-key")).unwrap(),
+        "set"
+    );
+    // The saved file is unchanged, and without the draft it still fails.
+    assert_eq!(
+        fs::read_to_string(config_file(&fix)).unwrap(),
+        "efforts:\n  codex: bogus\n"
+    );
+    let (code, _, err) = run(&fix, "", &["config", "check", "-m", "codex"]);
+    assert_eq!(code, 1);
+    assert!(err.contains("invalid effort \"bogus\" for codex"), "{err}");
+}
+
+#[test]
+fn check_config_stdin_validates_the_draft() {
+    let fix = Fixture::new();
+    let (code, out, err) = run(
+        &fix,
+        "proxy:\n  key: sk-in-yaml\n",
+        &["config", "check", "--config-stdin"],
+    );
+    assert_eq!((code, out.as_str()), (1, ""));
+    assert_eq!(
+        err,
+        "proxy.key is not allowed in <stdin>; remove it and store the key with: rival config key set\n"
+    );
+}

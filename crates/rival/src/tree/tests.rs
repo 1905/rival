@@ -191,12 +191,23 @@ fn other_commands_match_cli_surface() {
 fn config_subtree() {
     let r = root();
     let config = node(&r, &["config"]);
-    assert_eq!(names(config), ["show", "set", "key", "models"]);
+    assert_eq!(names(config), ["show", "set", "key", "models", "check"]);
     assert_eq!(names(node(&r, &["config", "key"])), ["set", "clear"]);
     let json = [f("json", "false")];
     assert_eq!(flags(node(&r, &["config", "show"])), json);
     assert_eq!(flags(node(&r, &["config", "set"])), json);
     assert_eq!(flags(node(&r, &["config", "models"])), json);
+    assert_eq!(
+        flags(node(&r, &["config", "check"])),
+        [
+            ("model".to_string(), Some('m'), String::new()),
+            f("json", "false"),
+            f("config-stdin", "false")
+        ]
+    );
+    let inv = parse_ok(&["config", "check", "-m", "opus,fable", "--json"]);
+    assert_eq!(inv.id, CommandId::ConfigCheck);
+    assert_eq!(inv.strings("model"), argv(&["opus", "fable"]));
     assert_eq!(parse_ok(&["config"]).id, CommandId::Config);
     let inv = parse_ok(&["config", "set", "proxy.url", "http://h"]);
     assert_eq!(

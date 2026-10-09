@@ -70,6 +70,11 @@ impl Paths {
         self.root.join("config.yaml")
     }
 
+    /// The model check's logs and its empty work directory.
+    pub fn check_dir(&self) -> PathBuf {
+        self.root.join("check")
+    }
+
     /// The default proxy key file.
     pub fn proxy_key_file(&self) -> PathBuf {
         self.root.join("proxy.key")

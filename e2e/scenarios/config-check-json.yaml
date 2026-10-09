@@ -1,0 +1,224 @@
+{
+  "name": "config-check-json",
+  "description": "`rival config check -m codex,sol,opus,fable,claude --json` with both routes on the proxy (the scenario server) and the key in RIVAL_PROXY_KEY. `opus` and `claude` are one model, so four rows. One `/v1/models` call serves the header and every row. Each model gets one real adapter call: the codex ones with the provider -c values and RIVAL_PROXY_KEY in the env, the Claude ones with `--model emcd_/…`, `--effort low` and the proxy env, all read-only in ~/.rival/check. The rows print one JSON line each as they finish (any order), then the summary line with the proxy state. Sol's reply is not `ok`: it passes, flagged unexpected. Fable answers 429 `cooling down`: it fails with `limit` and the hint. Exit 1, no session saved. The adapters' info log lines are held back: stderr has no log event.",
+  "fakes": {
+    "absent": [
+      "docker"
+    ],
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<HOME>/.rival/check",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\nReply with exactly: ok"
+              },
+              "cwd": "<HOME>/.rival/check",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "ok\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<HOME>/.rival/check",
+              "-m",
+              "gpt-6.1-sol",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\nReply with exactly: ok"
+              },
+              "cwd": "<HOME>/.rival/check",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "Sure: ok\n",
+            "exit": 0
+          }
+        ]
+      },
+      "claude": {
+        "responses": [
+          {
+            "argv_prefix": [
+              "-p",
+              "--model",
+              "emcd_/claude-opus-5-5",
+              "--effort",
+              "low",
+              "--output-format",
+              "text"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Reply with exactly: ok"
+              },
+              "cwd": "<HOME>/.rival/check",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "ok\n",
+            "exit": 0
+          },
+          {
+            "argv_prefix": [
+              "-p",
+              "--model",
+              "emcd_/claude-fable-5-1",
+              "--effort",
+              "low",
+              "--output-format",
+              "text"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Reply with exactly: ok"
+              },
+              "cwd": "<HOME>/.rival/check",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "",
+            "exit": 1,
+            "stderr": "API Error: 429 All credentials for model emcd_/claude-fable-5-1 are cooling down (rate_limit_error: monthly spend limit)\n"
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd_\n  codex:\n    enabled: true\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd_/claude-fable-5-1",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            },
+            {
+              "id": "gpt-6.1-sol",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "config",
+        "check",
+        "-m",
+        "codex,sol,opus,fable,claude",
+        "--json"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": {
+          "$regex": "(?m)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"codex\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"unexpected\":false,\"wire_model\":\"gpt\\-6\\-astra\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"sol\",\"ok\":true,\"reply\":\"Sure:\\ ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"unexpected\":true,\"wire_model\":\"gpt\\-6\\.1\\-sol\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"claude\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-opus\\-5\\-5\"\\}$)(?=(?s:.*)^\\{\"error\":\"exited\\ with\\ code\\ 1:\\ API\\ Error:\\ 429\\ All\\ credentials\\ for\\ model\\ emcd_/claude\\-fable\\-5\\-1\\ are\\ cooling\\ down\\ \\(rate_limit_error:\\ monthly\\ spend\\ limit\\)\",\"hint\":\"proxy\\ account\\ emcd_\\ is\\ at\\ its\\ limit\\ \\(429\\);\\ no\\ other\\ prefix\\ serves\\ claude\\-fable\\-5\\-1\\ —\\ wait\\ for\\ the\\ limit\\ to\\ reset\",\"limit\":true,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":false,\"reply\":\"\",\"route\":\"proxy\",\"runtime\":\"claude\",\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}$)(?:^\\{\"error\"[^\\n]*\\}\\n){4}\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":3,\"total\":4\\}\\}\\n"
+        },
+        "stderr_lines": [
+          "config check: 1 of 4 models failed"
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/check/claude.log",
+      ".rival/check/codex.log",
+      ".rival/check/fable.log",
+      ".rival/check/sol.log"
+    ],
+    "calls": {
+      "codex": 2,
+      "claude": 2
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

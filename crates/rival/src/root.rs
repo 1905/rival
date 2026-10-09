@@ -505,9 +505,11 @@ fn pre_run(
     inv: &Invocation,
     bg: &mut Background,
 ) -> PreRun {
-    // `config set` and `config key` can repair an invalid config file.
+    // `config set` and `config key` can repair an invalid config file;
+    // `config check --config-stdin` does not read it.
     if let Some(err) = env.cfg.user_config_error()
         && !inv.id.repairs_config()
+        && !(inv.id == CommandId::ConfigCheck && inv.bool("config-stdin"))
     {
         return PreRun::Fail(CmdError::plain(err.to_string()));
     }
@@ -590,6 +592,7 @@ fn dispatch(
         CommandId::ConfigKeySet => config_cmd::key_set_action(env, inv),
         CommandId::ConfigKeyClear => config_cmd::key_clear_action(env),
         CommandId::ConfigModels => config_cmd::models_action(env, inv),
+        CommandId::ConfigCheck => config_cmd::check_action(env, inv),
         CommandId::Queue => queue_sessions::queue_list_action(env),
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),

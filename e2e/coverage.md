@@ -134,6 +134,17 @@ The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` 
 | preflight: key rejected (401), codex never runs | — | proxy-codex-key-rejected |
 | exact `-c` strings, TOML-unsafe URL refused, prefix on the wire id, direct argv unchanged, proxy hint (429, rejected key) | unit tests `executor::codex::tests` | same |
 
+## config check
+
+`rival config check` makes one real adapter call per model (`Reply with exactly: ok`, effort low, read-only, in `~/.rival/check`), with no queue slot and an ephemeral session: no scenario home has a `sessions/` or `queue/` file. The JSON rows come in completion order, so `config-check-json` matches each row with a lookahead.
+
+| Command / flag | ✓ | ✗ |
+|---|---|---|
+| `config check` (default models: codex, sol, claude, fable, security reviewer), text table in model order, `N of M ok`, exit 1 | config-check-fail-exit (codex, sol) | config-check-fail-exit (claude/fable not installed, K3 preflight) |
+| `config check -m LIST --json` through the proxy: no info log lines on stderr, one `/v1/models` call, one JSON line per row, summary line with the proxy state, `opus` = `claude`, unexpected reply passes flagged, 429 row with `limit` and the hint | config-check-json | config-check-json (fable 429) |
+| `config check --config-stdin` (an unsaved draft; config.yaml untouched) | config-check-draft | invalid draft, invalid saved file bypassed: unit tests `config_cmd::tests::check_config_stdin_*` |
+| engine: proxy down, key rejected or missing, model not listed, timeout, at most 3 live calls, logs under `check/`, no session saved | unit tests `check::tests`, `executor::subprocess::tests::ephemeral_session_is_never_saved`, `session::tests::ephemeral_session_save_writes_nothing` | same |
+
 ## wait
 
 | Command / flag | ✓ | ✗ |

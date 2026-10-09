@@ -22,7 +22,7 @@ pub(crate) fn path_env(cfg: &Config) -> Option<&OsStr> {
 }
 
 /// Looks up `name` in `cfg`'s `$PATH`.
-pub(crate) fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::LookPathError> {
+pub fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::LookPathError> {
     process::look_path(name, path_env(cfg))
 }
 

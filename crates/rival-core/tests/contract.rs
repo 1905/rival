@@ -168,6 +168,7 @@ fn session_of(f: &Fields) -> Session {
         owner_pid: f.owner_pid,
         owner_pid_start: f.owner_pid_start,
         start_mono: Default::default(),
+        ephemeral: false,
     }
 }
 

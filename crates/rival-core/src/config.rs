@@ -1102,8 +1102,9 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
 }
 
 /// Parses and validates config text as if read from `path` (errors name
-/// `path`). [`load_user_config`] and the writer share it.
-pub(crate) fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigError> {
+/// `path`). [`load_user_config`], the writer and `config check
+/// --config-stdin` (a draft) share it.
+pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigError> {
     let shown = path.display();
     let parse_err = |e: &dyn fmt::Display| ConfigError::new(format!("parse {shown}: {e}"));
     let raw: Option<RawUserConfig> = serde_saphyr::from_str(text).map_err(|e| parse_err(&e))?;

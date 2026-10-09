@@ -41,6 +41,7 @@ pub enum CommandId {
     ConfigKeySet,
     ConfigKeyClear,
     ConfigModels,
+    ConfigCheck,
     Install,
     Queue,
     QueueClear,
@@ -83,6 +84,7 @@ impl CommandId {
             ["rival", "config", "key", "set"] => ConfigKeySet,
             ["rival", "config", "key", "clear"] => ConfigKeyClear,
             ["rival", "config", "models"] => ConfigModels,
+            ["rival", "config", "check"] => ConfigCheck,
             ["rival", "install"] => Install,
             ["rival", "queue"] => Queue,
             ["rival", "queue", "clear"] => QueueClear,
@@ -118,6 +120,7 @@ impl CommandId {
                 | ConfigKey
                 | ConfigKeyClear
                 | ConfigModels
+                | ConfigCheck
                 | Install
                 | Completion
                 | CompletionBash
@@ -333,6 +336,12 @@ pub fn build(defaults: &Defaults) -> Command {
         ]),
         with_args(command("models", "List the models the proxy serves"))
             .arg(bool_flag("json", "print one JSON object")),
+        with_args(command("check", "Send one short prompt to each model and show which answer"))
+            .args([
+                model_flag("", "models to check: codex, sol, claude (or opus), fable, k3, grok, grok-4.6-openrouter, or all (comma-separated; default: codex, sol, claude, fable and the security reviewer)"),
+                bool_flag("json", "print one JSON line per model as it finishes, then a summary line"),
+                bool_flag("config-stdin", "check a draft config.yaml read from stdin instead of the saved file"),
+            ]),
     ]);
 
     command("rival", "Dispatch prompts and reviews to external AI models")

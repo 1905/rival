@@ -135,6 +135,11 @@ pub struct Session {
     /// Not in the record: the monotonic clock behind `start_time`.
     #[serde(skip)]
     pub start_mono: MonoStart,
+    /// Not in the record: a run that is never saved (the model check).
+    /// [`Session::save`] writes nothing for it, so no `sessions/` file, run
+    /// list entry or dashboard row shows the run.
+    #[serde(skip)]
+    pub ephemeral: bool,
 }
 
 /// The outcome fields of a record, for readers that must not fail on an
@@ -452,8 +457,11 @@ impl Session {
     /// app); with one shared temp name, two concurrent writers could
     /// interleave into a partial file and rename it into place. The temp name
     /// never ends in ".json", so readers that glob or suffix-match "*.json"
-    /// skip it.
+    /// skip it. An [`Session::ephemeral`] session is not written.
     pub fn save(&self, paths: &Paths) -> anyhow::Result<()> {
+        if self.ephemeral {
+            return Ok(());
+        }
         let dir = paths.sessions_dir();
         let data = self.to_json()?;
 

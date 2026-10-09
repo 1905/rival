@@ -436,6 +436,7 @@ fn full_session() -> Session {
         owner_pid: 43,
         owner_pid_start: 8,
         start_mono: MonoStart::default(),
+        ephemeral: false,
     }
 }
 
@@ -1165,4 +1166,21 @@ fn to_json_scrubs_registered_secrets() {
         text.contains("\"error\": \"claude said <redacted>\""),
         "{text}"
     );
+}
+
+#[test]
+fn ephemeral_session_save_writes_nothing() {
+    let home = tempfile::tempdir().unwrap();
+    let paths = Paths::from_home(home.path());
+    fs::create_dir_all(paths.sessions_dir()).unwrap();
+    let sess = Session {
+        id: "check-codex".to_string(),
+        ephemeral: true,
+        ..Session::default()
+    };
+    sess.save(&paths).unwrap();
+    assert_eq!(fs::read_dir(paths.sessions_dir()).unwrap().count(), 0);
+    // The flag is not part of the record.
+    let json = String::from_utf8(sess.to_json().unwrap()).unwrap();
+    assert!(!json.contains("ephemeral"), "{json}");
 }
