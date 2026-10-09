@@ -113,6 +113,7 @@ fn claude_review_transport_restrictions() {
                     "review",
                     "medium",
                     &repo,
+                    config::CLAUDE_MODEL,
                     read_only,
                     None,
                     Some(&mut out),
@@ -169,6 +170,7 @@ fn claude_docker_review_mount_is_read_only() {
                 "review",
                 "medium",
                 &repo,
+                config::CLAUDE_MODEL,
                 true,
                 None,
                 Some(&mut out),
@@ -966,6 +968,7 @@ fn proxy_key_never_reaches_the_log_mirror_or_record() {
                 "review",
                 "medium",
                 &repo,
+                config::CLAUDE_MODEL,
                 true,
                 None,
                 Some(&mut out),
@@ -993,4 +996,46 @@ fn proxy_key_never_reaches_the_log_mirror_or_record() {
         record.contains(&format!("\"wire_model\": \"{WIRE}\"")),
         "{record}"
     );
+}
+
+/// Fable 5.1 runs on the Claude runtime: its id reaches `--model`, and on
+/// the proxy route it gets the prefix. The session keeps the bare id.
+#[test]
+fn fable_runs_direct_and_through_the_proxy() {
+    let run = |env: &Env| {
+        let cfg = env.config();
+        let work = env.work_str();
+        let mut sess = env.session("claude", "review", config::FABLE_MODEL, &work);
+        let mut seen = None;
+        run_claude_model(
+            &cfg,
+            &mut sess,
+            "p",
+            "medium",
+            &work,
+            config::FABLE_MODEL,
+            true,
+            None,
+            recorder(&mut seen, Ok(RunResult::default())),
+        )
+        .unwrap();
+        (seen.unwrap(), sess)
+    };
+    let env = Env::new();
+    env.fake_on_path("claude");
+    let (seen, sess) = run(&env);
+    let mut want = read_only_argv("medium");
+    want[2] = config::FABLE_MODEL.to_string();
+    assert_eq!(seen.args, want);
+    assert_eq!((sess.route.as_str(), sess.wire_model.as_str()), ("", ""));
+
+    let env = proxy_env_at("http://127.0.0.1:8999");
+    env.fake_on_path("claude");
+    let (seen, sess) = run(&env);
+    want[2] = "emcd_/claude-fable-5-1".to_string();
+    assert_eq!(seen.args, want);
+    assert_eq!(sess.model, config::FABLE_MODEL);
+    assert_eq!(sess.wire_model, "emcd_/claude-fable-5-1");
+    assert!(is_claude_model(config::FABLE_MODEL));
+    assert!(!is_claude_model(config::SOL_MODEL));
 }

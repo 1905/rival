@@ -312,6 +312,17 @@ fn engine_label_table() {
         ("custom", "", "custom"),
         ("custom", "custom/model", "retired-model"),
         ("custom", GROK_OPENROUTER_LABEL, GROK_OPENROUTER_LABEL),
+        // Sol 6.1 and Fable 5.1 are current again; old ids keep their labels.
+        ("codex", SOL_MODEL, SOL_LABEL),
+        ("codex", "gpt-6.1-sol", "sol"),
+        ("codex", "gpt-5.6-sol", "sol"),
+        ("codex", CODEX_MODEL, CODEX_LABEL),
+        ("claude", FABLE_MODEL, FABLE_LABEL),
+        ("claude", "claude-fable-5-1", "fable"),
+        ("claude", "claude-fable-5", "retired-model"),
+        ("fable", FABLE_MODEL, FABLE_LABEL),
+        ("", SOL_MODEL, SOL_LABEL),
+        ("", FABLE_MODEL, FABLE_LABEL),
     ];
     for (cli, model, want) in cases {
         assert_eq!(
@@ -339,6 +350,9 @@ fn model_label_only_exposes_supported_models() {
         (CODEX_LABEL, CODEX_LABEL),
         (GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         (GROK_OPENROUTER_LABEL, GROK_OPENROUTER_LABEL),
+        (SOL_MODEL, SOL_LABEL),
+        (FABLE_MODEL, FABLE_LABEL),
+        (FABLE_LABEL, FABLE_LABEL),
     ];
     for (model, want) in cases {
         assert_eq!(model_label(model), want, "model_label({model:?})");
@@ -1905,4 +1919,30 @@ fn route_debug_hides_the_key() {
     let shown = format!("{route:?}");
     assert!(!shown.contains("sk-very-secret"), "{shown}");
     assert!(shown.contains("emcd_"), "{shown}");
+}
+
+/// Sol 6.1 and Fable 5.1 logs show their own labels; a Codex log's bare
+/// "Codex" banner names Codex, not Sol.
+#[test]
+fn public_runtime_log_names_sol_and_fable() {
+    assert_eq!(
+        public_runtime_log("codex", SOL_MODEL, "Codex v1\nmodel: gpt-6.1-sol\n"),
+        "Sol runtime v1\nmodel: sol\n"
+    );
+    assert_eq!(
+        public_runtime_log("codex", CODEX_MODEL, "Codex v1\nmodel: gpt-6-astra\n"),
+        "Codex runtime v1\nmodel: codex\n"
+    );
+    assert_eq!(
+        public_runtime_log("codex", "", "Codex v1\n"),
+        "Sol runtime v1\n"
+    );
+    assert_eq!(
+        public_runtime_log(
+            "claude",
+            FABLE_MODEL,
+            "Claude Code v2\nmodel: claude-fable-5-1\n"
+        ),
+        "Fable runtime v2\nmodel: fable\n"
+    );
 }

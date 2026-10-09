@@ -13,6 +13,7 @@
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use rival_core::config::OPUS_ALIAS;
 use rival_core::duration;
 
 use crate::csvflag;
@@ -27,10 +28,12 @@ pub enum CommandId {
     Command,
     CommandClaude,
     CommandCodex,
+    CommandFable,
     CommandGrok,
     CommandK3,
     CommandPlan,
     CommandSecurity,
+    CommandSol,
     Config,
     ConfigShow,
     ConfigSet,
@@ -43,6 +46,7 @@ pub enum CommandId {
     QueueClear,
     Run,
     RunClaude,
+    RunFable,
     RunGrok,
     RunK3,
     Sessions,
@@ -66,10 +70,12 @@ impl CommandId {
             ["rival", "command"] => Command,
             ["rival", "command", "claude"] => CommandClaude,
             ["rival", "command", "codex"] => CommandCodex,
+            ["rival", "command", "fable"] => CommandFable,
             ["rival", "command", "grok"] => CommandGrok,
             ["rival", "command", "k3"] => CommandK3,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
+            ["rival", "command", "sol"] => CommandSol,
             ["rival", "config"] => Config,
             ["rival", "config", "show"] => ConfigShow,
             ["rival", "config", "set"] => ConfigSet,
@@ -82,6 +88,7 @@ impl CommandId {
             ["rival", "queue", "clear"] => QueueClear,
             ["rival", "run"] => Run,
             ["rival", "run", "claude"] => RunClaude,
+            ["rival", "run", "fable"] => RunFable,
             ["rival", "run", "grok"] => RunGrok,
             ["rival", "run", "k3"] => RunK3,
             ["rival", "sessions"] => Sessions,
@@ -279,14 +286,17 @@ pub fn build(defaults: &Defaults) -> Command {
         .global(true),
     )
     .subcommands([
-        model_command("claude", "Skill-facing Claude executor"),
+        // `opus` is another name for `claude`; clap reports the canonical
+        // name, so the command path stays `command claude`.
+        model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
         model_command("codex", "Skill-facing Codex executor"),
+        model_command("fable", "Skill-facing Fable executor"),
         model_command("grok", "Skill-facing Grok executor"),
         model_command("k3", "Run Kimi K3 prompts from stdin"),
-        with_args(command("plan", "Review a plan/spec with Codex and/or Claude")).args([
+        with_args(command("plan", "Review a plan/spec with Codex, Sol, Claude and/or Fable")).args([
             workdir(),
             no_queue(),
-            model_flag("codex", "plan review model(s): codex, claude (comma-separated)"),
+            model_flag("codex", "plan review model(s): codex, sol, claude (or opus), fable (comma-separated; default: plan.models, else codex)"),
             effort("override reasoning effort for every selected model: low, medium, high, xhigh, ultra (default: each model's own)"),
         ]),
         with_args(command("security", "Security review with the configured model")).args([
@@ -294,6 +304,7 @@ pub fn build(defaults: &Defaults) -> Command {
             no_queue(),
             bool_flag("which", "print the resolved model and exit"),
         ]),
+        model_command("sol", "Skill-facing Sol executor"),
     ]);
 
     // `key set` keeps its stray words: the action refuses them without
@@ -343,6 +354,12 @@ pub fn build(defaults: &Defaults) -> Command {
                     run_command(
                         "claude",
                         "Run Claude",
+                        Some("reasoning effort override (low, medium, high, xhigh)"),
+                    )
+                    .visible_alias(OPUS_ALIAS),
+                    run_command(
+                        "fable",
+                        "Run Fable",
                         Some("reasoning effort override (low, medium, high, xhigh)"),
                     ),
                     run_command(

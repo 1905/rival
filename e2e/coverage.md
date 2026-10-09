@@ -30,12 +30,17 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command codex --no-queue`, `--workdir` | command-codex-no-queue-workdir | workdir-missing |
 | `command claude` | executor-claude-success, executor-claude-docker-success | executor-claude-failure, executor-claude-quota, executor-claude-missing-runtime, executor-claude-docker-failure, executor-claude-docker-quota |
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
+| `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
+| `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
+| `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
 | `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
 | `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
 | `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
+| `command plan -m opus,fable,sol` (two blocks on the Claude runtime, one on codex, all through the proxy; repair pass per block) | plan-three-models | unit tests `command_plan::tests::parse_plan_models`, `review::planrun::tests::two_models_on_one_runtime_run_as_two_blocks` |
+| `command plan` default from `plan.models` | unit test `command_plan::tests::plan_models_config_is_the_default` | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |
 | `command security` | security-k3-structured | security-k3-nonzero-exit, security-missing-key |
@@ -44,7 +49,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | review wording edit (code, security, plan; none for a clean review) | review-language-code, review-language-security, review-language-plan, review-language-clean | unit tests: `lang::repair`, `model_command`, `command_security`, `review::planrun` |
 | every `command *` leaf `--help` | help-every-command (help) | — |
 
-Concurrent reviewers (plan-dual-models) bind each session file by its `cli` field (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
+Concurrent reviewers bind each session file by its `cli` field (plan-dual-models) or its `model` field (plan-three-models, where two reviewers share a runtime) (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
 
 ## run
 
@@ -55,6 +60,7 @@ Concurrent reviewers (plan-dual-models) bind each session file by its `cli` fiel
 | `run claude --effort` | run-claude-flags | run-claude-flags (invalid effort) |
 | `run claude --review` | run-claude-flags | — |
 | `run claude --no-queue`, `--workdir` | run-claude-flags, sessions-list | workdir-missing |
+| `run fable`, `run opus` (alias of `run claude`) | unit tests `tree::tests::opus_is_an_alias_of_claude`, `model_specs::tests::fable_and_sol_specs_follow_their_runtimes` | — |
 | `run grok --prompt-stdin`, `--effort`, `--no-queue`, `--workdir` | run-grok-flags | workdir-missing |
 | `run grok --review` (ultra clamps to high, read-only sandbox) | run-grok-flags | — |
 | `run k3 --prompt-stdin`, `--no-queue`, `--workdir` | run-k3-flags | workdir-missing |

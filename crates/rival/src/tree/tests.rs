@@ -113,7 +113,9 @@ fn command_subtree_matches_cli_surface() {
     let command = node(&r, &["command"]);
     assert_eq!(
         names(command),
-        ["claude", "codex", "grok", "k3", "plan", "security"]
+        [
+            "claude", "codex", "fable", "grok", "k3", "plan", "security", "sol"
+        ]
     );
     let detach = command
         .get_arguments()
@@ -124,7 +126,7 @@ fn command_subtree_matches_cli_surface() {
         detach.get_help().unwrap().to_string(),
         "run detached in a new process session; prints 'rival: detached pid=N' and exits"
     );
-    for model in ["claude", "codex", "grok", "k3"] {
+    for model in ["claude", "codex", "fable", "grok", "k3", "sol"] {
         assert_eq!(
             flags(node(&r, &["command", model])),
             [f("workdir", "."), f("no-queue", "false")],
@@ -160,7 +162,7 @@ fn other_commands_match_cli_surface() {
     );
     assert_eq!(names(node(&r, &["queue"])), ["clear"]);
     assert_eq!(flags(node(&r, &["queue", "clear"])), [f("force", "false")]);
-    assert_eq!(names(node(&r, &["run"])), ["claude", "grok", "k3"]);
+    assert_eq!(names(node(&r, &["run"])), ["claude", "fable", "grok", "k3"]);
     let run_flags = [
         f("effort", ""),
         f("workdir", "."),
@@ -169,6 +171,7 @@ fn other_commands_match_cli_surface() {
         f("no-queue", "false"),
     ];
     assert_eq!(flags(node(&r, &["run", "claude"])), run_flags);
+    assert_eq!(flags(node(&r, &["run", "fable"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "grok"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "k3"])), run_flags[1..]);
     assert_eq!(
@@ -282,10 +285,7 @@ fn removed_review_commands_do_not_resolve() {
         parse_err(&["command", "megareview"]),
         "unknown command \"megareview\" for \"rival command\""
     );
-    assert_eq!(
-        parse_err(&["command", "sol"]),
-        "unknown command \"sol\" for \"rival command\""
-    );
+    // Sol has `command sol` but no `run sol`.
     assert_eq!(
         parse_err(&["run", "sol"]),
         "unknown command \"sol\" for \"rival run\""
@@ -294,7 +294,6 @@ fn removed_review_commands_do_not_resolve() {
     for (parent, name) in [
         (None, "review"),
         (Some("command"), "megareview"),
-        (Some("command"), "sol"),
         (Some("run"), "sol"),
         (None, "server"),
     ] {
@@ -723,4 +722,22 @@ fn completion_scripts_cover_the_tree() {
             assert!(script.contains(word), "{shell}: script lacks {word}");
         }
     }
+}
+
+/// `opus` is another name for `claude` under `command` and `run`; the
+/// invocation keeps the canonical path.
+#[test]
+fn opus_is_an_alias_of_claude() {
+    let inv = parse_ok(&["command", "opus"]);
+    assert_eq!(inv.id, CommandId::CommandClaude);
+    assert_eq!(inv.path, ["rival", "command", "claude"]);
+    let inv = parse_ok(&["run", "opus", "--prompt-stdin"]);
+    assert_eq!(inv.id, CommandId::RunClaude);
+    assert_eq!(parse_ok(&["command", "fable"]).id, CommandId::CommandFable);
+    assert_eq!(parse_ok(&["command", "sol"]).id, CommandId::CommandSol);
+    assert_eq!(parse_ok(&["run", "fable"]).id, CommandId::RunFable);
+    assert_eq!(
+        parse_err(&["run", "opuss"]).lines().next().unwrap(),
+        "unknown command \"opuss\" for \"rival run\""
+    );
 }

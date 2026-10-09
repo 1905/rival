@@ -560,3 +560,40 @@ fn codex_auth_hint_is_proxy_only() {
         )
     );
 }
+
+/// Sol 6.1 runs on the codex runtime, direct and through the proxy.
+#[test]
+fn sol_runs_direct_and_through_the_proxy() {
+    let run = |env: &Env| {
+        let cfg = env.config();
+        let work = env.work_str();
+        let mut sess = env.session("codex", "review", config::SOL_MODEL, &work);
+        let mut seen = None;
+        run_codex_model_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "ultra",
+            &work,
+            config::SOL_MODEL,
+            None,
+            recorder(&mut seen, Ok(RunResult::default())),
+        )
+        .unwrap();
+        (seen.unwrap(), sess)
+    };
+    let env = Env::new();
+    let (seen, _) = run(&env);
+    let mut want = argv("ultra", &env.work_str());
+    want[4] = config::SOL_MODEL.to_string();
+    assert_eq!(seen.args, want);
+
+    let env = proxy_env_at("http://127.0.0.1:8999");
+    let (seen, sess) = run(&env);
+    let mut want = proxy_argv("ultra", &env.work_str(), "http://127.0.0.1:8999");
+    want[4] = config::SOL_MODEL.to_string();
+    assert_eq!(seen.args, want);
+    assert_eq!(sess.wire_model, config::SOL_MODEL);
+    assert!(is_codex_model(config::SOL_MODEL));
+    assert!(!is_codex_model(config::GPT56_SOL_MODEL));
+}

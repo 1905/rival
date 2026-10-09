@@ -1,0 +1,169 @@
+{
+  "name": "fable-review",
+  "description": "`rival command fable` review, direct (no proxy block). The fake claude sees `--model claude-fable-5-1` at the Claude default effort (medium) for the review and low for the language repair pass. The session records the bare Fable id, cli claude and the subscription account; the output names the reviewer `fable`.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-fable-5-1",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed\\.\n\nReview scope: src/\n\n## Role: Implementation Bug Hunter\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "CLAUDECODE": null,
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-fable-5-1",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "CLAUDECODE": null,
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1"
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "fable"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: fable (claude-fable-5-1)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting fable (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "review"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "fable"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "subscription",
+              "model": "fable"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-fable-5-1",
+          "mode": "native",
+          "review_scope": "src/",
+          "account": "subscription"
+        }
+      }
+    ],
+    "calls": {
+      "claude": 2
+    }
+  }
+}

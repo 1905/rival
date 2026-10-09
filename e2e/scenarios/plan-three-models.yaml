@@ -1,0 +1,484 @@
+{
+  "name": "plan-three-models",
+  "description": "`rival command plan -m opus,fable,sol` with both proxy routes on: proxy.claude with prefix emcd_ and proxy.codex with no prefix. `opus` names Claude (Opus 5.5). Opus and Fable run on the fake claude as two blocks with wire ids emcd_/claude-opus-5-5 and emcd_/claude-fable-5-1 (ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY in the env); Sol runs on the fake codex with -m gpt-6.1-sol and the provider -c values, RIVAL_PROXY_KEY in the env and no `codex login status`. Each block's language repair pass runs on its own model at low effort. The preflights share one GET /v1/models. Each session keeps its bare model id and records route proxy and its wire_model.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "emcd_/claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)<ROOT>/work/plan\\.md(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"The claude review finds no gap.\",\"rating\":8,\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "emcd_/claude-opus-5-5",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"The claude review finds no gap.\",\"rating\":8,\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "emcd_/claude-fable-5-1",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)<ROOT>/work/plan\\.md(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"The fable review finds no gap.\",\"rating\":7,\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "emcd_/claude-fable-5-1",
+              "--effort",
+              "low",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "{\"summary\":\"The fable review finds no gap.\",\"rating\":7,\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      },
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.1-sol",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)<ROOT>/work/plan\\.md(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "{\"summary\":\"The sol review finds no gap.\",\"rating\":6,\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.1-sol",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "{\"summary\":\"The sol review finds no gap.\",\"rating\":6,\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000",
+    "CLAUDECODE": "1"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd_\n  codex:\n    enabled: true\n"
+    },
+    {
+      "write": "work/plan.md",
+      "text": "# Plan\n\nAdd a column, then ship.\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd_/claude-fable-5-1",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            },
+            {
+              "id": "gpt-6.1-sol",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "plan",
+        "-m",
+        "opus,fable,sol"
+      ],
+      "stdin": "plan.md",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL PLAN REVIEW (claude + fable + sol) ═══\n\nFile: <ROOT>/work/plan.md\n\n── claude ──\n\nRating: 8/10\n\nSummary: The claude review finds no gap.\n\nNo bugs or gaps found.\n\n\n── fable ──\n\nRating: 7/10\n\nSummary: The fable review finds no gap.\n\nNo bugs or gaps found.\n\n\n── sol ──\n\nRating: 6/10\n\nSummary: The sol review finds no gap.\n\nNo bugs or gaps found.\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<ID:OPUS>",
+              "reviewer": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<ID:FABLE>",
+              "reviewer": "fable"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting plan reviewer",
+            "fields": {
+              "session": "<ID:SOL>",
+              "reviewer": "sol"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:OPUS>",
+              "auth": "proxy",
+              "model": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:OPUS>",
+              "auth": "proxy",
+              "model": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:FABLE>",
+              "auth": "proxy",
+              "model": "fable"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:FABLE>",
+              "auth": "proxy",
+              "model": "fable"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/queue/.lock",
+      ".rival/sessions/<ID:OPUS>.json",
+      ".rival/sessions/<ID:OPUS>.log",
+      ".rival/sessions/<ID:OPUS>.log.repair.log",
+      ".rival/sessions/<ID:FABLE>.json",
+      ".rival/sessions/<ID:FABLE>.log",
+      ".rival/sessions/<ID:FABLE>.log.repair.log",
+      ".rival/sessions/<ID:SOL>.json",
+      ".rival/sessions/<ID:SOL>.log",
+      ".rival/sessions/<ID:SOL>.log.repair.log"
+    ],
+    "files": [
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "claude-opus-5-5"
+        },
+        "bind": {
+          "OPUS": "id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "mode": "plan",
+          "route": "proxy",
+          "wire_model": "emcd_/claude-opus-5-5",
+          "account": "proxy",
+          "review_scope": "<ROOT>/work/plan.md"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "claude-fable-5-1"
+        },
+        "bind": {
+          "FABLE": "id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "model": "claude-fable-5-1",
+          "effort": "medium",
+          "mode": "plan",
+          "route": "proxy",
+          "wire_model": "emcd_/claude-fable-5-1",
+          "account": "proxy",
+          "review_scope": "<ROOT>/work/plan.md"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "gpt-6.1-sol"
+        },
+        "bind": {
+          "SOL": "id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "mode": "plan",
+          "route": "proxy",
+          "wire_model": "gpt-6.1-sol",
+          "account": "proxy",
+          "review_scope": "<ROOT>/work/plan.md"
+        }
+      }
+    ],
+    "calls": {
+      "claude": 4,
+      "codex": 2
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

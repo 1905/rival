@@ -40,9 +40,14 @@ pub fn codex_preflight_for(cfg: &Config, model: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Whether the codex runtime runs `model`: Codex or Sol 6.1.
+pub fn is_codex_model(model: &str) -> bool {
+    model == config::CODEX_MODEL || model == config::SOL_MODEL
+}
+
 /// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
-/// also the model sent to the runtime. Codex is the only model it runs.
+/// also the model sent to the runtime. It runs Codex and Sol 6.1.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -79,7 +84,7 @@ pub(crate) fn run_codex_model_with(
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
-    if model != config::CODEX_MODEL {
+    if !is_codex_model(model) {
         bail!("unsupported codex model {:?}", model);
     }
     let result = (|| {

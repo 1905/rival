@@ -21,22 +21,28 @@ use crate::paths::{self, Paths};
 
 pub mod write;
 
-// GPT56_SOL_MODEL and SOL_LABEL name a removed model (2026-09-26). Nothing
-// runs it; the executor rejects it.
-/// read-compat: display of sessions recorded before Sol's removal
+/// read-compat: the Sol model before Sol 6.1. Nothing runs it; the
+/// executor rejects it. Its sessions still show as `sol`.
 pub const GPT56_SOL_MODEL: &str = "gpt-5.6-sol";
-// CODEX_MODEL shares the codex runtime with the removed Sol model, so
-// engine_label must match it before the "codex" adapter fallback, which
-// labels old sessions "sol". The public label equals the adapter name, so
-// identity checks key on the model id, never on the bare word "codex".
+// CODEX_MODEL and SOL_MODEL share the codex runtime, so engine_label must
+// match both ids before the "codex" adapter fallback, which labels old
+// sessions "sol". The public label equals the adapter name, so identity
+// checks key on the model id, never on the bare word "codex".
 pub const CODEX_MODEL: &str = "gpt-6-astra";
 pub const CODEX_LABEL: &str = "codex";
+/// Sol 6.1 on the codex runtime.
+pub const SOL_MODEL: &str = "gpt-6.1-sol";
 pub const CLAUDE_MODEL: &str = "claude-opus-5-5";
-/// read-compat: display of sessions recorded before Sol's removal. Also
-/// the `efforts.sol` key (Codex ladder).
+/// Fable 5.1 on the Claude Code runtime.
+pub const FABLE_MODEL: &str = "claude-fable-5-1";
+/// The Sol label: `command sol`, plan `-m sol` and the `efforts.sol` key
+/// (Codex ladder).
 pub const SOL_LABEL: &str = "sol";
 pub const CLAUDE_LABEL: &str = "claude";
-/// The `efforts.fable` key (Claude ladder).
+/// `opus`: another name for `claude` in commands and plan `-m`.
+pub const OPUS_ALIAS: &str = "opus";
+/// The Fable label: `command fable`, `run fable`, plan `-m fable` and the
+/// `efforts.fable` key (Claude ladder).
 pub const FABLE_LABEL: &str = "fable";
 pub const K3_LABEL: &str = "kimi-k3";
 /// The CLI command word for K3. It differs from [`K3_LABEL`], which is the
@@ -93,9 +99,11 @@ pub fn opencode_variant(model: &str, _effort: &str) -> &'static str {
 /// short model names consistently.
 pub fn model_label(model: &str) -> &'static str {
     match model {
-        GPT56_SOL_MODEL | SOL_LABEL => SOL_LABEL, // read-compat
+        SOL_MODEL | SOL_LABEL => SOL_LABEL,
+        GPT56_SOL_MODEL => SOL_LABEL, // read-compat
         CODEX_MODEL | CODEX_LABEL => CODEX_LABEL,
         CLAUDE_MODEL | CLAUDE_LABEL => CLAUDE_LABEL,
+        FABLE_MODEL | FABLE_LABEL => FABLE_LABEL,
         KIMI_MODEL | K3_LABEL => K3_LABEL,
         GROK_MODEL | GROK_LABEL => GROK_LABEL,
         // Distinct from GROK_LABEL: this is Grok on OpenCode via OpenRouter,
@@ -110,11 +118,15 @@ pub fn model_label(model: &str) -> &'static str {
 pub fn engine_label(cli: &str, model: &str) -> String {
     // Exact current ids win first.
     match model {
+        SOL_MODEL => return SOL_LABEL.to_string(),
         GPT56_SOL_MODEL => return SOL_LABEL.to_string(), // read-compat
-        // Checked before the adapter fallback: Codex and the removed Sol both
-        // ran on codex, so falling through would label Codex as Sol.
+        // Checked before the adapter fallback: Codex and Sol both run on
+        // codex, so falling through would label Codex as Sol.
         CODEX_MODEL => return CODEX_LABEL.to_string(),
         CLAUDE_MODEL => return CLAUDE_LABEL.to_string(),
+        // Checked before the adapter fallback, which labels other Claude-
+        // runtime ids "retired-model".
+        FABLE_MODEL => return FABLE_LABEL.to_string(),
         KIMI_MODEL => return K3_LABEL.to_string(),
         GROK_MODEL => return GROK_LABEL.to_string(),
         // Checked before the adapter fallback below: both this and K3 run on
@@ -244,8 +256,8 @@ pub fn public_runtime_log(cli: &str, model: &str, raw: &str) -> String {
                 } else if let Some(rest) = trimmed.strip_prefix("Codex ")
                     && i == 0
                 {
-                    // read-compat: display of sessions recorded before Sol's removal
-                    trimmed = format!("Sol runtime {rest}");
+                    // The resolved label: Sol (also old Sol sessions) or Codex.
+                    trimmed = format!("{} runtime {rest}", title_label(&engine_label(cli, model)));
                     body = format!("{leading}{trimmed}");
                     banner_seen = true;
                 }
@@ -293,7 +305,7 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     // "grok-4.6-openrouter". Replacing ids directly lets one substitution
     // corrupt another's output, so each id becomes a placeholder first and
     // only expands to its label once every id is consumed.
-    let mut pairs: Vec<(String, String)> = Vec::with_capacity(7);
+    let mut pairs: Vec<(String, String)> = Vec::with_capacity(9);
     if !model.is_empty() {
         // The run's own model wins, and is matched before the shared list so
         // a longer id is never shadowed by a shorter one it contains.
@@ -301,8 +313,10 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     }
     for (id, label) in [
         (GPT56_SOL_MODEL, SOL_LABEL), // read-compat
+        (SOL_MODEL, SOL_LABEL),
         (CODEX_MODEL, CODEX_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
+        (FABLE_MODEL, FABLE_LABEL),
         (KIMI_MODEL, K3_LABEL),
         (GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         (GROK_MODEL, GROK_LABEL),
@@ -320,12 +334,12 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     // label — a re-normalized log, or a model naming itself — and
     // "grok-4.6-openrouter" contains the id "grok-4.6", so an unprotected
     // label would be rewritten into "grok-openrouter".
-    // SOL_LABEL stays protected — read-compat.
     let mut protected = [
         GROK_OPENROUTER_LABEL,
         K3_LABEL,
         SOL_LABEL,
         CLAUDE_LABEL,
+        FABLE_LABEL,
         GROK_LABEL,
         CODEX_LABEL,
     ];
@@ -381,15 +395,16 @@ fn public_review_header(line: &str) -> String {
     match reviewer.to_lowercase().as_str() {
         "codex" => {
             // Sol and Codex share this adapter, so disambiguate by identity
-            // before defaulting to Sol. The label is the adapter word itself,
-            // so only a bare "codex" identity or the Codex model id means Codex.
+            // before defaulting to Sol (also the label of old Sol sessions).
+            // The label is the adapter word itself, so only a bare "codex"
+            // identity or the Codex model id means Codex.
             reviewer = if lower_identity == CODEX_LABEL
                 || lower_identity.contains(CODEX_MODEL)
                 || lower_identity.contains("astra")
             {
                 CODEX_LABEL.to_string()
             } else {
-                SOL_LABEL.to_string() // read-compat
+                SOL_LABEL.to_string()
             };
         }
         "claude" => {
@@ -398,6 +413,8 @@ fn public_review_header(line: &str) -> String {
             // model.
             reviewer = if lower_identity == CLAUDE_LABEL || lower_identity.contains(CLAUDE_MODEL) {
                 CLAUDE_LABEL.to_string()
+            } else if lower_identity.contains(FABLE_MODEL) {
+                FABLE_LABEL.to_string()
             } else {
                 "retired-model".to_string()
             };
@@ -410,7 +427,9 @@ fn public_review_header(line: &str) -> String {
             };
         }
         GPT56_SOL_MODEL => reviewer = SOL_LABEL.to_string(), // read-compat
+        SOL_MODEL => reviewer = SOL_LABEL.to_string(),
         CLAUDE_MODEL => reviewer = CLAUDE_LABEL.to_string(),
+        FABLE_MODEL => reviewer = FABLE_LABEL.to_string(),
         KIMI_MODEL => reviewer = K3_LABEL.to_string(),
         GROK_LABEL | GROK_MODEL => reviewer = GROK_LABEL.to_string(),
         _ => {}
@@ -639,23 +658,25 @@ pub const CLAUDE_AUTH_API: &str = "api";
 
 /// Models whose effort is a property of the model rather than of the surface
 /// invoking it. K3's provider exposes exactly one level; Codex defaults to
-/// xhigh for correctness and plan reviews; Claude runs at medium.
+/// xhigh for correctness and plan reviews; Claude runs at medium. Sol
+/// follows Codex and Fable follows Claude.
 fn pinned_model_effort(label: &str) -> Option<&'static str> {
     match label {
         "kimi-k3" => Some("max"),
-        CODEX_LABEL => Some("xhigh"),
-        // Claude runs Opus 5.5 at medium on every surface.
-        CLAUDE_LABEL => Some("medium"),
+        CODEX_LABEL | SOL_LABEL => Some("xhigh"),
+        // Claude runs Opus 5.5 at medium on every surface; Fable too.
+        CLAUDE_LABEL | FABLE_LABEL => Some("medium"),
         _ => None,
     }
 }
 
 fn builtin_model_effort(label: &str) -> &'static str {
     match label {
-        // Codex is the deep-reasoning model and is pinned to xhigh.
-        CODEX_LABEL => "xhigh",
+        // Codex is the deep-reasoning model and is pinned to xhigh; Sol
+        // follows Codex.
+        CODEX_LABEL | SOL_LABEL => "xhigh",
         "kimi-k3" => "max",
-        CLAUDE_LABEL => "medium",
+        CLAUDE_LABEL | FABLE_LABEL => "medium",
         // grok-4.6's menu is low/medium/high, and high is its own default.
         GROK_LABEL => "high",
         _ => DEFAULT_REVIEW_EFFORT,
@@ -665,11 +686,7 @@ fn builtin_model_effort(label: &str) -> &'static str {
 /// The built-in effort default of an effort label, for display. Fable
 /// follows Claude and Sol follows Codex.
 pub fn builtin_effort(label: &str) -> &'static str {
-    match label {
-        FABLE_LABEL => builtin_model_effort(CLAUDE_LABEL),
-        SOL_LABEL => builtin_model_effort(CODEX_LABEL),
-        _ => builtin_model_effort(label),
-    }
+    builtin_model_effort(label)
 }
 
 fn known_effort_model(label: &str) -> bool {

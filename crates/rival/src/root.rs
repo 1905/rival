@@ -16,7 +16,7 @@ use rival_core::{logging, queue, session, update};
 use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
-use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
+use crate::model_specs::{claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
 use crate::{command_plan, command_security, config_cmd, install, queue_sessions, update_cmd};
@@ -576,6 +576,8 @@ fn dispatch(
         }
         CommandId::CommandCodex => model_command(env, inv, codex_spec),
         CommandId::CommandClaude => model_command(env, inv, claude_spec),
+        CommandId::CommandFable => model_command(env, inv, fable_spec),
+        CommandId::CommandSol => model_command(env, inv, sol_spec),
         CommandId::CommandGrok => model_command(env, inv, grok_spec),
         CommandId::CommandK3 => model_command(env, inv, k3_spec),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
@@ -595,6 +597,7 @@ fn dispatch(
         // The error text is prefixed with "tui: ".
         CommandId::Tui => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
+        CommandId::RunFable => model_run(env, inv, fable_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),
         CommandId::Wait => {

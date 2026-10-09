@@ -43,6 +43,11 @@ pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     claude_preflight_model(cfg, config::CLAUDE_MODEL)
 }
 
+/// Whether the Claude Code runtime runs `model`: Opus 5.5 or Fable 5.1.
+pub fn is_claude_model(model: &str) -> bool {
+    model == config::CLAUDE_MODEL || model == config::FABLE_MODEL
+}
+
 /// [`claude_preflight`] for one Claude model id.
 pub fn claude_preflight_model(cfg: &Config, model: &str) -> anyhow::Result<()> {
     if oscmd::look_path(cfg, "claude").is_err() {
@@ -54,9 +59,9 @@ pub fn claude_preflight_model(cfg: &Config, model: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Executes a prompt through the Claude Code CLI on Opus 5.5,
-/// the only model on this path. `read_only` restricts tools and mounts the
-/// workdir read-only: reviews and task runs.
+/// Executes a prompt through the Claude Code CLI on `model` (Opus 5.5 or
+/// Fable 5.1). `read_only` restricts tools and mounts the workdir
+/// read-only: reviews and task runs.
 #[allow(clippy::too_many_arguments)]
 pub fn run_claude(
     ctx: &Context,
@@ -65,6 +70,7 @@ pub fn run_claude(
     prompt: &str,
     effort: &str,
     workdir: &str,
+    model: &str,
     read_only: bool,
     log: Option<&str>,
     mirror: Mirror<'_>,
@@ -75,7 +81,7 @@ pub fn run_claude(
         prompt,
         effort,
         workdir,
-        config::CLAUDE_MODEL,
+        model,
         read_only,
         log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
@@ -102,7 +108,7 @@ pub(crate) fn run_claude_model(
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
-    if model != config::CLAUDE_MODEL {
+    if !is_claude_model(model) {
         bail!("unsupported Claude Code model {:?}", model);
     }
     let result = (|| {

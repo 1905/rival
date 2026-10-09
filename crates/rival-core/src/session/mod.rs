@@ -662,7 +662,7 @@ fn group_mode_rank(mode: &str) -> i32 {
 
 fn group_model_rank(s: &Session) -> i32 {
     match config::engine_label(&s.cli, &s.model).as_str() {
-        config::SOL_LABEL => 0, // read-compat: display of sessions recorded before Sol's removal
+        config::SOL_LABEL => 0,
         "kimi-k3" => 1,
         config::CLAUDE_LABEL => 2,
         config::GROK_LABEL => 3,

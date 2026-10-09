@@ -125,7 +125,7 @@ pub(crate) fn run_claude_docker_with(
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
-    if model != config::CLAUDE_MODEL {
+    if !super::claude::is_claude_model(model) {
         bail!("unsupported Claude Code model {:?}", model);
     }
     let token = cfg.getenv(config::CLAUDE_DOCKER_TOKEN_ENV);
