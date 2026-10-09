@@ -266,6 +266,21 @@ mod tests {
         serde_json::from_str(line).unwrap()
     }
 
+    /// A secret JSON escapes (a quote, a backslash) is scrubbed from the
+    /// encoded log line too.
+    #[test]
+    fn format_scrubs_json_escaped_secrets() {
+        let secret = "test-log\"key\\scrub-0001";
+        crate::leakguard::register(secret);
+        let line = info()
+            .str("error", format!("got {secret}"))
+            .format(secret, plus3(2026, 1, 2, 3, 4, 5));
+        assert!(!line.contains("scrub-0001"), "{line}");
+        let map = parse(&line);
+        assert_eq!(map["error"], "got <redacted>");
+        assert_eq!(map["message"], "<redacted>");
+    }
+
     /// Object keys in document order, duplicates kept (serde_json's Map sorts and dedups).
     struct Keys(Vec<String>);
 

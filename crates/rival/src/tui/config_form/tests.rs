@@ -463,6 +463,39 @@ fn save_runs_once_and_lands_in_the_seed() {
     );
 }
 
+/// While a save is in flight the draft is frozen: an edit then would be
+/// dropped when the save lands and replaces the draft. Moving, checking
+/// and help still work; edits work again after the save.
+#[test]
+fn edits_wait_while_a_save_is_in_flight() {
+    let (_h, mut f) = form(Some(PROXY_YAML));
+    keys(&mut f, &["space"]);
+    assert_eq!(keys(&mut f, &["s"]), [Some(Effect::Save)]);
+    let req = f.save_request().unwrap();
+    let before = f.draft.clone();
+    // Toggle, step, edit, import and undo are all refused.
+    focus(&mut f, Field::CodexRoute);
+    for k in ["space", "enter", "left", "right", "h", "l", "u", "d"] {
+        assert_eq!(keys(&mut f, &[k]), [None], "{k}");
+        assert_eq!(f.draft, before, "{k} changed the draft");
+        assert_eq!(f.notice.as_ref().unwrap().text, "saving…", "{k}");
+    }
+    focus(&mut f, Field::Url);
+    keys(&mut f, &["enter", "e"]);
+    assert!(f.edit.is_none(), "no edit opens while saving");
+    focus(&mut f, Field::Model(0));
+    keys(&mut f, &["right"]);
+    assert_eq!(f.draft, before);
+    // Moving still works.
+    keys(&mut f, &["tab"]);
+    let saved = crate::tui::config_check::run_save(req).unwrap();
+    f.saved(&saved);
+    assert!(!f.dirty());
+    focus(&mut f, Field::CodexRoute);
+    keys(&mut f, &["space"]);
+    assert!(f.dirty(), "edits work again after the save");
+}
+
 #[test]
 fn a_check_runs_on_the_draft_and_drops_stale_rows() {
     let (_h, mut f) = form(Some(PROXY_YAML));

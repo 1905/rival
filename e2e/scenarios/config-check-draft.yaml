@@ -77,6 +77,13 @@
       }
     }
   },
+  "normalise": [
+    {
+      "regex": "check/[^/\\s\"]+-([0-9]+-[0-9a-f]{32})\\.log",
+      "kind": "replace",
+      "replace": "<RUN>"
+    }
+  ],
   "steps": [
     {
       "run": [
@@ -99,7 +106,7 @@
   "expect": {
     "home_files": [
       ".rival/config.yaml",
-      ".rival/check/fable.log"
+      ".rival/check/fable-<RUN>.log"
     ],
     "files": [
       {
@@ -107,7 +114,7 @@
         "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd2_\n"
       },
       {
-        "path": "<HOME>/.rival/check/fable.log",
+        "path": "<HOME>/.rival/check/fable-<RUN>.log",
         "text": "ok\n"
       }
     ],

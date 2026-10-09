@@ -445,6 +445,17 @@ impl ConfigForm {
             return self.edit_key(key, ev);
         }
         self.notice = None;
+        // The landing save replaces the draft, so an edit made meanwhile
+        // would be lost: the draft is frozen until then.
+        if self.saving
+            && matches!(
+                key,
+                "enter" | "space" | "left" | "h" | "right" | "l" | "e" | "d" | "u"
+            )
+        {
+            self.info("saving…");
+            return None;
+        }
         match key {
             "tab" => self.set_section(self.section.step(1)),
             "shift+tab" => self.set_section(self.section.step(-1)),

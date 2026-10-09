@@ -182,6 +182,13 @@
       }
     }
   },
+  "normalise": [
+    {
+      "regex": "check/[^/\\s\"]+-([0-9]+-[0-9a-f]{32})\\.log",
+      "kind": "replace",
+      "replace": "<RUN>"
+    }
+  ],
   "steps": [
     {
       "run": [
@@ -205,10 +212,10 @@
   "expect": {
     "home_files": [
       ".rival/config.yaml",
-      ".rival/check/claude.log",
-      ".rival/check/codex.log",
-      ".rival/check/fable.log",
-      ".rival/check/sol.log"
+      ".rival/check/claude-<RUN>.log",
+      ".rival/check/codex-<RUN>.log",
+      ".rival/check/fable-<RUN>.log",
+      ".rival/check/sol-<RUN>.log"
     ],
     "calls": {
       "codex": 2,

@@ -20,19 +20,31 @@ pub const MIN_SECRET_LEN: usize = 8;
 
 static SECRETS: RwLock<Vec<String>> = RwLock::new(Vec::new());
 
-/// Adds `secret` to the scrub list. Values shorter than
-/// [`MIN_SECRET_LEN`] (after trimming) and repeats are ignored.
+/// Adds `secret` to the scrub list, with its JSON-escaped form when that
+/// differs: session records and log lines are scrubbed after encoding, where
+/// a quote, a backslash or a control character is escaped. Values shorter
+/// than [`MIN_SECRET_LEN`] (after trimming) and repeats are ignored.
 pub fn register(secret: &str) {
     let secret = secret.trim();
     if secret.len() < MIN_SECRET_LEN {
         return;
     }
+    let escaped = json_escaped(secret);
     let mut list = SECRETS.write().unwrap_or_else(|e| e.into_inner());
-    if !list.iter().any(|s| s == secret) {
-        list.push(secret.to_string());
-        // Longest first, so a secret that contains another goes whole.
-        list.sort_by_key(|s| std::cmp::Reverse(s.len()));
+    for form in [secret, escaped.as_str()] {
+        if !list.iter().any(|s| s == form) {
+            list.push(form.to_string());
+        }
     }
+    // Longest first, so a secret that contains another goes whole.
+    list.sort_by_key(|s| std::cmp::Reverse(s.len()));
+}
+
+/// `s` as it appears inside a JSON string (serde_json's escaping, which the
+/// session records and the log lines use).
+fn json_escaped(s: &str) -> String {
+    let quoted = serde_json::to_string(s).expect("a str always serializes");
+    quoted[1..quoted.len() - 1].to_string()
 }
 
 /// Whether any secret is registered.

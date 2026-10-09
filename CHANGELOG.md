@@ -18,6 +18,7 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 - `rival config set` and the config windows rewrite `~/.rival/config.yaml`. Unknown keys stay; comments do not. The first rewrite of a hand-written file keeps `config.yaml.bak`.
 - Old Fable sessions show as `fable`, not `retired-model`.
 - Secrets are scrubbed: the proxy key never appears in logs, session files or errors.
+- Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
 
 ## [v5.0.0] — 2026-10-09
 

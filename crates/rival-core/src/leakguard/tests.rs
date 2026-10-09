@@ -41,3 +41,20 @@ fn a_longer_secret_goes_whole() {
     register("test-secret-scrub-0003-longer");
     assert_eq!(scrub("x test-secret-scrub-0003-longer y"), "x <redacted> y");
 }
+
+/// Session records and log lines are JSON: a secret with a quote, a
+/// backslash or a control character appears there escaped, and the
+/// escaped form is scrubbed too.
+#[test]
+fn json_escaped_secret_is_scrubbed() {
+    let secret = "test-\"secret\\scrub\t0004";
+    register(secret);
+    let encoded = serde_json::to_string(&format!("key {secret} end")).unwrap();
+    assert!(!encoded.contains(secret), "the test needs an escaped form");
+    assert_eq!(scrub(&encoded), "\"key <redacted> end\"");
+    assert_eq!(
+        scrub_bytes(encoded.as_bytes()).as_ref(),
+        b"\"key <redacted> end\"".as_slice()
+    );
+    assert_eq!(scrub(&format!("raw {secret}")), "raw <redacted>");
+}

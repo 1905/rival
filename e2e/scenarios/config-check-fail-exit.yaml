@@ -1,6 +1,6 @@
 {
   "name": "config-check-fail-exit",
-  "description": "`rival config check` with no proxy and the default models: codex, sol, claude, fable and the security reviewer (k3). Codex and Sol pass through the real codex adapter (preflight `codex login status`, then a read-only exec at low effort in ~/.rival/check). Claude and Fable fail as not installed (no claude, no docker) and never run; K3 fails its preflight (no MOONSHOT_API_KEY) and opencode never runs. The text table is in model order and the command exits 1. No session is saved and no queue slot is taken: home has only the two check logs.",
+  "description": "`rival config check` with no proxy and the default models: codex, sol, claude, fable and the security reviewer (k3). Codex and Sol pass through the real codex adapter (preflight `codex login status`, then a read-only exec at low effort in ~/.rival/check). Claude and Fable fail as not installed (no claude, no docker) and never run; K3 fails its preflight (no MOONSHOT_API_KEY) and opencode never runs. The text table is in model order and the command exits 1. No session is saved and no queue slot is taken: home has only the two check logs (one `check/<name>-<pid>-<id>.log` per run).",
   "fakes": {
     "absent": [
       "claude",
@@ -70,6 +70,11 @@
     {
       "regex": " ([0-9]+\\.[0-9]s) ",
       "kind": "duration"
+    },
+    {
+      "regex": "check/[^/\\s\"]+-([0-9]+-[0-9a-f]{32})\\.log",
+      "kind": "replace",
+      "replace": "<RUN>"
     }
   ],
   "steps": [
@@ -89,12 +94,12 @@
   ],
   "expect": {
     "home_files": [
-      ".rival/check/codex.log",
-      ".rival/check/sol.log"
+      ".rival/check/codex-<RUN>.log",
+      ".rival/check/sol-<RUN>.log"
     ],
     "files": [
       {
-        "path": "<HOME>/.rival/check/codex.log",
+        "path": "<HOME>/.rival/check/codex-<RUN>.log",
         "text": "ok\n"
       }
     ],

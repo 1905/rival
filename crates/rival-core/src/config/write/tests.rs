@@ -100,7 +100,13 @@ fn backup_is_made_only_on_the_first_rewrite() {
     set(&path, "efforts.claude", "medium").unwrap();
     assert_eq!(fs::read_to_string(bak(&path)).unwrap(), "marker");
     let rival = dir.path().join(".rival");
-    assert!(others(&rival, &["config.yaml", "config.yaml.bak"]).is_empty());
+    assert!(
+        others(
+            &rival,
+            &["config.yaml", "config.yaml.bak", "config.yaml.lock"]
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -130,7 +136,13 @@ fn an_invalid_value_leaves_the_old_file() {
         assert_eq!(fs::read_to_string(&path).unwrap(), original, "{key}");
     }
     assert!(!bak(&path).exists());
-    assert!(others(&dir.path().join(".rival"), &["config.yaml"]).is_empty());
+    assert!(
+        others(
+            &dir.path().join(".rival"),
+            &["config.yaml", "config.yaml.lock"]
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -353,4 +365,36 @@ fn render_builds_the_new_text_without_writing() {
         err.starts_with("invalid proxy.url \"ftp://x\" in "),
         "{err}"
     );
+}
+
+/// Concurrent writers (two `rival config set` runs) each read, edit and
+/// rename the file; a lock held across the whole update keeps every edit.
+#[test]
+fn concurrent_applies_keep_every_edit() {
+    let (_dir, path) = temp();
+    type Values = fn(usize) -> String;
+    let keys: [(&str, Values); 4] = [
+        ("proxy.url", |i| format!("http://h{i}.example")),
+        ("proxy.key_file", |i| format!("/k/{i}")),
+        ("proxy.claude.model_prefix", |i| format!("c{i}-")),
+        ("proxy.codex.model_prefix", |i| format!("x{i}-")),
+    ];
+    const ROUNDS: usize = 40;
+    std::thread::scope(|s| {
+        for (key, value) in keys {
+            let path = &path;
+            s.spawn(move || {
+                for i in 0..ROUNDS {
+                    set(path, key, &value(i)).unwrap();
+                }
+            });
+        }
+    });
+    let text = fs::read_to_string(&path).unwrap();
+    let user = parse_user_config(&text, &path).unwrap();
+    let last = ROUNDS - 1;
+    assert_eq!(user.proxy.url, keys[0].1(last), "{text}");
+    assert_eq!(user.proxy.key_file, keys[1].1(last), "{text}");
+    assert_eq!(user.proxy.claude.model_prefix, keys[2].1(last), "{text}");
+    assert_eq!(user.proxy.codex.model_prefix, keys[3].1(last), "{text}");
 }

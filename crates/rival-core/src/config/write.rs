@@ -6,7 +6,8 @@
 //! style are not. The new text is validated like [`load_user_config`]
 //! before it replaces the old file through a temp file and a rename. The
 //! first rewrite of a file without [`HEADER`] copies it to
-//! `config.yaml.bak`.
+//! `config.yaml.bak`. An exclusive lock on `config.yaml.lock` is held from
+//! the read to the rename, so concurrent writers do not lose edits.
 //!
 //! [`load_user_config`]: super::load_user_config
 
@@ -189,6 +190,32 @@ fn flatten(
 /// Applies `edits` to the config file at `path` in one write and returns
 /// the new, validated config. On any error the old file stays as it was.
 pub fn apply(path: &Path, edits: &[Edit]) -> Result<UserConfig, ConfigError> {
+    let shown = path.display();
+    with_lock(path, || apply_locked(path, edits))
+        .map_err(|e| ConfigError::new(format!("lock {shown}: {e}")))?
+}
+
+/// Runs `f` while holding an exclusive lock on `<path>.lock`, made with the
+/// config directory if needed. The lock file is never deleted (delete and
+/// recreate would split the lock across inodes); the lock is released when
+/// the guard drops, also on panic.
+fn with_lock<T>(path: &Path, f: impl FnOnce() -> T) -> std::io::Result<T> {
+    let lock_path = with_suffix(path, ".lock");
+    if let Some(dir) = lock_path.parent()
+        && !dir.as_os_str().is_empty()
+    {
+        fs::create_dir_all(dir)?;
+    }
+    let mut opts = fs::OpenOptions::new();
+    opts.create(true).truncate(false).read(true).write(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let mut lock = fd_lock::RwLock::new(opts.open(&lock_path)?);
+    let _guard = lock.write()?;
+    Ok(f())
+}
+
+fn apply_locked(path: &Path, edits: &[Edit]) -> Result<UserConfig, ConfigError> {
     let shown = path.display();
     let old = match fs::read_to_string(path) {
         Ok(text) => Some(text),

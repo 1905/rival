@@ -1168,6 +1168,24 @@ fn to_json_scrubs_registered_secrets() {
     );
 }
 
+/// A secret JSON escapes (a quote, a backslash) is scrubbed from the
+/// encoded record too.
+#[test]
+fn to_json_scrubs_json_escaped_secrets() {
+    let secret = "test-proxy\"key\\session-0001";
+    crate::leakguard::register(secret);
+    let sess = Session {
+        error_msg: format!("claude said {secret}"),
+        ..Session::default()
+    };
+    let text = String::from_utf8(sess.to_json().unwrap()).unwrap();
+    assert!(!text.contains("session-0001"), "{text}");
+    assert!(
+        text.contains("\"error\": \"claude said <redacted>\""),
+        "{text}"
+    );
+}
+
 #[test]
 fn ephemeral_session_save_writes_nothing() {
     let home = tempfile::tempdir().unwrap();

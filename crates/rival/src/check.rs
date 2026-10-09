@@ -7,8 +7,10 @@
 //! list, the model's own preflight, then the live call. The live call sends
 //! [`CHECK_PROMPT`] at low effort with review (read-only) permissions, under
 //! [`CHECK_TIMEOUT`], with no queue slot and an ephemeral session that is
-//! never saved. Its log is `<RIVAL_HOME>/check/<name>.log`. At most
-//! [`MAX_LIVE`] live calls run at once.
+//! never saved. Its log is `<RIVAL_HOME>/check/<name>-<pid>-<id>.log`, one
+//! per run, so concurrent checks never share a log; each check keeps the
+//! newest [`KEEP_LOGS`] of a model. At most [`MAX_LIVE`] live calls run at
+//! once.
 //!
 //! The engine runs the steps through a [`Runner`]; production uses
 //! [`SpecRunner`], tests a fake.
@@ -44,8 +46,13 @@ pub const CHECK_PROMPT: &str = "Reply with exactly: ok";
 pub const CHECK_EFFORT: &str = "low";
 /// The budget of one live call.
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(90);
+/// The budget of one model's preflight (`codex login status`,
+/// `docker info`).
+pub const PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(30);
 /// The most live calls at once.
 pub const MAX_LIVE: usize = 3;
+/// The check logs kept per model, the new one included.
+pub const KEEP_LOGS: usize = 5;
 /// The characters of the reply a row keeps.
 pub const REPLY_CHARS: usize = 40;
 
@@ -356,8 +363,9 @@ pub trait Runner: Sync {
     fn installed(&self, cfg: &Config, t: &Target) -> bool;
     /// The proxy's model list (`GET /v1/models`).
     fn models(&self, route: &Route) -> Result<Vec<String>, ModelsError>;
-    /// The model's own preflight.
-    fn preflight(&self, cfg: &Config, t: &Target) -> Result<(), String>;
+    /// The model's own preflight. It ends (killing any command it runs)
+    /// once `ctx` is done.
+    fn preflight(&self, ctx: &Context, cfg: &Config, t: &Target) -> Result<(), String>;
     /// The live call: [`CHECK_PROMPT`] with review permissions, its output
     /// in `log`, in `workdir`. `Ok` is the exit code.
     fn call(
@@ -586,8 +594,9 @@ impl Engine<'_> {
                 return row.fail(&e);
             }
         }
-        // 3. The model's own preflight.
-        if let Err(e) = self.runner.preflight(self.cfg, t) {
+        // 3. The model's own preflight, under the check's context and
+        // budget: `docker info` on a stuck daemon must not hang the check.
+        if let Err(e) = self.preflight(t) {
             return row.fail(&e);
         }
         if let Some(e) = self.dir_err {
@@ -597,6 +606,28 @@ impl Engine<'_> {
         self.live(t, row, route.as_ref(), &served)
     }
 
+    /// [`Runner::preflight`] under [`PREFLIGHT_TIMEOUT`] (or the call
+    /// budget when shorter); a cancelled check or the timeout is the error.
+    fn preflight(&self, t: &Target) -> Result<(), String> {
+        let budget = self.timeout.min(PREFLIGHT_TIMEOUT);
+        let (ctx, cancel) = self.ctx.with_timeout(budget);
+        let result = self.runner.preflight(&ctx, self.cfg, t);
+        let done = ctx.err();
+        cancel.cancel();
+        let Err(e) = result else { return Ok(()) };
+        if let Some(parent) = self.ctx.err() {
+            return Err(parent.to_string());
+        }
+        if done == Some(ContextError::DeadlineExceeded) {
+            let budget = i64::try_from(budget.as_nanos()).unwrap_or(i64::MAX);
+            return Err(format!(
+                "preflight: no answer in {} (timeout)",
+                duration::format(budget)
+            ));
+        }
+        Err(e)
+    }
+
     fn live(
         &self,
         t: &Target,
@@ -604,13 +635,10 @@ impl Engine<'_> {
         route: Option<&Route>,
         served: &[String],
     ) -> CheckRow {
+        // A new log for each run: the adapters append, and another check
+        // may be running the same model.
+        prune_logs(self.dir, t.name, KEEP_LOGS - 1);
         let log = log_path(self.dir, t.name);
-        // A fresh log for each check: the adapters append.
-        match fs::remove_file(&log) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return row.fail(&format!("remove {}: {e}", log.display())),
-        }
         let workdir = self.dir.to_string_lossy().into_owned();
         let _slot = self.live.acquire();
         if let Some(e) = self.ctx.err() {
@@ -683,9 +711,38 @@ impl Engine<'_> {
     }
 }
 
-/// `<dir>/<name>.log`.
+/// `<dir>/<name>-<pid>-<id>.log`: a new path for each run.
 pub fn log_path(dir: &Path, name: &str) -> PathBuf {
-    dir.join(format!("{name}.log"))
+    let id = uuid::Uuid::new_v4().simple();
+    dir.join(format!("{name}-{}-{id}.log", std::process::id()))
+}
+
+/// The model name of a [`log_path`] file name; `None` for other files.
+fn log_owner(file: &str) -> Option<&str> {
+    let mut parts = file.strip_suffix(".log")?.rsplitn(3, '-');
+    let id = parts.next()?;
+    let pid = parts.next()?;
+    let name = parts.next()?;
+    let hex = id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit());
+    let digits = !pid.is_empty() && pid.bytes().all(|b| b.is_ascii_digit());
+    (hex && digits).then_some(name)
+}
+
+/// Removes all but the newest `keep` run logs of `name` in `dir`. Errors
+/// are ignored: a log that stays is harmless.
+fn prune_logs(dir: &Path, name: &str, keep: usize) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
+        .flatten()
+        .filter(|e| e.file_name().to_str().and_then(log_owner) == Some(name))
+        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+        .collect();
+    logs.sort_by(|a, b| b.cmp(a));
+    for (_, path) in logs.into_iter().skip(keep) {
+        let _ = fs::remove_file(path);
+    }
 }
 
 fn make_private_dir(dir: &Path) -> Result<(), String> {
@@ -804,8 +861,9 @@ impl Runner for SpecRunner {
         proxy::models(route)
     }
 
-    fn preflight(&self, cfg: &Config, t: &Target) -> Result<(), String> {
-        (spec_for(t).preflight)(cfg, &cred_workdir(cfg)).map_err(|e| format!("{e:#}"))
+    fn preflight(&self, ctx: &Context, cfg: &Config, t: &Target) -> Result<(), String> {
+        executor::oscmd::with_context(ctx, || (spec_for(t).preflight)(cfg, &cred_workdir(cfg)))
+            .map_err(|e| format!("{e:#}"))
     }
 
     fn call(

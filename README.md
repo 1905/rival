@@ -558,9 +558,9 @@ Environment variables:
 | `RIVAL_CLAUDE_AUTH` | `subscription` | `subscription`/`sub` or `api`. See [Claude authentication](#claude-authentication-and-sandboxing). |
 | `RIVAL_CLAUDE_TOKEN` | unset | OAuth token for the Docker Claude runtime. |
 | `RIVAL_NO_UPDATE_CHECK` | unset | Disable the update check (`CI` also disables it). |
-| `RIVAL_PROXY` | unset | `off` sends this run direct, whatever `proxy:` says. |
-| `RIVAL_PROXY_URL` | unset | Wins over `proxy.url`. |
-| `RIVAL_PROXY_KEY` | unset | Wins over the key file. Never passed to a child process, except as the Codex provider key on the proxy route. |
+| `RIVAL_PROXY` | unset | `off` sends this run direct, whatever `proxy:` says. Process environment only; a repository .env cannot set it. |
+| `RIVAL_PROXY_URL` | unset | Wins over `proxy.url`. Process environment only; a repository .env cannot set it. |
+| `RIVAL_PROXY_KEY` | unset | Wins over the key file. Never passed to a child process, except as the Codex provider key on the proxy route. Process environment only; a repository .env cannot set it. |
 | `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Set it in the process environment; repository `.env` files cannot set it. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
 
 ### Proxy

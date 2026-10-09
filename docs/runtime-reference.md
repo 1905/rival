@@ -126,7 +126,7 @@ the run can never use.
 
 ### Proxy route
 
-When `proxy.claude.enabled` or `proxy.codex.enabled` is set (and `RIVAL_PROXY` is not `off`), that provider's runs go to `proxy.url` with the key from `RIVAL_PROXY_KEY` or the key file. The provider's own login is not used.
+When `proxy.claude.enabled` or `proxy.codex.enabled` is set (and `RIVAL_PROXY` is not `off`), that provider's runs go to `proxy.url` with the key from `RIVAL_PROXY_KEY` or the key file. The provider's own login is not used. `RIVAL_PROXY`, `RIVAL_PROXY_URL` and `RIVAL_PROXY_KEY` come from the process environment only: a repository `.env` cannot set them (any spelling on Windows), so a reviewed repository cannot send the key to its own URL.
 
 Claude (native):
 
@@ -160,7 +160,7 @@ Preflight (`GET <url>/v1/models`, 5 s, once per process):
 
 A 429 at run time ("cooling down", "monthly spend limit", `rate_limit_error`) gets a hint with the other prefixes that serve the model. Rival never switches prefix or falls back to a direct run by itself.
 
-`RIVAL_PROXY_KEY` is removed from every child environment and added back only for Codex on the proxy route. The key is scrubbed from provider output, session files, Rival's log lines and printed errors.
+`RIVAL_PROXY_KEY` is removed from every child environment and added back only for Codex on the proxy route. The key is scrubbed from provider output, session files, Rival's log lines and printed errors, also in its JSON-escaped form.
 
 Never commit provider keys or OAuth tokens. A project `.env` used for K3 must be
 listed in `.gitignore`.

@@ -53,6 +53,8 @@ struct Fake {
     missing: Vec<&'static str>,
     models: Result<Vec<String>, ModelsError>,
     preflight: HashMap<&'static str, &'static str>,
+    /// Preflights that wait until their context is done.
+    preflight_hang: Vec<&'static str>,
     replies: HashMap<&'static str, Reply>,
     hints: HashMap<&'static str, &'static str>,
     delay: Duration,
@@ -69,6 +71,7 @@ impl Fake {
             missing: Vec::new(),
             models: Ok(served()),
             preflight: HashMap::new(),
+            preflight_hang: Vec::new(),
             replies: HashMap::new(),
             hints: HashMap::new(),
             delay: Duration::ZERO,
@@ -102,7 +105,11 @@ impl Runner for Fake {
         self.models.clone()
     }
 
-    fn preflight(&self, _: &Config, t: &Target) -> Result<(), String> {
+    fn preflight(&self, ctx: &Context, _: &Config, t: &Target) -> Result<(), String> {
+        if self.preflight_hang.contains(&t.name) {
+            ctx.wait_timeout(Duration::from_secs(30));
+            return Err("the daemon is not running".to_string());
+        }
         match self.preflight.get(t.name) {
             Some(e) => Err(e.to_string()),
             None => Ok(()),
@@ -483,6 +490,44 @@ fn timeout_ends_the_call() {
     assert!(row(&report, "sol").ok);
 }
 
+/// A preflight that never answers (`docker info` on a stuck daemon) ends
+/// at the check's budget; the other models go on.
+#[test]
+fn timeout_ends_a_hung_preflight() {
+    let fix = Fixture::new();
+    let mut fake = Fake::new();
+    fake.preflight_hang.push("codex");
+    let started = Instant::now();
+    let report = check_timeout(&fix, &["codex", "sol"], &fake, Duration::from_millis(50));
+    assert!(started.elapsed() < Duration::from_secs(10));
+    let codex = row(&report, "codex");
+    assert_eq!(codex.error, "preflight: no answer in 50ms (timeout)");
+    assert!(!codex.called);
+    assert!(row(&report, "sol").ok);
+}
+
+/// Cancelling the check (`x`, closing the window) ends a hung preflight.
+#[test]
+fn cancel_ends_a_hung_preflight() {
+    let fix = Fixture::new();
+    let mut fake = Fake::new();
+    fake.preflight_hang.push("codex");
+    let targets = targets(&fix.cfg, &["codex".to_string()]).unwrap();
+    let (ctx, cancel) = Context::background().with_cancel();
+    let started = Instant::now();
+    let report = std::thread::scope(|s| {
+        s.spawn(|| {
+            std::thread::sleep(Duration::from_millis(100));
+            cancel.cancel();
+        });
+        run_check_with(&ctx, &fix.cfg, &targets, &fake, CHECK_TIMEOUT, &|_| {})
+    });
+    assert!(started.elapsed() < Duration::from_secs(10));
+    let codex = row(&report, "codex");
+    assert_eq!(codex.error, "context canceled");
+    assert!(!codex.called);
+}
+
 #[test]
 fn unexpected_reply_passes_flagged_and_is_cut_to_40_chars() {
     let fix = Fixture::new();
@@ -516,6 +561,24 @@ fn reply_drops_the_codex_banner() {
     assert!(!is_ok_reply("okay"));
 }
 
+/// The run logs of `name` in `dir`, oldest first by name order of the
+/// calls (`<name>-<pid>-<id>.log`).
+fn run_logs(dir: &Path, name: &str) -> Vec<PathBuf> {
+    let mut logs: Vec<PathBuf> = fs::read_dir(dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            let file = p.file_name().unwrap().to_str().unwrap();
+            file.strip_prefix(&format!("{name}-{}-", std::process::id()))
+                .and_then(|rest| rest.strip_suffix(".log"))
+                .is_some_and(|id| id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit()))
+        })
+        .collect();
+    logs.sort();
+    logs
+}
+
 #[test]
 fn logs_go_to_the_check_dir_and_no_session_is_saved() {
     let fix = Fixture::new();
@@ -524,10 +587,13 @@ fn logs_go_to_the_check_dir_and_no_session_is_saved() {
     assert!(report.all_ok());
     let dir = fix.cfg.paths().check_dir();
     for (name, log, workdir) in fake.calls.lock().unwrap().iter() {
-        assert_eq!(log, &dir.join(format!("{name}.log")));
+        assert_eq!(run_logs(&dir, name), vec![log.clone()]);
         assert_eq!(workdir, dir.to_str().unwrap());
     }
-    assert_eq!(fs::read_to_string(dir.join("codex.log")).unwrap(), "ok\n");
+    assert_eq!(
+        fs::read_to_string(&run_logs(&dir, "codex")[0]).unwrap(),
+        "ok\n"
+    );
     assert!(fix.sessions().is_empty());
     #[cfg(unix)]
     {
@@ -535,10 +601,76 @@ fn logs_go_to_the_check_dir_and_no_session_is_saved() {
         let mode = fs::metadata(&dir).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o700);
     }
-    // A second check starts each log fresh.
+    // A second check writes its own log and leaves the first one alone.
     let report = check(&fix, &["codex"], &fake);
     assert!(report.all_ok());
-    assert_eq!(fs::read_to_string(dir.join("codex.log")).unwrap(), "ok\n");
+    let logs = run_logs(&dir, "codex");
+    assert_eq!(logs.len(), 2);
+    for log in &logs {
+        assert_eq!(fs::read_to_string(log).unwrap(), "ok\n");
+    }
+}
+
+/// Two checks at once (two `rival config check` runs, or the TUI and the
+/// CLI) each get their own log, so neither deletes or reads the other's.
+#[test]
+fn concurrent_checks_get_their_own_logs() {
+    let fix = Fixture::new();
+    let mut fake = Fake::new();
+    fake.delay = Duration::from_millis(100);
+    std::thread::scope(|s| {
+        for _ in 0..2 {
+            s.spawn(|| assert!(check(&fix, &["codex"], &fake).all_ok()));
+        }
+    });
+    let calls = fake.calls.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    assert_ne!(calls[0].1, calls[1].1);
+    let dir = fix.cfg.paths().check_dir();
+    assert_eq!(run_logs(&dir, "codex").len(), 2);
+}
+
+/// Each check keeps the newest [`KEEP_LOGS`] logs of a model and removes
+/// older ones; other models' logs and other files stay.
+#[test]
+fn old_check_logs_are_pruned() {
+    let fix = Fixture::new();
+    let fake = Fake::new();
+    let dir = fix.cfg.paths().check_dir();
+    fs::create_dir_all(&dir).unwrap();
+    let pid = std::process::id();
+    let old = |name: &str, i: usize| dir.join(format!("{name}-{pid}-{:032x}.log", i));
+    let mut aged = Vec::new();
+    for i in 0..8 {
+        for name in ["codex", "grok", "grok-4.6-openrouter"] {
+            let path = old(name, i);
+            fs::write(&path, "old\n").unwrap();
+            let when = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000 + i as u64);
+            fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(when)
+                .unwrap();
+            aged.push(path);
+        }
+    }
+    fs::write(dir.join("codex.log"), "legacy\n").unwrap();
+    fs::write(dir.join("notes.txt"), "mine\n").unwrap();
+    assert!(check(&fix, &["codex"], &fake).all_ok());
+    let codex = run_logs(&dir, "codex");
+    assert_eq!(codex.len(), KEEP_LOGS, "{codex:?}");
+    // The newest old ones stay, with the new run's log.
+    for i in 8 - (KEEP_LOGS - 1)..8 {
+        assert!(old("codex", i).exists(), "codex {i}");
+    }
+    let new = &fake.calls.lock().unwrap()[0].1;
+    assert!(codex.contains(new));
+    for name in ["grok", "grok-4.6-openrouter"] {
+        assert_eq!(run_logs(&dir, name).len(), 8, "{name}");
+    }
+    assert!(dir.join("codex.log").exists());
+    assert!(dir.join("notes.txt").exists());
 }
 
 #[test]
@@ -655,6 +787,56 @@ fn fake_codex(dir: &Path) -> PathBuf {
     argv
 }
 
+/// The real preflight path: a `codex login status` that hangs is killed
+/// when the check is cancelled, and the check returns.
+#[cfg(unix)]
+#[test]
+fn real_preflight_is_killed_on_cancel() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let bin = tempfile::tempdir().unwrap();
+    let pidfile = bin.path().join("pid");
+    let script = bin.path().join("codex");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\necho $$ > '{}'\nexec /bin/sleep 30\n",
+            pidfile.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
+    let targets = targets(&fix.cfg, &["codex".to_string()]).unwrap();
+    let (ctx, cancel) = Context::background().with_cancel();
+    let started = Instant::now();
+    let report = std::thread::scope(|s| {
+        s.spawn(|| {
+            while !pidfile.exists() && started.elapsed() < Duration::from_secs(10) {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            cancel.cancel();
+        });
+        run_check(&ctx, &fix.cfg, &targets, &|_| {})
+    });
+    assert!(
+        started.elapsed() < Duration::from_secs(15),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(
+        row(&report, "codex").error,
+        "context canceled",
+        "{report:?}"
+    );
+    let pid: i32 = fs::read_to_string(&pidfile)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    // SAFETY: signal 0 only checks that the PID exists.
+    assert_ne!(unsafe { libc::kill(pid, 0) }, 0, "codex still runs");
+}
+
 #[cfg(unix)]
 #[test]
 fn real_adapter_path_saves_no_session() {
@@ -681,7 +863,9 @@ fn real_adapter_path_saves_no_session() {
         args.contains(&format!("\n-C\n{}\n", dir.display())),
         "{args}"
     );
-    assert_eq!(fs::read_to_string(dir.join("codex.log")).unwrap(), "ok\n");
+    let logs = run_logs(&dir, "codex");
+    assert_eq!(logs.len(), 1, "{logs:?}");
+    assert_eq!(fs::read_to_string(&logs[0]).unwrap(), "ok\n");
     let saved: Vec<_> = fs::read_dir(&sessions)
         .unwrap()
         .flatten()
