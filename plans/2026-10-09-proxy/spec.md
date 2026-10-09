@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-09
 **Scope:** /wrk/dev/rival. The file:line citations are from master `71835d3`.
-**Status:** planned
+**Status:** built (branch `feat/proxy`; app not compiled yet)
 
 ## TL;DR
 
@@ -432,3 +432,20 @@ Behavior:
 - **P6** — TUI config window. Gate: the checks above, render snapshots, manual use at 80×24.
 - **P7** — Rival.app settings. Gate: app build and tests, manual use on the Mac.
 - **P8** — README, runtime reference, CHANGELOG. Release with `rival-release`.
+
+## As-built notes
+
+Delivered on branch `feat/proxy` (2026-10-10). Deviations from the text above:
+
+- P1: `Config::proxy_route` returns `Result<Option<Route>, ConfigError>`. A missing key, URL or an open key file is an error, not `None`. `plan.models` defaults to `codex` (today's `--model` default), not `[codex, claude]`.
+- P1: the writer keeps plain values as written (the generic serde-saphyr tree changes `yes` and `0600`). Comments, anchors, tags and inline `[a, b]` lists are not kept.
+- P2: secrets were not scrubbed anywhere before. A new `leakguard` module holds a process-wide list; the proxy key joins it when loaded. It scrubs provider stdout and stderr (also a key split across reads), session JSON, rival's log lines and printed errors. `RIVAL_PROXY_KEY` is removed from every child environment; Codex gets it back through `Request.env` on the proxy route only.
+- P2: an empty Claude prefix is an error only when the proxy does not serve the bare id. The models call ignores `HTTP_PROXY` for loopback URLs and follows no redirects.
+- P2/P3: `route` and `wire_model` are written only on proxied runs.
+- P3: Codex errors on the proxy route get `codex_auth_hint` (401/403, the `Reconnecting...` loop, 429).
+- P4: the plan runner still accepts the words `codex` and `claude` next to model ids. Skill versions are not bumped here; the release bumps all skills together. There is no `rival run sol`.
+- P5: the engine is `crates/rival/src/check.rs`, because `ModelSpec` lives in the `rival` crate. Check sessions use `Session.ephemeral` (never saved) instead of `Request.persist`. Check runs execute in `~/.rival/check` (0700). Info log lines are held back during a check (`logging::min_level`). The security reviewer `grok` gets a small check-only spec, `grok-4.6-openrouter`.
+- P6: the TUI hook takes a start screen. `config_form` keeps a typed key out of the draft; `Config::with_draft_proxy_key` lets the check use it before save. The prefix picker offers only prefixes that serve the provider's models (real proxy: no bare Claude ids). No e2e scenario: the harness cannot drive a TTY.
+- P7: `RivalCLI` is in `RivalKit` so it can be tested. Written on Linux without Swift: `swift build`, `swift test` and a manual run on the Mac are still open.
+
+Manual checks on Dell against the real proxy: Opus, Fable, Codex and Sol raw prompts and reviews; `plan -m opus,fable,sol` (three blocks, own ratings); `rival config check` (4 of 4 proxied models ✓); a wrong key stops at the preflight with 401; the real key is found only in `proxy.key`; the config window renders, checks, edits and saves in tmux.
