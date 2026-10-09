@@ -2,7 +2,10 @@
 //! reads the real `~/.rival` or uses a real key.
 
 use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use rival_core::config::write::HEADER;
 
@@ -264,12 +267,109 @@ fn key_clear_removes_the_file() {
     assert!(out.starts_with("no proxy key file at "), "{out}");
 }
 
+/// A one-route HTTP fake on `127.0.0.1:0`: every request gets `status`
+/// and `body`. Returns the base URL and the Authorization headers seen.
+fn fake_proxy(status: u16, body: &'static str) -> (String, Arc<Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+    let log = seen.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut auth = String::new();
+            loop {
+                let mut h = String::new();
+                if reader.read_line(&mut h).unwrap() == 0 || h == "\r\n" {
+                    break;
+                }
+                if let Some((name, v)) = h.split_once(':')
+                    && name.eq_ignore_ascii_case("authorization")
+                {
+                    auth = v.trim().to_string();
+                }
+            }
+            log.lock().unwrap().push(auth);
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        }
+    });
+    (url, seen)
+}
+
+const MODEL_LIST: &str = r#"{"data":[{"id":"emcd_/claude-opus-5-5"},{"id":"gpt-6-astra"},{"id":"emcd2_/claude-opus-5-5"},{"id":"emcd_/claude-fable-5-1"}]}"#;
+
 #[test]
-fn models_is_not_built_yet() {
+fn models_lists_the_proxy_models_by_prefix() {
+    let (url, seen) = fake_proxy(200, MODEL_LIST);
+    let fix = Fixture::with_config_and_env(
+        "",
+        &[
+            ("RIVAL_PROXY_URL", url.as_str()),
+            ("RIVAL_PROXY_KEY", SECRET),
+        ],
+    );
+    let (code, out, err) = run(&fix, "", &["config", "models"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    assert_eq!(
+        out,
+        format!(
+            "proxy  {url}  4 models\n\n(no prefix)\n  gpt-6-astra\n\nemcd2_\n  claude-opus-5-5\n\nemcd_\n  claude-opus-5-5\n  claude-fable-5-1\n"
+        )
+    );
+    let (code, out, _) = run(&fix, "", &["config", "models", "--json"]);
+    assert_eq!(code, 0);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(out.lines().count(), 1, "{out}");
+    assert_eq!(v["url"], serde_json::json!(url));
+    assert_eq!(v["count"], 4);
+    assert_eq!(v["models"][0], "emcd_/claude-opus-5-5");
+    assert_eq!(
+        v["prefixes"]["emcd_"],
+        serde_json::json!(["claude-opus-5-5", "claude-fable-5-1"])
+    );
+    assert_eq!(v["prefixes"][""], serde_json::json!(["gpt-6-astra"]));
+    // One call per process: the second command reused the list.
+    assert_eq!(*seen.lock().unwrap(), vec![format!("Bearer {SECRET}")]);
+}
+
+#[test]
+fn models_names_the_missing_url_key_and_a_rejected_key() {
     let fix = Fixture::new();
+    let (code, _, err) = run(&fix, "", &["config", "models"]);
+    assert_eq!(
+        (code, err.as_str()),
+        (
+            1,
+            "proxy.url is not set — run rival config set proxy.url <url>\n"
+        )
+    );
+    let fix = Fixture::with_config_and_env("proxy:\n  url: http://127.0.0.1:9/\n", &[]);
+    let (code, _, err) = run(&fix, "", &["config", "models"]);
+    assert_eq!(
+        (code, err.as_str()),
+        (1, "proxy key missing — run rival config key set\n")
+    );
+    let (url, _) = fake_proxy(401, "{}");
+    let fix = Fixture::with_config_and_env(
+        "",
+        &[
+            ("RIVAL_PROXY_URL", url.as_str()),
+            ("RIVAL_PROXY_KEY", SECRET),
+        ],
+    );
     let (code, _, err) = run(&fix, "", &["config", "models", "--json"]);
-    assert_eq!(code, 1);
-    assert!(err.contains("needs the proxy module"), "{err}");
+    assert_eq!(
+        (code, err.as_str()),
+        (
+            1,
+            "proxy rejected the key (401) — run rival config key set\n"
+        )
+    );
 }
 
 #[test]

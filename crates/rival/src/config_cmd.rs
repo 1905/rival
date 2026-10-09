@@ -1,5 +1,6 @@
 //! `rival config`: show and change `~/.rival/config.yaml` and the proxy
-//! key. Bare `rival config` opens the TUI (the config window comes later).
+//! key, and list the proxy's models. Bare `rival config` opens the TUI (the
+//! config window comes later).
 
 use std::collections::HashSet;
 use std::io::BufRead;
@@ -7,8 +8,10 @@ use std::io::BufRead;
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, PROXY_KEY_ENV,
-    PROXY_URL_ENV, ProxyKeySource, ProxyRoute, SECURITY_REVIEWER_K3, SOL_LABEL,
+    PROXY_KEY_MISSING, PROXY_URL_ENV, ProxyKeySource, ProxyRoute, Route, SECURITY_REVIEWER_K3,
+    SOL_LABEL,
 };
+use rival_core::proxy;
 use serde_json::{Value as Json, json};
 
 use crate::root::{CmdEnv, CmdError};
@@ -314,9 +317,42 @@ pub fn key_clear_action(env: &mut CmdEnv<'_>) -> Result<(), CmdError> {
     Ok(())
 }
 
-/// `rival config models [--json]`: not built yet.
-pub fn models_action() -> Result<(), CmdError> {
-    Err(CmdError::plain(
-        "rival config models needs the proxy module (not built yet)",
-    ))
+/// `rival config models [--json]`: `GET <url>/v1/models` with the key,
+/// grouped by prefix. Text: one block per prefix ("" shows as
+/// `(no prefix)`). JSON: one object with the URL, the ids in proxy order
+/// and the bare models under each prefix.
+pub fn models_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
+    let plain = |e: config::ConfigError| CmdError::plain(e.to_string());
+    let url = env.cfg.proxy_url().map_err(plain)?;
+    if url.is_empty() {
+        return Err(CmdError::plain(
+            "proxy.url is not set — run rival config set proxy.url <url>",
+        ));
+    }
+    let key = env
+        .cfg
+        .proxy_key()
+        .map_err(plain)?
+        .ok_or_else(|| CmdError::plain(PROXY_KEY_MISSING))?;
+    let route = Route::new(url.clone(), "", key.secret());
+    let ids = proxy::models(&route).map_err(|e| CmdError::plain(e.to_string()))?;
+    let groups = proxy::group_by_prefix(&ids);
+    if inv.bool("json") {
+        let out = json!({"url": url, "count": ids.len(), "models": ids, "prefixes": groups});
+        let _ = writeln!(env.stdout, "{out}");
+        return Ok(());
+    }
+    let _ = writeln!(env.stdout, "proxy  {url}  {} models", ids.len());
+    for (prefix, models) in &groups {
+        let shown = if prefix.is_empty() {
+            "(no prefix)"
+        } else {
+            prefix.as_str()
+        };
+        let _ = writeln!(env.stdout, "\n{shown}");
+        for model in models {
+            let _ = writeln!(env.stdout, "  {model}");
+        }
+    }
+    Ok(())
 }

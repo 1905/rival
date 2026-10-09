@@ -105,6 +105,19 @@ Queue read and clear errors (`read queue: …`, `clear queue: …`) are unit-tes
 
 Numeric ordering (`1.2.3` < `1.10.0`, `v` prefixes, two-part versions) is unit-tested in `rival_core::update::tests`. A release build ignores `RIVAL_UPDATE_API`: `update::tests::release_builds_ignore_the_api_override` (run it with `cargo test --release`).
 
+## proxy (Claude)
+
+The scenario server doubles as the fake proxy: `/v1/models` with `"auth": "Bearer <test key>"` (401 for any other key), and `RIVAL_PROXY_URL=<SERVER>`. The fake `claude` pins the argv and the child env by name (`null` = unset); the only values it checks are the fixed test key and the loopback URL.
+
+| Behaviour | ✓ | ✗ |
+|---|---|---|
+| `command claude` review through the proxy: `--model emcd_/…`, `ANTHROPIC_BASE_URL`/`ANTHROPIC_API_KEY` set, inherited routing vars dropped, `RIVAL_CLAUDE_AUTH` ignored, repair pass on the same route, session `route`/`wire_model`/`account` | proxy-claude-review | — |
+| preflight: key rejected (401) | — | proxy-claude-key-rejected |
+| preflight: wire id not served, prefixes that serve the model | — | proxy-claude-model-missing |
+| 429 account limit: hint names the other prefix; the leak guard scrubs the echoed key from stdout and the log | — | proxy-claude-limit-429 |
+| `RIVAL_PROXY=off` runs direct (no `/v1/models` call, bare model) | proxy-off-env | — |
+| `config models [--json]`, preflight unreachable/empty-prefix/no-account rows, Docker proxy args | unit tests `config_cmd::tests::models_*`, `proxy::tests`, `executor::claude::tests` | same |
+
 ## wait
 
 | Command / flag | ✓ | ✗ |

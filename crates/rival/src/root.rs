@@ -490,7 +490,8 @@ fn execute_inner(
     match result {
         Ok(()) => 0,
         Err(err) => {
-            let _ = writeln!(env.stderr, "{}", err.message);
+            // The leak guard: no registered secret in a printed error.
+            let _ = writeln!(env.stderr, "{}", rival_core::leakguard::scrub(&err.message));
             err.code
         }
     }
@@ -586,7 +587,7 @@ fn dispatch(
         CommandId::ConfigSet => config_cmd::set_action(env, inv),
         CommandId::ConfigKeySet => config_cmd::key_set_action(env, inv),
         CommandId::ConfigKeyClear => config_cmd::key_clear_action(env),
-        CommandId::ConfigModels => config_cmd::models_action(),
+        CommandId::ConfigModels => config_cmd::models_action(env, inv),
         CommandId::Queue => queue_sessions::queue_list_action(env),
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),

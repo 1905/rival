@@ -1,0 +1,74 @@
+{
+  "name": "proxy-claude-key-rejected",
+  "description": "The proxy answers 401 to a wrong key. The preflight stops `rival command claude` before the queue and before claude runs: stderr names the fix, exit 1, no session file. The wrong key is not printed.",
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak",
+    "ANTHROPIC_AUTH_TOKEN": "sk-parity-token-must-not-leak",
+    "ANTHROPIC_BASE_URL": "https://elsewhere.invalid",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "other-model",
+    "CLAUDE_CODE_USE_BEDROCK": "1",
+    "RIVAL_CLAUDE_AUTH": "api",
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "wrong-proxy-key-1111"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd_\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd2_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "proxy rejected the key (401) — run rival config key set"
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml"
+    ],
+    "calls": {},
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

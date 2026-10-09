@@ -123,7 +123,10 @@ fn only_claude_reports_an_auth_hint() {
     assert_eq!(codex_spec().auth_hint(&cfg, log), "");
     let hint = claude_spec().auth_hint(&cfg, log);
     assert!(!hint.is_empty());
-    assert_eq!(hint, executor::claude_auth_hint(&cfg, Path::new(log)));
+    assert_eq!(
+        hint,
+        executor::claude_auth_hint(&cfg, config::CLAUDE_MODEL, Path::new(log))
+    );
 }
 
 #[test]

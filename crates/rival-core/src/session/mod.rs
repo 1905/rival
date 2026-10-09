@@ -106,6 +106,15 @@ pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(deserialize_with = "json::nullable")]
     pub account: String,
+    /// `proxy` for a run through the proxy; "" (not written) is direct.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub route: String,
+    /// The model id on the wire (`emcd_/claude-opus-5-5`) when it differs
+    /// from `model`; "" (not written) otherwise.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub wire_model: String,
     #[serde(deserialize_with = "json::nullable")]
     pub pid: i64,
     /// Start time of `pid` (Unix ns); guards against PID reuse.
@@ -430,9 +439,11 @@ impl Session {
         self.save(paths)
     }
 
-    /// The record bytes: pretty JSON with a two-space indent.
+    /// The record bytes: pretty JSON with a two-space indent. The leak
+    /// guard removes any registered secret (an error text may quote one).
     pub fn to_json(&self) -> anyhow::Result<Vec<u8>> {
-        serde_json::to_vec_pretty(self).map_err(|e| anyhow!("marshal session: {e}"))
+        let data = serde_json::to_vec_pretty(self).map_err(|e| anyhow!("marshal session: {e}"))?;
+        Ok(crate::leakguard::scrub_bytes(&data).into_owned())
     }
 
     /// Writes the session JSON atomically: a unique `<id>.json.tmp-*` file,

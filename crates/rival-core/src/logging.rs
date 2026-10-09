@@ -129,7 +129,8 @@ impl Event {
             push_pair(&mut line, "message", &Value::Str(msg.into()));
         }
         line.push('}');
-        line
+        // The leak guard: no registered secret in a log line.
+        crate::leakguard::scrub(&line).into_owned()
     }
 
     /// Writes the line plus a newline to `w` in one call.

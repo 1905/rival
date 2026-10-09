@@ -447,7 +447,7 @@ fn claude_auth_hint_cases() {
             .set("ANTHROPIC_API_KEY", Some(key));
         let path = dir.path().join(format!("run{i}.log"));
         std::fs::write(&path, log).unwrap();
-        let got = claude_auth_hint(&env.config(), &path);
+        let got = claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path);
         if want.is_empty() {
             assert_eq!(got, "", "{name}");
         } else {
@@ -463,24 +463,28 @@ fn claude_auth_hint_cases() {
     std::fs::write(&path, "x authentication_error y").unwrap();
     let mut env = Env::new();
     assert_eq!(
-        claude_auth_hint(&env.config(), &path),
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
         "rival: subscription auth failed — run `claude` once and /login (Pro/Max), or set RIVAL_CLAUDE_AUTH=api with a funded ANTHROPIC_API_KEY"
     );
     env.set("RIVAL_CLAUDE_AUTH", Some("api"))
         .set("ANTHROPIC_API_KEY", Some("k"));
     assert_eq!(
-        claude_auth_hint(&env.config(), &path),
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
         "rival: API auth failed (RIVAL_CLAUDE_AUTH=api) — check ANTHROPIC_API_KEY and its credit balance, or unset RIVAL_CLAUDE_AUTH to use the claude CLI subscription login"
     );
     env.set("ANTHROPIC_API_KEY", None);
     assert_eq!(
-        claude_auth_hint(&env.config(), &path),
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
         "RIVAL_CLAUDE_AUTH=api but ANTHROPIC_API_KEY is empty — set the key or unset RIVAL_CLAUDE_AUTH to use the claude CLI subscription login"
     );
 
     // missing log file
     assert_eq!(
-        claude_auth_hint(&env.config(), &dir.path().join("nope.log")),
+        claude_auth_hint(
+            &env.config(),
+            config::CLAUDE_MODEL,
+            &dir.path().join("nope.log")
+        ),
         ""
     );
 }
@@ -575,5 +579,418 @@ fn run_claude_native_forwards_the_log_file() {
     assert_eq!(
         seen.unwrap().log.as_deref(),
         Some("/home/s/sessions/x.log.repair.log")
+    );
+}
+
+// ---- the proxy route ----
+
+const PROXY_KEY: &str = "test-proxy-key-0000";
+const WIRE: &str = "emcd_/claude-opus-5-5";
+
+/// An Env whose config enables the Claude proxy route at `url` with the
+/// `emcd_` prefix, and the fake key in `RIVAL_PROXY_KEY`.
+fn proxy_env_at(url: &str) -> Env {
+    let mut env = Env::new();
+    let dir = env.home.path().join(".rival");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("config.yaml"),
+        format!("proxy:\n  url: {url}\n  claude:\n    enabled: true\n    model_prefix: emcd_\n"),
+    )
+    .unwrap();
+    env.set("RIVAL_PROXY_KEY", Some(PROXY_KEY));
+    env
+}
+
+/// The argv with the wire id in place of the bare model.
+fn with_wire(mut args: Vec<String>) -> Vec<String> {
+    args[2] = WIRE.to_string();
+    args
+}
+
+fn run_recorded(env: &Env, read_only: bool) -> (Spawned, Session) {
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("claude", "raw", config::CLAUDE_MODEL, &work);
+    let mut seen = None;
+    run_claude_model(
+        &cfg,
+        &mut sess,
+        "do it",
+        "low",
+        &work,
+        config::CLAUDE_MODEL,
+        read_only,
+        None,
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap();
+    (seen.unwrap(), sess)
+}
+
+#[test]
+fn native_proxy_request_sets_the_wire_id_and_env() {
+    for auth in [None, Some("api"), Some("subscription"), Some("bogus")] {
+        let mut env = proxy_env_at("http://127.0.0.1:8999/v1");
+        env.set("RIVAL_CLAUDE_AUTH", auth);
+        env.fake_on_path("claude");
+        let (seen, sess) = run_recorded(&env, false);
+        assert_eq!(seen.binary, "claude");
+        assert_eq!(seen.args, with_wire(raw_argv("low")), "{auth:?}");
+        assert_eq!(
+            seen.env,
+            strings(&[
+                "ANTHROPIC_BASE_URL=http://127.0.0.1:8999",
+                "ANTHROPIC_API_KEY=test-proxy-key-0000",
+            ])
+        );
+        assert_eq!(
+            seen.drop_env,
+            strings(&[
+                "CLAUDECODE",
+                "ANTHROPIC_AUTH_TOKEN",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL",
+                "ANTHROPIC_DEFAULT_SONNET_MODEL",
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+                "CLAUDE_CODE_USE_BEDROCK",
+                "CLAUDE_CODE_USE_VERTEX",
+                "ANTHROPIC_BASE_URL",
+                "ANTHROPIC_API_KEY",
+            ])
+        );
+        assert!(!seen.args.iter().any(|a| a.contains(PROXY_KEY)));
+        assert_eq!(seen.account, "proxy");
+        assert_eq!(seen.mode, "native");
+        // The session keeps the bare id.
+        assert_eq!(sess.model, config::CLAUDE_MODEL);
+        assert_eq!(
+            (sess.route.as_str(), sess.wire_model.as_str()),
+            ("proxy", WIRE)
+        );
+    }
+    // Review restrictions stay.
+    let env = proxy_env_at("http://127.0.0.1:8999");
+    env.fake_on_path("claude");
+    let (seen, _) = run_recorded(&env, true);
+    assert_eq!(seen.args, with_wire(read_only_argv("low")));
+}
+
+/// The child gets the injected proxy pair and none of the inherited
+/// variables that would send the run elsewhere.
+#[test]
+fn native_proxy_child_env_drops_the_inherited_routing() {
+    let mut env = proxy_env_at("http://127.0.0.1:8999");
+    for (k, v) in [
+        ("ANTHROPIC_AUTH_TOKEN", "inherited-token"),
+        ("ANTHROPIC_API_KEY", "inherited-key"),
+        ("ANTHROPIC_BASE_URL", "https://elsewhere.example"),
+        ("ANTHROPIC_DEFAULT_OPUS_MODEL", "x"),
+        ("ANTHROPIC_DEFAULT_SONNET_MODEL", "x"),
+        ("ANTHROPIC_DEFAULT_HAIKU_MODEL", "x"),
+        ("CLAUDE_CODE_USE_BEDROCK", "1"),
+        ("CLAUDE_CODE_USE_VERTEX", "1"),
+        ("CLAUDECODE", "1"),
+    ] {
+        env.set(k, Some(v));
+    }
+    env.fake_on_path("claude");
+    let (seen, _) = run_recorded(&env, false);
+    let drop: Vec<&str> = seen.drop_env.iter().map(String::as_str).collect();
+    let req = Request {
+        binary: "claude",
+        args: &seen.args,
+        env: &seen.env,
+        prompt: "",
+        drop_env: &drop,
+        environ: &seen.environ,
+        log: None,
+    };
+    let child: Vec<String> =
+        crate::executor::subprocess::dedup_env(&crate::executor::subprocess::child_env(&req))
+            .unwrap()
+            .into_iter()
+            .map(|kv| kv.into_string().unwrap())
+            .collect();
+    let anthropic: Vec<&String> = child
+        .iter()
+        .filter(|kv| kv.starts_with("ANTHROPIC_") || kv.starts_with("CLAUDE"))
+        .collect();
+    assert_eq!(
+        anthropic,
+        vec![
+            "ANTHROPIC_BASE_URL=http://127.0.0.1:8999",
+            "ANTHROPIC_API_KEY=test-proxy-key-0000",
+        ]
+    );
+}
+
+/// With no proxy route the request is byte-identical to the direct one:
+/// an absent block, a disabled route, and `RIVAL_PROXY=off`.
+#[test]
+fn direct_request_is_unchanged_when_the_proxy_is_off() {
+    let mut base = Env::new();
+    base.set("ANTHROPIC_API_KEY", Some("sk-x"));
+    base.fake_on_path("claude");
+    let (want, want_sess) = run_recorded(&base, true);
+    assert_eq!(want.args, read_only_argv("low"));
+    assert_eq!(
+        (want_sess.route.as_str(), want_sess.wire_model.as_str()),
+        ("", "")
+    );
+
+    let disabled = |extra: &[(&str, &str)], yaml: &str| {
+        let mut env = Env::new();
+        // The same temp dirs would differ, so compare against a twin env.
+        env.set("ANTHROPIC_API_KEY", Some("sk-x"));
+        for (k, v) in extra {
+            env.set(k, Some(v));
+        }
+        let dir = env.home.path().join(".rival");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("config.yaml"), yaml).unwrap();
+        env.fake_on_path("claude");
+        let (got, sess) = run_recorded(&env, true);
+        (got, sess, env)
+    };
+    let on = "proxy:\n  url: http://127.0.0.1:8999\n  claude:\n    enabled: true\n    model_prefix: emcd_\n";
+    let off = "proxy:\n  url: http://127.0.0.1:8999\n  claude:\n    enabled: false\n    model_prefix: emcd_\n";
+    for (name, extra, yaml) in [
+        ("disabled", vec![("RIVAL_PROXY_KEY", PROXY_KEY)], off),
+        (
+            "RIVAL_PROXY=off",
+            vec![("RIVAL_PROXY_KEY", PROXY_KEY), ("RIVAL_PROXY", "off")],
+            on,
+        ),
+    ] {
+        let (got, sess, env) = disabled(&extra, yaml);
+        assert_eq!(got.binary, want.binary, "{name}");
+        assert_eq!(got.args, want.args, "{name}");
+        assert_eq!(got.env, want.env, "{name}");
+        assert_eq!(got.drop_env, want.drop_env, "{name}");
+        assert_eq!(got.account, want.account, "{name}");
+        assert_eq!(
+            got.prompt,
+            format!(
+                "{}\ndo it",
+                env.config().build_workdir_preamble(env.work.path())
+            ),
+            "{name}"
+        );
+        assert_eq!(
+            (sess.route.as_str(), sess.wire_model.as_str()),
+            ("", ""),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn docker_proxy_passes_names_and_maps_a_loopback_host() {
+    for (url, inside, add_host) in [
+        (
+            "http://127.0.0.1:8317",
+            "http://host.docker.internal:8317",
+            true,
+        ),
+        (
+            "http://localhost:8317",
+            "http://host.docker.internal:8317",
+            true,
+        ),
+        (
+            "http://[::1]:8317",
+            "http://host.docker.internal:8317",
+            true,
+        ),
+        (
+            "https://proxy.example:9000",
+            "https://proxy.example:9000",
+            false,
+        ),
+    ] {
+        // No claude on PATH and no RIVAL_CLAUDE_TOKEN: Docker on the proxy.
+        let env = proxy_env_at(url);
+        let (seen, sess) = run_recorded(&env, false);
+        let name = crate::executor::claude_docker::container_name(&sess.id);
+        let mut want = strings(&[
+            "run",
+            "--rm",
+            "-i",
+            "--name",
+            &name,
+            "-v",
+            &format!("{}:/workspace", env.work_str()),
+            "-w",
+            "/workspace",
+        ]);
+        if add_host {
+            want.push("--add-host=host.docker.internal:host-gateway".into());
+        }
+        want.extend(strings(&[
+            "-e",
+            "ANTHROPIC_BASE_URL",
+            "-e",
+            "ANTHROPIC_API_KEY",
+            "rival-claude",
+        ]));
+        want.extend(with_wire(raw_argv("low")));
+        assert_eq!(seen.binary, "docker");
+        assert_eq!(seen.args, want, "{url}");
+        assert_eq!(
+            seen.env,
+            vec![
+                format!("ANTHROPIC_BASE_URL={inside}"),
+                format!("ANTHROPIC_API_KEY={PROXY_KEY}"),
+            ]
+        );
+        assert!(!seen.args.iter().any(|a| a.contains(PROXY_KEY)));
+        assert_eq!(seen.mode, "docker");
+        assert_eq!(seen.account, "proxy");
+        assert_eq!(sess.wire_model, WIRE);
+    }
+}
+
+#[test]
+fn proxy_route_errors_stop_the_run() {
+    // The route is on but no key is set.
+    let mut env = proxy_env_at("http://127.0.0.1:8999");
+    env.set("RIVAL_PROXY_KEY", None);
+    env.fake_on_path("claude");
+    let cfg = env.config();
+    let work = env.work_str();
+    let mut sess = env.session("claude", "raw", config::CLAUDE_MODEL, &work);
+    let mut seen = None;
+    let err = run_claude_model(
+        &cfg,
+        &mut sess,
+        "p",
+        "low",
+        &work,
+        config::CLAUDE_MODEL,
+        false,
+        None,
+        recorder(&mut seen, Ok(RunResult::default())),
+    )
+    .unwrap_err();
+    assert_eq!(
+        format!("{err:#}"),
+        "claude runtime: proxy key missing — run rival config key set"
+    );
+    assert!(seen.is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn claude_preflight_runs_the_proxy_preflight() {
+    use crate::proxy::testserver::serve;
+    let (url, seen) = serve(
+        200,
+        r#"{"data":[{"id":"emcd_/claude-opus-5-5"},{"id":"emcd2_/claude-opus-5-5"}]}"#,
+    );
+    let env = proxy_env_at(&url);
+    env.fake("claude", "#!/bin/sh\nexit 97\n");
+    claude_preflight(&env.config()).unwrap();
+    assert_eq!(seen.lock().unwrap()[0].1, format!("Bearer {PROXY_KEY}"));
+
+    let (url, _) = serve(200, r#"{"data":[{"id":"emcd2_/claude-opus-5-5"}]}"#);
+    let env = proxy_env_at(&url);
+    env.fake("claude", "#!/bin/sh\nexit 97\n");
+    assert_eq!(
+        claude_preflight(&env.config()).unwrap_err().to_string(),
+        "proxy does not serve emcd_/claude-opus-5-5; it serves claude-opus-5-5 as: emcd2_/claude-opus-5-5 — set proxy.claude.model_prefix"
+    );
+
+    let (url, _) = serve(401, "{}");
+    let env = proxy_env_at(&url);
+    env.fake("claude", "#!/bin/sh\nexit 97\n");
+    assert_eq!(
+        claude_preflight(&env.config()).unwrap_err().to_string(),
+        "proxy rejected the key (401) — run rival config key set"
+    );
+}
+
+#[test]
+fn claude_auth_hint_proxy_branch() {
+    use crate::proxy::testserver::serve;
+    let (url, _) = serve(
+        200,
+        r#"{"data":[{"id":"emcd_/claude-opus-5-5"},{"id":"emcd2_/claude-opus-5-5"}]}"#,
+    );
+    let env = proxy_env_at(&url);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("run.log");
+    std::fs::write(
+        &path,
+        "API Error: 429 {\"type\":\"rate_limit_error\",\"message\":\"All credentials for model emcd_/claude-opus-5-5 are cooling down\"}",
+    )
+    .unwrap();
+    assert_eq!(
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
+        "rival: proxy account emcd_ is at its limit (429); other prefixes that serve claude-opus-5-5: emcd2_ — set proxy.claude.model_prefix"
+    );
+    std::fs::write(&path, "API Error: 401 Invalid API key").unwrap();
+    assert_eq!(
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
+        "rival: proxy request failed for emcd_/claude-opus-5-5 — check the proxy key (rival config key set) and proxy.claude.model_prefix (now \"emcd_\"); a 429 means the account is at its limit"
+    );
+    // Not /login on the proxy route; a plain model failure has no hint.
+    std::fs::write(&path, "model overloaded, retry later").unwrap();
+    assert_eq!(
+        claude_auth_hint(&env.config(), config::CLAUDE_MODEL, &path),
+        ""
+    );
+}
+
+/// The leak guard: a provider that echoes the proxy key on stdout and
+/// stderr leaves no trace of it in the session log, the mirror, or the
+/// session record.
+#[cfg(unix)]
+#[test]
+fn proxy_key_never_reaches_the_log_mirror_or_record() {
+    let env = proxy_env_at("http://127.0.0.1:8999");
+    env.fake(
+        "claude",
+        "#!/bin/sh\n/bin/cat >/dev/null\nprintf 'key=%s\\n' \"$ANTHROPIC_API_KEY\"\nprintf 'err %s tail' \"$ANTHROPIC_API_KEY\" >&2\nexit 1\n",
+    );
+    let cfg = env.config();
+    let repo = env.work_str();
+    let mut sess = env.session("claude", "review", config::CLAUDE_MODEL, &repo);
+    let mut out = Vec::new();
+    let result = retry_busy(
+        || {
+            out.clear();
+            run_claude(
+                &Context::background(),
+                &cfg,
+                &mut sess,
+                "review",
+                "medium",
+                &repo,
+                true,
+                None,
+                Some(&mut out),
+            )
+        },
+        |r| format!("{r:?}"),
+    )
+    .unwrap();
+    assert_eq!(result.exit_code, 1);
+    let mirror = String::from_utf8(out).unwrap();
+    assert_eq!(mirror, "key=<redacted>\n");
+    let log = std::fs::read_to_string(&sess.log_file).unwrap();
+    assert!(!log.contains(PROXY_KEY), "{log}");
+    assert!(log.contains("key=<redacted>\n"), "{log}");
+    assert!(log.contains("err <redacted> tail"), "{log}");
+    // An error text that quotes the key is scrubbed from the record.
+    sess.fail(&env.paths(), 1, &format!("claude said {PROXY_KEY}"))
+        .unwrap();
+    let record =
+        std::fs::read_to_string(env.paths().sessions_dir().join(format!("{}.json", sess.id)))
+            .unwrap();
+    assert!(!record.contains(PROXY_KEY), "{record}");
+    assert!(record.contains("\"route\": \"proxy\""), "{record}");
+    assert!(
+        record.contains(&format!("\"wire_model\": \"{WIRE}\"")),
+        "{record}"
     );
 }

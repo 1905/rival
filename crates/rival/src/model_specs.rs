@@ -144,7 +144,7 @@ impl ModelSpec {
         if self.command_name != config::CLAUDE_LABEL {
             return String::new();
         }
-        executor::claude_auth_hint(cfg, Path::new(log_file))
+        executor::claude_auth_hint(cfg, self.model, Path::new(log_file))
     }
 }
 

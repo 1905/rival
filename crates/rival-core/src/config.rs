@@ -783,6 +783,18 @@ pub struct Route {
 }
 
 impl Route {
+    /// A route from its parts, for a draft config or a test. The key is
+    /// added to the leak guard's scrub list.
+    pub fn new(url: impl Into<String>, prefix: impl Into<String>, key: impl Into<String>) -> Self {
+        let key = key.into();
+        crate::leakguard::register(&key);
+        Route {
+            url: url.into(),
+            prefix: prefix.into(),
+            key,
+        }
+    }
+
     pub fn key(&self) -> &str {
         &self.key
     }
@@ -1367,8 +1379,13 @@ impl Config {
     /// The proxy key: `RIVAL_PROXY_KEY`, else the trimmed key file.
     /// `Ok(None)` means no key (unset, missing or empty file). Read once,
     /// at the first call.
+    /// A loaded key joins the leak guard's scrub list.
     pub fn proxy_key(&self) -> Result<Option<ProxyKey>, ConfigError> {
-        self.proxy_key.get_or_init(|| self.read_proxy_key()).clone()
+        let key = self.proxy_key.get_or_init(|| self.read_proxy_key()).clone();
+        if let Ok(Some(k)) = &key {
+            crate::leakguard::register(k.secret());
+        }
+        key
     }
 
     fn read_proxy_key(&self) -> Result<Option<ProxyKey>, ConfigError> {
