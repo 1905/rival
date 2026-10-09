@@ -118,6 +118,16 @@ The scenario server doubles as the fake proxy: `/v1/models` with `"auth": "Beare
 | `RIVAL_PROXY=off` runs direct (no `/v1/models` call, bare model) | proxy-off-env | — |
 | `config models [--json]`, preflight unreachable/empty-prefix/no-account rows, Docker proxy args | unit tests `config_cmd::tests::models_*`, `proxy::tests`, `executor::claude::tests` | same |
 
+## proxy (Codex)
+
+The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` then the two provider `-c` values (the `base_url` by a loopback `$regex`), and `RIVAL_PROXY_KEY` in the child env with the fixed test key.
+
+| Behaviour | ✓ | ✗ |
+|---|---|---|
+| `command codex` review through the proxy: provider `-c` values, `RIVAL_PROXY_KEY` in the env and in no argv, no `codex login status`, repair pass on the same route, session `route`/`wire_model`/`account` | proxy-codex-review | — |
+| preflight: key rejected (401), codex never runs | — | proxy-codex-key-rejected |
+| exact `-c` strings, TOML-unsafe URL refused, prefix on the wire id, direct argv unchanged, proxy hint (429, rejected key) | unit tests `executor::codex::tests` | same |
+
 ## wait
 
 | Command / flag | ✓ | ✗ |

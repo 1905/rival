@@ -1,0 +1,177 @@
+{
+  "name": "proxy-codex-review",
+  "description": "`rival command codex` review through the proxy. The config enables proxy.codex with no prefix; RIVAL_PROXY_URL points at the scenario server and RIVAL_PROXY_KEY holds a fixed test key. The preflight asks GET /v1/models once with `Authorization: Bearer <key>` and never runs `codex login status`. The fake codex sees `-m gpt-6-astra` followed by the two provider -c values (base_url <SERVER>/v1, env_key RIVAL_PROXY_KEY, wire_api responses), and RIVAL_PROXY_KEY in its env with the test key; the key is in no argv. The language repair pass runs on the same route. The session keeps the bare model and records route proxy, wire_model and account proxy.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)You are working in project directory: <ROOT>/work\n(?s:.*)Review scope: src/\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "model_provider=\"rival_proxy\"",
+              "-c",
+              {
+                "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
+              },
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+              }
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  codex:\n    enabled: true\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            },
+            {
+              "id": "gpt-6.1-sol",
+              "owned_by": "openai"
+            },
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting codex (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "review_scope": "src/",
+          "account": "proxy",
+          "route": "proxy",
+          "wire_model": "gpt-6-astra"
+        }
+      }
+    ],
+    "calls": {
+      "codex": 2
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

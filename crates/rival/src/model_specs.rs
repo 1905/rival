@@ -139,12 +139,16 @@ impl ModelSpec {
     }
 
     /// A provider-specific hint for a failed run, or "" when
-    /// the provider has none. Only Claude distinguishes auth failures.
+    /// the provider has none. Claude distinguishes auth failures; Codex
+    /// has a hint on the proxy route only.
     pub fn auth_hint(&self, cfg: &Config, log_file: &str) -> String {
-        if self.command_name != config::CLAUDE_LABEL {
-            return String::new();
+        match self.command_name {
+            config::CLAUDE_LABEL => {
+                executor::claude_auth_hint(cfg, self.model, Path::new(log_file))
+            }
+            config::CODEX_LABEL => executor::codex_auth_hint(cfg, self.model, Path::new(log_file)),
+            _ => String::new(),
         }
-        executor::claude_auth_hint(cfg, self.model, Path::new(log_file))
     }
 }
 
