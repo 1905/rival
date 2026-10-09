@@ -1,0 +1,1 @@
+{"count":6,"models":["emcd_/claude-opus-5-5","emcd_/claude-fable-5-1","emcd2_/claude-opus-5-5","emcd2_/claude-fable-5-1","gpt-6-astra","gpt-6.1-sol"],"prefixes":{"":["gpt-6-astra","gpt-6.1-sol"],"emcd2_":["claude-opus-5-5","claude-fable-5-1"],"emcd_":["claude-opus-5-5","claude-fable-5-1"]},"url":"http://127.0.0.1:8317"}
