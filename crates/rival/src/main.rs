@@ -1,5 +1,6 @@
 mod command_plan;
 mod command_security;
+mod config_cmd;
 mod csvflag;
 mod detach;
 mod gitscope_helper;

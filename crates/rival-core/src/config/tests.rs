@@ -609,7 +609,7 @@ fn grok_is_enumerated_in_effort_model_errors() {
     assert_eq!(
         err.to_string(),
         format!(
-            r#"invalid effort model "mystery" in {}; use one of: codex, kimi-k3, claude, grok"#,
+            r#"invalid effort model "mystery" in {}; use one of: codex, sol, kimi-k3, claude, fable, grok"#,
             path.display()
         )
     );
@@ -640,10 +640,9 @@ fn grok_concrete_model_id_is_never_exposed() {
 #[test]
 fn load_user_config_validates_effort_map() {
     let cases = [
-        // sol is a removed model: its old entry is dropped, not an error.
         (
             "valid",
-            "efforts:\n  sol: low\n  codex: ultra\n  kimi-k3: max\n  claude: medium\n",
+            "efforts:\n  sol: low\n  codex: ultra\n  kimi-k3: max\n  claude: medium\n  fable: high\n",
             None,
         ),
         (
@@ -668,14 +667,9 @@ fn load_user_config_validates_effort_map() {
                     "ultra",
                     "{name}"
                 );
-                assert!(
-                    !config
-                        .user_config()
-                        .unwrap()
-                        .efforts
-                        .contains_key(SOL_LABEL),
-                    "{name}: removed sol effort entry was kept"
-                );
+                let efforts = &config.user_config().unwrap().efforts;
+                assert_eq!(efforts.get(SOL_LABEL).map(String::as_str), Some("low"));
+                assert_eq!(efforts.get(FABLE_LABEL).map(String::as_str), Some("high"));
             }
             Some(want) => {
                 let err = config
@@ -1633,4 +1627,282 @@ fn auto_fix_critical_high_defaults_off() {
     }
     let (_home, missing) = loaded("");
     assert_eq!(missing.auto_fix_policy(), "off");
+}
+
+// ---- proxy and plan settings ----
+
+const FULL_PROXY: &str = "proxy:
+  url: http://127.0.0.1:8317/v1/
+  key_file: ~/keys/proxy.key
+  claude:
+    enabled: true
+    model_prefix: emcd_/
+  codex:
+    enabled: false
+    model_prefix: \"\"
+plan:
+  models: [codex, Opus, fable]
+";
+
+/// Writes `key` to `path` with owner-only permissions.
+fn write_key(path: &Path, key: &str) {
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, key).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+}
+
+#[test]
+fn proxy_and_plan_blocks_parse_and_normalize() {
+    let (_home, config) = loaded(FULL_PROXY);
+    assert_eq!(config.user_config_error(), None);
+    let user = config.user_config().unwrap();
+    assert_eq!(
+        user.proxy,
+        ProxyConfig {
+            url: "http://127.0.0.1:8317".into(),
+            key_file: "~/keys/proxy.key".into(),
+            claude: ProxyRoute {
+                enabled: true,
+                model_prefix: "emcd_".into(),
+            },
+            codex: ProxyRoute {
+                enabled: false,
+                model_prefix: String::new(),
+            },
+        }
+    );
+    assert_eq!(user.plan.models, ["codex", "opus", "fable"]);
+}
+
+#[test]
+fn no_proxy_block_means_proxy_off_for_both() {
+    for body in ["", "efforts:\n  codex: high\n", "proxy:\n", "plan:\n"] {
+        let (_home, config) = loaded(body);
+        assert_eq!(config.user_config_error(), None, "{body:?}");
+        let user = config.user_config().unwrap();
+        assert_eq!(user.proxy, ProxyConfig::default(), "{body:?}");
+        assert!(user.plan.models.is_empty(), "{body:?}");
+        for provider in [ProxyProvider::Claude, ProxyProvider::Codex] {
+            assert_eq!(config.proxy_route(provider), Ok(None), "{body:?}");
+        }
+    }
+    // No config file at all.
+    assert_eq!(cfg(&[]).proxy_route(ProxyProvider::Claude), Ok(None));
+}
+
+#[test]
+fn proxy_route_reads_url_prefix_and_key_file() {
+    let (home, config) = loaded(FULL_PROXY);
+    write_key(&home.path().join("keys/proxy.key"), "  sk-test-0001\n");
+    let route = config.proxy_route(ProxyProvider::Claude).unwrap().unwrap();
+    assert_eq!(route.url, "http://127.0.0.1:8317");
+    assert_eq!(route.prefix, "emcd_");
+    assert_eq!(route.key(), "sk-test-0001");
+    // Codex is not enabled.
+    assert_eq!(config.proxy_route(ProxyProvider::Codex), Ok(None));
+}
+
+#[test]
+fn proxy_env_overrides_url_and_key_and_switches_off() {
+    let body = "proxy:\n  url: http://127.0.0.1:8317\n  codex:\n    enabled: true\n";
+    let (home, _) = loaded(body);
+    // RIVAL_PROXY_KEY wins over the key file; RIVAL_PROXY_URL over proxy.url.
+    write_key(&home.path().join(".rival/proxy.key"), "from-file-key");
+    let config = home_config(
+        home.path(),
+        &[
+            ("RIVAL_PROXY_KEY", " env-key-1234 "),
+            ("RIVAL_PROXY_URL", "https://proxy.example:9000/v1"),
+        ],
+    );
+    let route = config.proxy_route(ProxyProvider::Codex).unwrap().unwrap();
+    assert_eq!(route.url, "https://proxy.example:9000");
+    assert_eq!(route.key(), "env-key-1234");
+    assert_eq!(route.prefix, "");
+    // RIVAL_PROXY=off sends the run direct.
+    for off in ["off", "OFF"] {
+        let config = home_config(home.path(), &[("RIVAL_PROXY", off)]);
+        assert_eq!(config.proxy_route(ProxyProvider::Codex), Ok(None), "{off}");
+    }
+    // Without the env key, the default key file is read.
+    let config = home_config(home.path(), &[]);
+    let route = config.proxy_route(ProxyProvider::Codex).unwrap().unwrap();
+    assert_eq!(route.key(), "from-file-key");
+    // An invalid RIVAL_PROXY_URL is an error naming the variable.
+    let config = home_config(home.path(), &[("RIVAL_PROXY_URL", "ftp://x")]);
+    let err = config.proxy_route(ProxyProvider::Codex).unwrap_err();
+    assert!(err.to_string().contains("RIVAL_PROXY_URL"), "{err}");
+}
+
+#[test]
+fn proxy_key_missing_or_empty_names_the_fix() {
+    let body = "proxy:\n  url: http://127.0.0.1:8317\n  claude:\n    enabled: true\n    model_prefix: emcd_\n";
+    let (home, config) = loaded(body);
+    // A missing key is not a load error: the key loads at the first use.
+    assert_eq!(config.user_config_error(), None);
+    let err = config.proxy_route(ProxyProvider::Claude).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "proxy key missing — run rival config key set"
+    );
+    assert_eq!(config.proxy_key(), Ok(None));
+    write_key(&home.path().join(".rival/proxy.key"), " \n");
+    let config = home_config(home.path(), &[]);
+    assert_eq!(config.proxy_key(), Ok(None));
+}
+
+#[test]
+fn proxy_route_needs_a_url() {
+    let (home, config) = loaded("proxy:\n  claude:\n    enabled: true\n");
+    write_key(&home.path().join(".rival/proxy.key"), "k");
+    let err = config.proxy_route(ProxyProvider::Claude).unwrap_err();
+    assert!(err.to_string().contains("proxy.url"), "{err}");
+}
+
+#[test]
+fn proxy_key_source_and_mask() {
+    let (home, _) = loaded("");
+    let file = home.path().join(".rival/proxy.key");
+    write_key(&file, "sk-abcdef-a91f\n");
+    let config = home_config(home.path(), &[]);
+    let key = config.proxy_key().unwrap().unwrap();
+    assert_eq!(key.secret(), "sk-abcdef-a91f");
+    assert_eq!(key.source, ProxyKeySource::File(file.clone()));
+    assert_eq!(key.masked(), "set (…a91f)");
+    assert!(!format!("{key:?}").contains("sk-abcdef"));
+    let config = home_config(home.path(), &[("RIVAL_PROXY_KEY", "env-secret-0042")]);
+    let key = config.proxy_key().unwrap().unwrap();
+    assert_eq!(key.source, ProxyKeySource::Env);
+    assert_eq!(key.masked(), "set (…0042)");
+    // A short key shows no characters.
+    let config = home_config(home.path(), &[("RIVAL_PROXY_KEY", "abc")]);
+    assert_eq!(config.proxy_key().unwrap().unwrap().masked(), "set");
+    assert_eq!(config.proxy_key_file(), file);
+}
+
+#[test]
+fn proxy_key_file_path_expands_home() {
+    let (home, config) = loaded("proxy:\n  key_file: ~/k/p.key\n");
+    assert_eq!(config.proxy_key_file(), home.path().join("k").join("p.key"));
+    let (_home, config) = loaded("proxy:\n  key_file: /etc/rival.key\n");
+    assert_eq!(config.proxy_key_file(), PathBuf::from("/etc/rival.key"));
+    let (home, config) = loaded("");
+    assert_eq!(
+        config.proxy_key_file(),
+        home.path().join(".rival").join("proxy.key")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn proxy_key_file_readable_by_others_is_an_error() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (home, _) = loaded("");
+    let file = home.path().join(".rival/proxy.key");
+    write_key(&file, "secret-key-9999");
+    for mode in [0o644, 0o640, 0o604] {
+        fs::set_permissions(&file, fs::Permissions::from_mode(mode)).unwrap();
+        let config = home_config(home.path(), &[]);
+        let err = config.proxy_key().unwrap_err().to_string();
+        assert!(err.contains(&file.display().to_string()), "{err}");
+        assert!(err.contains("chmod 600"), "{err}");
+        assert!(!err.contains("secret-key"), "{err}");
+    }
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o400)).unwrap();
+    let config = home_config(home.path(), &[]);
+    assert!(config.proxy_key().unwrap().is_some());
+}
+
+#[test]
+fn proxy_url_normalize() {
+    let ok = [
+        ("http://127.0.0.1:8317", "http://127.0.0.1:8317"),
+        ("http://127.0.0.1:8317/", "http://127.0.0.1:8317"),
+        ("http://127.0.0.1:8317/v1", "http://127.0.0.1:8317"),
+        ("http://127.0.0.1:8317/v1/", "http://127.0.0.1:8317"),
+        (
+            " https://proxy.example/base/v1 ",
+            "https://proxy.example/base",
+        ),
+        ("HTTPS://[::1]:8317", "HTTPS://[::1]:8317"),
+        ("http://user@host", "http://user@host"),
+    ];
+    for (raw, want) in ok {
+        assert_eq!(normalize_proxy_url(raw).as_deref(), Ok(want), "{raw:?}");
+    }
+    for raw in [
+        "",
+        "127.0.0.1:8317",
+        "ftp://host",
+        "http://",
+        "http:///v1",
+        "http://:8317",
+        "http://user@",
+        "http://[]:1",
+    ] {
+        assert!(normalize_proxy_url(raw).is_err(), "{raw:?}");
+    }
+}
+
+#[test]
+fn model_prefix_normalize() {
+    for (raw, want) in [
+        ("emcd_", "emcd_"),
+        ("emcd_/", "emcd_"),
+        (" emcd2_// ", "emcd2_"),
+        ("", ""),
+        ("/", ""),
+    ] {
+        assert_eq!(normalize_model_prefix(raw), want, "{raw:?}");
+    }
+}
+
+#[test]
+fn proxy_and_plan_validation_errors() {
+    let cases = [
+        ("proxy:\n  key: sk-secret\n", "rival config key set"),
+        ("proxy:\n  key:\n", "rival config key set"),
+        ("proxy:\n  url: ftp://x\n", "invalid proxy.url"),
+        ("proxy:\n  url: localhost:8317\n", "invalid proxy.url"),
+        ("plan:\n  models: [codex, gpt]\n", "invalid plan.models"),
+        ("proxy:\n  claude:\n    enabled: maybe\n", "parse "),
+        ("plan:\n  models: codex\n", "parse "),
+    ];
+    for (body, want) in cases {
+        let (home, config) = loaded(body);
+        let err = config
+            .user_config_error()
+            .unwrap_or_else(|| panic!("{body:?}: no error"))
+            .to_string();
+        assert!(err.contains(want), "{body:?}: {err}");
+        assert!(
+            err.contains(&config_path(home.path()).display().to_string()),
+            "{body:?}: {err}"
+        );
+        assert!(!err.contains("sk-secret"), "{body:?}: {err}");
+    }
+    let (_home, config) = loaded("plan:\n  models: [codex, gpt]\n");
+    assert_eq!(
+        config.user_config_error().unwrap().to_string(),
+        format!(
+            r#"invalid plan.models entry "gpt" in {}; use one of: codex, sol, claude, opus, fable"#,
+            config_path(_home.path()).display()
+        )
+    );
+}
+
+#[test]
+fn route_debug_hides_the_key() {
+    let route = Route {
+        url: "http://127.0.0.1:8317".into(),
+        prefix: "emcd_".into(),
+        key: "sk-very-secret".into(),
+    };
+    let shown = format!("{route:?}");
+    assert!(!shown.contains("sk-very-secret"), "{shown}");
+    assert!(shown.contains("emcd_"), "{shown}");
 }

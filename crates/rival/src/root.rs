@@ -19,7 +19,7 @@ use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{command_plan, command_security, install, queue_sessions, update_cmd};
+use crate::{command_plan, command_security, config_cmd, install, queue_sessions, update_cmd};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -504,7 +504,10 @@ fn pre_run(
     inv: &Invocation,
     bg: &mut Background,
 ) -> PreRun {
-    if let Some(err) = env.cfg.user_config_error() {
+    // `config set` and `config key` can repair an invalid config file.
+    if let Some(err) = env.cfg.user_config_error()
+        && !inv.id.repairs_config()
+    {
         return PreRun::Fail(CmdError::plain(err.to_string()));
     }
     // Detach before any side effects: the re-exec'd child redoes this hook.
@@ -514,7 +517,7 @@ fn pre_run(
     {
         return PreRun::Exit(code);
     }
-    let tui = inv.id == CommandId::Tui;
+    let tui = matches!(inv.id, CommandId::Tui | CommandId::Config);
     if tui {
         // The TUI owns the terminal: a log line on stderr (the background
         // reaper logs each orphan it fails) would draw over the screen.
@@ -564,7 +567,7 @@ fn dispatch(
             let _ = writeln!(env.stdout, "{BANNER}  {}", rival_core::VERSION);
             Ok(())
         }
-        CommandId::Command | CommandId::Run => {
+        CommandId::Command | CommandId::Run | CommandId::ConfigKey => {
             let _ = env
                 .stdout
                 .write_all(tree::render_help(root, &inv.path).as_bytes());
@@ -577,6 +580,13 @@ fn dispatch(
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
+        // The config window comes later; for now the dashboard opens.
+        CommandId::Config => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
+        CommandId::ConfigShow => config_cmd::show_action(env, inv),
+        CommandId::ConfigSet => config_cmd::set_action(env, inv),
+        CommandId::ConfigKeySet => config_cmd::key_set_action(env, inv),
+        CommandId::ConfigKeyClear => config_cmd::key_clear_action(env),
+        CommandId::ConfigModels => config_cmd::models_action(),
         CommandId::Queue => queue_sessions::queue_list_action(env),
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),

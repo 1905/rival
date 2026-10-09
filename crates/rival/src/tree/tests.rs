@@ -83,6 +83,7 @@ fn root_commands_match_cli_surface_including_help_and_completion() {
         names(&r),
         [
             "command",
+            "config",
             "install",
             "queue",
             "run",
@@ -184,6 +185,45 @@ fn other_commands_match_cli_surface() {
 }
 
 #[test]
+fn config_subtree() {
+    let r = root();
+    let config = node(&r, &["config"]);
+    assert_eq!(names(config), ["show", "set", "key", "models"]);
+    assert_eq!(names(node(&r, &["config", "key"])), ["set", "clear"]);
+    let json = [f("json", "false")];
+    assert_eq!(flags(node(&r, &["config", "show"])), json);
+    assert_eq!(flags(node(&r, &["config", "set"])), json);
+    assert_eq!(flags(node(&r, &["config", "models"])), json);
+    assert_eq!(parse_ok(&["config"]).id, CommandId::Config);
+    let inv = parse_ok(&["config", "set", "proxy.url", "http://h"]);
+    assert_eq!(
+        (inv.id, inv.args.clone()),
+        (CommandId::ConfigSet, argv(&["proxy.url", "http://h"]))
+    );
+    assert!(parse_ok(&["config", "set", "--json"]).bool("json"));
+    assert_eq!(parse_ok(&["config", "key"]).id, CommandId::ConfigKey);
+    // `key set` keeps stray words for its own error; the others refuse them.
+    assert_eq!(parse_ok(&["config", "key", "set", "x"]).args, ["x"]);
+    assert_eq!(
+        parse_err(&["config", "key", "clear", "x"]),
+        "unknown command \"x\" for \"rival config key clear\""
+    );
+    assert_eq!(
+        parse_err(&["config", "bogus"]),
+        "unknown command \"bogus\" for \"rival config\""
+    );
+    for id in [
+        CommandId::ConfigSet,
+        CommandId::ConfigKeySet,
+        CommandId::ConfigKeyClear,
+    ] {
+        assert!(id.repairs_config(), "{id:?}");
+    }
+    assert!(!CommandId::ConfigShow.repairs_config());
+    assert!(!CommandId::Config.repairs_config());
+}
+
+#[test]
 fn model_commands_are_public_and_registered() {
     let r = root();
     for (parent, model) in [
@@ -278,7 +318,7 @@ fn unknown_root_command_has_cobra_text_and_suggestions() {
     // Prefix matches, in AddCommand order; help is never suggested.
     assert_eq!(
         parse_err(&["co"]),
-        "unknown command \"co\" for \"rival\"\n\nDid you mean this?\n\tcommand\n\tcompletion\n"
+        "unknown command \"co\" for \"rival\"\n\nDid you mean this?\n\tcommand\n\tconfig\n\tcompletion\n"
     );
     assert_eq!(
         parse_err(&["WAIT2"]),
@@ -677,6 +717,8 @@ fn completion_scripts_cover_the_tree() {
             "wait",
             "timeout",
             "completion",
+            "config",
+            "models",
         ] {
             assert!(script.contains(word), "{shell}: script lacks {word}");
         }

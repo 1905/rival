@@ -31,6 +31,13 @@ pub enum CommandId {
     CommandK3,
     CommandPlan,
     CommandSecurity,
+    Config,
+    ConfigShow,
+    ConfigSet,
+    ConfigKey,
+    ConfigKeySet,
+    ConfigKeyClear,
+    ConfigModels,
     Install,
     Queue,
     QueueClear,
@@ -63,6 +70,13 @@ impl CommandId {
             ["rival", "command", "k3"] => CommandK3,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
+            ["rival", "config"] => Config,
+            ["rival", "config", "show"] => ConfigShow,
+            ["rival", "config", "set"] => ConfigSet,
+            ["rival", "config", "key"] => ConfigKey,
+            ["rival", "config", "key", "set"] => ConfigKeySet,
+            ["rival", "config", "key", "clear"] => ConfigKeyClear,
+            ["rival", "config", "models"] => ConfigModels,
             ["rival", "install"] => Install,
             ["rival", "queue"] => Queue,
             ["rival", "queue", "clear"] => QueueClear,
@@ -92,6 +106,11 @@ impl CommandId {
             self,
             Command
                 | Run
+                | Config
+                | ConfigShow
+                | ConfigKey
+                | ConfigKeyClear
+                | ConfigModels
                 | Install
                 | Completion
                 | CompletionBash
@@ -104,6 +123,13 @@ impl CommandId {
     /// cobra `Runnable()`: `completion` has no action and prints help.
     fn runnable(self) -> bool {
         self != CommandId::Completion
+    }
+
+    /// Commands that run with an invalid `config.yaml`, so they can fix
+    /// it.
+    pub fn repairs_config(self) -> bool {
+        use CommandId::*;
+        matches!(self, ConfigSet | ConfigKeySet | ConfigKeyClear)
     }
 }
 
@@ -270,10 +296,39 @@ pub fn build(defaults: &Defaults) -> Command {
         ]),
     ]);
 
+    // `key set` keeps its stray words: the action refuses them without
+    // echoing them, since a stray word may be the key.
+    let config_cmd = with_args(command(
+        "config",
+        "Show and change ~/.rival/config.yaml (no subcommand: open the TUI)",
+    ))
+    .subcommands([
+        with_args(command(
+            "show",
+            "Show each resolved value and its source (default, file, env)",
+        ))
+        .arg(bool_flag("json", "print one JSON object")),
+        with_args(command(
+            "set",
+            "Set one key (KEY VALUE), or apply a JSON patch from stdin (--json)",
+        ))
+        .arg(bool_flag("json", "read a JSON patch from stdin")),
+        with_args(command("key", "Store or remove the proxy key")).subcommands([
+            with_args(command(
+                "set",
+                "Store the proxy key read from stdin (mode 0600)",
+            )),
+            with_args(command("clear", "Remove the proxy key file")),
+        ]),
+        with_args(command("models", "List the models the proxy serves"))
+            .arg(bool_flag("json", "print one JSON object")),
+    ]);
+
     command("rival", "Dispatch prompts and reviews to external AI models")
         .bin_name("rival")
         .subcommands([
             command_cmd,
+            config_cmd,
             with_args(command("install", "Install skills for Claude Code and Codex")).args([
                 bool_flag("force", "overwrite without prompting"),
                 string_flag("target", "auto", "skill host: auto, claude, codex, all"),

@@ -69,6 +69,11 @@ impl Paths {
     pub fn config_file(&self) -> PathBuf {
         self.root.join("config.yaml")
     }
+
+    /// The default proxy key file.
+    pub fn proxy_key_file(&self) -> PathBuf {
+        self.root.join("proxy.key")
+    }
 }
 
 /// Lexical clean for the host: Unix rules, or on Windows [`clean_windows`].
