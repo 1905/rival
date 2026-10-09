@@ -2,14 +2,14 @@
 
 **Date:** 2026-10-09
 **Scope:** /wrk/dev/rival. The file:line citations are from master `71835d3`.
-**Status:** spec
+**Status:** planned
 
 ## TL;DR
 
-**P0 — proxy facts (no code).**
-- What: log Codex in on the proxy (`-codex-device-login`). Read `/v1/models` to get the Sol 6.1 id and the Codex prefix. Run one Codex CLI call by hand through the proxy.
+**P0 — proxy facts (no code). Done 2026-10-09.**
+- What: Codex is logged in on the proxy. `/v1/models` and hand-run calls gave the facts in [P0 findings](#p0-findings).
 - Why: the Codex wiring and the Sol id depend on these facts.
-- You decide or do: approve the device login on your phone or browser.
+- You decide or do: nothing more.
 - Not done: no change to the proxy config. T3 keeps working as it does today.
 
 **P1 — config schema and writer.**
@@ -25,9 +25,9 @@
 - Not done: no proxy-side alias.
 
 **P3 — Codex through the proxy.**
-- What: when `proxy.codex.enabled` is set, Codex runs get a custom Codex provider (`-c model_provider=…`) that points to `<url>/v1`, with the key in an environment variable.
+- What: when `proxy.codex.enabled` is set, Codex runs get a custom Codex provider (`-c model_provider=…`) that points to `<url>/v1`, with the key in an environment variable. P0 ran this form by hand: it works.
 - Why: the Codex arguments are fixed today (`executor/codex.rs:105`).
-- You decide or do: nothing after P0.
+- You decide or do: nothing.
 - Not done: no proxy route for the opencode models (K3, Grok).
 
 **P4 — Fable and Sol 6.1 come back.**
@@ -55,7 +55,7 @@
 2. **rival cannot use the proxy for Codex.**
    - `codex_run_args` is fixed (`executor/codex.rs:105`). It has no base URL and no provider.
    - The preflight runs `codex login status` (`executor/codex.rs:23`). Through the proxy, a local Codex login is not necessary and the check is wrong.
-3. **The proxy has no Codex account yet.** `auths/` holds the two Claude accounts only.
+3. **A Claude prefix can run out of quota.** On 2026-10-09 every `emcd2_/` Claude model returned 429 (monthly spend limit) and `emcd_/` worked. Today rival shows this only as a failed review.
 4. **No user can set any of this.**
    - Nothing writes `~/.rival/config.yaml`. `UserConfig` has no `Serialize` (`config.rs:703`).
    - The TUI has no settings screen (`tui/keys.rs:14` modes: List, Filter, Detail, Search, Confirm).
@@ -66,6 +66,21 @@
    - `rival install` deletes the `rival-fable` and `rival-sol` skills (`skills.rs:30`).
    - Old Fable sessions show as `retired-model` (`config.rs:125`).
    - `efforts.sol` is dropped when the config loads (`config.rs:807`).
+
+## P0 findings
+
+Tested on Dell on 2026-10-09: Codex CLI 0.161.0, Claude Code 2.1.289, proxy at `http://127.0.0.1:8317`.
+
+| Fact | Result | Effect on this spec |
+|---|---|---|
+| Codex models in `/v1/models` | `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-sol`, `gpt-5.6-sol` and others, all **without a prefix**, `owned_by: openai`. | The Codex prefix default is `""`. |
+| Sol 6.1 id | `gpt-6.1-sol`. | `SOL_MODEL = "gpt-6.1-sol"`. |
+| `codex exec` with the inline `-c model_providers.rival_proxy={…, wire_api = "responses"}` and `env_key = "RIVAL_PROXY_KEY"` | `ok`, exit 0, for `gpt-6.1-sol` and `gpt-6-astra`. | The inline form is the design. The `CODEX_HOME` overlay is dropped. |
+| Sol effort `xhigh` and `ultra` | Both `ok`. | Sol uses the full Codex ladder. No clamp. |
+| Codex with a wrong key | `Reconnecting... 1/5` … `5/5`, then exit 1. No clear error. | The proxy preflight is necessary. It stops a bad key before Codex retries. |
+| Claude with `ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL`, `--model emcd_/claude-fable-5-1` and `emcd_/claude-opus-5-5` | `ok`, exit 0. | The Claude design is confirmed. |
+| The same on `emcd2_/…` | `429 … All credentials for model emcd2_/… are cooling down (rate_limit_error: … monthly spend limit)`. | The check and the run classify 429 as an account limit. The hint names the other prefixes that serve the model. |
+| Claude `--model claude-fable-5-1` (no prefix) | `400 unknown provider for model claude-fable-5-1`. | A prefix is required for Claude. The preflight catches a missing prefix. |
 
 ## Goals
 
@@ -94,10 +109,10 @@ proxy:
   key_file: ~/.rival/proxy.key    # default; mode 0600
   claude:
     enabled: true
-    model_prefix: emcd2_          # wire id: emcd2_/claude-opus-5-5
+    model_prefix: emcd_           # wire id: emcd_/claude-opus-5-5
   codex:
     enabled: true
-    model_prefix: ""              # from P0; empty = no prefix
+    model_prefix: ""              # P0: Codex models have no prefix
 plan:
   models: [codex, claude]         # default --model for `rival command plan`
 efforts:
@@ -174,7 +189,7 @@ codex exec -C <workdir> -m <prefix>/<model>
 - `RIVAL_PROXY_KEY=<key>` goes in `Request.env`. The `-c` value holds only the name of the variable.
 - The preflight on the proxy route does not run `codex login status` (`executor/codex.rs:23`). It checks the binary and runs the [proxy preflight](#proxy-preflight).
 - `run_codex_model_with` accepts `CODEX_MODEL` and `SOL_MODEL` (`executor/codex.rs:72`).
-- P0 confirms the `-c` form and `wire_api` against Codex CLI 0.161.0 and the proxy. If the inline table form fails, the fallback is a generated `CODEX_HOME` overlay with the same provider block, as `opencode` gets a generated config today.
+- P0 confirmed this exact form against Codex CLI 0.161.0 and the proxy. A unit test pins the `-c` strings.
 
 ### Session record
 
@@ -194,9 +209,11 @@ The proxy preflight runs before the queue slot, for each proxied model:
 | Connection refused or timeout | `proxy unreachable at <url>: <reason>` |
 | 401 or 403 | `proxy rejected the key (<status>) — run rival config key set` |
 | Wire id not in the list | `proxy does not serve emcd2_/claude-fable-5-1; it serves claude-fable-5-1 as: emcd_/… — set proxy.claude.model_prefix` |
+| Claude model with an empty prefix | `the proxy needs a prefix for Claude models; it has: emcd_, emcd2_ — set proxy.claude.model_prefix` |
 | List has no model of that provider | `proxy has no codex account — log in on the proxy (-codex-device-login)` |
 
-- `claude_auth_hint` (`executor/claude.rs:213`) gets a third branch for the proxy route. It names the key and the prefix, not `/login`.
+- `/v1/models` lists a model also when its credentials are cooling down. The preflight cannot see a 429. The run and the check find it in the provider output: the markers `429` with `cooling down`, `monthly spend limit` or `rate_limit_error`. The hint is `proxy account <prefix> is at its limit (429); other prefixes that serve <model>: emcd_ — set proxy.claude.model_prefix`.
+- `claude_auth_hint` (`executor/claude.rs:213`) gets a third branch for the proxy route. It names the key, the prefix and the 429 hint, not `/login`.
 - The leak guard scrubs the key from logs, errors and session files, the same as other secrets.
 
 ## Models
@@ -204,13 +221,13 @@ The proxy preflight runs before the queue slot, for each proxied model:
 | Name | Aliases | Runtime | Model id | Label | Effort default | Commands |
 |---|---|---|---|---|---|---|
 | codex | — | codex | `gpt-6-astra` | codex | xhigh | `command codex`, plan |
-| sol | — | codex | `gpt-6.1-sol` (P0 confirms) | sol | xhigh | `command sol`, plan |
+| sol | — | codex | `gpt-6.1-sol` | sol | xhigh | `command sol`, plan |
 | claude | opus | Claude Code | `claude-opus-5-5` | claude | medium | `command claude`, `run claude`, plan |
 | fable | — | Claude Code | `claude-fable-5-1` | fable | medium | `command fable`, `run fable`, plan |
 
 Changes:
 - `config.rs`: `SOL_MODEL`, `FABLE_MODEL`, `FABLE_LABEL`. `engine_label` matches the new ids before the adapter fallback. `claude-fable-5-1` sessions now show as `fable`, not `retired-model`. `gpt-5.6-sol` sessions keep `sol`.
-- `known_effort_model` and the error text at `config.rs:811` accept `fable` and `sol`. Fable uses the Claude ladder, and Sol uses the Codex ladder. P0 confirms that Sol accepts `ultra`. If it does not, Sol clamps `ultra` to `xhigh` the same way Grok clamps.
+- `known_effort_model` and the error text at `config.rs:811` accept `fable` and `sol`. Fable uses the Claude ladder, and Sol uses the Codex ladder (P0: `ultra` works on Sol).
 - `model_specs.rs`: `fable_spec()`, `sol_spec()`. The `ModelSpec` closures pass the model id. `resolve_effort` treats Fable like Claude and Sol like Codex.
 - `root.rs:573`: `CommandFable`, `CommandSol`, `RunFable`, and `opus` as an alias of `command claude` / `run claude`. `tree.rs` and the shell completions follow.
 - `command_plan.rs:163`: `parse_plan_models` accepts `codex, sol, claude, opus, fable`. It removes duplicates by model id (`opus` and `claude` are one model). With no `--model`, the default comes from `plan.models`, then `codex`.
@@ -240,7 +257,7 @@ The steps for each model:
 
    No session JSON is written, so the run list and the app do not show check runs. If `run_subprocess` saves the session, P5 adds a flag that turns this off.
 4. **Pass.** Exit code 0 and a reply that is not empty. The row shows the latency and the first 40 characters of the reply. If the reply is not `ok`, the row still passes and shows the reply in yellow.
-5. **Fail.** The row shows the first error line from the preflight table, `auth_hint`, or the provider error after scrubbing.
+5. **Fail.** The row shows the first error line from the preflight table, the 429 hint, `auth_hint`, or the provider error after scrubbing. A 429 row is red with the label `limit`, so a user sees at once that the route works and the account is empty.
 
 Concurrency is at most 3 live calls. The exit code is 0 when all checked models pass, and 1 if one or more fail.
 
@@ -249,8 +266,8 @@ Output (text):
 ```
 proxy  http://127.0.0.1:8317  ✓ 200  38 models  key …a91f
 
-  ✓ claude  proxy   emcd2_/claude-opus-5-5   2.1s  ok
-  ✓ fable   proxy   emcd2_/claude-fable-5-1  1.8s  ok
+  ✓ claude  proxy   emcd_/claude-opus-5-5    2.1s  ok
+  ✓ fable   proxy   emcd_/claude-fable-5-1   1.8s  ok
   ✓ codex   proxy   gpt-6-astra              3.4s  ok
   ✗ sol     proxy   gpt-6.1-sol              —     proxy does not serve gpt-6.1-sol
   ✓ k3      direct  moonshotai/kimi-k3       4.0s  ok
@@ -393,8 +410,8 @@ Behavior:
 | Docker Claude with a loopback proxy URL. | Host is changed to `host.docker.internal` with `--add-host`. |
 | Hand-written `config.yaml` with comments. | `.bak` copy one time, then rival rewrites the file. |
 | The proxy changes the model list between preflight and run. | Normal provider error. |
-| Sol 6.1 id differs from `gpt-6.1-sol`. | P0 sets the constant. It is the only place. |
-| Codex CLI rejects the inline provider table. | Generated `CODEX_HOME` overlay (P3 fallback). |
+| A prefix account is at its limit (429). | The run fails with the 429 hint that names the other prefixes. No automatic switch (see Open questions). |
+| A later Codex CLI rejects the inline provider table. | The pinned unit test and the check show it. The fix is then a generated `CODEX_HOME` overlay. |
 | Check reply is not `ok`. | Pass, shown yellow: the model answered. |
 | Check on a model whose runtime is not installed. | Fail row `not installed`, no call. |
 
@@ -402,10 +419,11 @@ Behavior:
 
 1. **One code review on several models.** This spec makes Opus, Fable and Sol reviewers in each place Codex and Claude are. The plan review runs any set of them in one run. A command that runs one *code* review on several models and joins the findings is the removed megareview. It is not in this spec. Say if you want it, as a later spec.
 2. **Default plan models.** This spec keeps `[codex, claude]`. Change `plan.models` in the window to make `[claude, fable, sol]` the default.
+3. **Prefix fallback on 429.** `model_prefix` could take a list (`[emcd_, emcd2_]`) and move to the next prefix on a 429. This spec does not do it: a silent switch bills a different account. The check and the hint make the manual switch one key in the TUI.
 
 ## Rollout
 
-- **P0** — Codex device login on the proxy (you approve). Read `/v1/models`. Set the Sol id and the Codex prefix. Run one `codex exec` through the proxy with the `-c` provider by hand. No commit, notes in this file.
+- **P0** — done 2026-10-09. See [P0 findings](#p0-findings).
 - **P1** — config schema, writer, `rival config show/set/key/models`. Gate: fmt, clippy, workspace tests, three-OS CI.
 - **P2** — Claude proxy wiring, proxy preflight, session fields, leak-guard scrub. Gate: the checks above, e2e with fake proxy, manual Opus run on Dell.
 - **P3** — Codex proxy wiring. Gate: the checks above, manual Codex run on Dell.
