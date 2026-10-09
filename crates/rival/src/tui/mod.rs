@@ -6,6 +6,9 @@
 //! `rival_core::sessionview`; [`runtime`] wires them, the job workers and
 //! the model to the real terminal.
 
+pub mod config_check;
+pub mod config_form;
+pub mod config_view;
 pub mod detail_view;
 pub mod input;
 pub mod jobs;

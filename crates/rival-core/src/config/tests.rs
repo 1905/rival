@@ -1946,3 +1946,25 @@ fn public_runtime_log_names_sol_and_fable() {
         "Fable runtime v2\nmodel: fable\n"
     );
 }
+
+#[test]
+fn a_draft_proxy_key_stands_in_for_the_key_file_but_not_the_env() {
+    let body = "proxy:\n  url: http://127.0.0.1:8317\n  claude:\n    enabled: true\n";
+    let (home, config) = loaded(body);
+    write_key(&home.path().join(".rival/proxy.key"), "saved-key-0001");
+    // A config that already read the file still takes the draft key.
+    assert!(config.proxy_key().unwrap().is_some());
+    let draft = config.clone().with_draft_proxy_key(" draft-key-0002 ");
+    let route = draft.proxy_route(ProxyProvider::Claude).unwrap().unwrap();
+    assert_eq!(route.key(), "draft-key-0002");
+    let key = draft.proxy_key().unwrap().unwrap();
+    assert_eq!(key.source, ProxyKeySource::File(config.proxy_key_file()));
+    // The saved config still reads the file.
+    let route = config.proxy_route(ProxyProvider::Claude).unwrap().unwrap();
+    assert_eq!(route.key(), "saved-key-0001");
+    // RIVAL_PROXY_KEY wins over a draft key, as it wins over the file.
+    let env = home_config(home.path(), &[("RIVAL_PROXY_KEY", "env-key-0003")])
+        .with_draft_proxy_key("draft-key-0002");
+    let route = env.proxy_route(ProxyProvider::Claude).unwrap().unwrap();
+    assert_eq!(route.key(), "env-key-0003");
+}

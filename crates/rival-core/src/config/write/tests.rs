@@ -325,3 +325,32 @@ f: \"no end\\nline\"\n\
     texts(&back, &mut got);
     assert_eq!(got, want, "{text}");
 }
+
+#[test]
+fn render_builds_the_new_text_without_writing() {
+    let (_dir, path) = temp();
+    let old = "roles:\n  reviewer: be brief\nproxy:\n  url: http://127.0.0.1:8317/v1\n";
+    let edits = [
+        parse_setting("proxy.claude.enabled", "true").unwrap(),
+        parse_setting("proxy.claude.model_prefix", "emcd_").unwrap(),
+    ];
+    let (text, user) = render(Some(old), &edits, &path).unwrap();
+    assert_eq!(
+        text,
+        format!(
+            "{HEADER}\nroles:\n  reviewer: be brief\nproxy:\n  url: http://127.0.0.1:8317/v1\n  \
+             claude:\n    enabled: true\n    model_prefix: emcd_\n"
+        )
+    );
+    assert_eq!(user.proxy.url, "http://127.0.0.1:8317");
+    assert!(user.proxy.claude.enabled);
+    assert_eq!(user.roles["reviewer"], "be brief");
+    assert!(!path.exists(), "render never writes");
+    // An invalid result is the parse error, naming the path.
+    let bad = [parse_setting("proxy.url", "ftp://x").unwrap()];
+    let err = render(None, &bad, &path).unwrap_err().to_string();
+    assert!(
+        err.starts_with("invalid proxy.url \"ftp://x\" in "),
+        "{err}"
+    );
+}

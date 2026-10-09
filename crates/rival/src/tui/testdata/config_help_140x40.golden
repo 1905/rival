@@ -1,0 +1,81 @@
+╭─ rival · config ───┬────────────────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml ─╮|
+│                    │  PROXY   Claude and Codex through CLIProxyAPI                                                                       │|
+│ ▸ Proxy            │                                                                                                                     │|
+│   Models           │    Claude via proxy    ● on    Opus, Fable go through the proxy                                                     │|
+│   Review           │    Codex via proxy     ● on    Codex, Sol go through the proxy                                                      │|
+│   Check            │    URL                 http://127.0.0.1:8317                                                    ● online · 6 models │|
+│                    │    Key                 ••••••••a91f   ~/.rival/proxy.key  0600 ✓                                                    │|
+│                    │    Claude prefix     ╭ keys ────────────────────────────────────────────╮                                           │|
+│                    │    Codex prefix      │                                                  │                                           │|
+│                    │                      │ tab ⇧tab  next / previous section                │                                           │|
+│                    │  REQUESTS GO TO      │ 1-4       jump to a section                      │                                           │|
+│                    │    codex  Codex      │ ↑↓ j k    move between fields                    │                                           │|
+│                    │    sol    Sol 6.1    │ enter     edit a field, or toggle                │                                           │|
+│                    │    claude Opus 5.5   │ space     toggle; plan default on a model        │                                           │|
+│                    │    fable  Fable 5.1  │ ←→ h l    choose: prefix, effort, reviewer       │                                           │|
+│                    │                      │ e         type a prefix the proxy does not list  │                                           │|
+│                    │                      │ d         import ANTHROPIC_BASE_URL into URL     │                                           │|
+│                    │                      │ c         check the default models on the draft  │                                           │|
+│                    │                      │ a         check every model                      │                                           │|
+│                    │                      │ x         cancel a running check                 │                                           │|
+│                    │                      │ s         save the draft (and a typed key)       │                                           │|
+│                    │                      │ u         drop the draft                         │                                           │|
+│                    │                      │ esc q     back; asks first when unsaved          │                                           │|
+│                    │                      │ ?         this help                              │                                           │|
+│                    │                      │ ctrl+c    quit rival                             │                                           │|
+│                    │                      │                                                  │                                           │|
+│                    │                      ╰──────────────────────────────────────────────────╯                                           │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+├────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK   ● online · 6 models                                                                                                             │|
+│  not run yet · c checks the default models on the draft, a every model                                                                   │|
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│ any key close help                                                                                                                       │|
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d....................d..gggggddddddddddddddddddddddddddddddddddddddd.......................................................................d|
+dSSSSSSSSSSSSSSSSSSS.d.....................................................................................................................d|
+d.ddtttttt...........d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddd.....................................................d|
+d.ddtttttt...........d....ddddddddddddddddddddaaaaadddddddddddddddddddddddddddddddddd......................................................d|
+d.ddttttt............d....ddddddddddddddddddddTTTTTTTTTTTTTTTTTTTTT....................................................aaaaaaaaddddddddddd.d|
+d....................d....ddddddddddddddddddddTTTTTTTTTTTTdddddddddddddddddddddaaaaaaaa....................................................d|
+d....................d....ddddddddddddddddddaggggggaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...........................................d|
+d....................d....dddddddddddddddddda..................................................a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttttttttt................a...........................................d|
+d....................d..DDDDDDDDDDDDDD......aaaaaaaaaaaattttttttttttttttt......................a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttt....................a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttt................a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttttttttttt........a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaatttttttttttttttttttttttttttttttt.......a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
+d....................d......................aaaaaaaaaaaatttttttttttttttttttttttttttttttttt.....a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttt......................a...........................................d|
+d....................d......................aaaaaaaaaaaatttttttttttttttttttttt.................a...........................................d|
+d....................d......................aaaaaaaaaaaatttttttttttttttttttttttttttttttt.......a...........................................d|
+d....................d......................aaaaaaaaaaaatttttttttttttt.........................a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttt..........a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttt..............................a...........................................d|
+d....................d......................aaaaaaaaaaaatttttttttt.............................a...........................................d|
+d....................d......................a..................................................a...........................................d|
+d....................d......................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...........................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD...aaaaaaaaddddddddddd.............................................................................................................d|
+d..ddddddddddddddadddddddddddddddddddddddddddddddddddddddddadddddddddddd...................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaaaaaa.dddddddddd.......................................................................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

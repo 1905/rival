@@ -1,6 +1,7 @@
 //! `rival config`: show and change `~/.rival/config.yaml` and the proxy
-//! key, list the proxy's models, and check each model with a live call. Bare `rival config` opens the TUI (the
-//! config window comes later).
+//! key, list the proxy's models, and check each model with a live call.
+//! Bare `rival config` opens the TUI on its config window
+//! (`tui::config_view`).
 
 use std::collections::HashSet;
 use std::io::BufRead;

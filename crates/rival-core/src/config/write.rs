@@ -195,7 +195,30 @@ pub fn apply(path: &Path, edits: &[Edit]) -> Result<UserConfig, ConfigError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => return Err(ConfigError::new(format!("read {shown}: {e}"))),
     };
-    let tree = parse_tree(old.as_deref().unwrap_or(""))
+    let (text, user) = render(old.as_deref(), edits, path)?;
+
+    if let Some(old) = &old
+        && old.lines().next().map(str::trim_end) != Some(HEADER)
+    {
+        let backup = with_suffix(path, ".bak");
+        fs::copy(path, &backup).map_err(|e| ConfigError::new(format!("back up {shown}: {e}")))?;
+    }
+    let perms = fs::metadata(path).ok().map(|m| m.permissions());
+    write_atomic(path, text.as_bytes(), perms)
+        .map_err(|e| ConfigError::new(format!("write {shown}: {e}")))?;
+    Ok(user)
+}
+
+/// The text [`apply`] would write for `edits` on the file text `old`
+/// (`None`: no file), and the config it parses to, validated as if read
+/// from `path`. Nothing is written: the TUI checks a draft with it.
+pub fn render(
+    old: Option<&str>,
+    edits: &[Edit],
+    path: &Path,
+) -> Result<(String, UserConfig), ConfigError> {
+    let shown = path.display();
+    let tree = parse_tree(old.unwrap_or(""))
         .map_err(|e| ConfigError::new(format!("parse {shown}: {e}")))?;
     let mut entries = match tree {
         None => Vec::new(),
@@ -217,17 +240,7 @@ pub fn apply(path: &Path, edits: &[Edit]) -> Result<UserConfig, ConfigError> {
     emit_map(&mut text, &entries, 0, false)
         .map_err(|e| ConfigError::new(format!("write {shown}: {e}")))?;
     let user = parse_user_config(&text, path)?;
-
-    if let Some(old) = &old
-        && old.lines().next().map(str::trim_end) != Some(HEADER)
-    {
-        let backup = with_suffix(path, ".bak");
-        fs::copy(path, &backup).map_err(|e| ConfigError::new(format!("back up {shown}: {e}")))?;
-    }
-    let perms = fs::metadata(path).ok().map(|m| m.permissions());
-    write_atomic(path, text.as_bytes(), perms)
-        .map_err(|e| ConfigError::new(format!("write {shown}: {e}")))?;
-    Ok(user)
+    Ok((text, user))
 }
 
 /// The dotted paths of every map key in the config file, at any depth

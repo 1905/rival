@@ -26,6 +26,7 @@ use rival_core::config::Config;
 use rival_core::paths::Paths;
 use rival_core::sessionview::{self, SessionWatcher};
 
+use super::config_check::ConfigSeed;
 use super::jobs::{Job, JobEnv, JobOutput, LogViews};
 use super::logview::LogPane;
 use super::model::{Cmd, Model, Msg, SPIN_INTERVAL, TICK_INTERVAL};
@@ -69,8 +70,18 @@ pub enum Event {
     Signal(Signal),
 }
 
+/// Where the TUI opens.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Start {
+    /// The run list (`rival tui`).
+    #[default]
+    List,
+    /// The config window alone (`rival config`): `esc` quits.
+    Config,
+}
+
 /// Runs the dashboard until it quits. Returns the error text after "tui: ".
-pub fn run(cfg: &Config) -> Result<(), String> {
+pub fn run(cfg: &Config, start: Start) -> Result<(), String> {
     check_input()?;
     let (tx, rx) = mpsc::channel();
     // Before raw mode, as bubbletea installs its handlers first: SIGINT and
@@ -110,13 +121,27 @@ pub fn run(cfg: &Config) -> Result<(), String> {
     }));
 
     let mut model = Model::new(rival_core::VERSION);
+    let seed = ConfigSeed::load(cfg);
+    let mut cmds = Vec::new();
+    match start {
+        Start::List => model.set_config_seed(seed),
+        Start::Config => cmds = model.open_config_only(seed),
+    }
     let paths = cfg.paths().clone();
     let spawn_err = |what: &str, e: io::Error| format!("start {what}: {e}");
     let jobs = JobPool::start(JobEnv::system(paths.clone()), JOB_WORKERS, tx.clone())
         .map_err(|e| spawn_err("job workers", e))?;
     let jobs = owners.jobs.insert(jobs);
-    owners.watch =
-        Some(Watch::start(paths, tx.clone()).map_err(|e| spawn_err("session watch", e))?);
+    for cmd in cmds {
+        if let Cmd::Job(job) = cmd {
+            let _ = jobs.submit(job);
+        }
+    }
+    // The config window alone never shows a run, so nothing is watched.
+    if start == Start::List {
+        owners.watch =
+            Some(Watch::start(paths, tx.clone()).map_err(|e| spawn_err("session watch", e))?);
+    }
     owners.input =
         Some(Input::start(TERMINAL_INPUT, tx.clone()).map_err(|e| spawn_err("terminal input", e))?);
     drop(tx);
@@ -134,6 +159,8 @@ pub fn run(cfg: &Config) -> Result<(), String> {
         &mut owners.views,
         &opts,
     );
+    // A running check would hold a worker past the exit.
+    model.cancel_work();
     drop(terminal);
     owners.close();
     result
@@ -382,6 +409,7 @@ fn apply(
             Cmd::Quit => return Some(Ok(())),
             Cmd::Tick => timers.add(now + TICK_INTERVAL, Msg::Tick),
             Cmd::Spin => timers.add(now + SPIN_INTERVAL, Msg::SpinTick),
+            Cmd::After(delay, msg) => timers.add(now + delay, msg),
             Cmd::Job(job) => {
                 if jobs.submit(job).is_err() {
                     rejected.push(Msg::Rejected(BUSY_NOTICE.to_string()));
@@ -424,10 +452,10 @@ impl Timers {
 pub const MAX_PENDING_ACTIONS: usize = 8;
 
 /// The most jobs [`JobPool`] keeps waiting: one read per pane, one result
-/// parse, one prompt load and the actions. Tests check the bound; `Pending`
+/// parse, one prompt load, one proxy probe, one check and the actions. Tests check the bound; `Pending`
 /// keeps it by shape.
 #[cfg(test)]
-pub const MAX_PENDING: usize = 4 + MAX_PENDING_ACTIONS;
+pub const MAX_PENDING: usize = 6 + MAX_PENDING_ACTIONS;
 
 /// Work waiting for a worker, bounded by `MAX_PENDING`.
 ///
@@ -439,7 +467,9 @@ pub const MAX_PENDING: usize = 4 + MAX_PENDING_ACTIONS;
 ///   `ResultSlot` waits only for its newest request.
 /// - A prompt load replaces the waiting one; the detail screen waits only
 ///   for the run it shows.
-/// - Stops and log opens queue in order. One equal to a waiting job merges
+/// - A proxy probe replaces the waiting one; the window waits only for its
+///   newest. A check waits in its own slot; the window runs one at a time.
+/// - Stops, log opens and saves queue in order. One equal to a waiting job merges
 ///   with it (that one gives the outcome). Past [`MAX_PENDING_ACTIONS`] the
 ///   job is refused, and the caller tells the user.
 #[derive(Debug, Default)]
@@ -448,6 +478,10 @@ struct Pending {
     detail: Option<Job>,
     result: Option<Job>,
     prompts: Option<Job>,
+    /// The config window's newest proxy probe.
+    probe: Option<Job>,
+    /// The config window's check. The window runs one at a time.
+    check: Option<Job>,
     actions: VecDeque<Job>,
     closing: bool,
 }
@@ -455,10 +489,17 @@ struct Pending {
 impl Pending {
     #[cfg(test)]
     fn len(&self) -> usize {
-        [&self.preview, &self.detail, &self.result, &self.prompts]
-            .iter()
-            .filter(|j| j.is_some())
-            .count()
+        [
+            &self.preview,
+            &self.detail,
+            &self.result,
+            &self.prompts,
+            &self.probe,
+            &self.check,
+        ]
+        .iter()
+        .filter(|j| j.is_some())
+        .count()
             + self.actions.len()
     }
 
@@ -473,7 +514,9 @@ impl Pending {
             }
             Job::Result(_) => self.result = Some(job),
             Job::Prompts(_) => self.prompts = Some(job),
-            Job::Stop(_) | Job::OpenLog(_) => {
+            Job::Probe(_) => self.probe = Some(job),
+            Job::Check(_) => self.check = Some(job),
+            Job::Stop(_) | Job::OpenLog(_) | Job::Save(_) => {
                 if self.actions.contains(&job) {
                     return Ok(());
                 }
@@ -501,6 +544,8 @@ impl Pending {
             .or_else(|| self.result.take())
             .or_else(|| self.preview.take())
             .or_else(|| self.prompts.take())
+            .or_else(|| self.probe.take())
+            .or_else(|| self.check.take())
     }
 }
 
@@ -581,6 +626,8 @@ impl JobPool {
             pending.detail = None;
             pending.result = None;
             pending.prompts = None;
+            pending.probe = None;
+            pending.check = None;
         }
         self.shared.wake.notify_all();
         for worker in self.workers.drain(..) {
@@ -614,7 +661,10 @@ fn work(env: &JobEnv, shared: &Shared, out: &Sender<Event>) {
         };
         // A refused send drops the output here; an opened copy then applies
         // its own exit policy.
-        let _ = out.send(Event::Job(env.run(job)));
+        let emit = |msg: Msg| {
+            let _ = out.send(Event::Job(JobOutput::Msg(msg)));
+        };
+        let _ = out.send(Event::Job(env.run_with(job, &emit)));
     }
 }
 

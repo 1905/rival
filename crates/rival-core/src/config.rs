@@ -1287,6 +1287,25 @@ impl Config {
         self
     }
 
+    /// A draft key that is not saved yet (the TUI config window) in place of
+    /// the key file. `RIVAL_PROXY_KEY` still wins, as it wins over the file,
+    /// so a check of the draft sees the key a run would use. The key joins
+    /// the leak guard's scrub list.
+    pub fn with_draft_proxy_key(self, secret: &str) -> Self {
+        let secret = secret.trim();
+        if !self.getenv(PROXY_KEY_ENV).trim().is_empty() || secret.is_empty() {
+            return self;
+        }
+        crate::leakguard::register(secret);
+        let key = ProxyKey {
+            secret: secret.to_string(),
+            source: ProxyKeySource::File(self.proxy_key_file()),
+        };
+        let mut cfg = self;
+        cfg.proxy_key = OnceLock::from(Ok(Some(key)));
+        cfg
+    }
+
     pub fn paths(&self) -> &Paths {
         &self.paths
     }

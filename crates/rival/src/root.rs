@@ -331,8 +331,9 @@ pub type ConfigHook = Arc<dyn Fn(&Config) + Send + Sync>;
 /// The update check, printing its notice to the writer.
 pub type UpdateHook = Arc<dyn Fn(&Config, &mut dyn Write) + Send + Sync>;
 
-/// Runs the dashboard. The error is the text after "tui: ".
-pub type TuiHook = Box<dyn Fn(&Config) -> Result<(), String>>;
+/// Runs the dashboard, opened on the run list or on the config window. The
+/// error is the text after "tui: ".
+pub type TuiHook = Box<dyn Fn(&Config, crate::tui::runtime::Start) -> Result<(), String>>;
 
 /// The root's side effects, injectable for tests.
 pub struct RootHooks {
@@ -585,8 +586,8 @@ fn dispatch(
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
-        // The config window comes later; for now the dashboard opens.
-        CommandId::Config => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
+        CommandId::Config => (hooks.tui)(env.cfg, crate::tui::runtime::Start::Config)
+            .map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::ConfigShow => config_cmd::show_action(env, inv),
         CommandId::ConfigSet => config_cmd::set_action(env, inv),
         CommandId::ConfigKeySet => config_cmd::key_set_action(env, inv),
@@ -598,7 +599,8 @@ fn dispatch(
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),
         CommandId::Update => update_cmd::update_action(env),
         // The error text is prefixed with "tui: ".
-        CommandId::Tui => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
+        CommandId::Tui => (hooks.tui)(env.cfg, crate::tui::runtime::Start::List)
+            .map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunFable => model_run(env, inv, fable_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),

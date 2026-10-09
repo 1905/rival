@@ -22,6 +22,9 @@ use rival_core::logfmt;
 use rival_core::paths::Paths;
 use rival_core::session::Session;
 
+use super::config_check::{
+    self, CheckFn, CheckRequest, ModelsFn, ProbeRequest, SaveRequest, run_probe, run_save,
+};
 use super::kill::{ProcessOps, StopRequest, stop_sessions};
 use super::logview::{LogRequest, ReadTail, create_group_log_view, create_log_view, load_log};
 use super::model::Msg;
@@ -60,6 +63,13 @@ pub enum Job {
     Prompts(PromptsRequest),
     Stop(StopRequest),
     OpenLog(OpenLogRequest),
+    /// The config window's `/v1/models` call (the online dot, the prefix
+    /// pickers).
+    Probe(Box<ProbeRequest>),
+    /// The config window's model check; each row is its own message.
+    Check(Box<CheckRequest>),
+    /// The config window's save.
+    Save(SaveRequest),
 }
 
 /// What a finished job hands back.
@@ -330,6 +340,10 @@ pub struct JobEnv {
     pub launch: Launch,
     /// Where "o" writes its log copies.
     pub temp_dir: PathBuf,
+    /// The proxy's model list; tests fake it.
+    pub models: ModelsFn,
+    /// The model check; tests fake it.
+    pub check: CheckFn,
 }
 
 impl JobEnv {
@@ -340,12 +354,24 @@ impl JobEnv {
             read_tail: logfmt::read_tail,
             launch: launch_viewer,
             temp_dir: std::env::temp_dir(),
+            models: rival_core::proxy::models,
+            check: crate::check::run_check,
         }
     }
 
-    /// Runs `job` to completion.
+    /// Runs `job` to completion, dropping any results along the way.
+    #[cfg(test)]
     pub fn run(&self, job: Job) -> JobOutput {
+        self.run_with(job, &|_| {})
+    }
+
+    /// Runs `job` to completion. A job with results along the way (the
+    /// check's rows) hands each to `emit` before it returns.
+    pub fn run_with(&self, job: Job, emit: &(dyn Fn(Msg) + Sync)) -> JobOutput {
         match job {
+            Job::Probe(req) => JobOutput::Msg(Msg::ProxyModels(run_probe(*req, self.models))),
+            Job::Check(req) => JobOutput::Msg(config_check::run_check(*req, self.check, emit)),
+            Job::Save(req) => JobOutput::Msg(Msg::ConfigSaved(Box::new(run_save(req)))),
             Job::Log(req) => JobOutput::Msg(Msg::Log(load_log(req, self.read_tail))),
             Job::Result(req) => JobOutput::Msg(Msg::Result(load_result(req, self.read_tail))),
             Job::Prompts(req) => JobOutput::Msg(Msg::Prompts(self.load_prompts(req))),

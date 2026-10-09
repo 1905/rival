@@ -72,6 +72,16 @@ impl TextInput {
         self.cursor = self.value.len();
     }
 
+    /// The cursor as a char index into the value.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// The value's length in chars.
+    pub fn len(&self) -> usize {
+        self.value.len()
+    }
+
     /// Inserts pasted or typed text at the cursor. Tabs and line breaks
     /// become spaces and other control chars are dropped, so a paste cannot
     /// break the line. Text past the char limit is dropped.
@@ -149,6 +159,12 @@ impl TextInput {
     /// input's width. A focused input shows its cursor as a reversed cell; an
     /// empty one shows the placeholder.
     pub fn line(&self, styles: &Styles) -> Line<'static> {
+        self.line_in(styles, VIEW_WIDTH)
+    }
+
+    /// [`TextInput::line`] with `view_width` text cells after the prompt.
+    pub fn line_in(&self, styles: &Styles, view_width: usize) -> Line<'static> {
+        let view_width = view_width.max(1);
         let prompt_style = if self.focused {
             styles.accent
         } else {
@@ -174,11 +190,11 @@ impl TextInput {
             width(&self.value[from..to].iter().collect::<String>())
         };
         let cursor_w = usize::from(self.focused);
-        while start < self.cursor && cells(start, self.cursor) + cursor_w > VIEW_WIDTH {
+        while start < self.cursor && cells(start, self.cursor) + cursor_w > view_width {
             start += 1;
         }
         let mut end = start;
-        while end < self.value.len() && cells(start, end + 1) + cursor_w <= VIEW_WIDTH {
+        while end < self.value.len() && cells(start, end + 1) + cursor_w <= view_width {
             end += 1;
         }
         let end = end.max(self.cursor.min(self.value.len()));
