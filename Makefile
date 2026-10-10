@@ -48,7 +48,8 @@ cli-release-check:
 # Mac: try the branch CLI, TUI and Rival (dev) against the Dell's
 # CLIProxyAPI through an ssh tunnel. A throwaway RIVAL_HOME
 # (~/tmp-rival-try) keeps the installed rival and ~/.rival untouched. The
-# first run reads the proxy key from the clipboard (or PROXY_KEY=...).
+# first run reads the proxy key over ssh from the proxy host (or
+# PROXY_KEY=...).
 # Logic in scripts/try-proxy.sh.
 try-proxy:
 	scripts/try-proxy.sh app

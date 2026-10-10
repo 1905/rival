@@ -12,8 +12,9 @@
 #   PROXY_HOST    ssh alias of the proxy host (default dell)
 #   PROXY_PORT    proxy port on both ends (default 8317)
 #   CLAUDE_PREFIX model prefix for Claude (default emcd2_)
-#   PROXY_KEY     the proxy key; if unset and no key is saved yet, the
-#                 clipboard (pbpaste) is used
+#   PROXY_KEY     the proxy key; if unset and no key is saved yet, it is
+#                 read over ssh from KEY_FILE on PROXY_HOST
+#   KEY_FILE      key file on PROXY_HOST (default ~/cliproxyapi/t3-emcd-client.key)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -23,6 +24,7 @@ TRY_HOME=${TRY_HOME:-$HOME/tmp-rival-try}
 PROXY_HOST=${PROXY_HOST:-dell}
 PROXY_PORT=${PROXY_PORT:-8317}
 CLAUDE_PREFIX=${CLAUDE_PREFIX:-emcd2_}
+KEY_FILE=${KEY_FILE:-cliproxyapi/t3-emcd-client.key}
 tunnel="ssh -f -N -o ExitOnForwardFailure=yes -L ${PROXY_PORT}:127.0.0.1:${PROXY_PORT} ${PROXY_HOST}"
 
 if [ "$mode" = stop ]; then
@@ -60,8 +62,8 @@ echo "→ config in $RIVAL_HOME"
 if [ -n "${PROXY_KEY:-}" ]; then
     printf %s "$PROXY_KEY" | "$R" config key set
 elif [ ! -s "$RIVAL_HOME/proxy.key" ]; then
-    echo "  no key saved: using the clipboard"
-    pbpaste | "$R" config key set
+    echo "  no key saved: reading ${PROXY_HOST}:~/${KEY_FILE#\~/}"
+    ssh "$PROXY_HOST" "cat ~/${KEY_FILE#\~/}" | "$R" config key set
 fi
 
 echo "→ model check"
