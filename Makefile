@@ -1,6 +1,6 @@
 # Developer shortcuts. Rival.app targets (logic in app/scripts/*.py), then
 # the cli-* targets for the Rust CLI.
-.PHONY: run install test soak cli-build cli-install cli-test cli-release-check
+.PHONY: run install test soak cli-build cli-install cli-test cli-release-check try-proxy try-proxy-tui try-proxy-check try-proxy-stop
 
 # Debug build, wrapped as "Rival (dev)", opened against your real ~/.rival.
 run:
@@ -44,3 +44,20 @@ cli-test:
 # Validates .goreleaser.yaml. Builds nothing.
 cli-release-check:
 	goreleaser check
+
+# Mac: try the branch CLI, TUI and Rival (dev) against the Dell's
+# CLIProxyAPI through an ssh tunnel. A throwaway RIVAL_HOME
+# (~/tmp-rival-try) keeps the installed rival and ~/.rival untouched. The
+# first run reads the proxy key from the clipboard (or PROXY_KEY=...).
+# Logic in scripts/try-proxy.sh.
+try-proxy:
+	scripts/try-proxy.sh app
+
+try-proxy-tui:
+	scripts/try-proxy.sh tui
+
+try-proxy-check:
+	scripts/try-proxy.sh check
+
+try-proxy-stop:
+	scripts/try-proxy.sh stop
