@@ -1,0 +1,131 @@
+{
+  "name": "config-check-draft",
+  "description": "`rival config check -m fable --json --config-stdin` checks an unsaved draft. The saved config.yaml points Claude at prefix emcd2_, which the proxy does not serve; the draft on stdin (URL <SERVER>, prefix emcd_) is validated like config.yaml and used instead. The key still comes from RIVAL_PROXY_KEY. The fake claude sees `--model emcd_/claude-fable-5-1`. One row, the summary, exit 0; config.yaml is unchanged and no session is saved. The adapters' info log lines are held back: stderr has no log event.",
+  "fakes": {
+    "absent": [
+      "docker"
+    ],
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv_prefix": [
+              "-p",
+              "--model",
+              "emcd_/claude-fable-5-1",
+              "--effort",
+              "low",
+              "--output-format",
+              "text"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Reply with exactly: ok"
+              },
+              "cwd": "<HOME>/.rival/check",
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "ok\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd2_\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd_/claude-fable-5-1",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            },
+            {
+              "id": "gpt-6.1-sol",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "normalise": [
+    {
+      "regex": "check/[^/\\s\"]+-([0-9]+-[0-9a-f]{32})\\.log",
+      "kind": "replace",
+      "replace": "<RUN>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "config",
+        "check",
+        "-m",
+        "fable",
+        "--json",
+        "--config-stdin"
+      ],
+      "stdin": "proxy:\n  url: <SERVER>/v1\n  claude:\n    enabled: true\n    model_prefix: emcd_\n",
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}\\n\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":1,\"total\":1\\}\\}\\n"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/check/fable-<RUN>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/config.yaml",
+        "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd2_\n"
+      },
+      {
+        "path": "<HOME>/.rival/check/fable-<RUN>.log",
+        "text": "ok\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

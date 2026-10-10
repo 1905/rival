@@ -217,6 +217,142 @@ pub const FAKE_PROCS: ProcessOps = ProcessOps {
     terminate: fake_terminate,
 };
 
+/// What the fake proxy lists: two Claude accounts and Codex without a
+/// prefix.
+pub const FAKE_PROXY_IDS: [&str; 6] = [
+    "emcd_/claude-opus-5-5",
+    "emcd_/claude-fable-5-1",
+    "emcd2_/claude-opus-5-5",
+    "emcd2_/claude-fable-5-1",
+    "gpt-6-astra",
+    "gpt-6.1-sol",
+];
+
+/// The fake `/v1/models`: [`FAKE_PROXY_IDS`] for any URL whose key is
+/// `test-key-a91f`, a 401 for any other key. It never opens a socket.
+pub fn fake_models(
+    route: &rival_core::config::Route,
+) -> Result<Vec<String>, rival_core::proxy::ModelsError> {
+    if route.key() != "test-key-a91f" {
+        return Err(rival_core::proxy::ModelsError::Rejected(401));
+    }
+    Ok(FAKE_PROXY_IDS.iter().map(|s| s.to_string()).collect())
+}
+
+/// The fake check: every model passes in 1.5 s with `ok`, through the
+/// route the config picks, and each row is reported. No adapter runs.
+pub fn fake_check(
+    _ctx: &rival_core::cancel::Context,
+    cfg: &rival_core::config::Config,
+    targets: &[crate::check::Target],
+    on_row: &(dyn Fn(&crate::check::CheckRow) + Sync),
+) -> crate::check::Report {
+    let rows: Vec<crate::check::CheckRow> = targets
+        .iter()
+        .map(|t| {
+            let route = t.provider().and_then(|p| cfg.proxy_route(p).ok().flatten());
+            let row = crate::check::CheckRow {
+                name: t.name.to_string(),
+                runtime: t.runtime.to_string(),
+                route: if route.is_some() { "proxy" } else { "direct" }.to_string(),
+                wire_model: route.map_or_else(
+                    || t.model.to_string(),
+                    |r| rival_core::proxy::wire_id(&r.prefix, t.model),
+                ),
+                ok: true,
+                ms: 1500,
+                reply: "ok".to_string(),
+                called: true,
+                ..Default::default()
+            };
+            on_row(&row);
+            row
+        })
+        .collect();
+    crate::check::Report {
+        proxy: crate::check::ProxyLine::Off,
+        rows,
+    }
+}
+
+/// The proxy key the config fixtures store; [`fake_models`] accepts it.
+pub const TEST_KEY: &str = "test-key-a91f";
+
+/// A config with both routes on, the URL, a Claude prefix and a role.
+pub const PROXY_YAML: &str = "proxy:
+  url: http://127.0.0.1:8317
+  claude:
+    enabled: true
+    model_prefix: emcd2_
+  codex:
+    enabled: true
+roles:
+  reviewer: Review like a staff engineer.
+";
+
+/// Writes `yaml` (when given) and `key` (mode 0600, when given) into the
+/// harness home and loads the config window's seed from it, as the runtime
+/// does. Every runtime counts as installed but grok, so frames do not
+/// depend on the host `PATH`.
+pub fn config_seed(
+    h: &Harness,
+    yaml: Option<&str>,
+    key: Option<&str>,
+) -> super::config_check::ConfigSeed {
+    let paths = h.paths();
+    std::fs::create_dir_all(&paths.root).unwrap();
+    if let Some(yaml) = yaml {
+        std::fs::write(paths.config_file(), yaml).unwrap();
+    }
+    if let Some(key) = key {
+        let path = paths.proxy_key_file();
+        std::fs::write(&path, format!("{key}\n")).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+    }
+    let env = [(
+        rival_core::paths::HOME_VAR.to_string(),
+        h.home.path().to_string_lossy().into_owned(),
+    )]
+    .into_iter()
+    .collect();
+    let cfg = rival_core::config::Config::new(paths.clone(), env, None);
+    let mut seed = super::config_check::ConfigSeed::load(&cfg);
+    seed.installed = super::config_form::MODELS
+        .iter()
+        .map(|m| m.name != "grok")
+        .collect();
+    seed
+}
+
+/// `rival config` on [`config_seed`] at `width`×`height`, with its first
+/// probe answered by [`fake_models`].
+pub fn config_model(
+    h: &Harness,
+    yaml: Option<&str>,
+    key: Option<&str>,
+    width: u16,
+    height: u16,
+) -> Model {
+    let mut m = Model::new("3.34.0");
+    m.clock = fixed_now;
+    m.list.zone = fixed_zone;
+    m.update(Msg::Resize { width, height });
+    let seed = config_seed(h, yaml, key);
+    let cmds = m.open_config_only(seed);
+    for cmd in cmds {
+        if let Cmd::Job(job) = cmd
+            && let JobOutput::Msg(msg) = h.env.run(job)
+        {
+            drive(&mut m, &h.env, [msg]);
+        }
+    }
+    m
+}
+
 /// A temp home and the job environment pointing at it. The fakes on this
 /// thread start from "not alive, signals succeed, nothing recorded".
 pub struct Harness {
@@ -256,6 +392,8 @@ pub fn harness() -> Harness {
         read_tail: counting_read_tail,
         launch: fake_launch,
         temp_dir: tmp,
+        models: fake_models,
+        check: fake_check,
     };
     Harness { home, env }
 }
@@ -276,7 +414,10 @@ pub fn drive_with(
                 let Cmd::Job(job) = cmd else {
                     continue;
                 };
-                match env.run(job) {
+                let streamed = std::sync::Mutex::new(Vec::new());
+                let out = env.run_with(job, &|msg| streamed.lock().unwrap().push(msg));
+                queue.extend(streamed.into_inner().unwrap());
+                match out {
                     JobOutput::Msg(res) => queue.push_back(res),
                     JobOutput::Opened(opened) => {
                         if let Some(views) = views.as_deref_mut() {
@@ -345,6 +486,8 @@ pub fn press(name: &str) -> KeyEvent {
         "space" => (KeyCode::Char(' '), none),
         "up" => (KeyCode::Up, none),
         "down" => (KeyCode::Down, none),
+        "left" => (KeyCode::Left, none),
+        "right" => (KeyCode::Right, none),
         "home" => (KeyCode::Home, none),
         "end" => (KeyCode::End, none),
         "pgup" => (KeyCode::PageUp, none),

@@ -108,9 +108,11 @@ fn antislop_skill_is_deprecated() {
     );
 }
 
+/// Only the plan variants of Sol and Fable stay retired: `rival-plan`
+/// takes `-m sol` and `-m fable`.
 #[test]
-fn sol_skills_are_retired() {
-    for name in ["rival-sol", "rival-plan-sol"] {
+fn plan_sol_and_fable_skills_stay_retired() {
+    for name in ["rival-plan-sol", "rival-plan-fable"] {
         assert!(
             !NAMES.contains(&name) && DEPRECATED.contains(&name),
             "{name} must be retired and cleaned on install"
@@ -128,13 +130,7 @@ fn sol_skills_are_retired() {
         let claude = skill(name);
         let codex = String::from_utf8(codex_skill(name, "test").unwrap()).unwrap();
         for text in [&claude, &codex] {
-            for forbidden in [
-                "rival-sol",
-                "rival-plan-sol",
-                "Sol",
-                "-m sol",
-                "--model sol",
-            ] {
+            for forbidden in ["rival-plan-sol", "rival-plan-fable", "gpt-5.6-sol"] {
                 assert!(
                     !text.contains(forbidden),
                     "{name} still advertises {forbidden:?}"
@@ -142,6 +138,36 @@ fn sol_skills_are_retired() {
             }
         }
     }
+}
+
+/// Fable 5.1 and Sol 6.1 have their own skills again.
+#[test]
+fn fable_and_sol_skills_are_active() {
+    for (name, command, model) in [
+        ("rival-fable", "fable", "Fable 5.1"),
+        ("rival-sol", "sol", "Sol"),
+    ] {
+        assert!(NAMES.contains(&name), "{name} is not active");
+        assert!(!DEPRECATED.contains(&name), "{name} is still deprecated");
+        let content = skill(name);
+        for want in [
+            format!("name: {name}\n"),
+            "version: ".to_string(),
+            format!("rival command {command} --detach --workdir"),
+            format!("/{name}"),
+            model.to_string(),
+        ] {
+            assert!(content.contains(&want), "{name} missing {want:?}");
+        }
+        for forbidden in ["rival command claude", "rival command codex", "Opus 5.5"] {
+            assert!(!content.contains(forbidden), "{name} has {forbidden:?}");
+        }
+    }
+    // rival-plan documents the model list.
+    let plan = skill("rival-plan");
+    assert!(plan.contains("--model opus,fable,sol"), "{plan}");
+    let codex = String::from_utf8(codex_skill("rival-plan", "1").unwrap()).unwrap();
+    assert!(codex.contains("--model opus,fable,sol"), "{codex}");
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -259,6 +285,8 @@ fn codex_skill_commands() {
     for (name, command) in [
         ("rival-claude", "claude"),
         ("rival-codex", "codex"),
+        ("rival-fable", "fable"),
+        ("rival-sol", "sol"),
         ("rival-k3", "k3"),
         ("rival-grok", "grok"),
         ("rival-plan", "plan --model codex --effort xhigh"),
@@ -302,6 +330,7 @@ fn embedded_files_are_codex_md_and_skill_md() {
 fn codex_skill_text_golden() {
     let review = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.";
     let plan_description = "Review a plan or specification document through Rival from Codex, returning ratings and findings.";
+    let plan_multi = "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh. To use other models, replace `--model codex --effort xhigh` with `--model <list>`: codex, sol, claude (or opus), fable, comma-separated, for example `--model opus,fable,sol`; each model then uses its configured effort unless the user supplies -re.";
     let plan = "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.";
     let cases = [
         (
@@ -310,8 +339,18 @@ fn codex_skill_text_golden() {
             "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). For a plan document use $rival-plan-claude. Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
         ),
         (
+            "rival-fable",
+            "Review code with Fable 5.1 through Rival and the authenticated Claude Code CLI. Use for a requested independent Fable review from Codex.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). For a plan document use $rival-plan with `--model fable`. Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
+        ),
+        (
             "rival-codex",
             "Run a requested codex prompt or code review through Rival from Codex.",
+            review,
+        ),
+        (
+            "rival-sol",
+            "Run a requested sol prompt or code review through Rival from Codex.",
             review,
         ),
         (
@@ -324,7 +363,7 @@ fn codex_skill_text_golden() {
             "Run a requested grok prompt or code review through Rival from Codex.",
             review,
         ),
-        ("rival-plan", plan_description, plan),
+        ("rival-plan", plan_description, plan_multi),
         ("rival-plan-codex", plan_description, plan),
         ("rival-plan-claude", plan_description, plan),
         (

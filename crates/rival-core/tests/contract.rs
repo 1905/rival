@@ -161,11 +161,14 @@ fn session_of(f: &Fields) -> Session {
         output_lines: f.output_lines,
         error_msg: f.error.clone(),
         account: f.account.clone(),
+        route: String::new(),
+        wire_model: String::new(),
         pid: f.pid,
         pid_start: f.pid_start,
         owner_pid: f.owner_pid,
         owner_pid_start: f.owner_pid_start,
         start_mono: Default::default(),
+        ephemeral: false,
     }
 }
 

@@ -25,6 +25,20 @@ The optional macOS viewer installs separately: `brew install --cask 1905/tap/riv
 | `/rival-claude review` | Claude (Opus 5.5, medium) hunts bugs in your changed files. |
 | `/rival-security` | Hunts exploitable vulnerabilities across twelve classes. |
 | `/rival-plan-codex plan.md` | Codex rates a plan from 1 to 10 and lists its bugs and gaps. |
+| `/rival-fable review`, `/rival-sol review` | Fable 5.1 or Sol 6.1 hunts bugs in your changed files. |
+
+**Run reviews through a proxy** (CLIProxyAPI or another OpenAI/Anthropic-compatible gateway):
+
+```bash
+rival config set proxy.url http://127.0.0.1:8317
+rival config key set < ~/proxy.key         # stdin only; stored 0600 in ~/.rival/proxy.key
+rival config set proxy.claude.enabled true
+rival config set proxy.claude.model_prefix emcd_
+rival config set proxy.codex.enabled true
+rival config check                         # sends "hi" to each model, shows ✓ or the fix
+```
+
+Or run `rival config` for the config window. See [Proxy](#proxy).
 
 | Rival.app | `rival tui` |
 |---|---|
@@ -48,13 +62,14 @@ Everything below is checked against the `rival` binary and its source. Commands,
 8. [Security review](#security-review)
 9. [GitLab MR review](#gitlab-mr-review)
 10. [Configuration](#configuration)
-11. [Queue and timeouts](#queue-and-timeouts)
-12. [Sessions directory](#sessions-directory)
-13. [TUI](#tui)
-14. [Rival.app](#rivalapp)
-15. [Claude authentication and sandboxing](#claude-authentication-and-sandboxing)
-16. [Removed in this release](#removed-in-this-release)
-17. [Uninstall](#uninstall)
+11. [Proxy](#proxy)
+12. [Queue and timeouts](#queue-and-timeouts)
+13. [Sessions directory](#sessions-directory)
+14. [TUI](#tui)
+15. [Rival.app](#rivalapp)
+16. [Claude authentication and sandboxing](#claude-authentication-and-sandboxing)
+17. [Removed in this release](#removed-in-this-release)
+18. [Uninstall](#uninstall)
 
 ### Install and setup
 
@@ -215,7 +230,7 @@ rival install --force           # overwrite without prompting
 
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
-- `rival install` removes retired skills: `rival-review`, `rival-sol`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-fable`, `rival-plan-fable` and older names.
+- `rival install` removes retired skills: `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable` and older names. `rival-fable` and `rival-sol` are back in 5.1.
 
 #### Provider runtimes
 
@@ -223,24 +238,26 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 
 | Model | Runtime and authentication |
 |---|---|
-| Codex (`gpt-6-astra`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. |
-| Claude (`claude-opus-5-5`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](docs/claude-docker-setup.md)). |
+| Codex (`gpt-6-astra`), Sol (`gpt-6.1-sol`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. Through the [proxy](#proxy), no `codex login` is needed. |
+| Claude (`claude-opus-5-5`), Fable (`claude-fable-5-1`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](docs/claude-docker-setup.md)). |
 | Kimi K3 (`moonshotai/kimi-k3`) | [OpenCode](https://opencode.ai/docs) plus `MOONSHOT_API_KEY`, exported or in a gitignored project `.env`. |
 | Grok (`grok-4.6`) | [Grok CLI](https://docs.x.ai/) with `grok login`. `XAI_API_KEY` is not supported. |
 | Grok via OpenRouter (`x-ai/grok-4.6`) | OpenCode plus `OPENROUTER_API_KEY`. Used only by the security review. |
 
 ### Skills
 
-`rival install` installs eight skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs ten skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
 
 | Skill | Syntax | Runs | Default model and effort |
 |---|---|---|---|
 | `/rival-codex` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command codex` | Codex, xhigh |
 | `/rival-claude` | `[-re level] [scope]` (always a review) | `rival command claude` | Claude, medium |
+| `/rival-fable` | `[-re level] [scope]` (always a review) | `rival command fable` | Fable, medium |
+| `/rival-sol` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol` | Sol, xhigh |
 | `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
 | `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
 | `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
-| `/rival-plan` | `<plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned) |
+| `/rival-plan` | `[-m opus,fable,sol] <plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned); `-m` picks other models |
 | `/rival-plan-codex` | `<plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned) |
 | `/rival-plan-claude` | `[-re level] <plan.md>` | `rival command plan --model claude` | Claude, medium |
 
@@ -259,6 +276,7 @@ Top-level commands (`rival --help`):
 | `rival run <x>` | Terminal runners with explicit flags. |
 | `rival wait` | Blocks until detached runs finish. |
 | `rival tui` | Full-screen session monitor. |
+| `rival config` | Config window. Subcommands: `show`, `set`, `key set`/`key clear`, `models`, `check`. See [Proxy](#proxy). |
 | `rival sessions [--active] [--recent N]` | Prints sessions as a text table. |
 | `rival queue` / `rival queue clear [--force]` | Shows queue tickets. `clear` removes dead tickets; `--force` also removes waiting tickets and keeps live running ones. |
 | `rival install`, `rival update`, `rival version`, `rival completion` | Setup and maintenance. |
@@ -270,15 +288,15 @@ Top-level commands (`rival --help`):
 
 | Subcommand | Flags (defaults) |
 |---|---|
-| `codex`, `claude`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
-| `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`codex`; accepts `codex`, `claude`), `--effort` |
+| `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
+| `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`plan.models`, else `codex`; accepts `codex`, `sol`, `claude`/`opus`, `fable`, comma-separated), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 
-`rival run` subcommands: `claude`, `grok`, `k3`. There is no `rival run codex`; use `rival command codex`.
+`rival run` subcommands: `claude` (alias `opus`), `fable`, `grok`, `k3`. There is no `rival run codex` or `rival run sol`; use `rival command codex` or `rival command sol`.
 
 | Flag | Meaning |
 |---|---|
@@ -341,7 +359,9 @@ cat out.txt                       # the review
 | Label | Model id | Runtime | Built-in effort |
 |---|---|---|---|
 | `codex` | `gpt-6-astra` | Codex CLI | `xhigh` |
-| `claude` | `claude-opus-5-5` | Claude Code CLI (native, else Docker) | `medium` |
+| `sol` | `gpt-6.1-sol` | Codex CLI | `xhigh` |
+| `claude` (alias `opus`) | `claude-opus-5-5` | Claude Code CLI (native, else Docker) | `medium` |
+| `fable` | `claude-fable-5-1` | Claude Code CLI (native, else Docker) | `medium` |
 | `kimi-k3` | `moonshotai/kimi-k3` | OpenCode, Moonshot provider | `max` (only level) |
 | `grok` | `grok-4.6` | Grok CLI | `high` |
 | `grok-4.6-openrouter` | `x-ai/grok-4.6` | OpenCode, OpenRouter | `xhigh` (security only) |
@@ -489,7 +509,9 @@ rival run claude --review https://gitlab.example.com/group/project/-/merge_reque
 ```yaml
 efforts:              # per-model default effort
   codex: xhigh        # low | medium | high | xhigh | ultra
+  sol: xhigh          # low | medium | high | xhigh | ultra
   claude: medium      # low | medium | high | xhigh | ultra
+  fable: medium       # low | medium | high | xhigh | ultra
   grok: high          # low | medium | high | xhigh | ultra (clamped to high)
   kimi-k3: max        # max only
 
@@ -501,6 +523,19 @@ claude:
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
 
+proxy:                # see Proxy
+  url: http://127.0.0.1:8317
+  key_file: ~/.rival/proxy.key   # default; the key never goes in this file
+  claude:
+    enabled: false
+    model_prefix: ""  # wire id <prefix>/<model>
+  codex:
+    enabled: false
+    model_prefix: ""
+
+plan:
+  models: [codex]     # default --model of rival command plan
+
 roles:                # optional prompt overrides
   bug_hunter: "..."   # replaces the code-review instructions
   security: "..."     # replaces the security-review instructions
@@ -508,7 +543,7 @@ roles:                # optional prompt overrides
 
 - The values shown for `efforts` are the built-in defaults.
 - An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
-- An old `efforts.sol` key is ignored.
+- `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
@@ -523,7 +558,41 @@ Environment variables:
 | `RIVAL_CLAUDE_AUTH` | `subscription` | `subscription`/`sub` or `api`. See [Claude authentication](#claude-authentication-and-sandboxing). |
 | `RIVAL_CLAUDE_TOKEN` | unset | OAuth token for the Docker Claude runtime. |
 | `RIVAL_NO_UPDATE_CHECK` | unset | Disable the update check (`CI` also disables it). |
+| `RIVAL_PROXY` | unset | `off` sends this run direct, whatever `proxy:` says. Process environment only; a repository .env cannot set it. |
+| `RIVAL_PROXY_URL` | unset | Wins over `proxy.url`. Process environment only; a repository .env cannot set it. |
+| `RIVAL_PROXY_KEY` | unset | Wins over the key file. Never passed to a child process, except as the Codex provider key on the proxy route. Process environment only; a repository .env cannot set it. |
 | `RIVAL_HOME` | unset | State directory used instead of `~/.rival`: `config.yaml`, `sessions/`, `queue/` and the update-check cache. Set it in the process environment; repository `.env` files cannot set it. Skills still go to `~/.claude/skills` and `~/.agents/skills`. |
+
+### Proxy
+
+Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one HTTP gateway such as CLIProxyAPI. Each provider has its own switch and model prefix. K3 and Grok always run direct.
+
+| Item | Claude route | Codex route |
+|---|---|---|
+| Model sent | `--model <prefix>/<model>`, e.g. `emcd_/claude-opus-5-5` | `-m <prefix>/<model>`, or the bare id when the prefix is empty |
+| Endpoint | `ANTHROPIC_BASE_URL=<url>` | an inline `rival_proxy` model provider, `base_url = "<url>/v1"`, `wire_api = "responses"` |
+| Key | `ANTHROPIC_API_KEY` in the child environment | `RIVAL_PROXY_KEY` in the child environment (`env_key`) |
+| Removed from the child | `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_USE_BEDROCK`/`VERTEX` | — |
+| Login needed | none (`RIVAL_CLAUDE_AUTH` is ignored) | none (`codex login status` is skipped) |
+
+- The key comes from `RIVAL_PROXY_KEY`, else `proxy.key_file`, else `~/.rival/proxy.key`. A key file that other users can read is an error. A `key:` in `config.yaml` is an error. The key is never in process arguments, and Rival scrubs it from logs, session files and errors.
+- Before a proxied run, Rival reads `<url>/v1/models` once. It stops with the fix when the proxy is down, rejects the key (401/403), or does not serve the exact model name. The error lists the prefixes that do serve it.
+- An account at its limit returns 429 at run time. The error names the other prefixes that serve the model. Rival does not switch prefixes by itself.
+- Docker Claude reaches a loopback proxy at `host.docker.internal`.
+- Sessions record `route` (`proxy`) and `wire_model`.
+
+`rival config` commands:
+
+| Command | Effect |
+|---|---|
+| `rival config` | Opens the config window (TUI). |
+| `rival config show [--json]` | Each value with its source: `default`, `file` or `env`. The key shows as `set (…a91f)` or `missing`. |
+| `rival config set KEY VALUE` | Sets one key, e.g. `proxy.claude.model_prefix emcd_`. `set --json` reads a patch from stdin. |
+| `rival config key set` / `key clear` | Reads the key from stdin (hidden on a terminal) and writes it with mode 0600 / removes it. |
+| `rival config models [--json]` | The proxy's models, grouped by prefix. |
+| `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and the security reviewer. Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
+
+The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes). Rival.app has the same settings under ⌘, (Settings…) and "Check models" in the menu bar.
 
 ### Queue and timeouts
 
@@ -623,7 +692,6 @@ Claude runs through the Claude Code CLI and bills your subscription login by def
 |---|---|
 | Megareview: `rival review`, `rival command megareview`, and the consilium judge | `rival command codex review` (skill: `/rival-codex review`) |
 | `/rival-review` skill | `/rival-codex review`. `rival install` removes the old skill. |
-| Sol (`gpt-5.6-sol`): `rival command sol`, `rival run sol`, `-m sol`, `/rival-sol`, `/rival-plan-sol` | Codex: `rival command codex`, `-m codex`, `/rival-codex`, `/rival-plan-codex` |
 | `rival server` (web dashboard) | Rival.app (`brew install --cask 1905/tap/rival-app`) or `rival tui` |
 
 Sessions written by older releases still render in the TUI and the app, with their old labels.

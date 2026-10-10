@@ -13,6 +13,7 @@
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use rival_core::config::OPUS_ALIAS;
 use rival_core::duration;
 
 use crate::csvflag;
@@ -27,15 +28,26 @@ pub enum CommandId {
     Command,
     CommandClaude,
     CommandCodex,
+    CommandFable,
     CommandGrok,
     CommandK3,
     CommandPlan,
     CommandSecurity,
+    CommandSol,
+    Config,
+    ConfigShow,
+    ConfigSet,
+    ConfigKey,
+    ConfigKeySet,
+    ConfigKeyClear,
+    ConfigModels,
+    ConfigCheck,
     Install,
     Queue,
     QueueClear,
     Run,
     RunClaude,
+    RunFable,
     RunGrok,
     RunK3,
     Sessions,
@@ -59,15 +71,26 @@ impl CommandId {
             ["rival", "command"] => Command,
             ["rival", "command", "claude"] => CommandClaude,
             ["rival", "command", "codex"] => CommandCodex,
+            ["rival", "command", "fable"] => CommandFable,
             ["rival", "command", "grok"] => CommandGrok,
             ["rival", "command", "k3"] => CommandK3,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
+            ["rival", "command", "sol"] => CommandSol,
+            ["rival", "config"] => Config,
+            ["rival", "config", "show"] => ConfigShow,
+            ["rival", "config", "set"] => ConfigSet,
+            ["rival", "config", "key"] => ConfigKey,
+            ["rival", "config", "key", "set"] => ConfigKeySet,
+            ["rival", "config", "key", "clear"] => ConfigKeyClear,
+            ["rival", "config", "models"] => ConfigModels,
+            ["rival", "config", "check"] => ConfigCheck,
             ["rival", "install"] => Install,
             ["rival", "queue"] => Queue,
             ["rival", "queue", "clear"] => QueueClear,
             ["rival", "run"] => Run,
             ["rival", "run", "claude"] => RunClaude,
+            ["rival", "run", "fable"] => RunFable,
             ["rival", "run", "grok"] => RunGrok,
             ["rival", "run", "k3"] => RunK3,
             ["rival", "sessions"] => Sessions,
@@ -92,6 +115,12 @@ impl CommandId {
             self,
             Command
                 | Run
+                | Config
+                | ConfigShow
+                | ConfigKey
+                | ConfigKeyClear
+                | ConfigModels
+                | ConfigCheck
                 | Install
                 | Completion
                 | CompletionBash
@@ -104,6 +133,13 @@ impl CommandId {
     /// cobra `Runnable()`: `completion` has no action and prints help.
     fn runnable(self) -> bool {
         self != CommandId::Completion
+    }
+
+    /// Commands that run with an invalid `config.yaml`, so they can fix
+    /// it.
+    pub fn repairs_config(self) -> bool {
+        use CommandId::*;
+        matches!(self, ConfigSet | ConfigKeySet | ConfigKeyClear)
     }
 }
 
@@ -253,14 +289,17 @@ pub fn build(defaults: &Defaults) -> Command {
         .global(true),
     )
     .subcommands([
-        model_command("claude", "Skill-facing Claude executor"),
+        // `opus` is another name for `claude`; clap reports the canonical
+        // name, so the command path stays `command claude`.
+        model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
         model_command("codex", "Skill-facing Codex executor"),
+        model_command("fable", "Skill-facing Fable executor"),
         model_command("grok", "Skill-facing Grok executor"),
         model_command("k3", "Run Kimi K3 prompts from stdin"),
-        with_args(command("plan", "Review a plan/spec with Codex and/or Claude")).args([
+        with_args(command("plan", "Review a plan/spec with Codex, Sol, Claude and/or Fable")).args([
             workdir(),
             no_queue(),
-            model_flag("codex", "plan review model(s): codex, claude (comma-separated)"),
+            model_flag("codex", "plan review model(s): codex, sol, claude (or opus), fable (comma-separated; default: plan.models, else codex)"),
             effort("override reasoning effort for every selected model: low, medium, high, xhigh, ultra (default: each model's own)"),
         ]),
         with_args(command("security", "Security review with the configured model")).args([
@@ -268,12 +307,48 @@ pub fn build(defaults: &Defaults) -> Command {
             no_queue(),
             bool_flag("which", "print the resolved model and exit"),
         ]),
+        model_command("sol", "Skill-facing Sol executor"),
+    ]);
+
+    // `key set` keeps its stray words: the action refuses them without
+    // echoing them, since a stray word may be the key.
+    let config_cmd = with_args(command(
+        "config",
+        "Show and change ~/.rival/config.yaml (no subcommand: open the TUI)",
+    ))
+    .subcommands([
+        with_args(command(
+            "show",
+            "Show each resolved value and its source (default, file, env)",
+        ))
+        .arg(bool_flag("json", "print one JSON object")),
+        with_args(command(
+            "set",
+            "Set one key (KEY VALUE), or apply a JSON patch from stdin (--json)",
+        ))
+        .arg(bool_flag("json", "read a JSON patch from stdin")),
+        with_args(command("key", "Store or remove the proxy key")).subcommands([
+            with_args(command(
+                "set",
+                "Store the proxy key read from stdin (mode 0600)",
+            )),
+            with_args(command("clear", "Remove the proxy key file")),
+        ]),
+        with_args(command("models", "List the models the proxy serves"))
+            .arg(bool_flag("json", "print one JSON object")),
+        with_args(command("check", "Send one short prompt to each model and show which answer"))
+            .args([
+                model_flag("", "models to check: codex, sol, claude (or opus), fable, k3, grok, grok-4.6-openrouter, or all (comma-separated; default: codex, sol, claude, fable and the security reviewer)"),
+                bool_flag("json", "print one JSON line per model as it finishes, then a summary line"),
+                bool_flag("config-stdin", "check a draft config.yaml read from stdin instead of the saved file"),
+            ]),
     ]);
 
     command("rival", "Dispatch prompts and reviews to external AI models")
         .bin_name("rival")
         .subcommands([
             command_cmd,
+            config_cmd,
             with_args(command("install", "Install skills for Claude Code and Codex")).args([
                 bool_flag("force", "overwrite without prompting"),
                 string_flag("target", "auto", "skill host: auto, claude, codex, all"),
@@ -288,6 +363,12 @@ pub fn build(defaults: &Defaults) -> Command {
                     run_command(
                         "claude",
                         "Run Claude",
+                        Some("reasoning effort override (low, medium, high, xhigh)"),
+                    )
+                    .visible_alias(OPUS_ALIAS),
+                    run_command(
+                        "fable",
+                        "Run Fable",
                         Some("reasoning effort override (low, medium, high, xhigh)"),
                     ),
                     run_command(

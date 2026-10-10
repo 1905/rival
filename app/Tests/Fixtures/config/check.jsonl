@@ -1,0 +1,6 @@
+{"called":true,"error":"","hint":"","limit":false,"ms":3412,"name":"codex","ok":true,"reply":"ok","route":"proxy","runtime":"codex","unexpected":false,"wire_model":"gpt-6-astra"}
+{"called":false,"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","unexpected":false,"wire_model":"gpt-6.1-sol"}
+{"called":true,"error":"429 All credentials for model emcd2_/claude-opus-5-5 are cooling down","hint":"emcd_ also serves claude-opus-5-5: rival config set proxy.claude.model_prefix emcd_","limit":true,"ms":812,"name":"claude","ok":false,"reply":"","route":"proxy","runtime":"claude","unexpected":false,"wire_model":"emcd2_/claude-opus-5-5"}
+{"called":true,"error":"","hint":"","limit":false,"ms":1812,"name":"fable","ok":true,"reply":"OK!","route":"proxy","runtime":"claude","unexpected":true,"wire_model":"emcd2_/claude-fable-5-1"}
+{"error":"","hint":"","limit":false,"ms":4020,"name":"k3","ok":true,"reply":"ok","route":"direct","runtime":"opencode","unexpected":false,"wire_model":"moonshotai/kimi-k3"}
+{"proxy":{"key_tail":"a91f","models":38,"state":"up","url":"http://127.0.0.1:8317"},"summary":{"ok":3,"total":5}}

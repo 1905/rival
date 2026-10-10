@@ -8,7 +8,7 @@
 use std::fmt::Display;
 use std::io::Write;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Local, SecondsFormat};
@@ -18,8 +18,10 @@ const APP: &str = "rival";
 /// Where lines go; `None` means stderr.
 static SINK: Mutex<Option<Box<dyn Write + Send>>> = Mutex::new(None);
 static ENABLED: AtomicBool = AtomicBool::new(true);
+/// Lines below this level are dropped (a [`Level`] as `u8`).
+static MIN_LEVEL: AtomicU8 = AtomicU8::new(Level::Debug as u8);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
     Debug,
     Info,
@@ -129,7 +131,8 @@ impl Event {
             push_pair(&mut line, "message", &Value::Str(msg.into()));
         }
         line.push('}');
-        line
+        // The leak guard: no registered secret in a log line.
+        crate::leakguard::scrub(&line).into_owned()
     }
 
     /// Writes the line plus a newline to `w` in one call.
@@ -147,7 +150,9 @@ impl Event {
 
     /// Writes the line to the global sink, unless logging is disabled.
     pub fn msg(self, msg: &str) {
-        if !ENABLED.load(Ordering::Relaxed) {
+        if !ENABLED.load(Ordering::Relaxed)
+            || (self.level as u8) < MIN_LEVEL.load(Ordering::Relaxed)
+        {
             return;
         }
         let now = Local::now().fixed_offset();
@@ -184,6 +189,7 @@ fn json_string(s: &str) -> String {
 pub fn init() {
     *SINK.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     ENABLED.store(true, Ordering::Relaxed);
+    MIN_LEVEL.store(Level::Debug as u8, Ordering::Relaxed);
 }
 
 /// Sends lines to `w` instead of stderr.
@@ -218,6 +224,26 @@ impl Drop for Suppressed {
     }
 }
 
+/// Drops lines below `level` until dropped, then restores the previous
+/// minimum. The model check holds it at warn, so the adapters' info lines
+/// do not land between its rows.
+#[must_use = "the minimum level is restored when the guard drops"]
+pub struct MinLevel {
+    previous: u8,
+}
+
+pub fn min_level(level: Level) -> MinLevel {
+    MinLevel {
+        previous: MIN_LEVEL.swap(level as u8, Ordering::Relaxed),
+    }
+}
+
+impl Drop for MinLevel {
+    fn drop(&mut self) {
+        MIN_LEVEL.store(self.previous, Ordering::Relaxed);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,6 +264,21 @@ mod tests {
 
     fn parse(line: &str) -> Map<String, Json> {
         serde_json::from_str(line).unwrap()
+    }
+
+    /// A secret JSON escapes (a quote, a backslash) is scrubbed from the
+    /// encoded log line too.
+    #[test]
+    fn format_scrubs_json_escaped_secrets() {
+        let secret = "test-log\"key\\scrub-0001";
+        crate::leakguard::register(secret);
+        let line = info()
+            .str("error", format!("got {secret}"))
+            .format(secret, plus3(2026, 1, 2, 3, 4, 5));
+        assert!(!line.contains("scrub-0001"), "{line}");
+        let map = parse(&line);
+        assert_eq!(map["error"], "got <redacted>");
+        assert_eq!(map["message"], "<redacted>");
     }
 
     /// Object keys in document order, duplicates kept (serde_json's Map sorts and dedups).
@@ -426,6 +467,29 @@ mod tests {
         set_enabled(true);
         assert!(!buf.text().contains("hidden"));
 
+        init();
+    }
+
+    #[test]
+    fn min_level_drops_lower_lines_and_restores() {
+        let _serial = GLOBAL.lock().unwrap_or_else(|p| p.into_inner());
+        let buf = Shared::default();
+        init();
+        set_writer(Box::new(buf.clone()));
+        {
+            let _warn = min_level(Level::Warn);
+            info().msg("min-level info");
+            debug().msg("min-level debug");
+            warn().msg("min-level warn");
+            error().msg("min-level error");
+        }
+        info().msg("min-level after");
+        let text = buf.text();
+        assert!(!text.contains("min-level info"), "{text}");
+        assert!(!text.contains("min-level debug"), "{text}");
+        for kept in ["min-level warn", "min-level error", "min-level after"] {
+            assert!(text.contains(kept), "{kept}: {text}");
+        }
         init();
     }
 }

@@ -1,0 +1,49 @@
+╭─ rival · config ────────────────────────────────────── ~/.rival/config.yaml ─╮|
+│ 1 Proxy  2 Models  3 Review  4 Check                                         │|
+│                                                                              │|
+│  Sends "Reply with exactly: ok" to each model at low effort, through         │|
+│  the route the draft picks. Nothing is saved first.                          │|
+│                                                                              │|
+│  proxy  ● online · 6 models                                                  │|
+│                                                                              │|
+│  ⠋ codex   proxy   gpt-6-astra                  …  checking                  │|
+│  ✗ sol     proxy   gpt-6.1-sol                  —                            │|
+│      proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log in     │|
+│      Codex on the proxy (-codex-device-login)                                │|
+│      set proxy.codex.model_prefix                                            │|
+│  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                        │|
+│  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s                            │|
+│      Sure! ok.  (not ok)                                                     │|
+│  ✗ k3      direct  moonshotai/kimi-k3        4.0s                            │|
+│      limit 429 monthly spend limit reached                                   │|
+│      the account is at its limit; try again after the reset                  │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK  ✓ 2  ✗ 2  ⠋ 1  · running · 4 of 5 done           ● online · 6 models │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│ tab section  ↑↓ scroll  x cancel check  s save  ? help  esc back             │|
+╰──────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.dddddddddddddddddddddddddddddAAAAAAA.........................................d|
+d..............................................................................d|
+d..ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.........d|
+d..dddddddddddddddddddddddddddddddddddddddddddddddddd..........................d|
+d..............................................................................d|
+d..dddddddaaaaaaaaddddddddddd..................................................d|
+d..............................................................................d|
+d..rrtttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..dddddddd..................d|
+d..fftttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd............................d|
+d......fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.....d|
+d......ffffffffffffffffffffffffffffffffffffffff................................d|
+d......dddddddddddddddddddddddddddd............................................d|
+d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..tt........................d|
+d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd............................d|
+d......ggggggggggggggggggg.....................................................d|
+d..fftttttt..dddddd..TTTTTTTTTTTTTTTTTTTTTTT..ddddd............................d|
+d......ggggg.fffffffffffffffffffffffffffffff...................................d|
+d......dddddddddddddddddddddddddddddddddddddddddddddddddddddd..................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD..aaafffffrrrrrddddrrrrrrrrrrrrrrrrrrrrr...........aaaaaaaaddddddddddd.d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaa.ddddddd..aa.dddddd..a.dddddddddddd..a.dddd..a.dddd..aaa.dddd.............d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

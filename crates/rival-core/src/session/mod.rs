@@ -106,6 +106,15 @@ pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(deserialize_with = "json::nullable")]
     pub account: String,
+    /// `proxy` for a run through the proxy; "" (not written) is direct.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub route: String,
+    /// The model id on the wire (`emcd_/claude-opus-5-5`) when it differs
+    /// from `model`; "" (not written) otherwise.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub wire_model: String,
     #[serde(deserialize_with = "json::nullable")]
     pub pid: i64,
     /// Start time of `pid` (Unix ns); guards against PID reuse.
@@ -126,6 +135,11 @@ pub struct Session {
     /// Not in the record: the monotonic clock behind `start_time`.
     #[serde(skip)]
     pub start_mono: MonoStart,
+    /// Not in the record: a run that is never saved (the model check).
+    /// [`Session::save`] writes nothing for it, so no `sessions/` file, run
+    /// list entry or dashboard row shows the run.
+    #[serde(skip)]
+    pub ephemeral: bool,
 }
 
 /// The outcome fields of a record, for readers that must not fail on an
@@ -430,9 +444,11 @@ impl Session {
         self.save(paths)
     }
 
-    /// The record bytes: pretty JSON with a two-space indent.
+    /// The record bytes: pretty JSON with a two-space indent. The leak
+    /// guard removes any registered secret (an error text may quote one).
     pub fn to_json(&self) -> anyhow::Result<Vec<u8>> {
-        serde_json::to_vec_pretty(self).map_err(|e| anyhow!("marshal session: {e}"))
+        let data = serde_json::to_vec_pretty(self).map_err(|e| anyhow!("marshal session: {e}"))?;
+        Ok(crate::leakguard::scrub_bytes(&data).into_owned())
     }
 
     /// Writes the session JSON atomically: a unique `<id>.json.tmp-*` file,
@@ -441,8 +457,11 @@ impl Session {
     /// app); with one shared temp name, two concurrent writers could
     /// interleave into a partial file and rename it into place. The temp name
     /// never ends in ".json", so readers that glob or suffix-match "*.json"
-    /// skip it.
+    /// skip it. An [`Session::ephemeral`] session is not written.
     pub fn save(&self, paths: &Paths) -> anyhow::Result<()> {
+        if self.ephemeral {
+            return Ok(());
+        }
         let dir = paths.sessions_dir();
         let data = self.to_json()?;
 
@@ -651,7 +670,7 @@ fn group_mode_rank(mode: &str) -> i32 {
 
 fn group_model_rank(s: &Session) -> i32 {
     match config::engine_label(&s.cli, &s.model).as_str() {
-        config::SOL_LABEL => 0, // read-compat: display of sessions recorded before Sol's removal
+        config::SOL_LABEL => 0,
         "kimi-k3" => 1,
         config::CLAUDE_LABEL => 2,
         config::GROK_LABEL => 3,

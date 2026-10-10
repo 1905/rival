@@ -71,7 +71,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\AReview a plan/spec with Codex and/or Claude)(?=.*Usage:\\s+rival\\s+command\\s+plan(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for plan)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort for every selected model)(?=.*(?<![\\w-])\\-m,\\ \\-\\-model(?![\\w-])[ =\\[<]*strings\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?plan review model\\(s\\): codex, claude)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+          "$regex": "(?s)(?=.*\\AReview a plan/spec with Codex, Sol, Claude and/or Fable)(?=.*Usage:\\s+rival\\s+command\\s+plan(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for plan)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort for every selected model)(?=.*(?<![\\w-])\\-m,\\ \\-\\-model(?![\\w-])[ =\\[<]*strings\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?plan review model\\(s\\): codex, sol, claude \\(or opus\\), fable)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
         },
         "stderr_lines": [],
         "log_events": []

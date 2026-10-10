@@ -972,3 +972,43 @@ fn the_screen_is_restored_before_blocking_joins_on_every_path() {
         );
     }
 }
+
+/// A config check on a worker sends each row as its own message before the
+/// report, and an `After` command becomes a timer.
+#[test]
+fn a_check_job_streams_its_rows_through_the_pool() {
+    let h = harness();
+    let seed = testkit::config_seed(&h, Some(testkit::PROXY_YAML), Some(testkit::TEST_KEY));
+    let mut form = crate::tui::config_form::ConfigForm::new(seed);
+    let req = form.start_check(false).unwrap();
+    let run = req.run;
+    let (tx, rx) = mpsc::channel();
+    let mut jobs = JobPool::start(h.env.clone(), JOB_WORKERS, tx).unwrap();
+    jobs.submit(Job::Check(Box::new(req))).unwrap();
+    let mut rows = 0;
+    loop {
+        match rx.recv_timeout(WAIT).unwrap() {
+            Event::Job(JobOutput::Msg(Msg::CheckRow { run: r, .. })) if r == run => rows += 1,
+            Event::Job(JobOutput::Msg(Msg::CheckDone { run: r, report })) if r == run => {
+                assert_eq!(report.rows.len(), rows);
+                break;
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+    assert_eq!(rows, 5);
+    jobs.shutdown();
+
+    let mut timers = Timers::default();
+    let (pool_tx, _pool_rx) = mpsc::channel();
+    let pool = JobPool::start(h.env.clone(), 1, pool_tx).unwrap();
+    let start = Instant::now();
+    let cmd = Cmd::After(Duration::from_millis(600), Msg::ConfigProbe(3));
+    assert!(apply(vec![cmd], &mut timers, &pool, start, &mut Vec::new()).is_none());
+    assert_eq!(timers.next(), Some(start + Duration::from_millis(600)));
+    assert!(timers.take_due(start).is_empty());
+    assert_eq!(
+        timers.take_due(start + Duration::from_millis(600)),
+        [Msg::ConfigProbe(3)]
+    );
+}

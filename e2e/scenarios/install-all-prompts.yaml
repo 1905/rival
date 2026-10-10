@@ -32,7 +32,7 @@
       "stdin": "n\nYES\ny\n",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]     skipped\n  ? rival-plan — update vunknown → v<V>? [y/N]   ✓ rival-plan — updated (vunknown → v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 6 installed, 1 updated, 1 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]   ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 1 updated, 0 up to date, 0 removed\n",
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]     skipped\n  ✓ rival-sol — installed (v<V>)\n  ? rival-plan — update vunknown → v<V>? [y/N]   ✓ rival-plan — updated (vunknown → v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 8 installed, 1 updated, 1 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]   ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 1 updated, 0 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -41,18 +41,22 @@
   "expect": {
     "home_files": [
       ".claude/skills/rival-codex/SKILL.md",
+      ".claude/skills/rival-sol/SKILL.md",
       ".claude/skills/rival-plan/SKILL.md",
       ".claude/skills/rival-plan-codex/SKILL.md",
       ".claude/skills/rival-plan-claude/SKILL.md",
       ".claude/skills/rival-claude/SKILL.md",
+      ".claude/skills/rival-fable/SKILL.md",
       ".claude/skills/rival-k3/SKILL.md",
       ".claude/skills/rival-grok/SKILL.md",
       ".claude/skills/rival-security/SKILL.md",
       ".agents/skills/rival-codex/SKILL.md",
+      ".agents/skills/rival-sol/SKILL.md",
       ".agents/skills/rival-plan/SKILL.md",
       ".agents/skills/rival-plan-codex/SKILL.md",
       ".agents/skills/rival-plan-claude/SKILL.md",
       ".agents/skills/rival-claude/SKILL.md",
+      ".agents/skills/rival-fable/SKILL.md",
       ".agents/skills/rival-k3/SKILL.md",
       ".agents/skills/rival-grok/SKILL.md",
       ".agents/skills/rival-security/SKILL.md"

@@ -11,6 +11,7 @@ use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
@@ -18,20 +19,31 @@ use serde::{Deserialize, Deserializer};
 use crate::duration;
 use crate::paths::{self, Paths};
 
-// GPT56_SOL_MODEL and SOL_LABEL name a removed model (2026-09-26). Nothing
-// runs it; the executor rejects it.
-/// read-compat: display of sessions recorded before Sol's removal
+pub mod write;
+
+/// read-compat: the Sol model before Sol 6.1. Nothing runs it; the
+/// executor rejects it. Its sessions still show as `sol`.
 pub const GPT56_SOL_MODEL: &str = "gpt-5.6-sol";
-// CODEX_MODEL shares the codex runtime with the removed Sol model, so
-// engine_label must match it before the "codex" adapter fallback, which
-// labels old sessions "sol". The public label equals the adapter name, so
-// identity checks key on the model id, never on the bare word "codex".
+// CODEX_MODEL and SOL_MODEL share the codex runtime, so engine_label must
+// match both ids before the "codex" adapter fallback, which labels old
+// sessions "sol". The public label equals the adapter name, so identity
+// checks key on the model id, never on the bare word "codex".
 pub const CODEX_MODEL: &str = "gpt-6-astra";
 pub const CODEX_LABEL: &str = "codex";
+/// Sol 6.1 on the codex runtime.
+pub const SOL_MODEL: &str = "gpt-6.1-sol";
 pub const CLAUDE_MODEL: &str = "claude-opus-5-5";
-/// read-compat: display of sessions recorded before Sol's removal
+/// Fable 5.1 on the Claude Code runtime.
+pub const FABLE_MODEL: &str = "claude-fable-5-1";
+/// The Sol label: `command sol`, plan `-m sol` and the `efforts.sol` key
+/// (Codex ladder).
 pub const SOL_LABEL: &str = "sol";
 pub const CLAUDE_LABEL: &str = "claude";
+/// `opus`: another name for `claude` in commands and plan `-m`.
+pub const OPUS_ALIAS: &str = "opus";
+/// The Fable label: `command fable`, `run fable`, plan `-m fable` and the
+/// `efforts.fable` key (Claude ladder).
+pub const FABLE_LABEL: &str = "fable";
 pub const K3_LABEL: &str = "kimi-k3";
 /// The CLI command word for K3. It differs from [`K3_LABEL`], which is the
 /// public display and error name.
@@ -87,9 +99,11 @@ pub fn opencode_variant(model: &str, _effort: &str) -> &'static str {
 /// short model names consistently.
 pub fn model_label(model: &str) -> &'static str {
     match model {
-        GPT56_SOL_MODEL | SOL_LABEL => SOL_LABEL, // read-compat
+        SOL_MODEL | SOL_LABEL => SOL_LABEL,
+        GPT56_SOL_MODEL => SOL_LABEL, // read-compat
         CODEX_MODEL | CODEX_LABEL => CODEX_LABEL,
         CLAUDE_MODEL | CLAUDE_LABEL => CLAUDE_LABEL,
+        FABLE_MODEL | FABLE_LABEL => FABLE_LABEL,
         KIMI_MODEL | K3_LABEL => K3_LABEL,
         GROK_MODEL | GROK_LABEL => GROK_LABEL,
         // Distinct from GROK_LABEL: this is Grok on OpenCode via OpenRouter,
@@ -104,11 +118,15 @@ pub fn model_label(model: &str) -> &'static str {
 pub fn engine_label(cli: &str, model: &str) -> String {
     // Exact current ids win first.
     match model {
+        SOL_MODEL => return SOL_LABEL.to_string(),
         GPT56_SOL_MODEL => return SOL_LABEL.to_string(), // read-compat
-        // Checked before the adapter fallback: Codex and the removed Sol both
-        // ran on codex, so falling through would label Codex as Sol.
+        // Checked before the adapter fallback: Codex and Sol both run on
+        // codex, so falling through would label Codex as Sol.
         CODEX_MODEL => return CODEX_LABEL.to_string(),
         CLAUDE_MODEL => return CLAUDE_LABEL.to_string(),
+        // Checked before the adapter fallback, which labels other Claude-
+        // runtime ids "retired-model".
+        FABLE_MODEL => return FABLE_LABEL.to_string(),
         KIMI_MODEL => return K3_LABEL.to_string(),
         GROK_MODEL => return GROK_LABEL.to_string(),
         // Checked before the adapter fallback below: both this and K3 run on
@@ -238,8 +256,8 @@ pub fn public_runtime_log(cli: &str, model: &str, raw: &str) -> String {
                 } else if let Some(rest) = trimmed.strip_prefix("Codex ")
                     && i == 0
                 {
-                    // read-compat: display of sessions recorded before Sol's removal
-                    trimmed = format!("Sol runtime {rest}");
+                    // The resolved label: Sol (also old Sol sessions) or Codex.
+                    trimmed = format!("{} runtime {rest}", title_label(&engine_label(cli, model)));
                     body = format!("{leading}{trimmed}");
                     banner_seen = true;
                 }
@@ -287,7 +305,7 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     // "grok-4.6-openrouter". Replacing ids directly lets one substitution
     // corrupt another's output, so each id becomes a placeholder first and
     // only expands to its label once every id is consumed.
-    let mut pairs: Vec<(String, String)> = Vec::with_capacity(7);
+    let mut pairs: Vec<(String, String)> = Vec::with_capacity(9);
     if !model.is_empty() {
         // The run's own model wins, and is matched before the shared list so
         // a longer id is never shadowed by a shorter one it contains.
@@ -295,8 +313,10 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     }
     for (id, label) in [
         (GPT56_SOL_MODEL, SOL_LABEL), // read-compat
+        (SOL_MODEL, SOL_LABEL),
         (CODEX_MODEL, CODEX_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
+        (FABLE_MODEL, FABLE_LABEL),
         (KIMI_MODEL, K3_LABEL),
         (GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         (GROK_MODEL, GROK_LABEL),
@@ -314,12 +334,12 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     // label — a re-normalized log, or a model naming itself — and
     // "grok-4.6-openrouter" contains the id "grok-4.6", so an unprotected
     // label would be rewritten into "grok-openrouter".
-    // SOL_LABEL stays protected — read-compat.
     let mut protected = [
         GROK_OPENROUTER_LABEL,
         K3_LABEL,
         SOL_LABEL,
         CLAUDE_LABEL,
+        FABLE_LABEL,
         GROK_LABEL,
         CODEX_LABEL,
     ];
@@ -375,15 +395,16 @@ fn public_review_header(line: &str) -> String {
     match reviewer.to_lowercase().as_str() {
         "codex" => {
             // Sol and Codex share this adapter, so disambiguate by identity
-            // before defaulting to Sol. The label is the adapter word itself,
-            // so only a bare "codex" identity or the Codex model id means Codex.
+            // before defaulting to Sol (also the label of old Sol sessions).
+            // The label is the adapter word itself, so only a bare "codex"
+            // identity or the Codex model id means Codex.
             reviewer = if lower_identity == CODEX_LABEL
                 || lower_identity.contains(CODEX_MODEL)
                 || lower_identity.contains("astra")
             {
                 CODEX_LABEL.to_string()
             } else {
-                SOL_LABEL.to_string() // read-compat
+                SOL_LABEL.to_string()
             };
         }
         "claude" => {
@@ -392,6 +413,8 @@ fn public_review_header(line: &str) -> String {
             // model.
             reviewer = if lower_identity == CLAUDE_LABEL || lower_identity.contains(CLAUDE_MODEL) {
                 CLAUDE_LABEL.to_string()
+            } else if lower_identity.contains(FABLE_MODEL) {
+                FABLE_LABEL.to_string()
             } else {
                 "retired-model".to_string()
             };
@@ -404,7 +427,9 @@ fn public_review_header(line: &str) -> String {
             };
         }
         GPT56_SOL_MODEL => reviewer = SOL_LABEL.to_string(), // read-compat
+        SOL_MODEL => reviewer = SOL_LABEL.to_string(),
         CLAUDE_MODEL => reviewer = CLAUDE_LABEL.to_string(),
+        FABLE_MODEL => reviewer = FABLE_LABEL.to_string(),
         KIMI_MODEL => reviewer = K3_LABEL.to_string(),
         GROK_LABEL | GROK_MODEL => reviewer = GROK_LABEL.to_string(),
         _ => {}
@@ -633,31 +658,42 @@ pub const CLAUDE_AUTH_API: &str = "api";
 
 /// Models whose effort is a property of the model rather than of the surface
 /// invoking it. K3's provider exposes exactly one level; Codex defaults to
-/// xhigh for correctness and plan reviews; Claude runs at medium.
+/// xhigh for correctness and plan reviews; Claude runs at medium. Sol
+/// follows Codex and Fable follows Claude.
 fn pinned_model_effort(label: &str) -> Option<&'static str> {
     match label {
         "kimi-k3" => Some("max"),
-        CODEX_LABEL => Some("xhigh"),
-        // Claude runs Opus 5.5 at medium on every surface.
-        CLAUDE_LABEL => Some("medium"),
+        CODEX_LABEL | SOL_LABEL => Some("xhigh"),
+        // Claude runs Opus 5.5 at medium on every surface; Fable too.
+        CLAUDE_LABEL | FABLE_LABEL => Some("medium"),
         _ => None,
     }
 }
 
 fn builtin_model_effort(label: &str) -> &'static str {
     match label {
-        // Codex is the deep-reasoning model and is pinned to xhigh.
-        CODEX_LABEL => "xhigh",
+        // Codex is the deep-reasoning model and is pinned to xhigh; Sol
+        // follows Codex.
+        CODEX_LABEL | SOL_LABEL => "xhigh",
         "kimi-k3" => "max",
-        CLAUDE_LABEL => "medium",
+        CLAUDE_LABEL | FABLE_LABEL => "medium",
         // grok-4.6's menu is low/medium/high, and high is its own default.
         GROK_LABEL => "high",
         _ => DEFAULT_REVIEW_EFFORT,
     }
 }
 
+/// The built-in effort default of an effort label, for display. Fable
+/// follows Claude and Sol follows Codex.
+pub fn builtin_effort(label: &str) -> &'static str {
+    builtin_model_effort(label)
+}
+
 fn known_effort_model(label: &str) -> bool {
-    matches!(label, CODEX_LABEL | "kimi-k3" | CLAUDE_LABEL | GROK_LABEL)
+    matches!(
+        label,
+        CODEX_LABEL | SOL_LABEL | "kimi-k3" | CLAUDE_LABEL | FABLE_LABEL | GROK_LABEL
+    )
 }
 
 fn valid_configured_model_effort(label: &str, effort: &str) -> bool {
@@ -698,11 +734,203 @@ pub struct SecurityConfig {
     pub reviewer: String,
 }
 
+/// The proxy switch for one provider (`proxy.claude`, `proxy.codex`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProxyRoute {
+    pub enabled: bool,
+    /// Normalized: no trailing `/`. "" means the bare model id.
+    pub model_prefix: String,
+}
+
+/// The `proxy:` block. No block means the proxy is off for both providers.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProxyConfig {
+    /// Normalized by [`normalize_proxy_url`]; "" when unset.
+    pub url: String,
+    /// As written (`~` expands at use); "" means `~/.rival/proxy.key`.
+    pub key_file: String,
+    pub claude: ProxyRoute,
+    pub codex: ProxyRoute,
+}
+
+/// The `plan:` block.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PlanConfig {
+    /// Lowercase names from [`PLAN_MODEL_NAMES`]; empty when unset.
+    pub models: Vec<String>,
+}
+
+/// The names `plan.models` accepts.
+pub const PLAN_MODEL_NAMES: [&str; 5] = ["codex", "sol", "claude", "opus", "fable"];
+
+/// The proxy key. It wins over the key file.
+pub const PROXY_KEY_ENV: &str = "RIVAL_PROXY_KEY";
+/// The proxy URL. It wins over `proxy.url`.
+pub const PROXY_URL_ENV: &str = "RIVAL_PROXY_URL";
+/// `RIVAL_PROXY=off` sends one run direct, whatever the config says.
+pub const PROXY_SWITCH_ENV: &str = "RIVAL_PROXY";
+/// The error for an enabled route without a key.
+pub const PROXY_KEY_MISSING: &str = "proxy key missing — run rival config key set";
+
+/// A provider that can go through the proxy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyProvider {
+    Claude,
+    Codex,
+}
+
+impl ProxyProvider {
+    /// The config key under `proxy:`.
+    pub fn name(self) -> &'static str {
+        match self {
+            ProxyProvider::Claude => "claude",
+            ProxyProvider::Codex => "codex",
+        }
+    }
+}
+
+/// A resolved proxy route for one run. `Debug` hides the key.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Route {
+    /// Normalized base URL, without `/v1`.
+    pub url: String,
+    /// Normalized model prefix; "" means the bare model id.
+    pub prefix: String,
+    key: String,
+}
+
+impl Route {
+    /// A route from its parts, for a draft config or a test. The key is
+    /// added to the leak guard's scrub list.
+    pub fn new(url: impl Into<String>, prefix: impl Into<String>, key: impl Into<String>) -> Self {
+        let key = key.into();
+        crate::leakguard::register(&key);
+        Route {
+            url: url.into(),
+            prefix: prefix.into(),
+            key,
+        }
+    }
+
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+}
+
+impl fmt::Debug for Route {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Route")
+            .field("url", &self.url)
+            .field("prefix", &self.prefix)
+            .field("key", &"<hidden>")
+            .finish()
+    }
+}
+
+/// Where the proxy key came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProxyKeySource {
+    Env,
+    File(PathBuf),
+}
+
+/// A loaded proxy key. `Debug` hides the secret.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ProxyKey {
+    secret: String,
+    pub source: ProxyKeySource,
+}
+
+impl ProxyKey {
+    pub fn secret(&self) -> &str {
+        &self.secret
+    }
+
+    /// `set (…a91f)`: the last 4 characters. A key shorter than 8
+    /// characters shows none.
+    pub fn masked(&self) -> String {
+        let chars: Vec<char> = self.secret.chars().collect();
+        if chars.len() < 8 {
+            return "set".to_string();
+        }
+        let tail: String = chars[chars.len() - 4..].iter().collect();
+        format!("set (…{tail})")
+    }
+}
+
+impl fmt::Debug for ProxyKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProxyKey")
+            .field("secret", &"<hidden>")
+            .field("source", &self.source)
+            .finish()
+    }
+}
+
+/// Normalizes a proxy base URL: trims it, requires `http` or `https` with a
+/// host, and removes a trailing `/` or `/v1`. `Err` holds the reason.
+pub fn normalize_proxy_url(raw: &str) -> Result<String, String> {
+    let url = raw.trim();
+    let lower = url.to_ascii_lowercase();
+    let scheme_len = if lower.starts_with("http://") {
+        7
+    } else if lower.starts_with("https://") {
+        8
+    } else {
+        return Err("use an http:// or https:// URL".to_string());
+    };
+    if url.chars().any(char::is_whitespace) {
+        return Err("the URL has a space".to_string());
+    }
+    let rest = &url[scheme_len..];
+    let auth_len = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..auth_len];
+    let host_port = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    let host = match host_port.strip_prefix('[') {
+        Some(v6) => v6.split_once(']').map_or("", |(h, _)| h),
+        None => host_port.split(':').next().unwrap_or(""),
+    };
+    if host.is_empty() {
+        return Err("the URL has no host".to_string());
+    }
+    let head = &url[..scheme_len + auth_len];
+    let mut path = url[scheme_len + auth_len..].trim_end_matches('/');
+    if let Some(stripped) = path.strip_suffix("/v1") {
+        path = stripped.trim_end_matches('/');
+    }
+    Ok(format!("{head}{path}"))
+}
+
+/// Trims a model prefix and removes its trailing `/`.
+pub fn normalize_model_prefix(raw: &str) -> String {
+    raw.trim().trim_end_matches('/').trim().to_string()
+}
+
+/// `~` and `~/…` under `home`; other paths as written. An empty `home`
+/// leaves the path as written.
+fn expand_home(path: &str, home: &str) -> PathBuf {
+    if home.is_empty() {
+        return PathBuf::from(path);
+    }
+    if path == "~" {
+        return PathBuf::from(home);
+    }
+    let rest = path
+        .strip_prefix("~/")
+        .or_else(|| path.strip_prefix("~\\").filter(|_| cfg!(windows)));
+    match rest {
+        Some(rest) => Path::new(home).join(rest),
+        None => PathBuf::from(path),
+    }
+}
+
 /// Optional user configuration from `~/.rival/config.yaml`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UserConfig {
     pub claude: ClaudeConfig,
     pub security: SecurityConfig,
+    pub proxy: ProxyConfig,
+    pub plan: PlanConfig,
     pub efforts: BTreeMap<String, String>,
     pub roles: BTreeMap<String, String>,
     /// Lets the skills apply fixes for CONFIRMED critical and high findings
@@ -735,6 +963,56 @@ struct RawSecurity {
     reviewer: GoString,
 }
 
+/// Marks a key that is present, whatever its value (null too).
+#[derive(Default)]
+struct Present(bool);
+
+impl<'de> Deserialize<'de> for Present {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        serde::de::IgnoredAny::deserialize(d)?;
+        Ok(Present(true))
+    }
+}
+
+#[derive(Default, Deserialize)]
+struct RawProxyRoute {
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    model_prefix: GoString,
+}
+
+impl From<Option<RawProxyRoute>> for ProxyRoute {
+    fn from(raw: Option<RawProxyRoute>) -> Self {
+        let raw = raw.unwrap_or_default();
+        ProxyRoute {
+            enabled: raw.enabled.unwrap_or_default(),
+            model_prefix: raw.model_prefix.0,
+        }
+    }
+}
+
+#[derive(Default, Deserialize)]
+struct RawProxy {
+    #[serde(default)]
+    url: GoString,
+    #[serde(default)]
+    key_file: GoString,
+    /// Only to reject it: the key never lives in `config.yaml`.
+    #[serde(default)]
+    key: Present,
+    #[serde(default)]
+    claude: Option<RawProxyRoute>,
+    #[serde(default)]
+    codex: Option<RawProxyRoute>,
+}
+
+#[derive(Default, Deserialize)]
+struct RawPlan {
+    #[serde(default)]
+    models: Option<Vec<GoString>>,
+}
+
 /// Unknown keys (for example the removed megareview's `review:` roster) are
 /// ignored, like yaml.v3.
 #[derive(Default, Deserialize)]
@@ -749,6 +1027,10 @@ struct RawUserConfig {
     roles: Option<BTreeMap<String, GoString>>,
     #[serde(default)]
     auto_fix_critical_high: Option<bool>,
+    #[serde(default)]
+    proxy: Option<RawProxy>,
+    #[serde(default)]
+    plan: Option<RawPlan>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -759,9 +1041,26 @@ impl From<RawUserConfig> for UserConfig {
                 .map(|(k, v)| (k, v.0))
                 .collect()
         };
+        let proxy = raw.proxy.unwrap_or_default();
         UserConfig {
             claude: ClaudeConfig {
                 subscription: raw.claude.unwrap_or_default().subscription.0,
+            },
+            proxy: ProxyConfig {
+                url: proxy.url.0,
+                key_file: proxy.key_file.0,
+                claude: proxy.claude.into(),
+                codex: proxy.codex.into(),
+            },
+            plan: PlanConfig {
+                models: raw
+                    .plan
+                    .unwrap_or_default()
+                    .models
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|m| m.0)
+                    .collect(),
             },
             security: SecurityConfig {
                 reviewer: raw.security.unwrap_or_default().reviewer.0,
@@ -797,19 +1096,27 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
             e
         )));
     }
-    let parse_err = |e: &dyn fmt::Display| ConfigError::new(format!("parse {shown}: {e}"));
-    let text = String::from_utf8(data).map_err(|e| parse_err(&e))?;
-    let raw: Option<RawUserConfig> = serde_saphyr::from_str(&text).map_err(|e| parse_err(&e))?;
-    let mut cfg = UserConfig::from(raw.unwrap_or_default());
+    let text =
+        String::from_utf8(data).map_err(|e| ConfigError::new(format!("parse {shown}: {e}")))?;
+    parse_user_config(&text, path).map(Some)
+}
 
-    // Sol was removed on 2026-09-26. An old efforts.sol entry configures
-    // nothing that can run, so drop it instead of failing every command.
-    cfg.efforts.remove(SOL_LABEL);
+/// Parses and validates config text as if read from `path` (errors name
+/// `path`). [`load_user_config`], the writer and `config check
+/// --config-stdin` (a draft) share it.
+pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigError> {
+    let shown = path.display();
+    let parse_err = |e: &dyn fmt::Display| ConfigError::new(format!("parse {shown}: {e}"));
+    let raw: Option<RawUserConfig> = serde_saphyr::from_str(text).map_err(|e| parse_err(&e))?;
+    let raw = raw.unwrap_or_default();
+    let key_in_yaml = raw.proxy.as_ref().is_some_and(|p| p.key.0);
+    let mut cfg = UserConfig::from(raw);
+
     for (label, raw) in cfg.efforts.iter_mut() {
         let effort = raw.trim().to_lowercase();
         if !known_effort_model(label) {
             return Err(ConfigError::new(format!(
-                "invalid effort model {:?} in {shown}; use one of: codex, kimi-k3, claude, grok",
+                "invalid effort model {:?} in {shown}; use one of: codex, sol, kimi-k3, claude, fable, grok",
                 label
             )));
         }
@@ -840,7 +1147,33 @@ pub fn load_user_config(path: &Path) -> Result<Option<UserConfig>, ConfigError> 
         }
         cfg.security.reviewer = name;
     }
-    Ok(Some(cfg))
+    if key_in_yaml {
+        return Err(ConfigError::new(format!(
+            "proxy.key is not allowed in {shown}; remove it and store the key with: rival config key set"
+        )));
+    }
+    let url = cfg.proxy.url.trim().to_string();
+    if !url.is_empty() {
+        cfg.proxy.url = normalize_proxy_url(&url).map_err(|why| {
+            ConfigError::new(format!("invalid proxy.url {:?} in {shown}: {why}", url))
+        })?;
+    }
+    cfg.proxy.key_file = cfg.proxy.key_file.trim().to_string();
+    for route in [&mut cfg.proxy.claude, &mut cfg.proxy.codex] {
+        route.model_prefix = normalize_model_prefix(&route.model_prefix);
+    }
+    for model in cfg.plan.models.iter_mut() {
+        let name = model.trim().to_lowercase();
+        if !PLAN_MODEL_NAMES.contains(&name.as_str()) {
+            return Err(ConfigError::new(format!(
+                "invalid plan.models entry {:?} in {shown}; use one of: {}",
+                model.trim(),
+                PLAN_MODEL_NAMES.join(", ")
+            )));
+        }
+        *model = name;
+    }
+    Ok(cfg)
 }
 
 /// Runtime configuration: the environment and the user config, captured
@@ -854,6 +1187,8 @@ pub struct Config {
     cwd: Option<PathBuf>,
     user: Option<UserConfig>,
     user_err: Option<ConfigError>,
+    /// The proxy key, read at the first [`Config::proxy_key`] call.
+    proxy_key: OnceLock<Result<Option<ProxyKey>, ConfigError>>,
     /// The snapshot is this process's environment ([`Config::load`]), so
     /// OS calls that read the environment themselves (Windows
     /// `GetTempPath2W`) see the same values.
@@ -910,6 +1245,8 @@ impl Config {
         self.environ = environ;
         self.cwd = cwd;
         self.process_env = false;
+        // RIVAL_PROXY_KEY may come from the new environment.
+        self.proxy_key = OnceLock::new();
         self
     }
 
@@ -928,6 +1265,7 @@ impl Config {
             cwd,
             user: None,
             user_err: None,
+            proxy_key: OnceLock::new(),
             process_env: false,
         };
         if !cfg.getenv(paths::STATE_ROOT_VAR).is_empty() || !cfg.getenv(paths::HOME_VAR).is_empty()
@@ -945,7 +1283,27 @@ impl Config {
     pub fn with_user_config(mut self, user: Option<UserConfig>) -> Self {
         self.user = user;
         self.user_err = None;
+        self.proxy_key = OnceLock::new();
         self
+    }
+
+    /// A draft key that is not saved yet (the TUI config window) in place of
+    /// the key file. `RIVAL_PROXY_KEY` still wins, as it wins over the file,
+    /// so a check of the draft sees the key a run would use. The key joins
+    /// the leak guard's scrub list.
+    pub fn with_draft_proxy_key(self, secret: &str) -> Self {
+        let secret = secret.trim();
+        if !self.getenv(PROXY_KEY_ENV).trim().is_empty() || secret.is_empty() {
+            return self;
+        }
+        crate::leakguard::register(secret);
+        let key = ProxyKey {
+            secret: secret.to_string(),
+            source: ProxyKeySource::File(self.proxy_key_file()),
+        };
+        let mut cfg = self;
+        cfg.proxy_key = OnceLock::from(Ok(Some(key)));
+        cfg
     }
 
     pub fn paths(&self) -> &Paths {
@@ -1016,6 +1374,132 @@ impl Config {
         } else {
             "off"
         }
+    }
+
+    /// The configured `plan.models`; empty when unset.
+    pub fn plan_models(&self) -> &[String] {
+        self.user.as_ref().map_or(&[], |u| u.plan.models.as_slice())
+    }
+
+    /// `RIVAL_PROXY=off`: this run goes direct.
+    pub fn proxy_off(&self) -> bool {
+        self.getenv(PROXY_SWITCH_ENV)
+            .trim()
+            .eq_ignore_ascii_case("off")
+    }
+
+    /// The proxy base URL: `RIVAL_PROXY_URL`, then `proxy.url`; "" when
+    /// neither is set. An invalid `RIVAL_PROXY_URL` is an error.
+    pub fn proxy_url(&self) -> Result<String, ConfigError> {
+        let env = self.getenv(PROXY_URL_ENV).trim();
+        if !env.is_empty() {
+            return normalize_proxy_url(env).map_err(|why| {
+                ConfigError::new(format!("invalid {PROXY_URL_ENV} {:?}: {why}", env))
+            });
+        }
+        Ok(self
+            .user
+            .as_ref()
+            .map_or_else(String::new, |u| u.proxy.url.clone()))
+    }
+
+    /// The key file: `proxy.key_file` (with `~` expanded), else
+    /// `~/.rival/proxy.key`.
+    pub fn proxy_key_file(&self) -> PathBuf {
+        let configured = self.user.as_ref().map_or("", |u| u.proxy.key_file.as_str());
+        if configured.is_empty() {
+            return self.paths.proxy_key_file();
+        }
+        expand_home(configured, self.getenv(paths::HOME_VAR))
+    }
+
+    /// The proxy key: `RIVAL_PROXY_KEY`, else the trimmed key file.
+    /// `Ok(None)` means no key (unset, missing or empty file). Read once,
+    /// at the first call.
+    /// A loaded key joins the leak guard's scrub list.
+    pub fn proxy_key(&self) -> Result<Option<ProxyKey>, ConfigError> {
+        let key = self.proxy_key.get_or_init(|| self.read_proxy_key()).clone();
+        if let Ok(Some(k)) = &key {
+            crate::leakguard::register(k.secret());
+        }
+        key
+    }
+
+    fn read_proxy_key(&self) -> Result<Option<ProxyKey>, ConfigError> {
+        let env = self.getenv(PROXY_KEY_ENV).trim();
+        if !env.is_empty() {
+            return Ok(Some(ProxyKey {
+                secret: env.to_string(),
+                source: ProxyKeySource::Env,
+            }));
+        }
+        let path = self.proxy_key_file();
+        let shown = path.display();
+        let mut file = match std::fs::File::open(&path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(ConfigError::new(format!("read proxy key {shown}: {e}"))),
+        };
+        // Like ssh: a key that other users can read is refused.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = file
+                .metadata()
+                .map_err(|e| ConfigError::new(format!("read proxy key {shown}: {e}")))?
+                .permissions()
+                .mode();
+            if mode & 0o077 != 0 {
+                return Err(ConfigError::new(format!(
+                    "proxy key {shown} is open to other users (mode {:04o}) — run chmod 600 {shown}",
+                    mode & 0o777
+                )));
+            }
+        }
+        let mut data = String::new();
+        file.read_to_string(&mut data)
+            .map_err(|e| ConfigError::new(format!("read proxy key {shown}: {e}")))?;
+        let key = data.trim();
+        if key.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(ProxyKey {
+            secret: key.to_string(),
+            source: ProxyKeySource::File(path.clone()),
+        }))
+    }
+
+    /// The proxy route for `provider`, or `None` when its switch is off or
+    /// `RIVAL_PROXY=off`. An enabled route without a URL or a key is an
+    /// error. The key is read here, not when the config loads.
+    pub fn proxy_route(&self, provider: ProxyProvider) -> Result<Option<Route>, ConfigError> {
+        if self.proxy_off() {
+            return Ok(None);
+        }
+        let Some(user) = self.user.as_ref() else {
+            return Ok(None);
+        };
+        let route = match provider {
+            ProxyProvider::Claude => &user.proxy.claude,
+            ProxyProvider::Codex => &user.proxy.codex,
+        };
+        if !route.enabled {
+            return Ok(None);
+        }
+        let url = self.proxy_url()?;
+        if url.is_empty() {
+            return Err(ConfigError::new(
+                "proxy.url is not set — run rival config set proxy.url <url>",
+            ));
+        }
+        let key = self
+            .proxy_key()?
+            .ok_or_else(|| ConfigError::new(PROXY_KEY_MISSING))?;
+        Ok(Some(Route {
+            url,
+            prefix: route.model_prefix.clone(),
+            key: key.secret,
+        }))
     }
 
     /// The raw `security.reviewer` value, or "" when unset.

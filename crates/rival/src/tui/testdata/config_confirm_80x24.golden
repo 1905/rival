@@ -1,0 +1,49 @@
+╭─ rival · config ─────────────────────────── ~/.rival/config.yaml  ● unsaved ─╮|
+│ 1 Proxy  2 Models  3 Review  4 Check                                         │|
+│                                                                              │|
+│  ▸ Claude via proxy    ○ off   Opus, Fable use their own login               │|
+│                        space or ←→ switches it                               │|
+│    Codex via proxy     ● on    Codex, Sol go through the proxy               │|
+│    URL                 http://127.0.0.1:8317             ● online · 6 models │|
+│    Key                 ••••••••a91f   ~/.rival/proxy.key  0600 ✓             │|
+│    Claude prefix       ‹ emcd2_ ›   also: emcd_   route off                  │|
+│    Codex prefix        ‹ none ›                                              │|
+│                                                                              │|
+│  REQUESTS GO TO                                                              │|
+│    codex  Codex      proxy   → gpt-6-astra                                   │|
+│    sol    Sol 6.1    proxy   → gpt-6.1-sol                                   │|
+│    claude Opus 5.5   direct  → claude-opus-5-5                               │|
+│    fable  Fable 5.1  direct  → claude-fable-5-1                              │|
+│                                                                              │|
+│                                                                              │|
+│                                                                              │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK  not run · c checks the draft                     ● online · 6 models │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│ save changes?   y save and close  n discard  esc stay                        │|
+╰──────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTdddddddddddddddddddddddddddddddddddddddddddddddddddaaaaaaaaaadd|
+d.AAAAAAAddddddddddddddddddddddddddddd.........................................d|
+d..............................................................................d|
+d.????????????????????????????????????????????????????????????????????????????.d|
+d........................ddddddddddddddddddddddd...............................d|
+d....ddddddddddddddddddddaaaaadddddddddddddddddddddddddddddddddd...............d|
+d....ddddddddddddddddddddTTTTTTTTTTTTTTTTTTTTT.............aaaaaaaaddddddddddd.d|
+d....ddddddddddddddddddddTTTTTTTTTTTTdddddddddddddddddddddaaaaaaaa.............d|
+d....ddddddddddddddddddddddTTTTTTdddddddddddddddddddddddddddd..................d|
+d....ddddddddddddddddddddddTTTTdd..............................................d|
+d..............................................................................d|
+d..DDDDDDDDDDDDDD..............................................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddddddddddddTTTTTTTTTTTTTTT...............................d|
+d....tttttttdddddddddddddddddddddTTTTTTTTTTTTTTTT..............................d|
+d..............................................................................d|
+d..............................................................................d|
+d..............................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.rrrrrrrrrrrrr...adddddddddddddddddaddddddddddaaaddddd........................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

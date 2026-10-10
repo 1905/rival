@@ -1,0 +1,49 @@
+╭─ rival · config ────────────────────────────────────── ~/.rival/config.yaml ─╮|
+│ 1 Proxy  2 Models  3 Review  4 Check                                         │|
+│                                                                              │|
+│    MODEL   RUNTIME      ROUTE   EFFORT       PLAN                            │|
+│    codex   Codex CLI    proxy     xhigh      [■]                             │|
+│    sol     Codex CLI    proxy     xhigh      [ ]                             │|
+│  ▸ claude  Claude Code  proxy   ‹ medium ›   [ ]                             │|
+│    fable   Claude Code  proxy     medium     [ ]                             │|
+│    k3      OpenCode     direct    max fixed   —                              │|
+│    grok    grok CLI     direct    high        —   not installed              │|
+│                                                                              │|
+│    Opus 5.5 sends emcd2_/claude-opus-5-5                                     │|
+│    PLAN marks what rival command plan runs without -m                        │|
+│                                                                              │|
+│                                                                              │|
+│                                                                              │|
+│                                                                              │|
+│                                                                              │|
+│                                                                              │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK  not run · c checks the draft                     ● online · 6 models │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│ tab section  ←→ effort  space plan  c check  s save  ? help  esc back        │|
+╰──────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.dddddddddAAAAAAAAddddddddddddddddddd.........................................d|
+d..............................................................................d|
+d..DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD............................d|
+d....tttttttttttttttttttttaaaaaaaatttttttttttttaaa.............................d|
+d....tttttttttttttttttttttaaaaaaaatttttttttttttddd.............................d|
+d.????????????????????????????????????????????????????????????????????????????.d|
+d....tttttttttttttttttttttaaaaaaaatttttttttttttddd.............................d|
+d....tttttttttttttttttttttdddddddddddddddddddddddd.............................d|
+d....dddddddddddddddddddddddddddddtttttttttttttdddddddddddddddddd..............d|
+d..............................................................................d|
+d..tttttttttttddddddTTTTTTTTTTTTTTTTTTTTTT.....................................d|
+d..dddddddddddddddddddddddddddddddddddddddddddddddddddd........................d|
+d..............................................................................d|
+d..............................................................................d|
+d..............................................................................d|
+d..............................................................................d|
+d..............................................................................d|
+d..............................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaa.ddddddd..aa.dddddd..aaaaa.dddd..a.ddddd..a.dddd..a.dddd..aaa.dddd........d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

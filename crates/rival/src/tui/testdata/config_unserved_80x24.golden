@@ -1,0 +1,49 @@
+╭─ rival · config ────────────────────────────────────── ~/.rival/config.yaml ─╮|
+│ 1 Proxy  2 Models  3 Review  4 Check                                         │|
+│                                                                              │|
+│    Claude via proxy    ● on    Opus, Fable go through the proxy              │|
+│  ▸ Codex via proxy     ● on    Codex, Sol go through the proxy               │|
+│                        space or ←→ switches it                               │|
+│    URL                 http://127.0.0.1:8317             ● online · 6 models │|
+│    Key                 ••••••••a91f   ~/.rival/proxy.key  0600 ✓             │|
+│    Claude prefix       ‹ team9 ›   also: emcd2_, emcd_                       │|
+│                        ! the proxy does not serve claude-opus-5-5 as         │|
+│                          team9/claude-opus-5-5                               │|
+│    Codex prefix        ‹ none ›                                              │|
+│                                                                              │|
+│  REQUESTS GO TO                                                              │|
+│    codex  Codex      proxy   → gpt-6-astra                                   │|
+│    sol    Sol 6.1    proxy   → gpt-6.1-sol                                   │|
+│    claude Opus 5.5   proxy   → team9/claude-opus-5-5                         │|
+│    fable  Fable 5.1  proxy   → team9/claude-fable-5-1                        │|
+│                                                                              │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK  not run · c checks the draft                     ● online · 6 models │|
+├──────────────────────────────────────────────────────────────────────────────┤|
+│ tab section  ↑↓ field  space toggle  c check  s save  ? help  esc back       │|
+╰──────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.AAAAAAAddddddddddddddddddddddddddddd.........................................d|
+d..............................................................................d|
+d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddd..............d|
+d.????????????????????????????????????????????????????????????????????????????.d|
+d........................ddddddddddddddddddddddd...............................d|
+d....ddddddddddddddddddddTTTTTTTTTTTTTTTTTTTTT.............aaaaaaaaddddddddddd.d|
+d....ddddddddddddddddddddTTTTTTTTTTTTdddddddddddddddddddddaaaaaaaa.............d|
+d....ddddddddddddddddddddddTTTTTdddddddddddddddddddddddd.......................d|
+d........................ggggggggggggggggggggggggggggggggggggggggggggg.........d|
+d........................ggggggggggggggggggggggg...............................d|
+d....ddddddddddddddddddddddTTTTdd..............................................d|
+d..............................................................................d|
+d..DDDDDDDDDDDDDD..............................................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT.........................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT........................d|
+d..............................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaa.ddddddd..aa.ddddd..aaaaa.dddddd..a.ddddd..a.dddd..a.dddd..aaa.dddd.......d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

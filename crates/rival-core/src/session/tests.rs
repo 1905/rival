@@ -364,6 +364,8 @@ const FULL: &str = concat!(
     "  \"output_lines\": -3,\n",
     "  \"error\": \"boom\",\n",
     "  \"account\": \"acc\",\n",
+    "  \"route\": \"proxy\",\n",
+    "  \"wire_model\": \"emcd_/gpt-6-astra\",\n",
     "  \"pid\": 42,\n",
     "  \"pid_start\": 7,\n",
     "  \"owner_pid\": 43,\n",
@@ -427,11 +429,14 @@ fn full_session() -> Session {
         output_lines: -3,
         error_msg: "boom".into(),
         account: "acc".into(),
+        route: "proxy".into(),
+        wire_model: "emcd_/gpt-6-astra".into(),
         pid: 42,
         pid_start: 7,
         owner_pid: 43,
         owner_pid_start: 8,
         start_mono: MonoStart::default(),
+        ephemeral: false,
     }
 }
 
@@ -1130,4 +1135,70 @@ fn sort_group_members_mixed_legacy_and_queued_is_total() {
             .windows(2)
             .all(|w| w[0].queued_at <= w[1].queued_at)
     );
+}
+
+/// `route` and `wire_model` are optional: a record without them loads, and
+/// a direct run (both empty) writes neither.
+#[test]
+fn route_fields_are_optional() {
+    let old = Session::from_json(EXIT_SEVEN.as_bytes()).unwrap();
+    assert_eq!((old.route.as_str(), old.wire_model.as_str()), ("", ""));
+    assert_eq!(
+        String::from_utf8(old.to_json().unwrap()).unwrap(),
+        EXIT_SEVEN
+    );
+    let full = Session::from_json(FULL.as_bytes()).unwrap();
+    assert_eq!(full.route, "proxy");
+    assert_eq!(full.wire_model, "emcd_/gpt-6-astra");
+}
+
+/// The leak guard: a registered secret never reaches the record.
+#[test]
+fn to_json_scrubs_registered_secrets() {
+    crate::leakguard::register("test-proxy-key-session-0000");
+    let sess = Session {
+        error_msg: "claude said test-proxy-key-session-0000".into(),
+        ..Session::default()
+    };
+    let text = String::from_utf8(sess.to_json().unwrap()).unwrap();
+    assert!(!text.contains("test-proxy-key-session-0000"), "{text}");
+    assert!(
+        text.contains("\"error\": \"claude said <redacted>\""),
+        "{text}"
+    );
+}
+
+/// A secret JSON escapes (a quote, a backslash) is scrubbed from the
+/// encoded record too.
+#[test]
+fn to_json_scrubs_json_escaped_secrets() {
+    let secret = "test-proxy\"key\\session-0001";
+    crate::leakguard::register(secret);
+    let sess = Session {
+        error_msg: format!("claude said {secret}"),
+        ..Session::default()
+    };
+    let text = String::from_utf8(sess.to_json().unwrap()).unwrap();
+    assert!(!text.contains("session-0001"), "{text}");
+    assert!(
+        text.contains("\"error\": \"claude said <redacted>\""),
+        "{text}"
+    );
+}
+
+#[test]
+fn ephemeral_session_save_writes_nothing() {
+    let home = tempfile::tempdir().unwrap();
+    let paths = Paths::from_home(home.path());
+    fs::create_dir_all(paths.sessions_dir()).unwrap();
+    let sess = Session {
+        id: "check-codex".to_string(),
+        ephemeral: true,
+        ..Session::default()
+    };
+    sess.save(&paths).unwrap();
+    assert_eq!(fs::read_dir(paths.sessions_dir()).unwrap().count(), 0);
+    // The flag is not part of the record.
+    let json = String::from_utf8(sess.to_json().unwrap()).unwrap();
+    assert!(!json.contains("ephemeral"), "{json}");
 }

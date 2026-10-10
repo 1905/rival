@@ -6,6 +6,20 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 
 ## [Unreleased]
 
+### Added
+- **Proxy support.** Claude runs (Opus, Fable) and Codex runs (Codex, Sol) can go through an HTTP gateway such as CLIProxyAPI: one `proxy.url`, one key file, and an on/off switch and model prefix for each provider. A preflight reads `/v1/models` and names the fix for a dead proxy, a rejected key or a wrong prefix. A 429 account limit names the other prefixes. `RIVAL_PROXY=off` sends one run direct.
+- `rival config`: a config window in the TUI, plus `show`, `set`, `key set`/`key clear`, `models` and `check`. `rival config check` sends a short prompt to each model through its real adapter and shows ✓, latency and reply, or the error.
+- Rival.app: a Settings window (⌘,) with Proxy, Models and Check tabs, and "Check models" in the menu bar.
+- **Fable 5.1** (`claude-fable-5-1`) and **Sol 6.1** (`gpt-6.1-sol`) are reviewers again: `rival command fable|sol`, `rival run fable`, `/rival-fable`, `/rival-sol`, and plan review with `-m opus,fable,sol`. `opus` is an alias of `claude`.
+- `plan.models` in `~/.rival/config.yaml` sets the default plan models. `efforts.fable` and `efforts.sol` are valid.
+- Sessions record `route` and `wire_model` on proxied runs.
+
+### Changed
+- `rival config set` and the config windows rewrite `~/.rival/config.yaml`. Unknown keys stay; comments do not. The first rewrite of a hand-written file keeps `config.yaml.bak`.
+- Old Fable sessions show as `fable`, not `retired-model`.
+- Secrets are scrubbed: the proxy key never appears in logs, session files or errors.
+- Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
+
 ## [v5.0.0] — 2026-10-09
 
 The CLI is now written in Rust. The Go CLI is gone. Commands, flags, session files, queue behavior, provider arguments and embedded skills keep the Go contracts. 86 end-to-end scenarios check them on macOS and Linux.

@@ -1,11 +1,13 @@
-//! `rival command plan`: review a plan/spec file with Codex and/or Claude.
+//! `rival command plan`: review a plan/spec file with Codex, Sol, Claude
+//! and/or Fable.
 
 use std::io::{self, Write};
 use std::path::Path;
 
 use rival_core::cancel::Context;
 use rival_core::config::{
-    self, CLAUDE_LABEL, CLAUDE_MODEL, CODEX_LABEL, CODEX_MODEL, Config, VALID_EFFORTS,
+    self, CLAUDE_LABEL, CLAUDE_MODEL, CODEX_LABEL, CODEX_MODEL, Config, FABLE_LABEL, FABLE_MODEL,
+    OPUS_ALIAS, SOL_LABEL, SOL_MODEL, VALID_EFFORTS,
 };
 use rival_core::paths;
 use rival_core::review::{self, PlanRunResult, ReviewBatch};
@@ -21,12 +23,15 @@ pub const PLAN_USAGE: &str = "Usage:
   /rival-plan path/to/plan.md — review with Codex at xhigh effort
   /rival-plan-codex path/to/plan.md — review with Codex at xhigh effort
   /rival-plan-claude path/to/plan.md — review with Claude
+  /rival-plan -m opus,fable,sol path/to/plan.md — review with several models
   rival command plan --help — show native command options
 
 Input is a single path to a markdown plan/spec file. The /rival-plan and
-/rival-plan-codex skills always use xhigh. Native Codex effort defaults to xhigh
-and Claude to medium, unless overridden per model in ~/.rival/config.yaml.
---model accepts codex and claude. An unavailable model is skipped, not fatal.";
+/rival-plan-codex skills always use xhigh. Native Codex and Sol effort defaults
+to xhigh, Claude and Fable to medium, unless overridden per model in
+~/.rival/config.yaml. --model accepts codex, sol, claude (or opus) and fable;
+without it, plan.models from ~/.rival/config.yaml, else codex. An unavailable
+model is skipped, not fatal.";
 
 /// Runs the plan review; tests inject a fake.
 pub type PlanRunner<'a> = dyn Fn(&Context, &Config, &str, &ReviewBatch<'_>, &mut dyn Write) -> anyhow::Result<PlanRunResult>
@@ -39,6 +44,8 @@ pub struct PlanOptions {
     pub no_queue: bool,
     /// `--model` values (`GetStringSlice`).
     pub models: Vec<String>,
+    /// `Flags().Changed("model")`.
+    pub models_set: bool,
     pub effort: String,
     /// `Flags().Changed("effort")`.
     pub effort_set: bool,
@@ -50,6 +57,7 @@ impl PlanOptions {
             workdir: inv.string("workdir"),
             no_queue: inv.bool("no-queue"),
             models: inv.strings("model"),
+            models_set: inv.changed("model"),
             effort: inv.string("effort"),
             effort_set: inv.changed("effort"),
         }
@@ -85,7 +93,13 @@ pub fn run_command_plan(
         return Err(fail_on_stdout(env.stdout, invalid_flag_effort(effort)));
     }
 
-    let clis = parse_plan_models(&opts.models).map_err(|e| fail_on_stdout(env.stdout, e))?;
+    // No --model: plan.models from the config, else the flag default (codex).
+    let selected = if !opts.models_set && !cfg.plan_models().is_empty() {
+        cfg.plan_models()
+    } else {
+        opts.models.as_slice()
+    };
+    let models = parse_plan_models(selected).map_err(|e| fail_on_stdout(env.stdout, e))?;
     // A terminal stdin means no piped path: show usage instead of hanging.
     if env.stdin.is_char_device() {
         let _ = writeln!(env.stdout, "{PLAN_USAGE}");
@@ -119,7 +133,7 @@ pub fn run_command_plan(
         workdir: &workdir,
         group_id: &group_id,
         no_queue: opts.no_queue,
-        clis: &clis,
+        models: &models,
     };
     let result = run(&ctx, cfg, &abs_path, &batch, env.stderr)
         .map_err(|e| CmdError::plain(format!("{e:#}")))?;
@@ -157,27 +171,29 @@ pub(crate) fn invalid_flag_effort(effort: &str) -> String {
     )
 }
 
-/// Validates model-facing selectors and maps them to
-/// the internal adapters the plan runner uses. It de-duplicates by concrete
-/// model while preserving the user's order.
+/// Validates model-facing selectors and maps them to the model ids the
+/// plan runner uses. It de-duplicates by model id (`opus` and `claude` are
+/// one model) while preserving the user's order.
 pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = Vec::new();
     for value in raw {
         for part in value.split(',') {
-            let model = part.trim().to_lowercase();
-            let cli = match model.as_str() {
-                CODEX_LABEL | CODEX_MODEL => "codex",
-                CLAUDE_LABEL | CLAUDE_MODEL => "claude",
+            let name = part.trim().to_lowercase();
+            let model = match name.as_str() {
+                CODEX_LABEL | CODEX_MODEL => CODEX_MODEL,
+                SOL_LABEL | SOL_MODEL => SOL_MODEL,
+                CLAUDE_LABEL | OPUS_ALIAS | CLAUDE_MODEL => CLAUDE_MODEL,
+                FABLE_LABEL | FABLE_MODEL => FABLE_MODEL,
                 "" => return Err("model selector cannot be empty".to_string()),
                 _ => {
                     return Err(format!(
-                        "unknown plan model {:?}; use one of: codex, claude",
+                        "unknown plan model {:?}; use one of: codex, sol, claude, opus, fable",
                         part
                     ));
                 }
             };
-            if !out.iter().any(|c| c == cli) {
-                out.push(cli.to_string());
+            if !out.iter().any(|m| m == model) {
+                out.push(model.to_string());
             }
         }
     }

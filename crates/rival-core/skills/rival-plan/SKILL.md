@@ -1,8 +1,8 @@
 ---
 name: rival-plan
 version: 5.0.0
-description: Review a plan/spec markdown document with Codex at xhigh effort via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan.
-argument-hint: "<path-to-plan.md>"
+description: Review a plan/spec markdown document with Codex at xhigh effort (or with the models given by -m, e.g. -m opus,fable,sol) via the rival binary. Rates it 1-10 and finds bugs and gaps. Use only when the user explicitly invokes /rival-plan.
+argument-hint: "[-m codex,sol,claude,opus,fable] <path-to-plan.md>"
 allowed-tools: Bash, Read, Write
 ---
 
@@ -14,6 +14,8 @@ effort. The model rates the plan 1-10 and returns numbered findings
 the background, so this skill does not block the session.
 
 For a single-model review, use `/rival-plan-codex` or `/rival-plan-claude`.
+To pick the models, put `-m <list>` before the path:
+`/rival-plan -m opus,fable,sol path/to/plan.md`.
 
 ## Instructions
 
@@ -25,9 +27,21 @@ If `$ARGUMENTS` is empty or blank, respond with this usage message and STOP:
 
 > **Usage:**
 > - `/rival-plan path/to/plan.md` — review with Codex at xhigh effort
+> - `/rival-plan -m opus,fable,sol path/to/plan.md` — review with Opus, Fable and Sol
 > - `/rival-plan` — show this usage info
 >
 > Input is a single path to a markdown plan/spec file. Codex runs at xhigh.
+> Models for `-m` (comma-separated): `codex`, `sol`, `claude` (or `opus`), `fable`.
+> With `-m`, each model uses its configured effort (Codex and Sol: xhigh, Claude
+> and Fable: medium).
+
+### Models
+
+If `$ARGUMENTS` starts with `-m <list>` (or `--model <list>`), take it out of the
+input. Then launch with `--model <list>` in place of
+`--model codex --effort xhigh`, for example:
+`rival command plan --model opus,fable,sol --detach --workdir "$(pwd)" ...`.
+Without `-m`, use the command below as written.
 
 ### Execute — launch detached, then watch in the background
 
@@ -48,7 +62,7 @@ RIVAL_PID="$(sed -n 's/^rival: detached pid=\([0-9]*\)$/\1/p' "$RIVAL_ERR" | hea
 [ -n "$RIVAL_PID" ] && echo "rival_pid=$RIVAL_PID" || { echo "DETACH FAILED:"; tail -n 5 "$RIVAL_ERR"; exit 1; }
 ```
 
-Replace `$ARGUMENTS` with the actual path verbatim. **Create `RIVAL_IN` with the Write tool FIRST**: write `$ARGUMENTS` verbatim to a new file `/tmp/rival_in_<8 fresh random hex chars>.txt`, then put that literal path in the `RIVAL_IN=` line. Never create this file with echo/printf/heredoc — the Write tool bypasses the shell entirely, so no character of the content can be shell-interpreted. Capture the printed `rival_out` and `rival_err` paths.
+Replace `$ARGUMENTS` with the actual path verbatim (without a `-m <list>` part). **Create `RIVAL_IN` with the Write tool FIRST**: write `$ARGUMENTS` verbatim to a new file `/tmp/rival_in_<8 fresh random hex chars>.txt`, then put that literal path in the `RIVAL_IN=` line. Never create this file with echo/printf/heredoc — the Write tool bypasses the shell entirely, so no character of the content can be shell-interpreted. Capture the printed `rival_out` and `rival_err` paths.
 
 **Step 2 — arm the background watcher (`run_in_background: true`):**
 

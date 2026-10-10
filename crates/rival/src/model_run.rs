@@ -99,7 +99,8 @@ pub fn run_model_run(
             group_id: "",
         },
     )?;
-    if spec.command_name == rival_core::config::CLAUDE_LABEL {
+    // Opus and Fable both run on the Claude runtime.
+    if spec.cli == "claude" {
         sess.account = cfg.claude_subscription().to_string();
     }
 

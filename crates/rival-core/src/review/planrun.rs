@@ -80,16 +80,28 @@ pub fn run_failure_reason(label: &str, raw: &str, parsed: bool) -> String {
 
 /// Keeps user-facing failures model-specific even though the implementation
 /// uses local adapter binaries underneath.
-fn plan_failure_reason(cli: &str, reason: &str) -> String {
-    config::public_runtime_error(cli, plan_model_for_cli(cli), reason)
+fn plan_failure_reason(cli: &str, model: &str, reason: &str) -> String {
+    config::public_runtime_error(cli, model, reason)
 }
 
-/// The model id recorded for a plan CLI's session.
-fn plan_model_for_cli(cli: &str) -> &str {
-    match cli {
+/// The model id of a plan reviewer entry: a model id as is; the runtime
+/// words `codex` and `claude` name Codex and Opus.
+fn plan_model(entry: &str) -> &str {
+    match entry {
         "codex" => config::CODEX_MODEL,
         "claude" => config::CLAUDE_MODEL,
-        _ => cli,
+        _ => entry,
+    }
+}
+
+/// The runtime (session `cli`) of a plan model id.
+fn plan_cli(model: &str) -> &str {
+    if executor::is_codex_model(model) {
+        "codex"
+    } else if executor::is_claude_model(model) {
+        "claude"
+    } else {
+        model
     }
 }
 
@@ -111,11 +123,13 @@ struct PlanCLIRun {
     reason: String,
 }
 
-type PreflightFn<'a> = dyn Fn(&str) -> anyhow::Result<()> + Sync + 'a;
+/// Checks one reviewer before it is queued: `(cli, model)`.
+type PreflightFn<'a> = dyn Fn(&str, &str) -> anyhow::Result<()> + Sync + 'a;
 
 /// Runs one CLI's plan review on the session: `(ctx, sess, cli, prompt,
 /// effort, workdir, log)` → the raw log bytes and the exit code. `log` is the
-/// file that gets the output; `None` is the session log.
+/// file that gets the output; `None` is the session log. The model is the
+/// session's `model`.
 type RunFn<'a> = dyn Fn(
         &Context,
         &mut Session,
@@ -136,27 +150,20 @@ struct PlanExecutor<'a> {
 
 fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
     PlanExecutor {
-        preflight: Box::new(move |cli| match cli {
-            "codex" => executor::codex_preflight_for(cfg, plan_model_for_cli(cli)),
-            "claude" => executor::claude_preflight(cfg),
+        preflight: Box::new(move |cli, model| match cli {
+            "codex" => executor::codex_preflight_for(cfg, model),
+            "claude" => executor::claude_preflight_model(cfg, model),
             _ => Err(anyhow!("unsupported plan cli: {cli}")),
         }),
         run: Box::new(move |ctx, sess, cli, prompt, effort, workdir, log| {
+            let model = sess.model.clone();
             let result = match cli {
                 "codex" => executor::run_codex_model(
-                    ctx,
-                    cfg,
-                    sess,
-                    prompt,
-                    effort,
-                    workdir,
-                    plan_model_for_cli(cli),
-                    log,
-                    None,
+                    ctx, cfg, sess, prompt, effort, workdir, &model, log, None,
                 )?,
-                "claude" => {
-                    executor::run_claude(ctx, cfg, sess, prompt, effort, workdir, true, log, None)?
-                }
+                "claude" => executor::run_claude(
+                    ctx, cfg, sess, prompt, effort, workdir, &model, true, log, None,
+                )?,
                 _ => bail!("unsupported plan cli: {cli}"),
             };
             // `{e}`, not `{e:#}`: the error already prints as `op path: reason`.
@@ -177,8 +184,9 @@ pub struct ReviewBatch<'a> {
     pub group_id: &'a str,
     /// Skip the queue (`--no-queue`).
     pub no_queue: bool,
-    /// Adapter names ("codex", "claude") in the requested order.
-    pub clis: &'a [String],
+    /// The reviewers' model ids in the requested order. The runtime words
+    /// "codex" and "claude" also name Codex and Opus.
+    pub models: &'a [String],
 }
 
 /// What a doc review runs: the mode, prompt, target and fallback effort.
@@ -196,7 +204,7 @@ pub struct DocReview<'a> {
     pub fallback_effort: &'a str,
 }
 
-/// Reviews the plan/spec file at `abs_path` with each CLI in `batch.clis`,
+/// Reviews the plan/spec file at `abs_path` with each model in `batch.models`,
 /// concurrently, under a single queue ticket. There is no judge: each CLI's
 /// structured 1-10 rating and findings come back independently. A CLI that
 /// is unavailable, fails, or hits quota is recorded in `skipped` rather than
@@ -275,14 +283,15 @@ fn run_doc_review_with(
     batch: &ReviewBatch<'_>,
     stderr: &mut dyn Write,
 ) -> anyhow::Result<PlanRunResult> {
-    if batch.clis.is_empty() {
+    if batch.models.is_empty() {
         bail!("no plan models requested");
     }
 
     // Preflight each CLI BEFORE enqueuing so a doomed run never occupies a
     // slot. Unavailable CLIs are skipped; sessions are created only for the
     // survivors.
-    let mut plan_clis: Vec<&str> = Vec::new();
+    // (cli, model) of each reviewer that passed its preflight.
+    let mut plan_clis: Vec<(&str, &str)> = Vec::new();
     let mut skipped: Vec<SkippedCLI> = Vec::new();
 
     // Created BEFORE the creation loop so an error mid-loop still cleans up
@@ -293,11 +302,11 @@ fn run_doc_review_with(
         sessions: Vec::new(),
     };
 
-    for cli in batch.clis {
-        let cli = cli.as_str();
-        let model = plan_model_for_cli(cli);
-        if let Err(err) = (ex.preflight)(cli) {
-            let reason = plan_failure_reason(cli, &format!("{err:#}"));
+    for entry in batch.models {
+        let model = plan_model(entry);
+        let cli = plan_cli(model);
+        if let Err(err) = (ex.preflight)(cli, model) {
+            let reason = plan_failure_reason(cli, model, &format!("{err:#}"));
             logging::warn()
                 .str("reviewer", config::engine_label(cli, model))
                 .str("reason", reason.clone())
@@ -310,7 +319,7 @@ fn run_doc_review_with(
             continue;
         }
         let model_fallback = match doc.fallback_effort {
-            "" if cli == "codex" => "xhigh",
+            "" if executor::is_codex_model(model) => "xhigh",
             "" => config::DEFAULT_PLAN_EFFORT,
             fallback => fallback,
         };
@@ -344,7 +353,7 @@ fn run_doc_review_with(
         if cli == "claude" {
             sess.account = cfg.claude_subscription().to_string();
         }
-        plan_clis.push(cli);
+        plan_clis.push((cli, model));
         created.sessions.push(sess);
     }
 
@@ -383,7 +392,7 @@ fn run_doc_review_with(
             .sessions
             .iter_mut()
             .zip(&plan_clis)
-            .map(|(sess, cli)| {
+            .map(|(sess, &(cli, model))| {
                 let run_ctx = &run_ctx;
                 scope.spawn(move || {
                     run_plan_cli(
@@ -393,6 +402,7 @@ fn run_doc_review_with(
                         ex,
                         sess,
                         cli,
+                        model,
                         doc.prompt,
                         batch.workdir,
                         doc.mode,
@@ -443,6 +453,7 @@ fn run_plan_cli(
     ex: &PlanExecutor<'_>,
     sess: &mut Session,
     cli: &str,
+    model: &str,
     prompt: &str,
     workdir: &str,
     mode: &str,
@@ -459,6 +470,7 @@ fn run_plan_cli(
         ex,
         &mut *guard.sess,
         cli,
+        model,
         prompt,
         workdir,
         mode,
@@ -475,12 +487,12 @@ fn run_plan_cli_inner(
     ex: &PlanExecutor<'_>,
     sess: &mut Session,
     cli: &str,
+    model: &str,
     prompt: &str,
     workdir: &str,
     mode: &str,
 ) -> PlanCLIRun {
     let paths = cfg.paths();
-    let model = plan_model_for_cli(cli);
     let label = config::engine_label(cli, model);
 
     logging::info()
@@ -500,7 +512,8 @@ fn run_plan_cli_inner(
         Ok(ran) => ran,
         Err(err) => {
             let err = format!("{err:#}");
-            let reason = run_timeout_reason(ctx, cfg, &label, &plan_failure_reason(cli, &err));
+            let reason =
+                run_timeout_reason(ctx, cfg, &label, &plan_failure_reason(cli, model, &err));
             let _ = sess.fail(paths, 1, &reason);
             return PlanCLIRun {
                 cli: cli.to_string(),
@@ -588,13 +601,13 @@ fn assemble_plan_results(
     let mut results = Vec::new();
     for r in batch {
         let model = if r.model.is_empty() {
-            plan_model_for_cli(&r.cli).to_string()
+            plan_model(&r.cli).to_string()
         } else {
             r.model
         };
         if let Some(err) = &r.err {
             let reason = if r.reason.is_empty() {
-                plan_failure_reason(&r.cli, err)
+                plan_failure_reason(&r.cli, &model, err)
             } else {
                 r.reason
             };

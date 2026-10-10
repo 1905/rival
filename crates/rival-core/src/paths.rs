@@ -69,6 +69,16 @@ impl Paths {
     pub fn config_file(&self) -> PathBuf {
         self.root.join("config.yaml")
     }
+
+    /// The model check's logs and its empty work directory.
+    pub fn check_dir(&self) -> PathBuf {
+        self.root.join("check")
+    }
+
+    /// The default proxy key file.
+    pub fn proxy_key_file(&self) -> PathBuf {
+        self.root.join("proxy.key")
+    }
 }
 
 /// Lexical clean for the host: Unix rules, or on Windows [`clean_windows`].
@@ -268,9 +278,10 @@ pub fn parse_dotenv(src: &str) -> Result<HashMap<String, String>, DotenvError> {
 /// missing or unparseable file is silently ignored, and existing process
 /// variables win, even when empty.
 ///
-/// `.env` never sets [`STATE_ROOT_VAR`]. The file belongs to the reviewed
-/// repository, so it must not move rival's state. Only the process
-/// environment can set it.
+/// `.env` never sets [`STATE_ROOT_VAR`] or the proxy variables
+/// ([`DOTENV_PROXY_VARS`]). The file belongs to the reviewed repository,
+/// so it must not move rival's state or send the proxy key elsewhere. Only
+/// the process environment can set them.
 ///
 /// # Safety
 ///
@@ -309,7 +320,7 @@ fn load_dotenv_for(
         if key.is_empty()
             || key.contains(['=', '\0'])
             || value.contains('\0')
-            || is_state_root_var(key, case_insensitive)
+            || is_dotenv_blocked(key, case_insensitive)
         {
             continue;
         }
@@ -317,6 +328,23 @@ fn load_dotenv_for(
             set(key, value);
         }
     }
+}
+
+/// The proxy variables a `.env` never sets, besides [`STATE_ROOT_VAR`]: a
+/// repository must not turn the proxy on or off or send the key elsewhere.
+pub const DOTENV_PROXY_VARS: [&str; 3] = [
+    crate::config::PROXY_SWITCH_ENV,
+    crate::config::PROXY_URL_ENV,
+    crate::config::PROXY_KEY_ENV,
+];
+
+/// Whether a `.env` may not set `key`: [`STATE_ROOT_VAR`] or one of
+/// [`DOTENV_PROXY_VARS`], under the host's name rule.
+fn is_dotenv_blocked(key: &str, case_insensitive: bool) -> bool {
+    is_state_root_var(key, case_insensitive)
+        || DOTENV_PROXY_VARS
+            .iter()
+            .any(|want| crate::envname::eq(case_insensitive, OsStr::new(key), want))
 }
 
 /// Whether `key` names [`STATE_ROOT_VAR`]. Windows environment names are
@@ -1196,6 +1224,32 @@ mod tests {
         let env = load(Some(file), &[]);
         assert!(!env.contains_key(STATE_ROOT_VAR));
         assert_eq!(env.contains_key("rival_home"), !cfg!(windows));
+    }
+
+    /// A repository `.env` must not route runs (or the stored key) to a
+    /// proxy of its choosing, so no spelling of the proxy variables loads
+    /// under the platform's name rule; exported values stay.
+    #[test]
+    fn dotenv_never_sets_proxy_vars() {
+        for name in ["RIVAL_PROXY", "RIVAL_PROXY_URL", "RIVAL_PROXY_KEY"] {
+            let lower = name.to_ascii_lowercase();
+            let file = format!("{name}=http://evil.example\n{lower}=x\nOK=1\n");
+            for windows in [false, true] {
+                let env = load_on(windows, &file, &[]);
+                assert!(!env.contains_key(name), "{name} windows={windows}");
+                assert_eq!(
+                    env.contains_key(&lower),
+                    !windows,
+                    "{name} windows={windows}"
+                );
+                assert_eq!(env["OK"], "1");
+                let env = load_on(windows, &file, &[(name, "mine")]);
+                assert_eq!(env[name], "mine", "{name} windows={windows}");
+            }
+            // Near names are ordinary keys.
+            let env = load_on(true, &format!("{name}X=1\n"), &[]);
+            assert_eq!(env[&format!("{name}X")], "1");
+        }
     }
 
     /// godotenv widens each UTF-8 byte of a key to a rune. The second byte

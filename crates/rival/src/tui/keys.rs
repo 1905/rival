@@ -23,16 +23,22 @@ pub enum Mode {
     Search,
     /// A y/n confirm bar is open.
     Confirm,
+    /// The config window has focus. It draws its own key bar.
+    Config,
+    /// A config field's text edit has focus.
+    ConfigEdit,
 }
 
 impl Mode {
     #[cfg(test)]
-    pub const ALL: [Mode; 5] = [
+    pub const ALL: [Mode; 7] = [
         Mode::List,
         Mode::Filter,
         Mode::Detail,
         Mode::Search,
         Mode::Confirm,
+        Mode::Config,
+        Mode::ConfigEdit,
     ];
 }
 
@@ -164,6 +170,26 @@ const FINDINGS: Binding = Binding::new(&["j", "k"], "j/k", "finding");
 const OPEN_FINDING: Binding = Binding::new(&["enter", "space"], "enter", "open");
 /// "n/p": the page keys as one help entry.
 const PAGES: Binding = Binding::new(&["n", "p"], "n/p", "page");
+/// "c" in the list opens the config window.
+pub const OPEN_CONFIG: Binding = Binding::new(&["c"], "c", "config");
+
+/// The config window's keys. The window draws its own key bar from its
+/// focus; these are the same keys for [`KeyMap::help`].
+const CONFIG_KEYS: [Binding; 9] = [
+    Binding::new(&["tab", "shift+tab"], "tab", "section"),
+    Binding::new(&["up", "down", "j", "k"], "↑↓", "field"),
+    Binding::new(&["enter"], "enter", "edit"),
+    Binding::new(&["space"], "space", "toggle"),
+    Binding::new(&["left", "right", "h", "l"], "←→", "choose"),
+    Binding::new(&["c", "a"], "c/a", "check"),
+    Binding::new(&["s"], "s", "save"),
+    Binding::new(&["u"], "u", "undo"),
+    Binding::new(&["esc", "q"], "esc", "back"),
+];
+const CONFIG_EDIT_KEYS: [Binding; 2] = [
+    Binding::new(&["enter"], "enter", "save field"),
+    Binding::new(&["esc"], "esc", "cancel"),
+];
 
 impl KeyMap {
     /// Every binding with its field name, for tests.
@@ -287,6 +313,8 @@ impl KeyMap {
                 self.back.relabel("clear"),
             ]),
             Mode::Confirm => ModeHelp::simple(vec![self.yes, self.no]),
+            Mode::Config => ModeHelp::simple(CONFIG_KEYS.to_vec()),
+            Mode::ConfigEdit => ModeHelp::simple(CONFIG_EDIT_KEYS.to_vec()),
             Mode::List => ModeHelp {
                 short: vec![
                     self.up,
@@ -303,7 +331,7 @@ impl KeyMap {
                     vec![self.next_page, self.prev_page],
                     vec![self.open, self.filter, self.back],
                     vec![self.next_tab, self.prev_tab],
-                    vec![self.help, self.quit],
+                    vec![self.help, OPEN_CONFIG, self.quit],
                 ],
             },
         }

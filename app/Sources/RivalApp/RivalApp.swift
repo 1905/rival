@@ -15,6 +15,8 @@ final class AppModel {
     static let mainWindowID = "main"
 
     let store: SessionStore
+    /// The Settings window and the menu-bar model check.
+    let settings: SettingsModel
     /// `RunItem.id` of the selected run. Survives refreshes and re-sorts.
     var selectedRunID: String?
     /// A dim line for the menu bar popover when finish notifications cannot be
@@ -23,9 +25,12 @@ final class AppModel {
     /// SwiftUI's `openWindow`, captured from the first view that appears.
     /// Needed to reopen the main window after the user closed it.
     @ObservationIgnored var openWindowAction: OpenWindowAction?
+    /// SwiftUI's `openSettings`, captured the same way.
+    @ObservationIgnored var openSettingsAction: OpenSettingsAction?
 
     init(store: SessionStore) {
         self.store = store
+        self.settings = SettingsModel()
     }
 
     /// The selected run in the current snapshot, even when the filter hides it.
@@ -48,6 +53,12 @@ final class AppModel {
         } else if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix(Self.mainWindowID) == true }) {
             window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// Opens or fronts the Settings window (a model check notification click).
+    func showSettings() {
+        NSApp.activate()
+        openSettingsAction?()
     }
 }
 
@@ -97,6 +108,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.model = model
         self.notifier = Notifier(app: model)
         super.init()
+        let notifier = self.notifier
+        model.settings.postNote = { note in notifier.postCheck(note) }
         if firstScanDelay > .zero {
             Task { try? await Task.sleep(for: firstScanDelay); store.start() }
         } else {
@@ -136,6 +149,11 @@ struct RivalMacApp: App {
                 Button("Find Previous") { LogFind.shared.perform(.previousMatch) }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
             }
+        }
+
+        // ⌘, and "Settings…" in the app menu and the menu-bar popover.
+        Settings {
+            SettingsView(settings: delegate.model.settings)
         }
 
         MenuBarExtra {

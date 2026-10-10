@@ -25,6 +25,7 @@ use super::process::{self, Abort, ExitState, Io, KillOutcome, ProcessHandle};
 use crate::cancel::{CancelFunc, Context};
 use crate::envname;
 use crate::gitscope;
+use crate::leakguard;
 use crate::logging::{self, Event};
 use crate::paths::Paths;
 use crate::procinfo;
@@ -41,8 +42,10 @@ use crate::session::{self, Session};
 /// repo's .env must not be able to reconfigure the authenticated grok runtime
 /// — proxy/base URLs, `GROK_HOME`, auth helpers — and `XAI_API_KEY` fallback
 /// auth is deliberately unsupported, since grok runs on the user's own
-/// `grok login` credentials.
-const BLOCKED_ENV_PREFIXES: [&str; 16] = [
+/// `grok login` credentials. `RIVAL_PROXY_KEY` is rival's own secret: a
+/// proxied run gets the key in the variable its provider reads, through
+/// the trusted `Request.env`, and no other child sees it.
+const BLOCKED_ENV_PREFIXES: [&str; 17] = [
     "HTTP_PROXY",
     "HTTPS_PROXY",
     "ALL_PROXY",
@@ -59,6 +62,7 @@ const BLOCKED_ENV_PREFIXES: [&str; 16] = [
     "MOONSHOT_",
     "GROK_",
     "XAI_",
+    "RIVAL_PROXY_KEY",
 ];
 
 /// Bounds how long [`run_subprocess`] keeps reading the provider's output
@@ -870,6 +874,10 @@ fn tee_line<W: Write + ?Sized>(
     log: &SyncLog,
     mirror: Option<&mut W>,
 ) -> (usize, Option<String>) {
+    // The leak guard: a registered secret never reaches the log or the
+    // mirror. A line holds a whole secret, since a secret has no newline.
+    let line = leakguard::scrub_bytes(line);
+    let line = line.as_ref();
     let (n, err) = log.write(line);
     if err.is_some() {
         return (n, err);
@@ -890,6 +898,42 @@ fn tee_line<W: Write + ?Sized>(
     (line.len(), None)
 }
 
+/// The leak guard for output read in chunks: a secret may be split across
+/// two reads, so up to `max_len - 1` bytes after the last newline wait for
+/// the next chunk (a secret has no newline, so whole lines go at once).
+/// With no secret registered, chunks pass through unchanged.
+#[derive(Default)]
+pub(crate) struct ScrubCarry {
+    pending: Vec<u8>,
+}
+
+impl ScrubCarry {
+    /// The bytes of `chunk` (after the held tail) that are safe to write.
+    pub(crate) fn push<'a>(&mut self, chunk: &'a [u8]) -> std::borrow::Cow<'a, [u8]> {
+        let hold = leakguard::max_len().saturating_sub(1);
+        if hold == 0 && self.pending.is_empty() {
+            return std::borrow::Cow::Borrowed(chunk);
+        }
+        self.pending.extend_from_slice(chunk);
+        let mut scrubbed = leakguard::scrub_bytes(&self.pending).into_owned();
+        // A secret not yet whole starts in the last `hold` bytes, after
+        // the last newline.
+        let line_end = scrubbed
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |i| i + 1);
+        let cut = scrubbed.len().saturating_sub(hold).max(line_end);
+        self.pending = scrubbed.split_off(cut);
+        std::borrow::Cow::Owned(scrubbed)
+    }
+
+    /// The held tail, scrubbed, at the end of the stream.
+    pub(crate) fn finish(&mut self) -> Vec<u8> {
+        let rest = std::mem::take(&mut self.pending);
+        leakguard::scrub_bytes(&rest).into_owned()
+    }
+}
+
 /// The stderr worker: copies stderr to the log. A log write error
 /// stops the copy; the pipe stays open until the reap.
 fn copy_stderr(
@@ -899,17 +943,23 @@ fn copy_stderr(
     session_id: &str,
 ) -> Option<String> {
     let mut buf = vec![0u8; STDERR_BUF];
+    let mut guard = ScrubCarry::default();
     let err = loop {
         match process::read_some(stderr, &mut buf, abort) {
             Io::Done(0) => break None,
             Io::Done(n) => {
-                if let (_, Some(err)) = log.write(&buf[..n]) {
+                if let (_, Some(err)) = log.write(&guard.push(&buf[..n])) {
                     break Some(err);
                 }
             }
             Io::Aborted => break Some(format!("read {PIPE_READ_NAME}: {ERR_CLOSED}")),
             Io::Err(e) => break Some(file_error("read", PIPE_READ_NAME, &e)),
         }
+    };
+    let rest = guard.finish();
+    let err = match err {
+        None if !rest.is_empty() => log.write(&rest).1,
+        err => err,
     };
     if let Some(e) = &err {
         logging::error()
@@ -973,6 +1023,9 @@ mod env_case_tests {
             ("Moonshot_Api_Key=sk", false, true),
             ("Grok_Home=evil", false, true),
             ("Xai_Api_Key=sk", false, true),
+            ("RIVAL_PROXY_KEY=test-proxy-key-0000", false, false),
+            ("Rival_Proxy_Key=test-proxy-key-0000", false, true),
+            ("RIVAL_PROXY_URL=http://127.0.0.1:1", true, true),
             // Near names: no blocked prefix in any case.
             ("Node_Option=near", true, true),
             ("Https_Proxi=near", true, true),
@@ -1097,6 +1150,33 @@ mod env_case_tests {
         let mut unix = inherited.clone();
         unix.extend(trusted.iter().map(OsString::from));
         assert_eq!(child_env_case(false, &req), unix);
+    }
+
+    /// A secret split across two stderr reads is still scrubbed.
+    #[test]
+    fn scrub_carry_joins_a_secret_split_across_chunks() {
+        crate::leakguard::register("test-secret-carry-0000");
+        let text = b"a test-secret-carry-0000 b test-secret-carry-0000";
+        for cut in 0..=text.len() {
+            let mut carry = ScrubCarry::default();
+            let mut out = carry.push(&text[..cut]).into_owned();
+            out.extend_from_slice(&carry.push(&text[cut..]));
+            out.extend(carry.finish());
+            assert_eq!(out, b"a <redacted> b <redacted>", "cut {cut}");
+        }
+        // A whole line is written at once; only the partial tail waits.
+        let mut carry = ScrubCarry::default();
+        assert_eq!(
+            carry
+                .push(
+                    b"line test-secret-carry-0000
+next"
+                )
+                .as_ref(),
+            b"line <redacted>
+"
+        );
+        assert_eq!(carry.finish(), b"next");
     }
 
     #[test]

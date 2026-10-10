@@ -33,7 +33,7 @@ fn hooks(events: &Events, detach: DetachOutcome) -> RootHooks {
             push(&d, "detach");
             detach
         }),
-        tui: Box::new(move |_| {
+        tui: Box::new(move |_, _| {
             push(&t, "tui");
             Ok(())
         }),
@@ -224,7 +224,7 @@ fn tui_suppresses_logging_and_reaps_in_the_background() {
         }),
         update_check: Arc::new(move |_, _| push(&u, "update")),
         detach: Box::new(|| DetachOutcome::Continue),
-        tui: Box::new(move |_| {
+        tui: Box::new(move |_, _| {
             push(&t, format!("tui logging={}", logging::is_enabled()));
             let _ = started_tx.send(());
             Ok(())
@@ -255,7 +255,7 @@ fn tui_errors_get_the_tui_prefix() {
     let fix = Fixture::new();
     let events = recorder();
     let mut hooks = hooks(&events, DetachOutcome::Continue);
-    hooks.tui = Box::new(|_| Err(crate::tui::runtime::INTERRUPTED.to_string()));
+    hooks.tui = Box::new(|_, _| Err(crate::tui::runtime::INTERRUPTED.to_string()));
     let r = run_tui(&fix, &hooks, &events);
     assert_eq!(r.code, 1);
     assert_eq!(
@@ -290,7 +290,7 @@ fn an_update_notice_during_the_tui_waits_for_the_restored_terminal() {
                 let _ = printed_tx.send(());
             }),
             detach: Box::new(|| DetachOutcome::Continue),
-            tui: Box::new(move |_| {
+            tui: Box::new(move |_, _| {
                 // The TUI is running: wait until the check has written.
                 printed_rx
                     .lock()
@@ -320,7 +320,7 @@ fn update_check_wait_is_bounded() {
             push(&u, "update done");
         }),
         detach: Box::new(|| DetachOutcome::Continue),
-        tui: Box::new(|_| Ok(())),
+        tui: Box::new(|_, _| Ok(())),
     };
     let args = vec!["version".to_string()];
     let mut stdout = Vec::new();
@@ -861,4 +861,30 @@ fn windows_stdout_missing_handles_fail_writes() {
         run_win_stdin_helper("out-nullhandle"),
         format!("{head}\nwrite=write stdout: write /dev/stdout: {invalid_handle}")
     );
+}
+
+/// `rival tui` opens the run list; bare `rival config` opens the config
+/// window, with the same terminal setup.
+#[test]
+fn tui_and_config_open_their_own_start() {
+    use crate::tui::runtime::Start;
+    for (args, want) in [(["tui"], Start::List), (["config"], Start::Config)] {
+        let _serial = LOGGING.lock().unwrap_or_else(|p| p.into_inner());
+        let fix = Fixture::new();
+        let events = recorder();
+        let t = Arc::clone(&events);
+        let hooks = RootHooks {
+            reap: Arc::new(|_| {}),
+            update_check: Arc::new(|_, _| {}),
+            detach: Box::new(|| DetachOutcome::Continue),
+            tui: Box::new(move |_, start| {
+                push(&t, format!("{start:?} logging={}", logging::is_enabled()));
+                Ok(())
+            }),
+        };
+        let r = run_with(&fix, &mut FakeStdin::new(""), &hooks, &events, &args);
+        logging::set_enabled(true);
+        assert_eq!(r.code, 0, "{args:?}: {}", r.stderr);
+        assert_eq!(r.events, [format!("{want:?} logging=false")], "{args:?}");
+    }
 }
