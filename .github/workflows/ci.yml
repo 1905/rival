@@ -117,10 +117,12 @@ jobs:
           cargo build -p rival --locked
           python3 e2e/run.py --bin target/debug/rival
 
-      # The app decodes the Rust writer's golden files (testdata/written).
-      - name: Swift session decoding
+      # Compile the complete app and run all tests, including configuration
+      # and Rust writer session-decoding contracts, before publishing a tag.
+      - name: Swift app build and tests
         if: runner.os == 'macOS'
         working-directory: app
         run: |
           swift --version
-          swift test --filter SessionDecodingTests
+          swift build --product RivalApp
+          swift test

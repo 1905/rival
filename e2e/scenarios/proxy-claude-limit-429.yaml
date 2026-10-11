@@ -1,0 +1,165 @@
+{
+  "name": "proxy-claude-limit-429",
+  "description": "The emcd2_ account is at its limit: the preflight passes (the list still shows the model), the fake claude prints a 429 cooling-down error and exits 1. The hint names the other prefix that serves the model (emcd_). The fake also echoes the proxy key: the leak guard shows `<redacted>` in stdout and the session log, and the key is in no file.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "emcd2_/claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--dangerously-skip-permissions"
+            ],
+            "times": 1,
+            "expect": {
+              "env": {
+                "ANTHROPIC_BASE_URL": {
+                  "$regex": "http://127\\.0\\.0\\.1:[0-9]+"
+                },
+                "ANTHROPIC_API_KEY": "test-proxy-key-0000",
+                "ANTHROPIC_AUTH_TOKEN": null,
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": null,
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": null,
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL": null,
+                "CLAUDE_CODE_USE_BEDROCK": null,
+                "CLAUDE_CODE_USE_VERTEX": null,
+                "CLAUDECODE": null,
+                "RIVAL_PROXY_KEY": null
+              }
+            },
+            "stdout": "API Error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model emcd2_/claude-opus-5-5 are cooling down (monthly spend limit)\"}} key=test-proxy-key-0000\n",
+            "exit": 1
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak",
+    "ANTHROPIC_AUTH_TOKEN": "sk-parity-token-must-not-leak",
+    "ANTHROPIC_BASE_URL": "https://elsewhere.invalid",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "other-model",
+    "CLAUDE_CODE_USE_BEDROCK": "1",
+    "RIVAL_CLAUDE_AUTH": "api",
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd2_\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd2_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "API Error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model emcd2_/claude are cooling down (monthly spend limit)\"}} key=<redacted>\n\nrival: proxy account emcd2_ is at its limit (429); other prefixes that serve claude-opus-5-5: emcd_ — set proxy.claude.model_prefix\n",
+        "stderr_lines": [
+          "claude exited with code 1"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "medium",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "debug",
+            "message": "proxy route wins over RIVAL_CLAUDE_AUTH",
+            "fields": {
+              "session": "<UUID1>"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID1>",
+              "auth": "proxy",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 1,
+          "model": "claude-opus-5-5",
+          "account": "proxy",
+          "route": "proxy",
+          "wire_model": "emcd2_/claude-opus-5-5"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "API Error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"All credentials for model emcd2_/claude-opus-5-5 are cooling down (monthly spend limit)\"}} key=<redacted>\n"
+      }
+    ],
+    "calls": {
+      "claude": 1
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

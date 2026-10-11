@@ -1700,3 +1700,47 @@ fn executable_without_shebang_is_exec_format_error() {
     );
     assert!(!marker.exists(), "the file ran through a shell");
 }
+
+// ---- ephemeral sessions ----
+
+/// An ephemeral session (the model check) runs like any other, but the PID
+/// save after the start writes nothing to `sessions/`.
+#[test]
+fn ephemeral_session_is_never_saved() {
+    let home = tempfile::tempdir().unwrap();
+    let work = tempfile::tempdir().unwrap();
+    let paths = Paths::from_home(home.path());
+    // The directory exists, so a save would succeed.
+    fs::create_dir_all(paths.sessions_dir()).unwrap();
+    let log = work.path().join("check.log");
+    let mut sess = Session {
+        id: "check-test".to_string(),
+        cli: "test".to_string(),
+        work_dir: work.path().to_str().unwrap().to_string(),
+        log_file: log.to_str().unwrap().to_string(),
+        status: "running".to_string(),
+        ephemeral: true,
+        ..Session::default()
+    };
+    let base = environ(&[PATH_ENTRY]);
+    let args = sh_args(&format!("{DRAIN}printf 'ok\\n'"));
+    let req = Request {
+        binary: "sh",
+        args: &args,
+        env: &[],
+        prompt: "",
+        drop_env: &[],
+        environ: &base,
+        log: None,
+    };
+    let res = run_subprocess(&Context::background(), &paths, &mut sess, &req, None).unwrap();
+    assert_eq!(res.exit_code, 0);
+    assert!(sess.pid > 0, "the PID is still recorded in memory");
+    assert_eq!(fs::read_to_string(&log).unwrap(), "ok\n");
+    let saved: Vec<_> = fs::read_dir(paths.sessions_dir())
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name())
+        .collect();
+    assert!(saved.is_empty(), "sessions/ holds {saved:?}");
+}

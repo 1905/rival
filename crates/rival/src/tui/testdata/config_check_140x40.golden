@@ -1,0 +1,81 @@
+╭─ rival · config ───┬────────────────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml ─╮|
+│                    │  CHECK   one short live call to each model                                                                          │|
+│   Proxy            │                                                                                                                     │|
+│   Models           │  Sends "Reply with exactly: ok" to each model at low effort, through                                                │|
+│   Review           │  the route the draft picks. Nothing is saved first.                                                                 │|
+│ ▸ Check  4/5       │                                                                                                                     │|
+│                    │  proxy  ● online · 6 models                                                                                         │|
+│                    │                                                                                                                     │|
+│                    │  ⠋ codex   proxy   gpt-6-astra                  …  checking                                                         │|
+│                    │  ✗ sol     proxy   gpt-6.1-sol                  —  proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log │|
+│                    │                                                    in Codex on the proxy (-codex-device-login)                      │|
+│                    │                                                    set proxy.codex.model_prefix                                     │|
+│                    │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                                                               │|
+│                    │  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s  Sure! ok.  (not ok)                                              │|
+│                    │  ✗ k3      direct  moonshotai/kimi-k3        4.0s  limit 429 monthly spend limit reached                            │|
+│                    │                                                    the account is at its limit; try again after the reset           │|
+│                    │                                                                                                                     │|
+│                    │  running · 4 of 5 done                                                                                              │|
+│                    │                                                                                                                     │|
+│                    │    c codex, sol, claude, fable and the security reviewer                                                            │|
+│                    │    a every model, K3 and Grok too                                                                                   │|
+│                    │    x cancels the running check                                                                                      │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+├────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK  ✓ 2  ✗ 2  ⠋ 1  · running · 4 of 5 done                                                                       ● online · 6 models │|
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│ tab section  ↑↓ scroll  x cancel check  s save  ? help  esc back                                                                         │|
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d....................d..gggggdddddddddddddddddddddddddddddddddddd..........................................................................d|
+d.ddttttt............d.....................................................................................................................d|
+d.ddtttttt...........d..ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd................................................d|
+d.ddtttttt...........d..dddddddddddddddddddddddddddddddddddddddddddddddddd.................................................................d|
+dSSSSSSSS?????SSSSSS.d.....................................................................................................................d|
+d....................d..dddddddaaaaaaaaddddddddddd.........................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d..rrtttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..dddddddd.........................................................d|
+d....................d..fftttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.d|
+d....................d....................................................fffffffffffffffffffffffffffffffffffffffffff......................d|
+d....................d....................................................dddddddddddddddddddddddddddd.....................................d|
+d....................d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..tt...............................................................d|
+d....................d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ggggggggggggggggggg..............................................d|
+d....................d..fftttttt..dddddd..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ggggg.fffffffffffffffffffffffffffffff............................d|
+d....................d....................................................dddddddddddddddddddddddddddddddddddddddddddddddddddddd...........d|
+d....................d.....................................................................................................................d|
+d....................d..rrrrrrrrrrrrrrrrrrrrr..............................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d..aaadddddddddddddddddddddddddddddddddddddddddddddddddddd............................................................d|
+d....................d..aaaddddddddddddddddddddddddddddd...................................................................................d|
+d....................d..aaadddddddddddddddddddddddddd......................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD..aaafffffrrrrrddddrrrrrrrrrrrrrrrrrrrrr.......................................................................aaaaaaaaddddddddddd.d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaa.ddddddd..aa.dddddd..a.dddddddddddd..a.dddd..a.dddd..aaa.dddd.........................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

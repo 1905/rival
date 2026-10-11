@@ -220,7 +220,9 @@ def validate(sc):
         raise ScenarioError("update_server.routes: want an object")
     for path, route in routes.items():
         where = "update_server.routes[%r]" % path
-        _keys(route, where, ("status", "json", "body", "content_type"), ("status",))
+        _keys(route, where, ("status", "json", "body", "content_type", "auth"), ("status",))
+        if "auth" in route and not isinstance(route["auth"], str):
+            raise ScenarioError(where + ".auth: want a string")
         if ("json" in route) == ("body" in route):
             raise ScenarioError(where + ": set exactly one of json, body")
     problems = normalise.validate_rules(sc.get("normalise", []))
@@ -487,6 +489,9 @@ class UpdateServer:
                 route = owner.routes.get(self.path)
                 if route is None:
                     status, body, ctype = 404, b'{"message":"Not Found"}', "application/json"
+                elif "auth" in route and self.headers.get("Authorization") != route["auth"]:
+                    # A route with "auth" answers 401 to any other Authorization.
+                    status, body, ctype = 401, b'{"error":"unauthorized"}', "application/json"
                 elif "json" in route:
                     status, ctype = route["status"], route.get("content_type", "application/json")
                     body = json.dumps(route["json"]).encode()
@@ -592,6 +597,10 @@ class Task:
         if isinstance(value, str):
             for token, path in (("<HOME>", self.home), ("<ROOT>", self.root), ("<BIN>", self.bin)):
                 value = value.replace(token, re.escape(path) if regex else path)
+            # The server starts after setup: <SERVER> expands in step env and args only.
+            if self.server is not None:
+                url = self.server.url
+                value = value.replace("<SERVER>", re.escape(url) if regex else url)
             return value
         if isinstance(value, dict):
             if set(value) == {"$regex"}:

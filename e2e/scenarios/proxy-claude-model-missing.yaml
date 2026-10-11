@@ -1,0 +1,74 @@
+{
+  "name": "proxy-claude-model-missing",
+  "description": "proxy.claude.model_prefix is emcd3_, which the proxy does not serve. The preflight lists the prefixes that serve claude-opus-5-5 and names the setting; claude never runs and no session is made.",
+  "env": {
+    "CLAUDECODE": "1",
+    "ANTHROPIC_API_KEY": "sk-parity-must-not-leak",
+    "ANTHROPIC_AUTH_TOKEN": "sk-parity-token-must-not-leak",
+    "ANTHROPIC_BASE_URL": "https://elsewhere.invalid",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "other-model",
+    "CLAUDE_CODE_USE_BEDROCK": "1",
+    "RIVAL_CLAUDE_AUTH": "api",
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "test-proxy-key-0000"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  claude:\n    enabled: true\n    model_prefix: emcd3_\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "emcd2_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            },
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "claude"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "proxy does not serve emcd3_/claude-opus-5-5; it serves claude-opus-5-5 as: emcd_/claude-opus-5-5, emcd2_/claude-opus-5-5 — set proxy.claude.model_prefix"
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml"
+    ],
+    "calls": {},
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

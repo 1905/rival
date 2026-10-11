@@ -290,4 +290,31 @@ final class ElapsedTests: XCTestCase {
         XCTAssertEqual(formatDuration(seconds: 420), "7m0s")
         XCTAssertEqual(formatDuration(seconds: 3600), "1h0m0s")
     }
+
+    // engine_label_table: every old and new id.
+    func testEngineLabelTable() {
+        let cases: [(String, String, String)] = [
+            ("codex", "gpt-6-astra", "codex"),
+            ("codex", "gpt-6.1-sol", "sol"),
+            ("codex", "gpt-5.6-sol", "sol"),
+            ("codex", "retired-sol-id", "sol"),
+            ("codex", "", "sol"),
+            ("claude", "claude-opus-5-5", "claude"),
+            ("claude", "claude-fable-5-1", "fable"),
+            ("claude", "claude-fable-5", "retired-model"),
+            ("claude", "", "retired-model"),
+            ("fable", "", "retired-model"),
+            ("fable", "claude-fable-5-1", "fable"),
+            ("", "gpt-6.1-sol", "sol"),
+            ("", "claude-fable-5-1", "fable"),
+            ("opencode", "moonshotai/kimi-k3", "kimi-k3"),
+            ("opencode", "x-ai/grok-4.6", "grok-4.6-openrouter"),
+            ("grok", "grok-4.6", "grok"),
+            ("custom", "custom/model", "retired-model"),
+            ("custom", "", "custom"),
+        ]
+        for (cli, model, want) in cases {
+            XCTAssertEqual(engineLabel(cli: cli, model: model), want, "\(cli) \(model)")
+        }
+    }
 }

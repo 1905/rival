@@ -23,6 +23,8 @@ Windows binaries and manual downloads are available on the [releases page](https
 |---|---|
 | `/rival-codex review` | Review changed code with Codex. |
 | `/rival-claude review` | Review changed code with Claude. |
+| `/rival-sol review` | Review changed code with Sol 6.1. |
+| `/rival-fable review` | Review changed code with Fable 5.1. |
 | `/rival-security` | Look for exploitable security vulnerabilities. |
 
 ## View the results

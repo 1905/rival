@@ -279,61 +279,76 @@ fn resolve_plan_path_reports_unreadable_files() {
 
 #[test]
 fn parse_plan_models() {
+    const CODEX: &str = "gpt-6-astra";
+    const SOL: &str = "gpt-6.1-sol";
+    const OPUS: &str = "claude-opus-5-5";
+    const FABLE: &str = "claude-fable-5-1";
     let ok: &[(&str, &[&str], &[&str])] = &[
         (
             "exact models",
             &["gpt-6-astra", "claude-opus-5-5"],
-            &["codex", "claude"],
+            &[CODEX, OPUS],
         ),
-        (
-            "friendly aliases",
-            &["codex", "claude"],
-            &["codex", "claude"],
-        ),
+        ("friendly names", &["codex", "claude"], &[CODEX, OPUS]),
         (
             "codex exact id deduplicated",
             &["codex", "gpt-6-astra"],
-            &["codex"],
+            &[CODEX],
         ),
-        ("comma separated", &["codex,claude"], &["codex", "claude"]),
+        ("comma separated", &["codex,claude"], &[CODEX, OPUS]),
         (
             "dedup preserves order",
             &["claude", "codex", "claude-opus-5-5"],
-            &["claude", "codex"],
+            &[OPUS, CODEX],
         ),
         (
             "trims and lowercases",
             &[" GPT-6-ASTRA ", "CLAUDE"],
-            &["codex", "claude"],
+            &[CODEX, OPUS],
+        ),
+        (
+            "all four, opus and claude are one model",
+            &["opus,fable,sol", "claude,codex"],
+            &[OPUS, FABLE, SOL, CODEX],
+        ),
+        (
+            "sol and codex share a runtime",
+            &["codex,sol"],
+            &[CODEX, SOL],
+        ),
+        (
+            "exact new ids",
+            &["gpt-6.1-sol", "claude-fable-5-1"],
+            &[SOL, FABLE],
         ),
     ];
     for (name, input, want) in ok {
         let input: Vec<String> = input.iter().map(|s| s.to_string()).collect();
         assert_eq!(super::parse_plan_models(&input).unwrap(), *want, "{name}");
     }
-    let bad: &[(&str, &[&str], &str)] = &[
+    const USE: &str = "use one of: codex, sol, claude, opus, fable";
+    let bad: &[(&str, &[&str], String)] = &[
         (
-            "sol is not a plan model",
-            &["sol"],
-            "unknown plan model \"sol\"; use one of: codex, claude",
+            "old sol id rejected",
+            &["gpt-5.6-sol"],
+            format!("unknown plan model \"gpt-5.6-sol\"; {USE}"),
         ),
         (
             "retired names rejected",
             &["astra"],
-            "unknown plan model \"astra\"; use one of: codex, claude",
-        ),
-        (
-            "fable rejected",
-            &["fable"],
-            "unknown plan model \"fable\"; use one of: codex, claude",
+            format!("unknown plan model \"astra\"; {USE}"),
         ),
         (
             "unknown model keeps the raw part",
             &["codex, Unsupported "],
-            "unknown plan model \" Unsupported \"; use one of: codex, claude",
+            format!("unknown plan model \" Unsupported \"; {USE}"),
         ),
-        ("empty model", &["codex,"], "model selector cannot be empty"),
-        ("no models", &[], "no plan models selected"),
+        (
+            "empty model",
+            &["codex,"],
+            "model selector cannot be empty".to_string(),
+        ),
+        ("no models", &[], "no plan models selected".to_string()),
     ];
     for (name, input, want) in bad {
         let input: Vec<String> = input.iter().map(|s| s.to_string()).collect();
@@ -499,7 +514,7 @@ struct Seen {
     workdir: String,
     group_id: String,
     no_queue: bool,
-    clis: Vec<String>,
+    models: Vec<String>,
 }
 
 fn sample_result() -> PlanRunResult {
@@ -548,7 +563,7 @@ fn run_plan(
         s.workdir = batch.workdir.to_string();
         s.group_id = batch.group_id.to_string();
         s.no_queue = batch.no_queue;
-        s.clis = batch.clis.to_vec();
+        s.models = batch.models.to_vec();
         outcome()
     };
     let prepare = no_mr();
@@ -593,7 +608,7 @@ fn successful_run_prints_the_formatted_review() {
     assert_eq!(r.seen.effort, "", "each model resolves its own effort");
     assert_eq!(r.seen.workdir, w);
     assert!(r.seen.no_queue);
-    assert_eq!(r.seen.clis, ["claude", "codex"]);
+    assert_eq!(r.seen.models, [CLAUDE_MODEL, CODEX_MODEL]);
     assert!(
         uuid::Uuid::parse_str(&r.seen.group_id).is_ok(),
         "group id {:?}",
@@ -623,7 +638,7 @@ fn stdin_effort_and_paths_with_spaces_reach_the_runner() {
         s(&dir.path().join("docs").join("my plan.md"))
     );
     assert_eq!(r.seen.effort, "ultra");
-    assert_eq!(r.seen.clis, ["codex"], "default model");
+    assert_eq!(r.seen.models, [CODEX_MODEL], "default model");
 
     let r = run_plan(
         &fix,
@@ -670,9 +685,9 @@ fn validation_errors_print_on_stdout_and_fail() {
             "invalid effort \"enormous\", must be one of: [low medium high xhigh ultra]".into(),
         ),
         (
-            &["-m", "sol"],
+            &["-m", "gpt-5.6-sol"],
             "plan.md",
-            "unknown plan model \"sol\"; use one of: codex, claude".into(),
+            "unknown plan model \"gpt-5.6-sol\"; use one of: codex, sol, claude, opus, fable".into(),
         ),
         (&["--model", ""], "plan.md", "no plan models selected".into()),
         (
@@ -739,7 +754,7 @@ fn checks_run_in_source_order() {
     let r = run_plan(
         &fix,
         &mut FakeStdin::new("plan.md"),
-        &["--workdir", &w, "--effort", "bogus", "-m", "sol"],
+        &["--workdir", &w, "--effort", "bogus", "-m", "astra"],
         || panic!("runner must not start"),
     );
     assert!(
@@ -753,7 +768,7 @@ fn checks_run_in_source_order() {
     let mut tty = FakeStdin::new("");
     tty.char_device = true;
     tty.forbid_read = true;
-    let r = run_plan(&fix, &mut tty, &["--workdir", &w, "-m", "sol"], || {
+    let r = run_plan(&fix, &mut tty, &["--workdir", &w, "-m", "astra"], || {
         panic!("runner must not start")
     });
     assert!(r.result.is_err());
@@ -877,4 +892,31 @@ fn root_shows_usage_on_a_terminal() {
     assert_eq!(code, 0);
     assert_eq!(stdout, format!("{PLAN_USAGE}\n"));
     assert_eq!(stderr, "");
+}
+
+/// With no `--model`, `plan.models` from the config picks the models; an
+/// explicit `--model` wins over it.
+#[test]
+fn plan_models_config_is_the_default() {
+    let fix = Fixture::with_config_yaml("plan:\n  models: [fable, sol, opus, claude]\n");
+    let (_dir, w, _plan) = workdir_with_plan();
+    let r = run_plan(
+        &fix,
+        &mut FakeStdin::new("plan.md\n"),
+        &["--workdir", &w, "--no-queue"],
+        || Ok(sample_result()),
+    );
+    assert_eq!(r.result, Ok(()));
+    assert_eq!(
+        r.seen.models,
+        [config::FABLE_MODEL, config::SOL_MODEL, config::CLAUDE_MODEL]
+    );
+
+    let r = run_plan(
+        &fix,
+        &mut FakeStdin::new("plan.md\n"),
+        &["--workdir", &w, "--no-queue", "-m", "codex"],
+        || Ok(sample_result()),
+    );
+    assert_eq!(r.seen.models, [CODEX_MODEL]);
 }

@@ -5,14 +5,17 @@
 //! Everything reads the injected [`Config`]: the binary is looked up in its
 //! `$PATH` and the child gets its `environ()` as the full environment.
 
+use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, PipeReader, Read};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::time::Duration;
 
 use super::process;
 use super::subprocess::{dedup_env, getenv, io_text};
+use crate::cancel::Context;
 use crate::config::Config;
 
 /// The `$PATH` that [`look_path`] reads: the first `PATH=` entry of
@@ -22,7 +25,7 @@ pub(crate) fn path_env(cfg: &Config) -> Option<&OsStr> {
 }
 
 /// Looks up `name` in `cfg`'s `$PATH`.
-pub(crate) fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::LookPathError> {
+pub fn look_path(cfg: &Config, name: &str) -> Result<PathBuf, process::LookPathError> {
     process::look_path(name, path_env(cfg))
 }
 
@@ -39,7 +42,10 @@ pub(crate) enum Output {
 /// Runs `name` with `args` and waits for it. Returns
 /// the captured output (empty unless [`Output::Combined`]) and the error
 /// text: the `LookPath` error, `start <path>: <io error>`, or the exit
-/// status (`exit status: 1`). stdin is the null device.
+/// status (`exit status: 1`). stdin is the null device. Under
+/// [`with_context`], a done context starts nothing, and one that ends while
+/// the command runs kills it; the error is then the context's
+/// (`context canceled`, `context deadline exceeded`).
 pub(crate) fn run(
     cfg: &Config,
     name: &str,
@@ -50,6 +56,9 @@ pub(crate) fn run(
         Ok(path) => path,
         Err(e) => return (Vec::new(), Err(e.to_string())),
     };
+    if let Some(e) = current_context().and_then(|ctx| ctx.err()) {
+        return (Vec::new(), Err(e.to_string()));
+    }
     let env = match dedup_env(cfg.environ()) {
         Ok(env) => env,
         Err(e) => return (Vec::new(), Err(e)),
@@ -92,9 +101,17 @@ pub(crate) fn run(
         Ok(child) => child,
         Err(e) => return (Vec::new(), Err(fork_error(&e))),
     };
-    let mut captured = Vec::new();
-    let read_err = reader.and_then(|mut r| r.read_to_end(&mut captured).err());
-    let status = child.wait();
+    let (captured, read_err, status) = match current_context() {
+        None => {
+            let mut captured = Vec::new();
+            let read_err = reader.and_then(|mut r| r.read_to_end(&mut captured).err());
+            (captured, read_err, child.wait())
+        }
+        Some(ctx) => match wait_or_kill(&ctx, child, reader) {
+            Ok(done) => done,
+            Err(e) => return (Vec::new(), Err(e)),
+        },
+    };
     let result = match status {
         Err(e) => Err(format!("wait: {}", io_text(&e))),
         Ok(status) if status.success() => match read_err {
@@ -104,6 +121,79 @@ pub(crate) fn run(
         Ok(status) => Err(status.to_string()),
     };
     (captured, result)
+}
+
+thread_local! {
+    /// The context [`run`] honours on this thread; see [`with_context`].
+    static CONTEXT: RefCell<Option<Context>> = const { RefCell::new(None) };
+}
+
+/// Runs `f` with `ctx` as the context of every [`run`] it makes on this
+/// thread: the preflights take no context of their own, and the model
+/// check must still end them on cancel or timeout.
+pub fn with_context<T>(ctx: &Context, f: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Context>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+            CONTEXT.with(|c| *c.borrow_mut() = previous);
+        }
+    }
+    let previous = CONTEXT.with(|c| c.borrow_mut().replace(ctx.clone()));
+    let _restore = Restore(previous);
+    f()
+}
+
+fn current_context() -> Option<Context> {
+    CONTEXT.with(|c| c.borrow().clone())
+}
+
+/// A command that ran to its end: the captured output, the read error and
+/// the exit status.
+type Finished = (Vec<u8>, Option<io::Error>, io::Result<ExitStatus>);
+
+/// How often a command under a context is polled.
+const POLL: Duration = Duration::from_millis(20);
+
+/// Waits for `child` and reads `reader` (on a helper thread) until both are
+/// done or `ctx` is. A done context kills the child and returns its error;
+/// a reader still held open by a descendant is left to its thread.
+fn wait_or_kill(
+    ctx: &Context,
+    mut child: Child,
+    reader: Option<PipeReader>,
+) -> Result<Finished, String> {
+    let reading = reader.map(|mut r| {
+        std::thread::spawn(move || {
+            let mut captured = Vec::new();
+            let err = r.read_to_end(&mut captured).err();
+            (captured, err)
+        })
+    });
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Ok(status),
+            Ok(None) => {}
+            Err(e) => break Err(e),
+        }
+        if let Some(e) = ctx.wait_timeout(POLL) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(e.to_string());
+        }
+    };
+    let Some(reading) = reading else {
+        return Ok((Vec::new(), None, status));
+    };
+    while !reading.is_finished() {
+        if let Some(e) = ctx.wait_timeout(POLL) {
+            return Err(e.to_string());
+        }
+    }
+    let (captured, read_err) = reading
+        .join()
+        .unwrap_or_else(|_| (Vec::new(), Some(io::Error::other("the reader panicked"))));
+    Ok((captured, read_err, status))
 }
 
 /// Builds the command for `name` with `args`, for callers that pick the
@@ -404,6 +494,71 @@ mod tests {
             );
         }
         assert!(!marker.exists(), "the file ran through a shell");
+    }
+
+    /// A preflight command under [`with_context`]: a context already done
+    /// starts nothing; one that ends while the command runs kills it and
+    /// returns its error at once, whatever the output mode.
+    #[cfg(unix)]
+    #[test]
+    fn a_done_context_kills_the_command() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{Duration, Instant};
+
+        use crate::cancel::Context;
+
+        let bin = tempfile::tempdir().unwrap();
+        let pidfile = bin.path().join("pid");
+        let script = bin.path().join("slow");
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\necho $$ > '{}'\nexec /bin/sleep 30\n",
+                pidfile.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let c = cfg(&[("PATH", bin.path().to_str().unwrap())]);
+
+        let (done, cancel) = Context::background().with_cancel();
+        cancel.cancel();
+        let (_, err) = with_context(&done, || run(&c, "slow", &[], Output::Discard));
+        assert_eq!(err.unwrap_err(), "context canceled");
+        assert!(!pidfile.exists(), "a done context starts nothing");
+
+        for out in [Output::Combined, Output::Discard, Output::Stderr] {
+            let _ = std::fs::remove_file(&pidfile);
+            let (ctx, _cancel) = Context::background().with_timeout(Duration::from_millis(300));
+            let start = Instant::now();
+            let (_, err) = retry_busy(
+                || with_context(&ctx, || run(&c, "slow", &[], out)),
+                |r| format!("{:?}", r.1),
+            );
+            assert_eq!(err.unwrap_err(), "context deadline exceeded");
+            assert!(
+                start.elapsed() < Duration::from_secs(10),
+                "{:?}",
+                start.elapsed()
+            );
+            let pid: i32 = std::fs::read_to_string(&pidfile)
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap();
+            // SAFETY: signal 0 only checks that the PID exists.
+            let alive = unsafe { libc::kill(pid, 0) } == 0;
+            assert!(!alive, "the command still runs");
+        }
+        // Outside with_context, run waits as before.
+        let quick = bin.path().join("quick");
+        std::fs::write(&quick, "#!/bin/sh\necho hi\n").unwrap();
+        std::fs::set_permissions(&quick, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let (out, err) = retry_busy(
+            || run(&c, "quick", &[], Output::Combined),
+            |r| format!("{:?}", r.1),
+        );
+        assert_eq!((out, err), (b"hi\n".to_vec(), Ok(())));
     }
 
     /// The `execve` image: argv[0] is the bare name, empty arguments stay,

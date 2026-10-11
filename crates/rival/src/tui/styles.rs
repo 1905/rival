@@ -65,6 +65,9 @@ pub struct Styles {
     pub queued: Style,
     pub completed: Style,
     pub failed: Style,
+    /// An answer that is not the expected one: amber without the weight of
+    /// `running`.
+    pub warn: Style,
     /// Notes inside log text.
     pub label: Style,
     /// An emphasised value: model id, session id.
@@ -105,6 +108,7 @@ impl Styles {
             queued: Style::new().fg(rgb(QUEUED)),
             completed: Style::new().fg(rgb(DONE)),
             failed: Style::new().fg(rgb(FAIL)),
+            warn: Style::new().fg(rgb(RUNNING)),
             label: dim,
             value: text.add_modifier(Modifier::BOLD),
             code_block: dim,

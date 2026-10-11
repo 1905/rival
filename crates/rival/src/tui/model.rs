@@ -22,9 +22,16 @@ use ratatui::widgets::{Block, BorderType, Padding, Widget};
 use rival_core::session::Session;
 use rival_core::sessionview::{self, Bucket, LoadProgress, SessionEvent};
 
+use crate::check::{CheckRow, Report};
+
+use super::config_check::{ConfigSeed, ProbeResult, SaveResult};
+use super::config_form::{ConfigForm, Effect, PROBE_DEBOUNCE};
+use super::config_view::{self, ViewCtx};
 use super::detail_view::{DetailPane, DetailTab, KillConfirm};
 use super::jobs::{Job, OpenLogRequest, PromptsResult};
-use super::keys::{ARROW_DOWN, ARROW_UP, FORCE_QUIT, KeyMap, Mode, help_lines, key_name};
+use super::keys::{
+    ARROW_DOWN, ARROW_UP, FORCE_QUIT, KeyMap, Mode, OPEN_CONFIG, help_lines, key_name,
+};
 use super::kill::{
     AliveFn, StopRequest, StopResult, UNVERIFIED_NOTICE, has_unverified, live_targets,
     recheck_targets, same_process,
@@ -133,6 +140,23 @@ pub enum Msg {
     Stopped(StopResult),
     /// The runtime could not queue a stop or a log open; the text says so.
     Rejected(String),
+    /// The config window's typing pause is over: probe `n` is due, unless
+    /// a newer one replaced it.
+    ConfigProbe(u64),
+    /// A [`Job::Probe`] finished.
+    ProxyModels(ProbeResult),
+    /// One model of check `run` finished.
+    CheckRow {
+        run: u64,
+        row: Box<CheckRow>,
+    },
+    /// Check `run` finished.
+    CheckDone {
+        run: u64,
+        report: Box<Report>,
+    },
+    /// A [`Job::Save`] finished.
+    ConfigSaved(Box<SaveResult>),
 }
 
 /// What the runtime must do after an update.
@@ -144,6 +168,8 @@ pub enum Cmd {
     Tick,
     /// Send [`Msg::SpinTick`] after [`SPIN_INTERVAL`].
     Spin,
+    /// Send the message after the delay (the config window's typing pause).
+    After(Duration, Msg),
     /// Run blocking work off the UI thread with `JobEnv::run` and send back
     /// the message it returns. Results may arrive late or out of order; the
     /// model drops the ones the screen no longer needs.
@@ -196,6 +222,12 @@ pub struct Model {
     pub(crate) styles: Styles,
     /// The wall clock for day sections and elapsed times; tests pin it.
     pub(crate) clock: fn() -> DateTime<FixedOffset>,
+    /// The open config window.
+    pub(crate) config: Option<ConfigForm>,
+    /// What the config window opens with; a save updates it.
+    pub(crate) config_seed: Option<ConfigSeed>,
+    /// `rival config`: the window is the whole TUI, and leaving it quits.
+    pub(crate) config_only: bool,
 }
 
 fn local_now() -> DateTime<FixedOffset> {
@@ -228,6 +260,9 @@ impl Model {
             version: version.into(),
             styles: STYLES,
             clock: local_now,
+            config: None,
+            config_seed: None,
+            config_only: false,
         };
         m.measure_help();
         m
@@ -236,6 +271,34 @@ impl Model {
     /// The commands to run at startup: the loader's spinner.
     pub fn init(&self) -> Vec<Cmd> {
         vec![Cmd::Spin]
+    }
+
+    /// What `c` opens the config window with.
+    pub fn set_config_seed(&mut self, seed: ConfigSeed) {
+        self.config_seed = Some(seed);
+    }
+
+    /// `rival config`: opens the window with nothing behind it. Returns the
+    /// first commands (the proxy probe).
+    pub fn open_config_only(&mut self, seed: ConfigSeed) -> Vec<Cmd> {
+        self.config_only = true;
+        // No session watch runs, so the loader never shows.
+        self.loaded = true;
+        self.config_seed = Some(seed);
+        self.open_config();
+        std::mem::take(&mut self.jobs)
+    }
+
+    /// Cancels work that would outlive the screen: a running check.
+    pub fn cancel_work(&mut self) {
+        if let Some(form) = self.config.as_mut() {
+            form.cancel_check();
+        }
+    }
+
+    /// Whether the config window shows.
+    pub fn in_config(&self) -> bool {
+        matches!(self.mode, Mode::Config | Mode::ConfigEdit) && self.config.is_some()
     }
 
     /// Whether the user asked to quit.
@@ -314,7 +377,7 @@ impl Model {
     }
 
     fn preview_shown(&self) -> bool {
-        self.lay.show_preview && !self.lay.too_small && !self.in_detail()
+        self.lay.show_preview && !self.lay.too_small && !self.in_detail() && !self.in_config()
     }
 
     /// Takes a finished log read. Each pane drops a read it no longer
@@ -372,6 +435,7 @@ impl Model {
                     Mode::Search => self.search_key(&key, &ev),
                     Mode::Confirm => self.confirm_key(&key),
                     Mode::List => self.list_key(&key),
+                    Mode::Config | Mode::ConfigEdit => self.config_key(&key, &ev),
                 }
             }
             Msg::Paste(text) => {
@@ -386,6 +450,10 @@ impl Model {
                         }
                     }
                     Mode::Search => self.detail.search.insert(&text),
+                    Mode::ConfigEdit => {
+                        let effect = self.config.as_mut().and_then(|f| f.paste(&text));
+                        self.config_effect(effect);
+                    }
                     _ => {}
                 }
                 Vec::new()
@@ -422,7 +490,7 @@ impl Model {
             Msg::SpinTick => {
                 // Dropping the tick ends the chain; the next snapshot with a
                 // running row restarts it. The loader keeps it alive.
-                if self.loaded && !self.list.any_live {
+                if self.loaded && !self.list.any_live && !self.config_busy() {
                     self.spinning = false;
                     return Vec::new();
                 }
@@ -468,16 +536,160 @@ impl Model {
                 Vec::new()
             }
             Msg::Rejected(text) => {
-                // Stop and open-log keys exist only on the detail screen.
+                // Stop and open-log keys exist only on the detail screen;
+                // the config window queues saves.
                 if self.in_detail() {
                     self.detail.notice = text;
+                } else if let Some(form) = self.config.as_mut()
+                    && form.saving
+                {
+                    form.save_failed(&text);
                 }
                 Vec::new()
             }
+            Msg::ConfigProbe(seq) => {
+                if let Some(form) = self.config.as_mut()
+                    && form.probe.seq == seq
+                    && let Some(req) = form.probe_request()
+                {
+                    self.jobs.push(Cmd::Job(Job::Probe(Box::new(req))));
+                }
+                Vec::new()
+            }
+            Msg::ProxyModels(res) => {
+                if let Some(form) = self.config.as_mut() {
+                    form.probe_done(res.seq, res.result);
+                }
+                Vec::new()
+            }
+            Msg::CheckRow { run, row } => {
+                if let Some(form) = self.config.as_mut() {
+                    form.check_row(run, *row);
+                }
+                Vec::new()
+            }
+            Msg::CheckDone { run, report } => {
+                let now = self.now();
+                if let Some(form) = self.config.as_mut() {
+                    form.check_done(run, *report, now);
+                }
+                Vec::new()
+            }
+            Msg::ConfigSaved(res) => self.config_saved(*res),
         }
     }
 
+    // --- the config window --------------------------------------------------
+
+    /// Whether the config window has a check running (the spinner keeps
+    /// going for it).
+    fn config_busy(&self) -> bool {
+        self.config.as_ref().is_some_and(|f| f.check.running)
+    }
+
+    /// `c` in the list, and `rival config`: opens the window on the saved
+    /// config and asks the proxy for its models.
+    fn open_config(&mut self) {
+        let Some(seed) = self.config_seed.clone() else {
+            return;
+        };
+        self.config = Some(ConfigForm::new(seed));
+        self.mode = Mode::Config;
+        self.show_all_help = false;
+        self.config_effect(Some(Effect::Probe { debounce: false }));
+    }
+
+    /// Leaves the window: back to the list, or out of `rival config`. A
+    /// running check is cancelled; the seed keeps what was saved.
+    fn close_config(&mut self) -> Vec<Cmd> {
+        if let Some(mut form) = self.config.take() {
+            form.cancel_check();
+            self.config_seed = Some(form.seed);
+        }
+        if self.config_only {
+            return self.quit();
+        }
+        self.mode = Mode::List;
+        Vec::new()
+    }
+
+    fn config_key(&mut self, key: &str, ev: &KeyEvent) -> Vec<Cmd> {
+        let Some(form) = self.config.as_mut() else {
+            self.mode = Mode::List;
+            return Vec::new();
+        };
+        let effect = form.apply(key, ev);
+        if effect == Some(Effect::Close) {
+            return self.close_config();
+        }
+        self.config_effect(effect);
+        self.sync_config_mode();
+        Vec::new()
+    }
+
+    /// The text edit owns the keyboard while it is open.
+    fn sync_config_mode(&mut self) {
+        if let Some(form) = &self.config {
+            self.mode = if form.editing() {
+                Mode::ConfigEdit
+            } else {
+                Mode::Config
+            };
+        }
+    }
+
+    /// Turns the window's effect into jobs and timers.
+    fn config_effect(&mut self, effect: Option<Effect>) {
+        let Some(form) = self.config.as_mut() else {
+            return;
+        };
+        match effect {
+            None | Some(Effect::Close) => {}
+            Some(Effect::Probe { debounce: true }) => {
+                let seq = form.bump_probe();
+                self.jobs
+                    .push(Cmd::After(PROBE_DEBOUNCE, Msg::ConfigProbe(seq)));
+            }
+            Some(Effect::Probe { debounce: false }) => {
+                form.bump_probe();
+                if let Some(req) = form.probe_request() {
+                    self.jobs.push(Cmd::Job(Job::Probe(Box::new(req))));
+                }
+            }
+            Some(Effect::Check { all }) => match form.start_check(all) {
+                Ok(req) => {
+                    self.jobs.push(Cmd::Job(Job::Check(Box::new(req))));
+                    if !self.spinning {
+                        self.spinning = true;
+                        self.jobs.push(Cmd::Spin);
+                    }
+                }
+                Err(e) => form.check_refused(&e),
+            },
+            Some(Effect::Save) => match form.save_request() {
+                Ok(req) => self.jobs.push(Cmd::Job(Job::Save(req))),
+                Err(e) => form.save_failed(&e),
+            },
+        }
+    }
+
+    fn config_saved(&mut self, res: SaveResult) -> Vec<Cmd> {
+        let Some(form) = self.config.as_mut() else {
+            return Vec::new();
+        };
+        match res {
+            Ok(saved) => {
+                if form.saved(&saved) {
+                    return self.close_config();
+                }
+            }
+            Err(e) => form.save_failed(&e),
+        }
+        Vec::new()
+    }
+
     fn quit(&mut self) -> Vec<Cmd> {
+        self.cancel_work();
         self.quitting = true;
         vec![Cmd::Quit]
     }
@@ -586,6 +798,8 @@ impl Model {
                 self.list.filter.reset();
                 self.list.refilter(now);
             }
+        } else if OPEN_CONFIG.matches(key) {
+            self.open_config();
         } else if k.open.matches(key) && self.list.selected().is_some() {
             self.mode = Mode::Detail;
             if let Some(req) = self.detail.open(self.list.selected()) {
@@ -899,6 +1113,14 @@ impl Model {
             return;
         }
 
+        if let Some(form) = self.config.as_ref().filter(|_| self.in_config()) {
+            let ctx = ViewCtx {
+                styles: &self.styles,
+                spin: SPIN_FRAMES[self.spin_frame],
+            };
+            config_view::render(form, area, out.buf, &ctx);
+            return;
+        }
         let spin = self.spin_frame();
         for line in render_header(
             w,
@@ -1037,6 +1259,8 @@ impl<'a> Rows<'a> {
     }
 }
 
+#[cfg(test)]
+mod config_tests;
 #[cfg(test)]
 mod detail_tests;
 #[cfg(test)]

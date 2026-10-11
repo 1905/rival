@@ -92,9 +92,10 @@ private func groupModelRank(_ s: Session) -> Int {
 /// only for member ordering; the UI shows the raw model id.
 public func engineLabel(cli: String, model: String) -> String {
     switch model {
-    case "gpt-5.6-sol": return "sol"
+    case "gpt-6.1-sol", "gpt-5.6-sol": return "sol"
     case "gpt-6-astra": return "codex"
     case "claude-opus-5-5": return "claude"
+    case "claude-fable-5-1": return "fable"
     case "moonshotai/kimi-k3": return "kimi-k3"
     case "grok-4.6": return "grok"
     case "x-ai/grok-4.6": return "grok-4.6-openrouter"
@@ -112,9 +113,10 @@ public func engineLabel(cli: String, model: String) -> String {
 
 private func modelLabel(_ model: String) -> String {
     switch model {
-    case "gpt-5.6-sol", "sol": return "sol"
+    case "gpt-6.1-sol", "gpt-5.6-sol", "sol": return "sol"
     case "gpt-6-astra", "codex": return "codex"
     case "claude-opus-5-5", "claude": return "claude"
+    case "claude-fable-5-1", "fable": return "fable"
     case "moonshotai/kimi-k3", "kimi-k3": return "kimi-k3"
     case "grok-4.6", "grok": return "grok"
     case "x-ai/grok-4.6", "grok-4.6-openrouter": return "grok-4.6-openrouter"

@@ -69,6 +69,13 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         Task { await post(notes) }
     }
 
+    /// Posts the menu-bar model check result ("✓ model check · 5 of 5 ok").
+    /// Not gated by "Notify on finish": the user asked for this one. The
+    /// menu-bar popover shows the same result inline.
+    func postCheck(_ note: FinishNote) {
+        Task { await post([note]) }
+    }
+
     private func post(_ notes: [FinishNote]) async {
         guard let center else { return }
         var status = await authorizationStatus(center)
@@ -113,7 +120,13 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let runID = response.notification.request.content.userInfo[runIDKey] as? String
-        Task { @MainActor in self.app.show(runID: runID) }
+        Task { @MainActor in
+            if runID == checkNoteID {
+                self.app.showSettings()
+            } else {
+                self.app.show(runID: runID)
+            }
+        }
         completionHandler()
     }
 

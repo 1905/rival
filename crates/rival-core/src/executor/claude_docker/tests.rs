@@ -157,6 +157,7 @@ fn docker_mount(env: &Env, cfg: &Config, workdir: &str) -> String {
         "high",
         workdir,
         config::CLAUDE_MODEL,
+        None,
         true,
         None,
         crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
@@ -219,6 +220,7 @@ fn token_goes_by_name_only_and_value_in_the_child_env() {
         "high",
         "/repo",
         config::CLAUDE_MODEL,
+        None,
         true,
         None,
         crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
@@ -259,6 +261,7 @@ fn failed_or_cancelled_runs_remove_their_container() {
             "high",
             "/repo",
             config::CLAUDE_MODEL,
+            None,
             true,
             None,
             crate::executor::testutil::recorder(&mut seen, result),
@@ -313,6 +316,7 @@ fn run_claude_docker_forwards_the_log_file() {
         "low",
         &work,
         config::CLAUDE_MODEL,
+        None,
         true,
         Some("/home/s/sessions/x.log.repair.log"),
         crate::executor::testutil::recorder(&mut seen, Ok(RunResult::default())),
@@ -321,5 +325,33 @@ fn run_claude_docker_forwards_the_log_file() {
     assert_eq!(
         seen.unwrap().log.as_deref(),
         Some("/home/s/sessions/x.log.repair.log")
+    );
+}
+
+/// On the proxy route the proxy key is the credential: no
+/// `RIVAL_CLAUDE_TOKEN` is needed.
+#[cfg(unix)]
+#[test]
+fn preflight_on_the_proxy_route_needs_no_token() {
+    let mut env = Env::new();
+    let dir = env.home.path().join(".rival");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("config.yaml"),
+        "proxy:\n  url: http://127.0.0.1:8999\n  claude:\n    enabled: true\n    model_prefix: emcd_\n",
+    )
+    .unwrap();
+    env.set("RIVAL_PROXY_KEY", Some("test-proxy-key-0000"));
+    let calls = fake_docker(&env, 0, 0, 1);
+    preflight(&env.config()).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(calls).unwrap(),
+        "info\nimage inspect rival-claude\n"
+    );
+    // Without the key the route is an error, not a token prompt.
+    env.set("RIVAL_PROXY_KEY", None);
+    assert_eq!(
+        preflight(&env.config()).unwrap_err(),
+        "proxy key missing — run rival config key set"
     );
 }

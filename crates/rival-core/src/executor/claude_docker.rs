@@ -6,13 +6,19 @@ use std::path::Path;
 
 use anyhow::bail;
 
-use super::claude::claude_args;
+use super::claude::{PROXY_KEY_VAR, PROXY_URL_VAR, claude_args, proxy_env};
 use super::oscmd::{self, Output};
 use super::process;
 use super::subprocess::{Request, RunResult, io_text};
-use crate::config::{self, Config};
+use crate::config::{self, Config, ProxyProvider, Route};
 use crate::logging;
+use crate::proxy;
 use crate::session::Session;
+
+/// The host a container uses for the machine it runs on.
+pub(crate) const DOCKER_HOST_ALIAS: &str = "host.docker.internal";
+/// Maps [`DOCKER_HOST_ALIAS`] on Linux, where Docker does not add it.
+pub(crate) const DOCKER_ADD_HOST: &str = "--add-host=host.docker.internal:host-gateway";
 
 const CLAUDE_DOCKER_IMAGE: &str = config::CLAUDE_DOCKER_IMAGE;
 
@@ -42,8 +48,10 @@ pub fn claude_docker_preflight(cfg: &Config) -> anyhow::Result<()> {
         );
     }
 
+    // On the proxy route the proxy key is the credential.
+    let proxied = cfg.proxy_route(ProxyProvider::Claude)?.is_some();
     let token = cfg.getenv(config::CLAUDE_DOCKER_TOKEN_ENV);
-    if token.is_empty() {
+    if token.is_empty() && !proxied {
         let env = config::CLAUDE_DOCKER_TOKEN_ENV;
         bail!(
             "{env} env var not set. To authenticate:\n  1. docker run -d --name rival-claude-login --user claude --entrypoint sh {CLAUDE_DOCKER_IMAGE} -c 'sleep 3600'\n  2. docker exec -it rival-claude-login claude login\n  3. docker exec rival-claude-login cat /home/claude/.claude/.credentials.json\n  4. export {env}=<accessToken from step 3>\n  5. docker rm -f rival-claude-login"
@@ -112,15 +120,16 @@ pub(crate) fn run_claude_docker_with(
     effort: &str,
     workdir: &str,
     model: &str,
+    route: Option<&Route>,
     read_only: bool,
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
-    if model != config::CLAUDE_MODEL {
+    if !super::claude::is_claude_model(model) {
         bail!("unsupported Claude Code model {:?}", model);
     }
     let token = cfg.getenv(config::CLAUDE_DOCKER_TOKEN_ENV);
-    if token.is_empty() {
+    if token.is_empty() && route.is_none() {
         bail!("{} env var not set", config::CLAUDE_DOCKER_TOKEN_ENV);
     }
 
@@ -153,22 +162,38 @@ pub(crate) fn run_claude_docker_with(
         &mount,
         "-w",
         "/workspace",
-        // The name only: Docker copies the value from its own environment.
-        // A value here would show in `ps` to every local user.
-        "-e",
-        "ANTHROPIC_AUTH_TOKEN",
-        CLAUDE_DOCKER_IMAGE,
     ]
     .iter()
     .map(|s| s.to_string())
     .collect();
-    args.extend(claude_args(model, effort, read_only));
+    // Names only: Docker copies each value from its own environment. A
+    // value here would show in `ps` to every local user.
+    let (child_env, wire_model) = match route {
+        Some(route) => {
+            let url = proxy::replace_loopback_host(&route.url, DOCKER_HOST_ALIAS);
+            if url != route.url {
+                args.push(DOCKER_ADD_HOST.to_string());
+            }
+            for var in [PROXY_URL_VAR, PROXY_KEY_VAR] {
+                args.extend(["-e".to_string(), var.to_string()]);
+            }
+            (proxy_env(&url, route), proxy::wire_id(&route.prefix, model))
+        }
+        None => {
+            args.extend(["-e".to_string(), "ANTHROPIC_AUTH_TOKEN".to_string()]);
+            (
+                vec![format!("ANTHROPIC_AUTH_TOKEN={token}")],
+                model.to_string(),
+            )
+        }
+    };
+    args.push(CLAUDE_DOCKER_IMAGE.to_string());
+    args.extend(claude_args(&wire_model, effort, read_only));
 
     let full_prompt = format!(
         "{}\n{prompt}",
         cfg.build_workdir_preamble(Path::new(workdir))
     );
-    let child_env = [format!("ANTHROPIC_AUTH_TOKEN={token}")];
     let req = Request {
         binary: "docker",
         args: &args,

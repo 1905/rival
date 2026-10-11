@@ -95,9 +95,9 @@ Rival launches installed provider CLIs; it does not replace their accounts.
 
 | Model | Runtime and required authentication |
 |---|---|
-| Codex | Codex CLI. Run `codex login` for browser-based ChatGPT authentication (preferred), or pipe an OpenAI API key to `codex login --with-api-key`. |
+| Codex, Sol | Codex CLI. Run `codex login` for browser-based ChatGPT authentication (preferred), or pipe an OpenAI API key to `codex login --with-api-key`. |
 | Kimi K3 | OpenCode plus `MOONSHOT_API_KEY`. Export it or place it in a gitignored project `.env`; Rival searches upward from the workdir. |
-| Claude, native | Claude Code CLI. Subscription login is the default. To opt into API billing, set both `RIVAL_CLAUDE_AUTH=api` and a funded `ANTHROPIC_API_KEY`. |
+| Claude (Opus), Fable, native | Claude Code CLI. Subscription login is the default. To opt into API billing, set both `RIVAL_CLAUDE_AUTH=api` and a funded `ANTHROPIC_API_KEY`. |
 | Claude, Docker fallback | `RIVAL_CLAUDE_TOKEN` containing the OAuth access token extracted by the flow in [Claude in Docker](claude-docker-setup.md). |
 | Grok | Grok CLI. Run `grok login` for browser OAuth against grok.com. The preflight requires `grok` on `PATH` and `~/.grok/auth.json` to exist. `XAI_API_KEY` is deliberately unsupported. |
 | Grok via OpenRouter (security only) | OpenCode plus `OPENROUTER_API_KEY`, from the environment or the nearest `.env` above the workdir. |
@@ -123,6 +123,44 @@ or base URLs, `GROK_HOME`, or auth helpers, and cannot inject an API key to
 bypass the logged-in account. The preflight resolves `auth.json` from the real
 home directory for the same reason: honoring `GROK_HOME` would check a location
 the run can never use.
+
+### Proxy route
+
+When `proxy.claude.enabled` or `proxy.codex.enabled` is set (and `RIVAL_PROXY` is not `off`), that provider's runs go to `proxy.url` with the key from `RIVAL_PROXY_KEY` or the key file. The provider's own login is not used. `RIVAL_PROXY`, `RIVAL_PROXY_URL` and `RIVAL_PROXY_KEY` come from the process environment only: a repository `.env` cannot set them (any spelling on Windows), so a reviewed repository cannot send the key to its own URL.
+
+Claude (native):
+
+```
+claude -p --model <prefix>/<model> ...          # same flags as direct
+env:  ANTHROPIC_BASE_URL=<url>  ANTHROPIC_API_KEY=<key>
+drop: CLAUDECODE ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL
+      CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX (and inherited BASE_URL/API_KEY)
+```
+
+Claude (Docker): the same variables, passed by name with `-e`. A loopback host becomes `host.docker.internal` with `--add-host=host.docker.internal:host-gateway`.
+
+Codex:
+
+```
+codex exec -C <workdir> -m <wire id>
+  -c model_provider="rival_proxy"
+  -c model_providers.rival_proxy={ name = "rival proxy", base_url = "<url>/v1", env_key = "RIVAL_PROXY_KEY", wire_api = "responses" }
+  -c model_reasoning_effort=<effort> --sandbox read-only --ephemeral --skip-git-repo-check --color never -
+env:  RIVAL_PROXY_KEY=<key>
+```
+
+Preflight (`GET <url>/v1/models`, 5 s, once per process):
+
+| Result | Error |
+|---|---|
+| connection refused or timeout | `proxy unreachable at <url>: <reason>` |
+| 401 or 403 | `proxy rejected the key (<status>) — run rival config key set` |
+| wire id not listed | `proxy does not serve <wire id>; it serves <model> as: <ids> — set proxy.<provider>.model_prefix` |
+| no models of the provider | `proxy has no <provider> account — log in on the proxy` |
+
+A 429 at run time ("cooling down", "monthly spend limit", `rate_limit_error`) gets a hint with the other prefixes that serve the model. Rival never switches prefix or falls back to a direct run by itself.
+
+`RIVAL_PROXY_KEY` is removed from every child environment and added back only for Codex on the proxy route. The key is scrubbed from provider output, session files, Rival's log lines and printed errors, also in its JSON-escaped form.
 
 Never commit provider keys or OAuth tokens. A project `.env` used for K3 must be
 listed in `.gitignore`.

@@ -1,0 +1,81 @@
+╭─ rival · config ───┬─────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml  ● unsaved ─╮|
+│                    │  PROXY   Claude and Codex through CLIProxyAPI                                                                       │|
+│ ▸ Proxy            │                                                                                                                     │|
+│   Models           │    Claude via proxy    ● on    Opus, Fable go through the proxy                                                     │|
+│   Review           │    Codex via proxy     ○ off   Codex, Sol use their own login                                                       │|
+│   Check  4/5       │    URL                 http://127.0.0.1:8317                                                    ● online · 6 models │|
+│                    │    Key                 ••••••••a91f   ~/.rival/proxy.key  0600 ✓                                                    │|
+│                    │  ▸ Claude prefix       ‹ emcd_ › ←→   also: emcd2_                                                                  │|
+│                    │                        the proxy account for Claude models · e types one                                            │|
+│                    │    Codex prefix        ‹ none ›   route off                                                                         │|
+│                    │                                                                                                                     │|
+│                    │  REQUESTS GO TO                                                                                                     │|
+│                    │    codex  Codex      direct  → gpt-6-astra                                                                          │|
+│                    │    sol    Sol 6.1    direct  → gpt-6.1-sol                                                                          │|
+│                    │    claude Opus 5.5   proxy   → emcd_/claude-opus-5-5                                                                │|
+│                    │    fable  Fable 5.1  proxy   → emcd_/claude-fable-5-1                                                               │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+│                    │                                                                                                                     │|
+├────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│  CHECK   ● online · 6 models                                                                                       running · 4 of 5 done │|
+│  ⠋ codex   direct  gpt-6-astra                  …  checking                                                                              │|
+│  ✗ sol     proxy   gpt-6.1-sol                  —  proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log in Codex on the      │|
+│                                                    proxy (-codex-device-login)                                                           │|
+│  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                                                                                    │|
+│  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s  Sure! ok.  (not ok)                                                                   │|
+│  ✗ k3      direct  moonshotai/kimi-k3        4.0s  limit 429 monthly spend limit reached                                                 │|
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
+│ tab section  ↑↓ field  ←→ choose  e type  x cancel check  s save  u undo  ? help  esc back                                               │|
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
+-- styles --
+dddgggggdddTTTTTTdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddaaaaaaaaaadd|
+d....................d..gggggddddddddddddddddddddddddddddddddddddddd.......................................................................d|
+dSSSSSSSSSSSSSSSSSSS.d.....................................................................................................................d|
+d.ddtttttt...........d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddd.....................................................d|
+d.ddtttttt...........d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.......................................................d|
+d.ddtttttrrrrr.......d....ddddddddddddddddddddTTTTTTTTTTTTTTTTTTTTT....................................................aaaaaaaaddddddddddd.d|
+d....................d....ddddddddddddddddddddTTTTTTTTTTTTdddddddddddddddddddddaaaaaaaa....................................................d|
+d....................d.???????????????????????????????????????????????????????????????????????????????????????????????????????????????????.d|
+d....................d........................ddddddddddddddddddddddddddddddddddddddddddddddddd............................................d|
+d....................d....ddddddddddddddddddddddTTTTdddddddddddddd.........................................................................d|
+d....................d.....................................................................................................................d|
+d....................d..DDDDDDDDDDDDDD.....................................................................................................d|
+d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTT..........................................................................d|
+d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTT..........................................................................d|
+d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT................................................................d|
+d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT...............................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+d....................d.....................................................................................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d..DDDDD...aaaaaaaaddddddddddd.......................................................................................rrrrrrrrrrrrrrrrrrrrr.d|
+d..rrtttttt..dddddd..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..dddddddd..............................................................................d|
+d..fftttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff......d|
+d....................................................fffffffffffffffffffffffffff...........................................................d|
+d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..tt....................................................................................d|
+d..aatttttt..aaaaaa..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ggggggggggggggggggg...................................................................d|
+d..fftttttt..dddddd..TTTTTTTTTTTTTTTTTTTTTTT..ddddd..ggggg.fffffffffffffffffffffffffffffff.................................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
+d.aaa.ddddddd..aa.ddddd..aa.dddddd..a.dddd..a.dddddddddddd..a.dddd..a.dddd..a.dddd..aaa.dddd...............................................d|
+dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

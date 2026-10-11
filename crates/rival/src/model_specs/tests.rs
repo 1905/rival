@@ -123,7 +123,10 @@ fn only_claude_reports_an_auth_hint() {
     assert_eq!(codex_spec().auth_hint(&cfg, log), "");
     let hint = claude_spec().auth_hint(&cfg, log);
     assert!(!hint.is_empty());
-    assert_eq!(hint, executor::claude_auth_hint(&cfg, Path::new(log)));
+    assert_eq!(
+        hint,
+        executor::claude_auth_hint(&cfg, config::CLAUDE_MODEL, Path::new(log))
+    );
 }
 
 #[test]
@@ -274,4 +277,53 @@ fn usage_texts_are_pinned() {
     assert_eq!(claude_spec().usage, CLAUDE_USAGE);
     assert_eq!(k3_spec().usage, K3_USAGE);
     assert_eq!(grok_spec().usage, GROK_USAGE);
+}
+
+/// Fable runs like Claude and Sol like Codex: runtime, label, effort
+/// default, and their own `efforts.fable` / `efforts.sol` keys.
+#[test]
+fn fable_and_sol_specs_follow_their_runtimes() {
+    let fable = fable_spec();
+    assert_eq!(
+        (fable.command_name, fable.cli, fable.model, fable.label()),
+        ("fable", "claude", config::FABLE_MODEL, "fable".to_string())
+    );
+    assert_eq!(fable.usage, FABLE_USAGE);
+    let sol = sol_spec();
+    assert_eq!(
+        (sol.command_name, sol.cli, sol.model, sol.label()),
+        ("sol", "codex", config::SOL_MODEL, "sol".to_string())
+    );
+    assert_eq!(sol.usage, SOL_USAGE);
+
+    let cfg = cfg();
+    assert_eq!(fable_spec().resolve_effort(&cfg, "").unwrap(), "medium");
+    assert_eq!(sol_spec().resolve_effort(&cfg, "").unwrap(), "xhigh");
+    assert_eq!(sol_spec().resolve_effort(&cfg, "ultra").unwrap(), "ultra");
+
+    let configured = cfg.clone().with_user_config(Some(UserConfig {
+        efforts: [("fable", "low"), ("sol", "high"), ("claude", "xhigh")]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+        ..UserConfig::default()
+    }));
+    assert_eq!(fable_spec().resolve_effort(&configured, "").unwrap(), "low");
+    assert_eq!(sol_spec().resolve_effort(&configured, "").unwrap(), "high");
+    assert_eq!(
+        claude_spec().resolve_effort(&configured, "").unwrap(),
+        "xhigh"
+    );
+
+    // Fable's auth hint is Claude's, for its own model.
+    let dir = tempfile::tempdir().unwrap();
+    let log = dir.path().join("x.log");
+    std::fs::write(&log, "Invalid API key · Please run /login\n").unwrap();
+    let log = log.to_str().unwrap();
+    assert_eq!(
+        fable_spec().auth_hint(&cfg, log),
+        executor::claude_auth_hint(&cfg, config::FABLE_MODEL, Path::new(log))
+    );
+    assert!(!fable_spec().auth_hint(&cfg, log).is_empty());
+    assert_eq!(sol_spec().auth_hint(&cfg, log), "");
 }

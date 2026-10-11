@@ -183,6 +183,40 @@ fn install_both_hosts_and_preserve_unrelated_skills() {
     }
 }
 
+/// Sol's review skill was retired before Sol 6.1. Upgrades must restore it
+/// for both hosts and remove only the obsolete plan variant.
+#[test]
+fn sol_review_skill_survives_upgrade_cleanup_and_forced_reinstall() {
+    let home = tempfile::tempdir().unwrap();
+    for target in skill_targets(home.path(), "all", false).unwrap() {
+        let sol = skill_file(&target, "rival-sol");
+        let retired = skill_file(&target, "rival-plan-sol");
+        for path in [&sol, &retired] {
+            write_skill(
+                path.parent().unwrap(),
+                path,
+                b"---\nversion: old\n---\nRetired Sol skill\n",
+            )
+            .unwrap();
+        }
+
+        for _ in 0..2 {
+            install(&target, true, "");
+            let got = fs::read(&sol).unwrap();
+            assert_eq!(got, want_content(&target, "rival-sol"));
+            let text = String::from_utf8(got).unwrap();
+            assert!(text.contains("Sol 6.1"), "{}: {text}", target.host);
+            assert!(
+                text.contains("rival command sol --detach --workdir"),
+                "{}: {text}",
+                target.host
+            );
+            assert_eq!(parse_version(&text), version("rival-sol"));
+            assert!(!retired.parent().unwrap().exists());
+        }
+    }
+}
+
 #[test]
 fn install_overwrite_and_buffered_answers() {
     let dir = tempfile::tempdir().unwrap();
@@ -319,7 +353,7 @@ fn fresh_install_transcript() {
     for name in skills::NAMES {
         want.push_str(&format!("  ✓ {name} — installed (v{})\n", version(name)));
     }
-    want.push_str("\nDone: 8 installed, 0 updated, 0 up to date, 0 removed\n");
+    want.push_str("\nDone: 10 installed, 0 updated, 0 up to date, 0 removed\n");
     assert_eq!(install(&target, false, ""), want);
 
     // Same version again: every skill is up to date and the reader is not
@@ -331,7 +365,7 @@ fn fresh_install_transcript() {
             version(name)
         ));
     }
-    want.push_str("\nDone: 0 installed, 0 updated, 8 up to date, 0 removed\n");
+    want.push_str("\nDone: 0 installed, 0 updated, 10 up to date, 0 removed\n");
     let mut answers = reader("y\n");
     let mut out = Vec::new();
     install_skills(&target, false, &mut answers, &mut out).unwrap();
@@ -371,7 +405,7 @@ fn update_prompt_transcript() {
     );
     assert_eq!(
         out.lines().last().unwrap(),
-        "Done: 0 installed, 1 updated, 7 up to date, 0 removed"
+        "Done: 0 installed, 1 updated, 9 up to date, 0 removed"
     );
     assert_eq!(
         fs::read(skill_file(&target, first)).unwrap(),
@@ -390,7 +424,7 @@ fn update_prompt_transcript() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 8 updated, 0 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 10 updated, 0 up to date, 0 removed\n"),
         "{out}"
     );
 }
@@ -431,7 +465,12 @@ fn one_reader_serves_every_target() {
 fn cleanup_counts_deprecated_and_retired() {
     let dir = tempfile::tempdir().unwrap();
     let target = claude_target(dir.path());
-    for name in ["rival-sol", "rival-astra", "rival-hashed", "rival-personal"] {
+    for name in [
+        "rival-plan-sol",
+        "rival-astra",
+        "rival-hashed",
+        "rival-personal",
+    ] {
         fs::create_dir_all(dir.path().join(name)).unwrap();
     }
     // A deprecated name that is a file is removed too.
@@ -445,8 +484,13 @@ fn cleanup_counts_deprecated_and_retired() {
         3,
         "{out}"
     );
-    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 8 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
-    for gone in ["rival-sol", "rival-astra", "rival-kimi", "rival-hashed"] {
+    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 10 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
+    for gone in [
+        "rival-plan-sol",
+        "rival-astra",
+        "rival-kimi",
+        "rival-hashed",
+    ] {
         assert!(!dir.path().join(gone).exists(), "{gone}");
     }
     assert!(dir.path().join("rival-personal").is_dir());
@@ -461,7 +505,7 @@ fn cleanup_failure_is_reported_and_not_counted() {
     let base = dir.path().join("skills");
     let target = claude_target(&base);
     install(&target, false, "");
-    fs::create_dir_all(base.join("rival-sol").join("inner")).unwrap();
+    fs::create_dir_all(base.join("rival-plan-sol").join("inner")).unwrap();
     // The entry cannot be unlinked from a read-only parent.
     fs::set_permissions(&base, fs::Permissions::from_mode(0o555)).unwrap();
     let out = install(&target, false, "");
@@ -477,7 +521,7 @@ fn cleanup_failure_is_reported_and_not_counted() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 0 updated, 8 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 0 updated, 10 up to date, 0 removed\n"),
         "{out}"
     );
 }
@@ -565,14 +609,14 @@ fn cleanup_removes_a_dangling_deprecated_link() {
     let dir = tempfile::tempdir().unwrap();
     let target = claude_target(dir.path());
     fs::create_dir_all(dir.path()).unwrap();
-    let link = dir.path().join("rival-sol");
+    let link = dir.path().join("rival-plan-sol");
     std::os::unix::fs::symlink(dir.path().join("missing"), &link).unwrap();
     let mut out = Vec::new();
     install_skills_with(&target, false, &mut reader(""), &mut out, &[]).unwrap();
     let out = String::from_utf8(out).unwrap();
     assert!(fs::symlink_metadata(&link).is_err(), "link still there");
     assert!(
-        out.ends_with("Done: 8 installed, 0 updated, 0 up to date, 1 removed\n"),
+        out.ends_with("Done: 10 installed, 0 updated, 0 up to date, 1 removed\n"),
         "{out}"
     );
 }
@@ -633,7 +677,7 @@ fn install_command_writes_under_home_not_rival_home() {
         "{stdout}"
     );
     assert!(
-        stdout.ends_with("Done: 8 installed, 0 updated, 0 up to date, 0 removed\n"),
+        stdout.ends_with("Done: 10 installed, 0 updated, 0 up to date, 0 removed\n"),
         "{stdout}"
     );
     for name in skills::NAMES {

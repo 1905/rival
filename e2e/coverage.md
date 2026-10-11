@@ -30,12 +30,17 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command codex --no-queue`, `--workdir` | command-codex-no-queue-workdir | workdir-missing |
 | `command claude` | executor-claude-success, executor-claude-docker-success | executor-claude-failure, executor-claude-quota, executor-claude-missing-runtime, executor-claude-docker-failure, executor-claude-docker-quota |
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
+| `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
+| `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
+| `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
 | `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
 | `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
 | `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
+| `command plan -m opus,fable,sol` (two blocks on the Claude runtime, one on codex, all through the proxy; repair pass per block) | plan-three-models | unit tests `command_plan::tests::parse_plan_models`, `review::planrun::tests::two_models_on_one_runtime_run_as_two_blocks` |
+| `command plan` default from `plan.models` | unit test `command_plan::tests::plan_models_config_is_the_default` | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |
 | `command security` | security-k3-structured | security-k3-nonzero-exit, security-missing-key |
@@ -44,7 +49,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | review wording edit (code, security, plan; none for a clean review) | review-language-code, review-language-security, review-language-plan, review-language-clean | unit tests: `lang::repair`, `model_command`, `command_security`, `review::planrun` |
 | every `command *` leaf `--help` | help-every-command (help) | — |
 
-Concurrent reviewers (plan-dual-models) bind each session file by its `cli` field (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
+Concurrent reviewers bind each session file by its `cli` field (plan-dual-models) or its `model` field (plan-three-models, where two reviewers share a runtime) (`expect.files` glob/where/bind). The checks tie the start event, the file name, the model, the result and the shared group id to the same reviewer, whichever starts first. `home_files` proves the queue ticket was released (only `.rival/queue/.lock` remains).
 
 ## run
 
@@ -55,6 +60,7 @@ Concurrent reviewers (plan-dual-models) bind each session file by its `cli` fiel
 | `run claude --effort` | run-claude-flags | run-claude-flags (invalid effort) |
 | `run claude --review` | run-claude-flags | — |
 | `run claude --no-queue`, `--workdir` | run-claude-flags, sessions-list | workdir-missing |
+| `run fable`, `run opus` (alias of `run claude`) | unit tests `tree::tests::opus_is_an_alias_of_claude`, `model_specs::tests::fable_and_sol_specs_follow_their_runtimes` | — |
 | `run grok --prompt-stdin`, `--effort`, `--no-queue`, `--workdir` | run-grok-flags | workdir-missing |
 | `run grok --review` (ultra clamps to high, read-only sandbox) | run-grok-flags | — |
 | `run k3 --prompt-stdin`, `--no-queue`, `--workdir` | run-k3-flags | workdir-missing |
@@ -104,6 +110,40 @@ Queue read and clear errors (`read queue: …`, `clear queue: …`) are unit-tes
 | background release check: stale cache, HTTP error, opt-outs | update-check-stale-cache-and-errors | update-check-stale-cache-and-errors |
 
 Numeric ordering (`1.2.3` < `1.10.0`, `v` prefixes, two-part versions) is unit-tested in `rival_core::update::tests`. A release build ignores `RIVAL_UPDATE_API`: `update::tests::release_builds_ignore_the_api_override` (run it with `cargo test --release`).
+
+## proxy (Claude)
+
+The scenario server doubles as the fake proxy: `/v1/models` with `"auth": "Bearer <test key>"` (401 for any other key), and `RIVAL_PROXY_URL=<SERVER>`. The fake `claude` pins the argv and the child env by name (`null` = unset); the only values it checks are the fixed test key and the loopback URL.
+
+| Behaviour | ✓ | ✗ |
+|---|---|---|
+| `command claude` review through the proxy: `--model emcd_/…`, `ANTHROPIC_BASE_URL`/`ANTHROPIC_API_KEY` set, inherited routing vars dropped, `RIVAL_CLAUDE_AUTH` ignored, repair pass on the same route, session `route`/`wire_model`/`account` | proxy-claude-review | — |
+| preflight: key rejected (401) | — | proxy-claude-key-rejected |
+| preflight: wire id not served, prefixes that serve the model | — | proxy-claude-model-missing |
+| 429 account limit: hint names the other prefix; the leak guard scrubs the echoed key from stdout and the log | — | proxy-claude-limit-429 |
+| `RIVAL_PROXY=off` runs direct (no `/v1/models` call, bare model) | proxy-off-env | — |
+| `config models [--json]`, preflight unreachable/empty-prefix/no-account rows, Docker proxy args | unit tests `config_cmd::tests::models_*`, `proxy::tests`, `executor::claude::tests` | same |
+
+## proxy (Codex)
+
+The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` then the two provider `-c` values (the `base_url` by a loopback `$regex`), and `RIVAL_PROXY_KEY` in the child env with the fixed test key.
+
+| Behaviour | ✓ | ✗ |
+|---|---|---|
+| `command codex` review through the proxy: provider `-c` values, `RIVAL_PROXY_KEY` in the env and in no argv, no `codex login status`, repair pass on the same route, session `route`/`wire_model`/`account` | proxy-codex-review | — |
+| preflight: key rejected (401), codex never runs | — | proxy-codex-key-rejected |
+| exact `-c` strings, TOML-unsafe URL refused, prefix on the wire id, direct argv unchanged, proxy hint (429, rejected key) | unit tests `executor::codex::tests` | same |
+
+## config check
+
+`rival config check` makes one real adapter call per model (`Reply with exactly: ok`, effort low, read-only, in `~/.rival/check`), with no queue slot and an ephemeral session: no scenario home has a `sessions/` or `queue/` file. The JSON rows come in completion order, so `config-check-json` matches each row with a lookahead.
+
+| Command / flag | ✓ | ✗ |
+|---|---|---|
+| `config check` (default models: codex, sol, claude, fable, security reviewer), text table in model order, `N of M ok`, exit 1 | config-check-fail-exit (codex, sol) | config-check-fail-exit (claude/fable not installed, K3 preflight) |
+| `config check -m LIST --json` through the proxy: no info log lines on stderr, one `/v1/models` call, one JSON line per row, summary line with the proxy state, `opus` = `claude`, unexpected reply passes flagged, 429 row with `limit` and the hint | config-check-json | config-check-json (fable 429) |
+| `config check --config-stdin` (an unsaved draft; config.yaml untouched) | config-check-draft | invalid draft, invalid saved file bypassed: unit tests `config_cmd::tests::check_config_stdin_*` |
+| engine: proxy down, key rejected or missing, model not listed, timeout, at most 3 live calls, logs under `check/`, no session saved | unit tests `check::tests`, `executor::subprocess::tests::ephemeral_session_is_never_saved`, `session::tests::ephemeral_session_save_writes_nothing` | same |
 
 ## wait
 

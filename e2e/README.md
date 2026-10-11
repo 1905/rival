@@ -84,7 +84,8 @@ Each scenario gets its own temp root:
     {"copy_bin": "brew/opt/rival/bin/rival"},
     {"git": "work/repo", "args": ["init", "-q"]}
   ],
-  "update_server": {"routes": {"/repos/1905/rival/releases/latest": {"status": 200, "json": {"tag_name": "v9.9.9"}}}},
+  "update_server": {"routes": {"/repos/1905/rival/releases/latest": {"status": 200, "json": {"tag_name": "v9.9.9"}},
+                               "/v1/models": {"status": 200, "auth": "Bearer test-proxy-key-0000", "json": {"data": []}}}},
   "normalise": [{"regex": "  (\\d+)  ", "kind": "pid"}, {"regex": "(\\d+s) ", "kind": "duration"},
                 {"regex": "v(\\d+\\.\\d+\\.\\d+)", "kind": "replace", "replace": "<V>"}],
   "steps": [
@@ -113,6 +114,8 @@ Each scenario gets its own temp root:
 ```
 
 - Inputs: `<ROOT>`, `<HOME>` and `<BIN>` expand to real paths in run args, `stdin`, `env`, fixtures and fake scripts. Inside `$regex` they expand escaped.
+- `<SERVER>` expands to the scenario server's base URL (`http://127.0.0.1:<port>`) in run args, `stdin` and `env`. It does not expand in fixtures or fake scripts, which are written before the server starts. The proxy scenarios point `RIVAL_PROXY_URL` at it.
+- A server route with `"auth": "Bearer <key>"` answers 401 to a request without that exact `Authorization` header. The proxy scenarios serve `/v1/models` this way.
 - Fixture and sync paths are relative to the root and may not leave it.
 - `system_tools` lists extra host tools. `git` is always linked; listing it, or any tool twice, is an error.
 - `git` fixtures run the system git with `protocol.allow=never`, a fixed identity and a fixed date. `clone`, `fetch`, `pull`, `push`, `ls-remote`, `submodule`, `archive` and `bundle` are rejected.

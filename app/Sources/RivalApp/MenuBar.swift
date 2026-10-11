@@ -29,11 +29,12 @@ struct MenuBarLabel: View {
 }
 
 /// The popover: up to 10 live runs (then "+N more — open Rival"), the last 5
-/// finished, the notify toggle, and Open Rival. Live elapsed times tick once
-/// a second; finished ones do not change.
+/// finished, the notify toggle, the model check, Settings and Open Rival.
+/// Live elapsed times tick once a second; finished ones do not change.
 struct MenuBarView: View {
     @Bindable var app: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @AppStorage(notifyOnFinishKey) private var notifyOnFinish = true
 
     var body: some View {
@@ -78,6 +79,15 @@ struct MenuBarView: View {
                         .foregroundStyle(Theme.dim)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                HStack(spacing: 8) {
+                    // The result also arrives as a notification.
+                    Button("Check models") { app.settings.runCheck(notify: true) }
+                        .disabled(app.settings.checking)
+                    checkStatus
+                    Spacer()
+                    Button("Settings…") { showSettings() }
+                        .keyboardShortcut(",")
+                }
                 HStack {
                     Button("Open Rival") { open(nil) }
                         .keyboardShortcut(.defaultAction)
@@ -93,7 +103,38 @@ struct MenuBarView: View {
         .frame(width: 460)
         .background(Theme.background)
         .preferredColorScheme(.dark)
-        .onAppear { app.openWindowAction = openWindow }
+        .onAppear {
+            app.openWindowAction = openWindow
+            app.openSettingsAction = openSettings
+        }
+    }
+
+    /// "checking…", "4 of 5 ok" or the error of the last model check.
+    @ViewBuilder
+    private var checkStatus: some View {
+        let settings = app.settings
+        if settings.checking {
+            Text("checking… \(settings.checkRows.count) done")
+                .font(Mono.small)
+                .foregroundStyle(Theme.dim)
+        } else if let error = settings.checkError {
+            Text(error)
+                .font(Mono.small)
+                .foregroundStyle(Theme.fail)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(error)
+        } else if let summary = settings.checkSummary {
+            Text(summary.text)
+                .font(Mono.small)
+                .foregroundStyle(summary.allOK ? Theme.accent : Theme.fail)
+        }
+    }
+
+    private func showSettings() {
+        app.openSettingsAction = openSettings
+        NSApp.activate()
+        openSettings()
     }
 
     @ViewBuilder

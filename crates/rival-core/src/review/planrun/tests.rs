@@ -9,7 +9,8 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::config::{
-    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, GPT56_SOL_MODEL, KIMI_MODEL, SOL_LABEL,
+    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, FABLE_MODEL, GPT56_SOL_MODEL, KIMI_MODEL, SOL_LABEL,
+    SOL_MODEL,
 };
 use crate::review::parse_reviewer_log;
 use crate::review::plan::PlanOutput;
@@ -62,7 +63,7 @@ fn batch<'a>(
         workdir,
         group_id,
         no_queue: true,
-        clis,
+        models: clis,
     }
 }
 
@@ -73,7 +74,7 @@ fn fake<'a>(
     + 'a,
 ) -> PlanExecutor<'a> {
     PlanExecutor {
-        preflight: Box::new(|_| Ok(())),
+        preflight: Box::new(|_, _| Ok(())),
         run: Box::new(move |ctx, sess, cli, prompt, effort, workdir, _log| {
             run(ctx, sess, cli, prompt, effort, workdir)
         }),
@@ -225,7 +226,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
                     workdir: &repo,
                     group_id: "codex-proof",
                     no_queue: true,
-                    clis: &selected,
+                    models: &selected,
                 },
                 &mut stderr,
             )
@@ -432,6 +433,7 @@ fn plan_engine_label() {
 fn plan_failure_reason_uses_model_name() {
     let got = plan_failure_reason(
         "codex",
+        CODEX_MODEL,
         "Codex CLI not installed; run codex login; gpt-6-astra",
     );
     assert!(
@@ -447,7 +449,11 @@ fn plan_failure_reason_uses_model_name() {
         "Codex runtime not installed; authenticate the Codex runtime; codex"
     );
     assert_eq!(
-        plan_failure_reason("claude", &format!("{CLAUDE_MODEL} failed in Claude CLI")),
+        plan_failure_reason(
+            "claude",
+            CLAUDE_MODEL,
+            &format!("{CLAUDE_MODEL} failed in Claude CLI")
+        ),
         "claude failed in Claude runtime"
     );
 }
@@ -590,6 +596,7 @@ fn run_plan_cli_restores_plan_mode() {
         &ex,
         &mut sess,
         "claude",
+        CLAUDE_MODEL,
         "p",
         workdir,
         MODE_PLAN,
@@ -919,7 +926,7 @@ fn no_models_requested() {
 fn preflight_failure_is_skipped_with_a_public_reason() {
     let (_home, cfg) = plan_test_config("");
     let ex = PlanExecutor {
-        preflight: Box::new(|cli| {
+        preflight: Box::new(|cli, _| {
             if cli == "codex" {
                 bail!("Codex CLI not installed; run codex login");
             }
@@ -950,7 +957,7 @@ fn preflight_failure_is_skipped_with_a_public_reason() {
 fn all_preflights_failing_is_an_error() {
     let (_home, cfg) = plan_test_config("");
     let ex = PlanExecutor {
-        preflight: Box::new(|cli| bail!("{cli} CLI missing")),
+        preflight: Box::new(|cli, _| bail!("{cli} CLI missing")),
         run: Box::new(|_, _, _, _, _, _, _| bail!("must not run")),
     };
     let err = run_plan(&cfg, &ex, "", "g", &clis(&["codex", "claude"])).unwrap_err();
@@ -1332,6 +1339,7 @@ fn run_plan_cli_fails_the_session_on_unwind() {
             &ex,
             &mut sess,
             "claude",
+            CLAUDE_MODEL,
             "p",
             "/w",
             MODE_PLAN,
@@ -1430,7 +1438,7 @@ fn repairing_executor<'a>(
     codex_reply: &'a str,
 ) -> PlanExecutor<'a> {
     PlanExecutor {
-        preflight: Box::new(|_| Ok(())),
+        preflight: Box::new(|_, _| Ok(())),
         run: Box::new(move |_, sess, cli, _prompt, effort, _, log| {
             calls.lock().unwrap().push((
                 cli.to_string(),
@@ -1498,4 +1506,103 @@ fn a_plan_repair_that_changes_the_rating_keeps_the_review() {
     let parsed = out.results[0].parsed.as_ref().unwrap();
     assert_eq!(parsed.rating, 6);
     assert_eq!(parsed.summary, "The codex plan can utilize the cache.");
+}
+
+/// Four models on two runtimes: Codex and Sol run as two codex blocks,
+/// Opus and Fable as two claude blocks, each with its own model, label and
+/// effort default. Each block's repair pass runs on its own model.
+#[test]
+fn two_models_on_one_runtime_run_as_two_blocks() {
+    let (_home, cfg) = plan_test_config("");
+    // (cli, model, effort, repair log)
+    let calls: Mutex<Vec<(String, String, String, bool)>> = Mutex::new(Vec::new());
+    let ex = PlanExecutor {
+        preflight: Box::new(|cli, model| {
+            assert_eq!(cli, plan_cli(model));
+            Ok(())
+        }),
+        run: Box::new(|_, sess, cli, _prompt, effort, _, log| {
+            let model = sess.model.clone();
+            calls.lock().unwrap().push((
+                cli.to_string(),
+                model.clone(),
+                effort.to_string(),
+                log.is_some(),
+            ));
+            let label = config::engine_label(cli, &model);
+            let (path, text) = match log {
+                None => (sess.log_file.clone(), flagged_plan(&label)),
+                Some(log) => (log.to_string(), repaired_plan(&label)),
+            };
+            std::fs::write(&path, &text)?;
+            Ok((text.into_bytes(), 0))
+        }),
+    };
+    let models = clis(&[CODEX_MODEL, SOL_MODEL, CLAUDE_MODEL, FABLE_MODEL]);
+    let out = run_plan(&cfg, &ex, "", "g", &models).unwrap();
+    drop(ex);
+
+    let got: Vec<(&str, &str, String)> = out
+        .results
+        .iter()
+        .map(|r| {
+            (
+                r.cli.as_str(),
+                r.model.as_str(),
+                r.parsed.as_ref().unwrap().summary.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("codex", CODEX_MODEL, repaired_summary("codex")),
+            ("codex", SOL_MODEL, repaired_summary("sol")),
+            ("claude", CLAUDE_MODEL, repaired_summary("claude")),
+            ("claude", FABLE_MODEL, repaired_summary("fable")),
+        ]
+    );
+
+    let mut calls = calls.into_inner().unwrap();
+    calls.sort();
+    let want = |cli: &str, model: &str, effort: &str| {
+        vec![
+            (
+                cli.to_string(),
+                model.to_string(),
+                effort.to_string(),
+                false,
+            ),
+            (cli.to_string(), model.to_string(), "low".to_string(), true),
+        ]
+    };
+    let mut expected = [
+        want("claude", CLAUDE_MODEL, "medium"),
+        want("claude", FABLE_MODEL, "medium"),
+        want("codex", CODEX_MODEL, "xhigh"),
+        want("codex", SOL_MODEL, "xhigh"),
+    ]
+    .concat();
+    expected.sort();
+    assert_eq!(calls, expected);
+
+    let sessions = Session::load_all(cfg.paths());
+    let mut recorded: Vec<(String, String)> = sessions
+        .iter()
+        .map(|s| (s.cli.clone(), s.model.clone()))
+        .collect();
+    recorded.sort();
+    assert_eq!(
+        recorded,
+        vec![
+            ("claude".to_string(), FABLE_MODEL.to_string()),
+            ("claude".to_string(), CLAUDE_MODEL.to_string()),
+            ("codex".to_string(), CODEX_MODEL.to_string()),
+            ("codex".to_string(), SOL_MODEL.to_string()),
+        ]
+    );
+}
+
+fn repaired_summary(label: &str) -> String {
+    format!("The {label} plan can use the cache.")
 }

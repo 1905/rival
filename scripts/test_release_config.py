@@ -94,7 +94,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_dispatch_has_no_inputs(self):
         on = self.wf.get("on", self.wf.get(True))  # YAML 1.1 reads `on` as true
-        self.assertEqual(on, {"push": {"tags": ["v*"]}, "workflow_dispatch": None})
+        self.assertEqual(on, {"push": {"tags": ["v*", "!v5.1.0"]}, "workflow_dispatch": None})
         self.assertEqual(self.wf["permissions"], {"contents": "read"})
 
     def test_secrets_and_write_access_only_on_the_tag_path(self):
@@ -122,6 +122,20 @@ class WorkflowTest(unittest.TestCase):
         targets = {entry["target"] for entry in job["strategy"]["matrix"]["include"]}
         self.assertEqual(targets, SIX)
         self.assertEqual(job["needs"], "snapshot")
+
+
+class PremergeAppTest(unittest.TestCase):
+    def test_macos_builds_app_and_runs_all_swift_tests(self):
+        ci = load(".github/workflows/ci.yml")
+        steps = ci["jobs"]["test"]["steps"]
+        app_steps = [step for step in steps if step.get("working-directory") == "app"]
+        self.assertEqual(len(app_steps), 1)
+        step = app_steps[0]
+        self.assertEqual(step["if"], "runner.os == 'macOS'")
+        commands = [line.strip() for line in step["run"].splitlines()]
+        self.assertIn("swift build --product RivalApp", commands)
+        self.assertIn("swift test", commands)
+        self.assertFalse(any("--filter" in line or "--skip" in line for line in commands))
 
 
 if __name__ == "__main__":

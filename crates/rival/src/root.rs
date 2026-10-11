@@ -16,10 +16,10 @@ use rival_core::{logging, queue, session, update};
 use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
-use crate::model_specs::{claude_spec, codex_spec, grok_spec, k3_spec};
+use crate::model_specs::{claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{command_plan, command_security, install, queue_sessions, update_cmd};
+use crate::{command_plan, command_security, config_cmd, install, queue_sessions, update_cmd};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -331,8 +331,9 @@ pub type ConfigHook = Arc<dyn Fn(&Config) + Send + Sync>;
 /// The update check, printing its notice to the writer.
 pub type UpdateHook = Arc<dyn Fn(&Config, &mut dyn Write) + Send + Sync>;
 
-/// Runs the dashboard. The error is the text after "tui: ".
-pub type TuiHook = Box<dyn Fn(&Config) -> Result<(), String>>;
+/// Runs the dashboard, opened on the run list or on the config window. The
+/// error is the text after "tui: ".
+pub type TuiHook = Box<dyn Fn(&Config, crate::tui::runtime::Start) -> Result<(), String>>;
 
 /// The root's side effects, injectable for tests.
 pub struct RootHooks {
@@ -490,7 +491,8 @@ fn execute_inner(
     match result {
         Ok(()) => 0,
         Err(err) => {
-            let _ = writeln!(env.stderr, "{}", err.message);
+            // The leak guard: no registered secret in a printed error.
+            let _ = writeln!(env.stderr, "{}", rival_core::leakguard::scrub(&err.message));
             err.code
         }
     }
@@ -504,7 +506,12 @@ fn pre_run(
     inv: &Invocation,
     bg: &mut Background,
 ) -> PreRun {
-    if let Some(err) = env.cfg.user_config_error() {
+    // `config set` and `config key` can repair an invalid config file;
+    // `config check --config-stdin` does not read it.
+    if let Some(err) = env.cfg.user_config_error()
+        && !inv.id.repairs_config()
+        && !(inv.id == CommandId::ConfigCheck && inv.bool("config-stdin"))
+    {
         return PreRun::Fail(CmdError::plain(err.to_string()));
     }
     // Detach before any side effects: the re-exec'd child redoes this hook.
@@ -514,7 +521,7 @@ fn pre_run(
     {
         return PreRun::Exit(code);
     }
-    let tui = inv.id == CommandId::Tui;
+    let tui = matches!(inv.id, CommandId::Tui | CommandId::Config);
     if tui {
         // The TUI owns the terminal: a log line on stderr (the background
         // reaper logs each orphan it fails) would draw over the screen.
@@ -564,7 +571,7 @@ fn dispatch(
             let _ = writeln!(env.stdout, "{BANNER}  {}", rival_core::VERSION);
             Ok(())
         }
-        CommandId::Command | CommandId::Run => {
+        CommandId::Command | CommandId::Run | CommandId::ConfigKey => {
             let _ = env
                 .stdout
                 .write_all(tree::render_help(root, &inv.path).as_bytes());
@@ -572,18 +579,30 @@ fn dispatch(
         }
         CommandId::CommandCodex => model_command(env, inv, codex_spec),
         CommandId::CommandClaude => model_command(env, inv, claude_spec),
+        CommandId::CommandFable => model_command(env, inv, fable_spec),
+        CommandId::CommandSol => model_command(env, inv, sol_spec),
         CommandId::CommandGrok => model_command(env, inv, grok_spec),
         CommandId::CommandK3 => model_command(env, inv, k3_spec),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
+        CommandId::Config => (hooks.tui)(env.cfg, crate::tui::runtime::Start::Config)
+            .map_err(|e| CmdError::plain(format!("tui: {e}"))),
+        CommandId::ConfigShow => config_cmd::show_action(env, inv),
+        CommandId::ConfigSet => config_cmd::set_action(env, inv),
+        CommandId::ConfigKeySet => config_cmd::key_set_action(env, inv),
+        CommandId::ConfigKeyClear => config_cmd::key_clear_action(env),
+        CommandId::ConfigModels => config_cmd::models_action(env, inv),
+        CommandId::ConfigCheck => config_cmd::check_action(env, inv),
         CommandId::Queue => queue_sessions::queue_list_action(env),
         CommandId::QueueClear => queue_sessions::queue_clear_action(env, inv),
         CommandId::Sessions => queue_sessions::sessions_action(env, inv),
         CommandId::Update => update_cmd::update_action(env),
         // The error text is prefixed with "tui: ".
-        CommandId::Tui => (hooks.tui)(env.cfg).map_err(|e| CmdError::plain(format!("tui: {e}"))),
+        CommandId::Tui => (hooks.tui)(env.cfg, crate::tui::runtime::Start::List)
+            .map_err(|e| CmdError::plain(format!("tui: {e}"))),
         CommandId::RunClaude => model_run(env, inv, claude_spec),
+        CommandId::RunFable => model_run(env, inv, fable_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
         CommandId::RunK3 => model_run(env, inv, k3_spec),
         CommandId::Wait => {

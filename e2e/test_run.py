@@ -463,6 +463,30 @@ class HttpTest(RunnerCase):
         self.assertRegex(server.url, r"^http://127\.0\.0\.1:\d+$")
 
 
+    def test_auth_route_answers_401_to_another_key(self):
+        import urllib.error
+        import urllib.request
+        server = run.UpdateServer({"/v1/models": {"status": 200, "auth": "Bearer test-proxy-key-0000",
+                                                  "json": {"data": []}}})
+        self.addCleanup(server.close)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+        def get(key):
+            req = urllib.request.Request(server.url + "/v1/models")
+            if key:
+                req.add_header("Authorization", "Bearer " + key)
+            try:
+                return opener.open(req, timeout=5).status
+            except urllib.error.HTTPError as err:
+                return err.code
+
+        self.assertEqual([get("test-proxy-key-0000"), get("wrong-key-1111"), get(None)], [200, 401, 401])
+
+    def test_server_token_expands_in_run_args(self):
+        sc = scenario([step([{"out": "<SERVER>\n"}], ok({"$regex": r"http://127\.0\.0\.1:\d+\n"}))])
+        self.assertPass(self.run_sc(sc))
+
+
 class RedirectTest(RunnerCase):
     """Task 2.2's case: arbitrary redirect names, stdin unlinked once the detached parent exits."""
 

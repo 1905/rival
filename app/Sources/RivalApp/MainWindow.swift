@@ -14,6 +14,7 @@ struct MainWindow: View {
     @State private var search = ""
     @State private var toast: String?
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     private var store: SessionStore { app.store }
 
@@ -42,7 +43,10 @@ struct MainWindow: View {
         .frame(minWidth: 900, minHeight: 520)
         // The notifier and the dock need a way to reopen this window after
         // it was closed; the action is only reachable from a view.
-        .onAppear { app.openWindowAction = openWindow }
+        .onAppear {
+            app.openWindowAction = openWindow
+            app.openSettingsAction = openSettings
+        }
     }
 }
 

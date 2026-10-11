@@ -1,0 +1,67 @@
+{
+  "name": "proxy-codex-key-rejected",
+  "description": "The proxy answers 401 to a wrong key. The preflight stops `rival command codex` before the queue and before codex runs (no `codex login status` either): stderr names the fix, exit 1, no session file. The wrong key is not printed.",
+  "env": {
+    "RIVAL_PROXY_URL": "<SERVER>",
+    "RIVAL_PROXY_KEY": "wrong-proxy-key-1111"
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "proxy:\n  codex:\n    enabled: true\n"
+    }
+  ],
+  "update_server": {
+    "routes": {
+      "/v1/models": {
+        "status": 200,
+        "auth": "Bearer test-proxy-key-0000",
+        "json": {
+          "object": "list",
+          "data": [
+            {
+              "id": "gpt-6-astra",
+              "owned_by": "openai"
+            },
+            {
+              "id": "gpt-6.1-sol",
+              "owned_by": "openai"
+            },
+            {
+              "id": "emcd_/claude-opus-5-5",
+              "owned_by": "anthropic"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "proxy rejected the key (401) — run rival config key set"
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml"
+    ],
+    "calls": {},
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      }
+    ]
+  }
+}

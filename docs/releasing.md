@@ -72,8 +72,8 @@ VERSION=3.23.0
    itself builds artifacts but does not duplicate this test gate.
 
    The candidate commit must also pass the full `CI` workflow on macOS,
-   Linux and Windows. This includes strict Clippy, CLI scenarios and Swift
-   session decoding. Do not tag a commit whose required checks are pending.
+   Linux and Windows. This includes strict Clippy, CLI scenarios, an explicit
+   Rival.app build and the complete Swift test suite. Do not tag a commit whose required checks are pending.
 
    Run the [unpublished snapshot](#unpublished-snapshot) on the release branch
    before the first Rust release, and whenever `.goreleaser.yaml`,
@@ -172,3 +172,13 @@ VERSION=3.23.0
    The app is ad-hoc signed, not notarized. The cask removes the quarantine
    flag in `postflight`. If Homebrew refuses the tap, run
    `brew trust --tap 1905/tap` and retry.
+
+## v5.1.0 source-only exception
+
+The maintainer requested v5.1.0 as a source-only release without building on
+their Mac. Its exact tag is excluded from the binary Release workflow; future
+version tags retain the normal pipeline and verification checklist above.
+Publish no CLI archives, app ZIP, DMG, checksums or Homebrew changes for this
+tag. State the unrun Rust/Swift and platform checks in the release notes.
+Keep it separate from the latest binary release so binary updaters do not
+select an assetless release. Do not reuse or move the existing v5.0.0 tag.
