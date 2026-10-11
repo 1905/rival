@@ -172,3 +172,13 @@ VERSION=3.23.0
    The app is ad-hoc signed, not notarized. The cask removes the quarantine
    flag in `postflight`. If Homebrew refuses the tap, run
    `brew trust --tap 1905/tap` and retry.
+
+## v5.1.0 source-only exception
+
+The maintainer requested v5.1.0 as a source-only release without building on
+their Mac. Its exact tag is excluded from the binary Release workflow; future
+version tags retain the normal pipeline and verification checklist above.
+Publish no CLI archives, app ZIP, DMG, checksums or Homebrew changes for this
+tag. State the unrun Rust/Swift and platform checks in the release notes.
+Keep it separate from the latest binary release so binary updaters do not
+select an assetless release. Do not reuse or move the existing v5.0.0 tag.

@@ -11,6 +11,9 @@ on:
   push:
     tags:
       - "v*"
+      # v5.1.0 is an explicitly requested source-only release: no binaries,
+      # app bundle, DMG, or Homebrew changes, even if Actions later resumes.
+      - "!v5.1.0"
   workflow_dispatch:
 
 permissions:

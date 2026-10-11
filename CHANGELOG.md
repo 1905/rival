@@ -2,9 +2,13 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-09.
+Latest binary release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-09.
 
 ## [Unreleased]
+
+## [v5.1.0] — 2026-10-11 (source only)
+
+This release publishes source code and embedded skills only, at the maintainer's request. It includes no compiled CLI, Rival.app, DMG or Homebrew update. Rust and Swift builds, the full CLI scenarios, cross-platform CI and Mac interaction checks were not completed for this candidate; GitHub Actions is blocked by an account billing issue. The source is unverified for binary distribution.
 
 ### Added
 - **Proxy support.** Claude runs (Opus, Fable) and Codex runs (Codex, Sol) can go through an HTTP gateway such as CLIProxyAPI: one `proxy.url`, one key file, and an on/off switch and model prefix for each provider. A preflight reads `/v1/models` and names the fix for a dead proxy, a rejected key or a wrong prefix. A 429 account limit names the other prefixes. `RIVAL_PROXY=off` sends one run direct.
@@ -19,6 +23,12 @@ Latest release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 
 - Old Fable sessions show as `fable`, not `retired-model`.
 - Secrets are scrubbed: the proxy key never appears in logs, session files or errors.
 - Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
+
+### Fixed
+- Sol 6.1 identity and setup are explicit in the generated Codex skill; upgrade/reinstall tests cover both skill hosts.
+- Settings serializes writes and startup lookup, preserves edits during saves and respects cancellation.
+- Login-shell lookup no longer hangs on inherited stdout or a large startup banner.
+- Premerge CI now builds Rival.app and runs its entire Swift test suite.
 
 ## [v5.0.0] — 2026-10-09
 

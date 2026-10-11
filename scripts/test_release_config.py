@@ -94,7 +94,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_dispatch_has_no_inputs(self):
         on = self.wf.get("on", self.wf.get(True))  # YAML 1.1 reads `on` as true
-        self.assertEqual(on, {"push": {"tags": ["v*"]}, "workflow_dispatch": None})
+        self.assertEqual(on, {"push": {"tags": ["v*", "!v5.1.0"]}, "workflow_dispatch": None})
         self.assertEqual(self.wf["permissions"], {"contents": "read"})
 
     def test_secrets_and_write_access_only_on_the_tag_path(self):
