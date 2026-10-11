@@ -12,6 +12,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG_GUARD = "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+APP_TAG_GUARD = TAG_GUARD + " && github.ref != 'refs/tags/v5.1.0'"
 SIX = {f"{system}_{arch}" for system in ("darwin", "linux", "windows") for arch in ("amd64", "arm64")}
 GOARCH = {"x86_64": "amd64", "aarch64": "arm64"}
 GOOS = {"apple-darwin": "darwin", "unknown-linux-gnu": "linux", "pc-windows-msvc": "windows"}
@@ -94,19 +95,19 @@ class WorkflowTest(unittest.TestCase):
 
     def test_dispatch_has_no_inputs(self):
         on = self.wf.get("on", self.wf.get(True))  # YAML 1.1 reads `on` as true
-        self.assertEqual(on, {"push": {"tags": ["v*", "!v5.1.0"]}, "workflow_dispatch": None})
+        self.assertEqual(on, {"push": {"tags": ["v*"]}, "workflow_dispatch": None})
         self.assertEqual(self.wf["permissions"], {"contents": "read"})
 
     def test_secrets_and_write_access_only_on_the_tag_path(self):
         for name, job in self.jobs.items():
             if "secrets." in self.job_text(name) or job.get("permissions", {}).get("contents") == "write":
-                self.assertEqual(job.get("if"), TAG_GUARD, name)
+                self.assertEqual(job.get("if"), APP_TAG_GUARD if name == "app" else TAG_GUARD, name)
         self.assertEqual(self.jobs["release"]["if"], TAG_GUARD)
-        self.assertEqual(self.jobs["app"]["if"], TAG_GUARD)
+        self.assertEqual(self.jobs["app"]["if"], APP_TAG_GUARD)
 
     def test_snapshot_jobs_publish_nothing(self):
         for name, job in self.jobs.items():
-            if job.get("if") == TAG_GUARD:
+            if job.get("if") in (TAG_GUARD, APP_TAG_GUARD):
                 continue
             self.assertEqual(job["if"], "github.event_name == 'workflow_dispatch'", name)
             self.assertEqual(job["permissions"], {"contents": "read"}, name)

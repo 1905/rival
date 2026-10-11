@@ -11,9 +11,6 @@ on:
   push:
     tags:
       - "v*"
-      # v5.1.0 is an explicitly requested source-only release: no binaries,
-      # app bundle, DMG, or Homebrew changes, even if Actions later resumes.
-      - "!v5.1.0"
   workflow_dispatch:
 
 permissions:
@@ -133,7 +130,9 @@ jobs:
   # goreleaser just made, then the rival-app cask in 1905/homebrew-tap is updated.
   app:
     needs: release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # v5.1.0 ships the CLI and Homebrew formula only, as requested. Do not
+    # build or publish the app, DMG or cask for this version.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref != 'refs/tags/v5.1.0'
     # macos-15 ships Xcode 16 (Swift 6) as default; Package.swift needs tools 6.0.
     runs-on: macos-15
     permissions:

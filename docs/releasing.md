@@ -173,12 +173,15 @@ VERSION=3.23.0
    flag in `postflight`. If Homebrew refuses the tap, run
    `brew trust --tap 1905/tap` and retry.
 
-## v5.1.0 source-only exception
+## v5.1.0 CLI-only exception
 
-The maintainer requested v5.1.0 as a source-only release without building on
-their Mac. Its exact tag is excluded from the binary Release workflow; future
-version tags retain the normal pipeline and verification checklist above.
-Publish no CLI archives, app ZIP, DMG, checksums or Homebrew changes for this
-tag. State the unrun Rust/Swift and platform checks in the release notes.
-Keep it separate from the latest binary release so binary updaters do not
-select an assetless release. Do not reuse or move the existing v5.0.0 tag.
+The maintainer requested a Homebrew release with proxy support and Sol 6.1,
+without building on their Mac or publishing a DMG. The normal hosted CLI
+release job builds its archives and updates the Homebrew formula. Only the
+app job excludes this exact tag, so no Rival.app ZIP, DMG or app cask update
+is published for v5.1.0. Future tags retain the full pipeline above.
+
+Do not point the tap at nonexistent archives or replace its prebuilt-binary
+installation with local source compilation. GitHub Actions billing must be
+unblocked before hosted builds can finish. Publish only verified CLI archives
+and their checksums; leave the existing v5.0.0 release/tag unchanged.

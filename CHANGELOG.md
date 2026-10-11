@@ -6,9 +6,9 @@ Latest binary release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.
 
 ## [Unreleased]
 
-## [v5.1.0] — 2026-10-11 (source only)
+## [v5.1.0] — CLI release preparation
 
-This release publishes source code and embedded skills only, at the maintainer's request. It includes no compiled CLI, Rival.app, DMG or Homebrew update. Rust and Swift builds, the full CLI scenarios, cross-platform CI and Mac interaction checks were not completed for this candidate; GitHub Actions is blocked by an account billing issue. The source is unverified for binary distribution.
+This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. Binary publication is pending: GitHub Actions is blocked by an account billing issue. Rust/Clippy, full CLI scenarios and cross-platform release verification have not yet passed for this candidate.
 
 ### Added
 - **Proxy support.** Claude runs (Opus, Fable) and Codex runs (Codex, Sol) can go through an HTTP gateway such as CLIProxyAPI: one `proxy.url`, one key file, and an on/off switch and model prefix for each provider. A preflight reads `/v1/models` and names the fix for a dead proxy, a rejected key or a wrong prefix. A 429 account limit names the other prefixes. `RIVAL_PROXY=off` sends one run direct.
