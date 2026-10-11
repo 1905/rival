@@ -44,6 +44,7 @@ final class SettingsModel {
     /// Set by the app delegate: posts the menu-bar check notification.
     @ObservationIgnored var postNote: (@MainActor (FinishNote) -> Void)?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var locatingTask: Task<Void, Never>?
     @ObservationIgnored private var checkTask: Task<Void, Never>?
 
     var hasDraft: Bool { !draft.isEmpty }
@@ -57,6 +58,12 @@ final class SettingsModel {
 
     /// Locates the CLI and reads the config, once per launch.
     func start() async {
+        // A menu-bar check can arrive while the Settings scene starts.
+        // Share that work instead of treating a pending lookup as missing.
+        if let locatingTask {
+            await locatingTask.value
+            return
+        }
         guard !started else { return }
         started = true
         await locate()
@@ -64,10 +71,19 @@ final class SettingsModel {
 
     /// Locates again ("Try again" on the not-found screen).
     func locate() async {
+        if let locatingTask {
+            await locatingTask.value
+            return
+        }
         cli = .locating
-        let found = await Task.detached { RivalCLI.locate() }.value
-        cli = found.map { .ready($0) } ?? .missing
-        if found != nil { await reload() }
+        let task = Task {
+            let found = await Task.detached { RivalCLI.locate() }.value
+            cli = found.map { .ready($0) } ?? .missing
+            if found != nil { await reload() }
+        }
+        locatingTask = task
+        await task.value
+        locatingTask = nil
     }
 
     func reload() async {
@@ -107,6 +123,9 @@ final class SettingsModel {
 
     /// Records an edit; an edit back to the saved value drops it.
     func set(_ key: String, _ value: JSONValue) {
+        // The forms are disabled during a write. Keep the same boundary
+        // here for bindings and actions already queued on the main actor.
+        guard !busy else { return }
         if saved?.values[key]?.value == value {
             draft[key] = nil
         } else {
@@ -151,7 +170,12 @@ final class SettingsModel {
     /// Saves the draft in one write. True when it saved (or had nothing to).
     @discardableResult
     func apply() async -> Bool {
-        guard let rival, hasDraft else { return true }
+        guard !busy else { return false }
+        guard hasDraft else { return true }
+        guard let rival else {
+            error = "rival CLI not found"
+            return false
+        }
         busy = true
         defer { busy = false }
         do {
@@ -167,13 +191,14 @@ final class SettingsModel {
     }
 
     func revert() {
+        guard !busy else { return }
         draft = [:]
         error = nil
     }
 
     func saveKey(_ key: String) async -> Bool {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let rival, !key.isEmpty else { return false }
+        guard !busy, let rival, !key.isEmpty else { return false }
         busy = true
         defer { busy = false }
         do {
@@ -187,7 +212,7 @@ final class SettingsModel {
     }
 
     func clearKey() async {
-        guard let rival else { return }
+        guard !busy, let rival else { return }
         busy = true
         defer { busy = false }
         do {
@@ -204,7 +229,7 @@ final class SettingsModel {
     /// `applyFirst` saves the draft first and stops when that fails.
     /// `notify` posts the result (the menu-bar check).
     func runCheck(applyFirst: Bool = false, notify: Bool = false) {
-        guard !checking else { return }
+        guard !checking, !busy else { return }
         checking = true
         checkTask = Task {
             await performCheck(applyFirst: applyFirst, notify: notify)
@@ -218,11 +243,19 @@ final class SettingsModel {
 
     private func performCheck(applyFirst: Bool, notify: Bool) async {
         if case .locating = cli { await start() }
+        guard !Task.isCancelled else {
+            checkError = "cancelled"
+            return
+        }
         guard let rival else {
             if notify { postNote?(checkFailedNote("rival CLI not found — \(RivalLocator.installCommand)")) }
             return
         }
         if applyFirst, !(await apply()) { return }
+        guard !Task.isCancelled else {
+            checkError = "cancelled"
+            return
+        }
         checkRows = []
         checkSummary = nil
         checkError = nil

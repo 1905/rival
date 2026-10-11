@@ -89,13 +89,13 @@ jobs:
           test -z "$(git status --porcelain -- testdata/)"
 
       # rival is Rust-only. Allowed: release history, plans, captured
-      # review text in fixtures, and the retired skill names that install
-      # must keep deleting.
+      # review text in fixtures, the command reference, and the retired
+      # skill names that install must keep deleting.
       - name: No Go, STE or antislop names
         if: runner.os == 'Linux'
         run: |
           ! git grep -n -I -E '\bGo\b|gostd|gojson|winpath|\bgo_[a-z]|[a-z]_go\b|_go_|\bGO_|\bste_|ste100|antislop' -- . \
-            ':!plans' ':!CHANGELOG.md' ':!README.md' ':!.github/workflows/ci.yml' \
+            ':!plans' ':!CHANGELOG.md' ':!README.md' ':!docs/command-reference.md' ':!.github/workflows/ci.yml' \
             ':!crates/rival-core/data/lang' ':!testdata/lang' \
             ':!testdata/logs/consilium_echoed_schema.log' \
             ':!crates/rival-core/src/review/testdata/consilium_echoed_schema.log' \
@@ -117,10 +117,12 @@ jobs:
           cargo build -p rival --locked
           python3 e2e/run.py --bin target/debug/rival
 
-      # The app decodes the Rust writer's golden files (testdata/written).
-      - name: Swift session decoding
+      # Compile the complete app and run all tests, including configuration
+      # and Rust writer session-decoding contracts, before publishing a tag.
+      - name: Swift app build and tests
         if: runner.os == 'macOS'
         working-directory: app
         run: |
           swift --version
-          swift test --filter SessionDecodingTests
+          swift build --product RivalApp
+          swift test

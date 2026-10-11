@@ -124,5 +124,19 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(job["needs"], "snapshot")
 
 
+class PremergeAppTest(unittest.TestCase):
+    def test_macos_builds_app_and_runs_all_swift_tests(self):
+        ci = load(".github/workflows/ci.yml")
+        steps = ci["jobs"]["test"]["steps"]
+        app_steps = [step for step in steps if step.get("working-directory") == "app"]
+        self.assertEqual(len(app_steps), 1)
+        step = app_steps[0]
+        self.assertEqual(step["if"], "runner.os == 'macOS'")
+        commands = [line.strip() for line in step["run"].splitlines()]
+        self.assertIn("swift build --product RivalApp", commands)
+        self.assertIn("swift test", commands)
+        self.assertFalse(any("--filter" in line or "--skip" in line for line in commands))
+
+
 if __name__ == "__main__":
     unittest.main()

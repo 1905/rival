@@ -3,7 +3,8 @@ import XCTest
 
 /// The `rival config … --json` bridge. Fixtures in Fixtures/config: `show`
 /// output captured from the CLI, `models` and `check` lines written to the
-/// Rust `to_json` field set. No process is ever started here.
+/// Rust `to_json` field set. Locator process tests use isolated /bin/sh
+/// scripts, never the user's login shell or a real rival/provider command.
 final class RivalCLITests: XCTestCase {
     func configFixture(_ name: String) throws -> Data {
         try Data(contentsOf: fixturesDir.appendingPathComponent("config", isDirectory: true).appendingPathComponent(name))
@@ -213,6 +214,35 @@ final class RivalCLITests: XCTestCase {
         // `command -v` prints nothing, or an alias line, when there is no binary.
         XCTAssertEqual(RivalLocator.parseLoginShell("RIVAL_PATH=/usr/bin\nRIVAL_BIN=\n").rival, nil)
         XCTAssertEqual(RivalLocator.parseLoginShell("RIVAL_BIN=alias rival=foo\n").rival, nil)
+    }
+
+    func testLoginShellDoesNotWaitForBackgroundStdout() {
+        // The shell exits immediately, but sleep retains its stdout for
+        // five seconds. Reading a pipe to EOF would wait for that child.
+        let start = ProcessInfo.processInfo.systemUptime
+        let result = RivalLocator.runLoginShell(
+            executable: "/bin/sh",
+            arguments: ["-c", "/bin/sleep 5 & printf 'RIVAL_PATH=/usr/bin\\nRIVAL_BIN=/test/rival\\n'"],
+            timeout: 2)
+        XCTAssertEqual(result, RivalLocator.LoginShell(path: "/usr/bin", rival: "/test/rival"))
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 3)
+    }
+
+    func testLoginShellLargeBannerCannotFillPipe() {
+        // More than a pipe buffer, and more than the retained output tail.
+        let result = RivalLocator.runLoginShell(
+            executable: "/bin/sh",
+            arguments: ["-c", "/bin/dd if=/dev/zero bs=1024 count=2048 2>/dev/null; printf '\\nRIVAL_PATH=/usr/bin\\nRIVAL_BIN=/test/rival\\n'"],
+            timeout: 5)
+        XCTAssertEqual(result, RivalLocator.LoginShell(path: "/usr/bin", rival: "/test/rival"))
+    }
+
+    func testLoginShellTimeoutIsBounded() {
+        let start = ProcessInfo.processInfo.systemUptime
+        let result = RivalLocator.runLoginShell(
+            executable: "/bin/sh", arguments: ["-c", "exec /bin/sleep 5"], timeout: 0.1)
+        XCTAssertNil(result)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 3)
     }
 
     func testChildEnvironmentUsesLoginPATH() {

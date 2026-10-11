@@ -183,6 +183,40 @@ fn install_both_hosts_and_preserve_unrelated_skills() {
     }
 }
 
+/// Sol's review skill was retired before Sol 6.1. Upgrades must restore it
+/// for both hosts and remove only the obsolete plan variant.
+#[test]
+fn sol_review_skill_survives_upgrade_cleanup_and_forced_reinstall() {
+    let home = tempfile::tempdir().unwrap();
+    for target in skill_targets(home.path(), "all", false).unwrap() {
+        let sol = skill_file(&target, "rival-sol");
+        let retired = skill_file(&target, "rival-plan-sol");
+        for path in [&sol, &retired] {
+            write_skill(
+                path.parent().unwrap(),
+                path,
+                b"---\nversion: old\n---\nRetired Sol skill\n",
+            )
+            .unwrap();
+        }
+
+        for _ in 0..2 {
+            install(&target, true, "");
+            let got = fs::read(&sol).unwrap();
+            assert_eq!(got, want_content(&target, "rival-sol"));
+            let text = String::from_utf8(got).unwrap();
+            assert!(text.contains("Sol 6.1"), "{}: {text}", target.host);
+            assert!(
+                text.contains("rival command sol --detach --workdir"),
+                "{}: {text}",
+                target.host
+            );
+            assert_eq!(parse_version(&text), version("rival-sol"));
+            assert!(!retired.parent().unwrap().exists());
+        }
+    }
+}
+
 #[test]
 fn install_overwrite_and_buffered_answers() {
     let dir = tempfile::tempdir().unwrap();

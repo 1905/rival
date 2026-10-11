@@ -87,7 +87,12 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
             "fable",
             "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). For a plan document use $rival-plan with `--model fable`. Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
         ),
-        "rival-codex" | "rival-sol" | "rival-k3" | "rival-grok" => {
+        "rival-sol" => (
+            "Run a requested Sol 6.1 prompt or code review through Rival from Codex.".into(),
+            "sol",
+            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
+        ),
+        "rival-codex" | "rival-k3" | "rival-grok" => {
             let model = name.strip_prefix("rival-").unwrap_or(name);
             (
                 format!("Run a requested {model} prompt or code review through Rival from Codex."),

@@ -145,7 +145,7 @@ fn plan_sol_and_fable_skills_stay_retired() {
 fn fable_and_sol_skills_are_active() {
     for (name, command, model) in [
         ("rival-fable", "fable", "Fable 5.1"),
-        ("rival-sol", "sol", "Sol"),
+        ("rival-sol", "sol", "Sol 6.1"),
     ] {
         assert!(NAMES.contains(&name), "{name} is not active");
         assert!(!DEPRECATED.contains(&name), "{name} is still deprecated");
@@ -162,6 +162,12 @@ fn fable_and_sol_skills_are_active() {
         for forbidden in ["rival command claude", "rival command codex", "Opus 5.5"] {
             assert!(!content.contains(forbidden), "{name} has {forbidden:?}");
         }
+        let codex = String::from_utf8(codex_skill(name, "test").unwrap()).unwrap();
+        assert!(codex.contains(model), "{name} does not name {model}");
+        assert!(
+            codex.contains(&format!("rival command {command} --detach --workdir")),
+            "{name} launches the wrong command from Codex"
+        );
     }
     // rival-plan documents the model list.
     let plan = skill("rival-plan");
@@ -350,8 +356,8 @@ fn codex_skill_text_golden() {
         ),
         (
             "rival-sol",
-            "Run a requested sol prompt or code review through Rival from Codex.",
-            review,
+            "Run a requested Sol 6.1 prompt or code review through Rival from Codex.",
+            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
         ),
         (
             "rival-k3",

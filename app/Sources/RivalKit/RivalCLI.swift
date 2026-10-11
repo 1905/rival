@@ -478,24 +478,50 @@ public enum RivalLocator {
     /// `/bin/zsh -lc …`, killed after 5 s (a profile that waits for input).
     /// Blocking: call it off the main thread.
     public static func runLoginShell() -> LoginShell? {
+        runLoginShell(executable: "/bin/zsh", arguments: ["-lc", loginShellScript], timeout: 5)
+    }
+
+    /// Testable without loading a user's shell profile. A regular file
+    /// cannot fill a pipe or wait for a background child to close stdout.
+    /// Only its final MiB is read, so a noisy profile cannot exhaust memory.
+    static func runLoginShell(executable: String, arguments: [String], timeout: TimeInterval) -> LoginShell? {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("rival-shell-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        } catch { return nil }
+        defer { try? fm.removeItem(at: dir) }
+        let outputURL = dir.appendingPathComponent("stdout")
+        guard fm.createFile(atPath: outputURL.path, contents: nil, attributes: [.posixPermissions: 0o600]),
+              let output = try? FileHandle(forWritingTo: outputURL) else { return nil }
+        defer { try? output.close() }
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", loginShellScript]
-        let out = Pipe()
-        process.standardOutput = out
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         do { try process.run() } catch { return nil }
-        let deadline = Date().addingTimeInterval(5)
-        while process.isRunning && Date() < deadline {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while process.isRunning && ProcessInfo.processInfo.systemUptime < deadline {
             Thread.sleep(forTimeInterval: 0.05)
         }
         if process.isRunning {
             process.terminate()
             return nil
         }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        return parseLoginShell(String(decoding: data, as: UTF8.self))
+        do {
+            // Open a separate handle: a background child may still write
+            // through the inherited one, whose file offset must not move.
+            let input = try FileHandle(forReadingFrom: outputURL)
+            defer { try? input.close() }
+            let end = try input.seekToEnd()
+            let count = min(end, 1024 * 1024)
+            try input.seek(toOffset: end - count)
+            let data = try input.read(upToCount: Int(count)) ?? Data()
+            return parseLoginShell(String(decoding: data, as: UTF8.self))
+        } catch { return nil }
     }
 
     /// The child environment: the app's own, with the login shell's `PATH`

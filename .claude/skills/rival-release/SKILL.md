@@ -26,7 +26,7 @@ to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`
    `make cli-test && make cli-release-check` (Rust workspace tests, release
    script tests, `goreleaser check`). Must be green before tagging.
    Require the candidate commit's full three-OS `CI` workflow to pass too,
-   including strict Clippy, CLI scenarios and Swift session decoding.
+   including strict Clippy, CLI scenarios, the Rival.app build and all Swift tests.
 3. **Snapshot gate** — required for the first Rust release and whenever
    `.goreleaser.yaml`, `release.yml`, `.github/actions/cli-release-tools/`,
    the toolchain or dependencies changed. A manual run publishes nothing:

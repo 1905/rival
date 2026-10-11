@@ -79,6 +79,7 @@ struct ProxyPane: View {
                 }
             }
             .formStyle(.grouped)
+            .disabled(settings.busy)
             .safeAreaInset(edge: .bottom, spacing: 0) { ApplyBar(settings: settings) }
         }
     }
@@ -88,7 +89,6 @@ struct ProxyPane: View {
         Task {
             if await settings.saveKey(key) {
                 keyInput = ""
-                await settings.refreshProxy()
             }
         }
     }

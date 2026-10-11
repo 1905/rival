@@ -580,7 +580,7 @@ fn run_logs(dir: &Path, name: &str) -> Vec<PathBuf> {
 }
 
 #[test]
-fn logs_go_to_the_check_dir_and_no_session_is_saved() {
+fn logs_use_the_check_dir_and_no_session_is_saved() {
     let fix = Fixture::new();
     let fake = Fake::new();
     let report = check(&fix, &["codex", "fable"], &fake);

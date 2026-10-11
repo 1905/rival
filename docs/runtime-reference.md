@@ -2,7 +2,7 @@
 
 This document describes Rival's command surface, models, authentication
 inputs, and effort resolution. Slash-command skills delegate to these same
-commands and runtimes. The README "Reference (for agents)" section is the
+commands and runtimes. The [command reference](command-reference.md) is the
 complete command reference; this page adds runtime detail.
 
 ## Code review

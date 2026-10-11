@@ -72,8 +72,8 @@ VERSION=3.23.0
    itself builds artifacts but does not duplicate this test gate.
 
    The candidate commit must also pass the full `CI` workflow on macOS,
-   Linux and Windows. This includes strict Clippy, CLI scenarios and Swift
-   session decoding. Do not tag a commit whose required checks are pending.
+   Linux and Windows. This includes strict Clippy, CLI scenarios, an explicit
+   Rival.app build and the complete Swift test suite. Do not tag a commit whose required checks are pending.
 
    Run the [unpublished snapshot](#unpublished-snapshot) on the release branch
    before the first Rust release, and whenever `.goreleaser.yaml`,

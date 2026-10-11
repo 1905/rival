@@ -40,6 +40,7 @@ struct ModelsPane: View {
                     }
                     .width(min: 80, ideal: 90)
                 }
+                .disabled(settings.busy)
                 Text("Plan default: the models `rival command plan` runs without -m.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
