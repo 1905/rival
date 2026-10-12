@@ -21,7 +21,9 @@ use crate::model_specs::{
 };
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
-use crate::{command_plan, command_security, config_cmd, install, queue_sessions, update_cmd};
+use crate::{
+    command_plan, command_security, config_cmd, install, queue_sessions, skill_command, update_cmd,
+};
 use crate::{startup_fds, wait};
 
 #[cfg(test)]
@@ -587,6 +589,7 @@ fn dispatch(
         CommandId::CommandK3 => model_command(env, inv, k3_spec()),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
+        CommandId::CommandSkill => skill_command::skill_command_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
         CommandId::Config => (hooks.tui)(env.cfg, crate::tui::runtime::Start::Config)
             .map_err(|e| CmdError::plain(format!("tui: {e}"))),

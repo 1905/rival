@@ -114,7 +114,7 @@ fn command_subtree_matches_cli_surface() {
     assert_eq!(
         names(command),
         [
-            "claude", "codex", "fable", "grok", "k3", "plan", "security", "sol"
+            "claude", "codex", "fable", "grok", "k3", "plan", "security", "skill", "sol"
         ]
     );
     let detach = command
@@ -151,6 +151,14 @@ fn command_subtree_matches_cli_surface() {
             f("which", "false")
         ]
     );
+    assert_eq!(
+        flags(node(&r, &["command", "skill"])),
+        [f("host", ""), f("workdir", "."), f("no-queue", "false")]
+    );
+    let inv = parse_ok(&["command", "skill", "--host", "codex", "--detach"]);
+    assert_eq!(inv.id, CommandId::CommandSkill);
+    assert_eq!(inv.string("host"), "codex");
+    assert!(inv.bool("detach"));
 }
 
 #[test]
@@ -758,7 +766,7 @@ fn opus_is_an_alias_of_claude() {
 #[test]
 fn ultrafast_is_not_a_flag() {
     for name in [
-        "codex", "sol", "claude", "opus", "fable", "grok", "k3", "plan", "security",
+        "codex", "sol", "claude", "opus", "fable", "grok", "k3", "plan", "security", "skill",
     ] {
         assert_eq!(
             parse_err(&["command", name, "--ultrafast"]),
