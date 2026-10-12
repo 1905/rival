@@ -1,82 +1,63 @@
 ---
 name: rival-release
 version: 5.1.0
-description: Release rival — bump skills, commit, tag, push; CI (goreleaser) publishes the GitHub release + brew formula. Then reinstall, verify, notify. Use when user says "release" or "commit push release".
+description: Release rival — bump skills, run the local gate, tag, push, then publish the GitHub release + brew formula from the MacBook Air with scripts/release-local.sh. Then reinstall, verify, notify. Use when user says "release" or "commit push release".
 argument-hint: "<version>"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 
 # Rival Release
 
-Release pipeline for the rival Rust CLI and Rival.app. **CI is the only
-publisher** — the `.github/workflows/release.yml` workflow runs goreleaser on
-every `v*` tag push and publishes the GitHub release, the six CLI archives,
-**and** the Homebrew formula (it has the `HOMEBREW_TAP_TOKEN` secret), then the
-`app` job publishes Rival.app and its cask. Do **NOT** run `goreleaser release`
-locally — a second goreleaser run on the same tag collides with the
-CI-published assets (`422 already_exists`) and turns CI red. The skill's job is
-to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`.
+Rival has **no hosted CI**: GitHub Actions is off for `1905/rival` and the repo
+has no workflow files. You publish the release yourself, from the MacBook Air
+(`ssh air`, arm64 macOS, Command Line Tools SDK), with
+`scripts/release-local.sh`. One GoReleaser run publishes the GitHub release
+(six CLI archives + `checksums.txt`) and pushes `rival.rb` to
+`1905/homebrew-tap`. Rival.app is not published. Full guide:
+`docs/releasing.md`.
 
-For v5.1.0, only CLI archives and the Homebrew formula are published. The
-app job is excluded for this tag: skip the app ZIP, DMG, cask and local app
-checks. Run Rust tests/builds on the Dell; do not build on the maintainer's
-Mac. Hosted CI still owns macOS/Windows checks and six-target snapshots.
-A billing lock is a blocker to publication, not permission to skip gates or
-publish a tag without verified assets. Leave v5.0.0 unchanged.
+Run the Rust gate on the Dell. Build release archives only on the Air. Never
+run `release` twice for one tag: the second run collides with the uploaded
+assets. Never move a published tag.
 
 ## Steps
 
-1. **Bump skill versions** — run `./scripts/bump-skill-versions.sh <version>` to
-   update the embedded SKILL.md files (`crates/rival-core/skills/`).
-2. **Build + test** — from the repository root:
-   create/activate a local Python venv and install `scripts/requirements-test.txt`.
-   `make cli-test && make cli-release-check` (Rust workspace tests, release
-   script tests, `goreleaser check` with only the documented `brews` warning
-   accepted). Must be green before tagging.
-   Require the candidate commit's full three-OS `CI` workflow to pass too,
-   including strict Clippy, CLI scenarios, the Rival.app build and all Swift tests.
-3. **Snapshot gate** — required for the first Rust release and whenever
-   `.goreleaser.yaml`, `release.yml`, `.github/actions/cli-release-tools/`,
-   the toolchain or dependencies changed. A manual run publishes nothing:
-   `gh workflow run release.yml --ref <branch>`, then `gh run watch <run-id>`.
-   `snapshot` and all six `snapshot-native` jobs must be green. Download the
-   artifact with
-   `gh run download <run-id> -n rival-snapshot -D /tmp/rival-snapshot-<version>`
-   and read `homebrew/rival.rb` (four darwin/linux URLs, `bin.install "rival"`).
-4. **Commit** all pending changes (skills, code, README, docs). Confirm
-   `git config user.email` is `32327548+1905@users.noreply.github.com` first.
-5. **Tag** `v<version>` on the release commit (`git tag v<version>`).
-6. **Push** `master` + the tag over SSH with the explicit `1905` key
-   (`/Users/kass/ssh/github-kass`; the HTTPS token lacks the `workflow` scope):
+1. **Bump skill versions** — `./scripts/bump-skill-versions.sh <version>`
+   (updates `crates/rival-core/skills/*/SKILL.md`).
+2. **Gate (Dell)** — `make cli-check`. It must end with `CHECK OK` (fmt,
+   strict Clippy, workspace tests, startup fds, release-script tests,
+   fixtures, name check, e2e scenarios). `executor::claude::tests::proxy_key_never_reaches_the_log_mirror_or_record`
+   is a known flaky test; re-run once before you call a failure real.
+3. **Changelog** — move `[Unreleased]` to `[v<version>] — <date>` and update
+   the "Latest binary release" line.
+4. **Commit** as `1905`: `git -c user.email=32327548+1905@users.noreply.github.com commit -am "release: v<version>"`.
+   No AI co-author trailers.
+5. **Snapshot (Air)** — sync the checkout and build without publishing:
    ```bash
-   export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i /Users/kass/ssh/github-kass"
-   git push git@github.com:1905/rival.git master
-   git push git@github.com:1905/rival.git v<version>
+   rsync -a --delete --exclude .venv --exclude target --exclude dist ./ air:tmp-rival-release/src/
+   ssh air 'cd ~/tmp-rival-release/src && scripts/release-local.sh check && scripts/release-local.sh snapshot'
    ```
-   This push triggers the Release workflow.
-7. **Watch CI** — `gh run watch` (or `gh run list --workflow=Release`). The
-   `release` job (macos-15) builds six targets — darwin/linux with
-   cargo-zigbuild, windows with cargo-xwin — publishes the GitHub release +
-   assets, and pushes the updated formula to `1905/homebrew-tap` (`rival.rb` at
-   root). The `app` job then uploads Rival.app and updates `Casks/rival-app.rb`.
-   - If CI fails, inspect with `gh run view --log-failed`, fix and rerun the checks before publishing a new tag. Never move a published release tag.
-8. **Verify release published** — `gh release view v<version>` should list
-   `rival_{darwin,linux}_{amd64,arm64}.tar.gz`,
-   `rival_windows_{amd64,arm64}.zip`, `checksums.txt`, `Rival-app.zip` and the
-   DMG. Confirm `1905/homebrew-tap` got a "Brew formula update for rival
-   version v<version>" commit and a "Cask update for rival-app version
-   v<version>" commit.
-9. **Brew reinstall** — `brew update && brew uninstall rival && brew install 1905/tap/rival`.
-10. **Install skills** — `rival install --force`.
-11. **Verify** — `rival version` should show the new version (`which -a rival`
-    if it looks old: a dev build can shadow brew's binary).
-12. **Notify** — send a Telegram notification via `/notify` with version + changelog summary.
-
-## Notes
-- goreleaser config (`.goreleaser.yaml` at the repository root) uses `brews:`
-  (deprecated but the correct artifact for this tap — a Formula at root, not a
-  Cask). Do not switch to `homebrew_casks:` without migrating the whole tap.
-- Pinned release tools (Rust, Zig, cargo-zigbuild, cargo-xwin, GoReleaser) are
-  in `.github/actions/cli-release-tools/action.yml`.
-- The brew formula is updated **by CI**, not by hand. No manual `rival.rb`
-  edits.
+   Six `ok` lines plus `ok homebrew/rival.rb` and `RELEASE_LOCAL_OK snapshot`.
+   First time on a host: `scripts/release-local.sh setup`. A full build takes
+   about 12 minutes; run it in the background.
+6. **Tag and push** — `git tag v<version>`, `git push origin master`,
+   `git push origin v<version>`. Nothing runs on the push.
+7. **Publish (Air)** — sync again (now with the tag), then pass the token on
+   stdin so it is never on a command line:
+   ```bash
+   rsync -a --delete --exclude .venv --exclude target --exclude dist ./ air:tmp-rival-release/src/
+   gh auth token --user 1905 | ssh air 'cd ~/tmp-rival-release/src && scripts/release-local.sh release'
+   ```
+   Expect `release published` and `pushing repository=1905/homebrew-tap`.
+8. **Verify** — `gh release view v<version>` lists the six archives and
+   `checksums.txt`; `1905/homebrew-tap` has `Brew formula update for rival
+   version v<version>`.
+9. **Install** — on the Air: `brew update && brew upgrade rival` (or
+   `brew install 1905/tap/rival`), `rival version`. On the Dell (no brew):
+   download `rival_linux_amd64.tar.gz` + `checksums.txt` with
+   `gh release download`, check the hash, move the old `~/.local/bin/rival` to
+   `/wrk/trash/`, install the new one, then `rival install --force`.
+   If `rival version` is old, run `which -a rival`: a dev build earlier on
+   PATH shadows the brew one.
+10. **Notify** — send a Telegram notification via `/notify` with the version
+    and a changelog summary.

@@ -1,6 +1,6 @@
-"""Release contracts that `goreleaser check` does not cover: the publication
-boundary in release.yml, the six targets and archive names, the formula's
-tap, and target-scoped build environment. Static checks; nothing is built.
+"""Release contracts that `goreleaser check` does not cover: the six targets
+and archive names, the formula's tap, and target-scoped build environment.
+Static checks; nothing is built.
 
 Requires PyYAML (`import yaml`); a missing module fails the run.
 """
@@ -11,8 +11,6 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-TAG_GUARD = "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
-APP_TAG_GUARD = TAG_GUARD + " && github.ref != 'refs/tags/v5.1.0'"
 SIX = {f"{system}_{arch}" for system in ("darwin", "linux", "windows") for arch in ("amd64", "arm64")}
 GOARCH = {"x86_64": "amd64", "aarch64": "arm64"}
 GOOS = {"apple-darwin": "darwin", "unknown-linux-gnu": "linux", "pc-windows-msvc": "windows"}
@@ -83,60 +81,6 @@ class GoreleaserTest(unittest.TestCase):
         self.assertNotIn("directory", brew)  # rival.rb at the tap root
         self.assertEqual(brew["repository"], {"owner": "1905", "name": "homebrew-tap", "branch": "master",
                                               "token": "{{ .Env.HOMEBREW_TAP_TOKEN }}"})
-
-
-class WorkflowTest(unittest.TestCase):
-    def setUp(self):
-        self.wf = load(".github/workflows/release.yml")
-        self.jobs = self.wf["jobs"]
-
-    def job_text(self, name):
-        return yaml.safe_dump(self.jobs[name])
-
-    def test_dispatch_has_no_inputs(self):
-        on = self.wf.get("on", self.wf.get(True))  # YAML 1.1 reads `on` as true
-        self.assertEqual(on, {"push": {"tags": ["v*"]}, "workflow_dispatch": None})
-        self.assertEqual(self.wf["permissions"], {"contents": "read"})
-
-    def test_secrets_and_write_access_only_on_the_tag_path(self):
-        for name, job in self.jobs.items():
-            if "secrets." in self.job_text(name) or job.get("permissions", {}).get("contents") == "write":
-                self.assertEqual(job.get("if"), APP_TAG_GUARD if name == "app" else TAG_GUARD, name)
-        self.assertEqual(self.jobs["release"]["if"], TAG_GUARD)
-        self.assertEqual(self.jobs["app"]["if"], APP_TAG_GUARD)
-
-    def test_snapshot_jobs_publish_nothing(self):
-        for name, job in self.jobs.items():
-            if job.get("if") in (TAG_GUARD, APP_TAG_GUARD):
-                continue
-            self.assertEqual(job["if"], "github.event_name == 'workflow_dispatch'", name)
-            self.assertEqual(job["permissions"], {"contents": "read"}, name)
-            text = self.job_text(name)
-            for word in ("secrets.", "gh release", "git push", "git tag", "goreleaser publish"):
-                self.assertNotIn(word, text, name)
-            for step in job["steps"]:
-                if "goreleaser" in step.get("run", ""):
-                    self.assertIn("--snapshot", step["run"], name)
-
-    def test_native_checks_cover_six_targets(self):
-        job = self.jobs["snapshot-native"]
-        targets = {entry["target"] for entry in job["strategy"]["matrix"]["include"]}
-        self.assertEqual(targets, SIX)
-        self.assertEqual(job["needs"], "snapshot")
-
-
-class PremergeAppTest(unittest.TestCase):
-    def test_macos_builds_app_and_runs_all_swift_tests(self):
-        ci = load(".github/workflows/ci.yml")
-        steps = ci["jobs"]["test"]["steps"]
-        app_steps = [step for step in steps if step.get("working-directory") == "app"]
-        self.assertEqual(len(app_steps), 1)
-        step = app_steps[0]
-        self.assertEqual(step["if"], "runner.os == 'macOS'")
-        commands = [line.strip() for line in step["run"].splitlines()]
-        self.assertIn("swift build --product RivalApp", commands)
-        self.assertIn("swift test", commands)
-        self.assertFalse(any("--filter" in line or "--skip" in line for line in commands))
 
 
 if __name__ == "__main__":

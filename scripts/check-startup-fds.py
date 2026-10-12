@@ -18,6 +18,7 @@ Both cases stop before any provider, queue or network work. Each run gets a
 temporary HOME and RIVAL_HOME and a minimal environment.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -31,7 +32,17 @@ def build(release):
     if release:
         cmd.append("--release")
     subprocess.run(cmd, cwd=ROOT, check=True)
-    return os.path.join(ROOT, "target", "release" if release else "debug", "rival")
+    return os.path.join(target_dir(), "release" if release else "debug", "rival")
+
+
+def target_dir():
+    """Cargo's target directory: `target/` unless CARGO_TARGET_DIR or a
+    cargo config moves it."""
+    meta = subprocess.run(
+        ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+        cwd=ROOT, check=True, stdout=subprocess.PIPE,
+    )
+    return json.loads(meta.stdout)["target_directory"]
 
 
 def run(binary, args, close_fd):
