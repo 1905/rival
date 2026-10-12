@@ -13,9 +13,6 @@ files (git auto-detected) or an explicit scope. Omitted effort uses the `fable`
 default in `~/.rival/config.yaml`, with a built-in medium fallback. The run is
 detached and watched in the background — this skill does not block your session.
 
-For a Fable review of a plan/spec *document* (rated 1-10) use `/rival-plan` with
-`--model fable`.
-
 ## Instructions
 
 **Arguments received:** $ARGUMENTS

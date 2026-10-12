@@ -27,6 +27,11 @@ Windows binaries and manual downloads are available on the [releases page](https
 | `/rival-fable review` | Review changed code with Fable 5.1. |
 | `/rival-security` | Look for exploitable security vulnerabilities. |
 
+In 5.1.0, `rival install` provides seven review skills, including `/rival-sol`
+for Sol 6.1. The three `rival-plan*` skills are retired; upgrades preserve their
+installed folders outside the active skills tree. Plan reviews remain available
+through `rival command plan`. See the [skill migration details](docs/command-reference.md#skills).
+
 ## View the results
 
 Run `rival tui` to browse reviews and their findings.

@@ -24,6 +24,9 @@ This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and pr
 - Secrets are scrubbed: the proxy key never appears in logs, session files or errors.
 - Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
 
+### Removed
+- `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills. Install/update moves existing copies outside the active skills directory, preserving local edits, extra files and earlier backups. Seven review skills remain, including `rival-sol`; the native `rival command plan` command remains available.
+
 ### Fixed
 - Sol 6.1 identity and setup are explicit in the generated Codex skill; upgrade/reinstall tests cover both skill hosts.
 - Settings serializes writes and startup lookup, preserves edits during saves and respects cancellation.

@@ -1,13 +1,13 @@
 {
   "name": "install-all-prompts",
-  "description": "`rival install --target all` with stdin 'n\\nYES\\ny\\n': Claude skills are processed first, then Codex, all reading one shared stdin. Claude rival-codex (version old) is declined and printed as skipped, counted as up to date. Claude rival-plan has no frontmatter so its version is 'unknown'; 'YES' is accepted case-insensitively and it is updated. The third answer accepts the Codex rival-codex update. The declined file keeps its text.",
+  "description": "`rival install --target all` with stdin 'n\\nYES\\ny\\n': Claude skills are processed first, then Codex, all reading one shared stdin. Claude rival-codex (version old) is declined and printed as skipped, counted as up to date. Claude rival-claude has no frontmatter so its version is 'unknown'; 'YES' is accepted case-insensitively and it is updated. The third answer accepts the Codex rival-codex update. The declined file keeps its text.",
   "fixtures": [
     {
       "write": "home/.claude/skills/rival-codex/SKILL.md",
       "text": "---\nversion: old\n---\nclaude custom"
     },
     {
-      "write": "home/.claude/skills/rival-plan/SKILL.md",
+      "write": "home/.claude/skills/rival-claude/SKILL.md",
       "text": "no frontmatter"
     },
     {
@@ -32,7 +32,7 @@
       "stdin": "n\nYES\ny\n",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]     skipped\n  ✓ rival-sol — installed (v<V>)\n  ? rival-plan — update vunknown → v<V>? [y/N]   ✓ rival-plan — updated (vunknown → v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 8 installed, 1 updated, 1 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]   ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-plan — installed (v<V>)\n  ✓ rival-plan-codex — installed (v<V>)\n  ✓ rival-plan-claude — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 1 updated, 0 up to date, 0 removed\n",
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]     skipped\n  ✓ rival-sol — installed (v<V>)\n  ? rival-claude — update vunknown → v<V>? [y/N]   ✓ rival-claude — updated (vunknown → v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 5 installed, 1 updated, 1 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ? rival-codex — update vold → v<V>? [y/N]   ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 6 installed, 1 updated, 0 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -42,9 +42,6 @@
     "home_files": [
       ".claude/skills/rival-codex/SKILL.md",
       ".claude/skills/rival-sol/SKILL.md",
-      ".claude/skills/rival-plan/SKILL.md",
-      ".claude/skills/rival-plan-codex/SKILL.md",
-      ".claude/skills/rival-plan-claude/SKILL.md",
       ".claude/skills/rival-claude/SKILL.md",
       ".claude/skills/rival-fable/SKILL.md",
       ".claude/skills/rival-k3/SKILL.md",
@@ -52,9 +49,6 @@
       ".claude/skills/rival-security/SKILL.md",
       ".agents/skills/rival-codex/SKILL.md",
       ".agents/skills/rival-sol/SKILL.md",
-      ".agents/skills/rival-plan/SKILL.md",
-      ".agents/skills/rival-plan-codex/SKILL.md",
-      ".agents/skills/rival-plan-claude/SKILL.md",
       ".agents/skills/rival-claude/SKILL.md",
       ".agents/skills/rival-fable/SKILL.md",
       ".agents/skills/rival-k3/SKILL.md",

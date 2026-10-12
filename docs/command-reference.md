@@ -186,6 +186,14 @@ rival install --force           # overwrite without prompting
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
 - `rival install` removes retired skills: `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable` and older names. `rival-fable` and `rival-sol` are back in 5.1.
 
+The retired `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills are
+no longer installed. On `rival install` or `rival update`, existing copies are
+moved to numbered backups under `~/.claude/rival-retired-skills` or
+`~/.agents/rival-retired-skills`, outside the active skills directory. Local
+edits and extra files are preserved; earlier backups are never overwritten.
+Plan reviews remain available through `rival command plan` with the document
+path on stdin.
+
 #### Provider runtimes
 
 Install and authenticate the runtime for each model you use. Rival does not include these programs.
@@ -200,7 +208,7 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 
 ### Skills
 
-`rival install` installs ten skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs seven skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
 
 | Skill | Syntax | Runs | Default model and effort |
 |---|---|---|---|
@@ -211,9 +219,6 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 | `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
 | `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
 | `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
-| `/rival-plan` | `[-m opus,fable,sol] <plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned); `-m` picks other models |
-| `/rival-plan-codex` | `<plan.md>` | `rival command plan --model codex --effort xhigh` | Codex, xhigh (pinned) |
-| `/rival-plan-claude` | `[-re level] <plan.md>` | `rival command plan --model claude` | Claude, medium |
 
 - `review` with no scope reviews the changed files found by git. A scope may be a path or plain language, for example `review the auth middleware`.
 - Git scope detection: tracked changes against `HEAD` plus untracked files first. If the tree is clean, the files of the last commit. If there are none, the entire project.
@@ -325,7 +330,6 @@ cat out.txt                       # the review
 - Kimi K3 always runs at `max`. Any `-re` value is accepted and ignored.
 - Grok accepts `low`, `medium`, `high`. Higher values clamp to `high`, and the session records the clamped value.
 - Claude maps `low` and `medium` to the same CLI levels, and `high`, `xhigh` and `ultra` to the Claude CLI level `max`.
-- The plan skills `/rival-plan` and `/rival-plan-codex` always pass `--effort xhigh`.
 
 ### Code review: JSON contract and console output
 

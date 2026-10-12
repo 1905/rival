@@ -91,8 +91,8 @@ printf '%s\n' 'docs/plan.md' |
   rival command plan --model claude --workdir /path/to/project
 ```
 
-The installed `/rival-claude`, `/rival-plan`, and `/rival-plan-claude` skills use
-the same runtime selection and Docker fallback.
+The installed `/rival-claude` and `/rival-fable` skills and the native plan
+command use the same runtime selection and Docker fallback.
 
 ### 5. Optional effort defaults
 
