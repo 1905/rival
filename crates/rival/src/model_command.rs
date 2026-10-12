@@ -2,7 +2,7 @@
 
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::{Config, PromptKind, public_runtime_log};
-use rival_core::executor::RunResult;
+use rival_core::executor::{self, ROUTE_PROXY, RunResult};
 use rival_core::logging;
 use rival_core::paths::Paths;
 use rival_core::result::PayloadKind;
@@ -189,6 +189,13 @@ pub fn run_model_command(
     if let Err(e) = env.stdout.write_all(out.as_bytes()) {
         return Err(crate::command_plan::write_stdout_error(&e));
     }
+    if let Some(notice) = tier_omitted_notice(spec, &sess) {
+        let _ = write!(env.stdout, "\n{notice}");
+        let _ = env.stderr.write_all(notice.as_bytes());
+        logging::warn()
+            .str("session", sess.id.as_str())
+            .msg("codex omitted the ultrafast service tier");
+    }
 
     if exit_code != 0 {
         // The hint follows the log on stdout, so a skill capturing output
@@ -200,6 +207,35 @@ pub fn run_model_command(
         return Err(CmdError::exit(exit_code as i32, exit_msg));
     }
     Ok(())
+}
+
+/// The lines that say Codex dropped the requested tier, or `None`. Codex
+/// warns, then sends the request without the tier, so the run still counts.
+/// The language pass is a second call with its own log; either log can
+/// carry the warning. Only the direct route names the account as the cause:
+/// through the proxy, the catalog and the account are the proxy's.
+pub(crate) fn tier_omitted_notice(spec: &ModelSpec, sess: &Session) -> Option<String> {
+    let tier = spec.service_tier?;
+    let omitted = [
+        sess.log_file.clone(),
+        format!("{}.repair.log", sess.log_file),
+    ]
+    .iter()
+    .filter_map(|path| std::fs::read(path).ok())
+    .any(|log| executor::ultrafast_omitted(&String::from_utf8_lossy(&log)));
+    if !omitted {
+        return None;
+    }
+    let mut notice = format!(
+        "rival: ⚠ {tier} not applied — Codex omitted service_tier={tier} for {} because its model catalog does not list the tier; the run used the standard tier.\n",
+        spec.label()
+    );
+    if sess.route != ROUTE_PROXY {
+        notice.push_str(
+            "rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n",
+        );
+    }
+    Some(notice)
 }
 
 /// A review's prompt, recorded scope, and where it runs.

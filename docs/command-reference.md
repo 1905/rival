@@ -225,7 +225,7 @@ only when you intend to overwrite your installed skill contents.
 
 ### Skills
 
-`rival install` installs seven skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs nine skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
 
 | Skill | Syntax | Runs | Default model and effort |
 |---|---|---|---|
@@ -233,6 +233,8 @@ only when you intend to overwrite your installed skill contents.
 | `/rival-claude` | `[-re level] [scope]` (always a review) | `rival command claude` | Claude, medium |
 | `/rival-fable` | `[-re level] [scope]` (always a review) | `rival command fable` | Fable, medium |
 | `/rival-sol` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol` | Sol, xhigh |
+| `/rival-astra-ultrafast` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command codex --ultrafast` | Codex (GPT-6 Astra) on the Ultrafast tier, xhigh |
+| `/rival-sol-ultrafast` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol --ultrafast` | Sol on the Ultrafast tier, xhigh |
 | `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
 | `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
 | `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
@@ -264,11 +266,16 @@ Top-level commands (`rival --help`):
 
 | Subcommand | Flags (defaults) |
 |---|---|
-| `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
+| `codex`, `sol` | `--workdir` (`.`), `--no-queue`, `--ultrafast` |
+| `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
 | `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`plan.models`, else `codex`; accepts `codex`, `sol`, `claude`/`opus`, `fable`, comma-separated), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
+- `--ultrafast` (codex and sol only) asks Codex for the Ultrafast service tier: it adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true` after `-m <model>`, on the direct and the proxy route. Every call of the run gets it, including the language-repair pass. The session records `"service_tier": "ultrafast"`.
+  - Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.
+  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival then prints `rival: ⚠ ultrafast not applied — …` after the output, on stdout and stderr. The exit code does not change.
+  - Rival cannot see a tier that a server-side requirement turns off: Codex drops it without a warning. Whether a proxy forwards `service_tier` depends on the proxy.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 

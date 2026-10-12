@@ -25,10 +25,13 @@ Windows binaries and manual downloads are available on the [releases page](https
 | `/rival-claude review` | Review changed code with Claude. |
 | `/rival-sol review` | Review changed code with Sol 6.1. |
 | `/rival-fable review` | Review changed code with Fable 5.1. |
+| `/rival-astra-ultrafast review` | Review changed code with GPT-6 Astra on the Codex Ultrafast tier. |
+| `/rival-sol-ultrafast review` | Review changed code with Sol 6.1 on the Codex Ultrafast tier. |
 | `/rival-security` | Look for exploitable security vulnerabilities. |
 
-In 5.1.0, `rival install` provides seven review skills, including `/rival-sol`
-for Sol 6.1. The three `rival-plan*` skills are retired; upgrades preserve their
+In 5.1.0, `rival install` provides nine review skills, including `/rival-sol`
+for Sol 6.1 and the two Ultrafast skills. Ultrafast needs a Codex account on
+Pro $500, or an Enterprise/Edu workspace with Ultrafast on. The three `rival-plan*` skills are retired; upgrades preserve their
 installed folders outside the active skills tree. Plan reviews remain available
 through `rival command plan`. See the [skill migration details](docs/command-reference.md#skills).
 

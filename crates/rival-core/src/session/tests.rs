@@ -366,6 +366,7 @@ const FULL: &str = concat!(
     "  \"account\": \"acc\",\n",
     "  \"route\": \"proxy\",\n",
     "  \"wire_model\": \"emcd_/gpt-6-astra\",\n",
+    "  \"service_tier\": \"ultrafast\",\n",
     "  \"pid\": 42,\n",
     "  \"pid_start\": 7,\n",
     "  \"owner_pid\": 43,\n",
@@ -431,6 +432,7 @@ fn full_session() -> Session {
         account: "acc".into(),
         route: "proxy".into(),
         wire_model: "emcd_/gpt-6-astra".into(),
+        service_tier: "ultrafast".into(),
         pid: 42,
         pid_start: 7,
         owner_pid: 43,
@@ -1137,12 +1139,13 @@ fn sort_group_members_mixed_legacy_and_queued_is_total() {
     );
 }
 
-/// `route` and `wire_model` are optional: a record without them loads, and
-/// a direct run (both empty) writes neither.
+/// `route`, `wire_model` and `service_tier` are optional: a record without
+/// them loads, and a direct run without a tier (all empty) writes none.
 #[test]
 fn route_fields_are_optional() {
     let old = Session::from_json(EXIT_SEVEN.as_bytes()).unwrap();
     assert_eq!((old.route.as_str(), old.wire_model.as_str()), ("", ""));
+    assert_eq!(old.service_tier, "");
     assert_eq!(
         String::from_utf8(old.to_json().unwrap()).unwrap(),
         EXIT_SEVEN
@@ -1150,6 +1153,7 @@ fn route_fields_are_optional() {
     let full = Session::from_json(FULL.as_bytes()).unwrap();
     assert_eq!(full.route, "proxy");
     assert_eq!(full.wire_model, "emcd_/gpt-6-astra");
+    assert_eq!(full.service_tier, "ultrafast");
 }
 
 /// The leak guard: a registered secret never reaches the record.

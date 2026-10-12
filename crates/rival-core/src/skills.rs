@@ -13,9 +13,11 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// All embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 7] = [
+pub const NAMES: [&str; 9] = [
     "rival-codex",
     "rival-sol",
+    "rival-astra-ultrafast",
+    "rival-sol-ultrafast",
     "rival-claude",
     "rival-fable",
     "rival-k3",
@@ -89,6 +91,16 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
             "Run a requested Sol 6.1 prompt or code review through Rival from Codex.".into(),
             "sol",
             "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
+        ),
+        "rival-astra-ultrafast" => (
+            "Run a requested GPT-6 Astra prompt or code review on the Codex Ultrafast tier through Rival from Codex.".into(),
+            "codex --ultrafast",
+            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects GPT-6 Astra (`gpt-6-astra`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.codex` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
+        ),
+        "rival-sol-ultrafast" => (
+            "Run a requested Sol 6.1 prompt or code review on the Codex Ultrafast tier through Rival from Codex.".into(),
+            "sol --ultrafast",
+            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
         ),
         "rival-codex" | "rival-k3" | "rival-grok" => {
             let model = name.strip_prefix("rival-").unwrap_or(name);

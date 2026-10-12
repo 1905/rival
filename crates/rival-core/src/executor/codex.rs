@@ -17,6 +17,16 @@ use crate::session::Session;
 /// The provider name the proxy route gives Codex in its `-c` values.
 const PROXY_PROVIDER: &str = "rival_proxy";
 
+/// The Codex service tier of `command codex|sol --ultrafast`.
+pub const ULTRAFAST_TIER: &str = "ultrafast";
+
+/// Codex prints this line, then sends the request without the tier, when
+/// the model catalog it loaded does not list the configured tier
+/// (openai/codex `core/src/session/mod.rs`, `unsupported_service_tier_warning`).
+const TIER_OMITTED_PREFIX: &str =
+    "warning: Configured service tier `ultrafast` is not advertised as supported for model `";
+const TIER_OMITTED_SUFFIX: &str = "` and will be omitted from requests.";
+
 /// Checks that codex is installed and authenticated,
 /// naming the given model in its errors. On the proxy route the proxy is
 /// the credential: the check asks the proxy, not `codex login status`.
@@ -45,9 +55,21 @@ pub fn is_codex_model(model: &str) -> bool {
     model == config::CODEX_MODEL || model == config::SOL_MODEL
 }
 
+/// Whether a codex log has the runtime warning that Codex omitted the
+/// Ultrafast tier. Only a whole line matches, so the same words inside a
+/// prompt or a reply do not.
+pub fn ultrafast_omitted(log: &str) -> bool {
+    log.lines().map(str::trim).any(|line| {
+        line.strip_prefix(TIER_OMITTED_PREFIX)
+            .and_then(|rest| rest.strip_suffix(TIER_OMITTED_SUFFIX))
+            .is_some_and(|slug| !slug.is_empty() && !slug.contains('`'))
+    })
+}
+
 /// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
 /// also the model sent to the runtime. It runs Codex and Sol 6.1.
+/// `tier` is the Codex service tier; `None` sends none.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -57,6 +79,7 @@ pub fn run_codex_model(
     effort: &str,
     workdir: &str,
     model: &str,
+    tier: Option<&str>,
     log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
@@ -67,6 +90,7 @@ pub fn run_codex_model(
         effort,
         workdir,
         model,
+        tier,
         log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
@@ -81,23 +105,27 @@ pub(crate) fn run_codex_model_with(
     effort: &str,
     workdir: &str,
     model: &str,
+    tier: Option<&str>,
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
     if !is_codex_model(model) {
         bail!("unsupported codex model {:?}", model);
     }
+    if let Some(tier) = tier {
+        sess.service_tier = tier.to_string();
+    }
     let result = (|| {
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {
                 let wire = proxy::wire_id(&route.prefix, model);
-                let args = codex_proxy_run_args(&wire, effort, workdir, &route.url)?;
+                let args = codex_proxy_run_args(&wire, effort, workdir, tier, &route.url)?;
                 sess.route = ROUTE_PROXY.to_string();
                 sess.wire_model = wire;
                 sess.account = ROUTE_PROXY.to_string();
                 (args, proxy_env(&route))
             }
-            None => (codex_run_args(model, effort, workdir), Vec::new()),
+            None => (codex_run_args(model, effort, workdir, tier), Vec::new()),
         };
 
         let full_prompt = format!(
@@ -130,10 +158,18 @@ pub(crate) fn run_codex_model_with(
     })
 }
 
-pub(crate) fn codex_run_args(model: &str, effort: &str, workdir: &str) -> Vec<String> {
+/// The `codex exec` argv. A `tier` adds `-c service_tier="<tier>"` and
+/// `-c features.ultrafast_mode=true` right after `-m <model>`, so a local
+/// config that turned the feature off cannot drop the tier unseen.
+pub(crate) fn codex_run_args(
+    model: &str,
+    effort: &str,
+    workdir: &str,
+    tier: Option<&str>,
+) -> Vec<String> {
     // The codex runtime takes ultra as its own reasoning level (distinct from
     // xhigh), so preserve the requested value instead of normalizing it.
-    [
+    let mut args: Vec<String> = [
         "exec",
         "-C",
         workdir,
@@ -151,19 +187,32 @@ pub(crate) fn codex_run_args(model: &str, effort: &str, workdir: &str) -> Vec<St
     ]
     .iter()
     .map(|s| s.to_string())
-    .collect()
+    .collect();
+    if let Some(tier) = tier {
+        args.splice(
+            5..5,
+            [
+                "-c".to_string(),
+                format!("service_tier=\"{tier}\""),
+                "-c".to_string(),
+                "features.ultrafast_mode=true".to_string(),
+            ],
+        );
+    }
+    args
 }
 
 /// [`codex_run_args`] on the proxy route: the two provider `-c` pairs go
-/// right after `-m <wire>`. The key is not here; the provider names the
-/// variable that holds it.
+/// right after `-m <wire>`, before any tier pairs. The key is not here; the
+/// provider names the variable that holds it.
 pub(crate) fn codex_proxy_run_args(
     wire: &str,
     effort: &str,
     workdir: &str,
+    tier: Option<&str>,
     url: &str,
 ) -> anyhow::Result<Vec<String>> {
-    let mut args = codex_run_args(wire, effort, workdir);
+    let mut args = codex_run_args(wire, effort, workdir, tier);
     args.splice(5..5, proxy_provider_args(url)?);
     Ok(args)
 }

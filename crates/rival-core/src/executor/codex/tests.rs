@@ -30,7 +30,7 @@ fn argv(effort: &str, workdir: &str) -> Vec<String> {
 #[test]
 fn codex_run_args_uses_explicit_model_and_effort() {
     for effort in ["high", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo");
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo", None);
         assert_eq!(args, argv(effort, "/repo"));
         let joined = args.join(" ");
         assert!(joined.contains(&format!("-m {}", config::CODEX_MODEL)));
@@ -38,13 +38,16 @@ fn codex_run_args_uses_explicit_model_and_effort() {
         assert!(joined.contains("--sandbox read-only"));
     }
     // An empty workdir stays an empty argument after -C.
-    assert_eq!(codex_run_args(config::CODEX_MODEL, "", ""), argv("", ""));
+    assert_eq!(
+        codex_run_args(config::CODEX_MODEL, "", "", None),
+        argv("", "")
+    );
 }
 
 #[test]
 fn codex_passes_ultra_and_xhigh_through_unaliased() {
     for effort in ["xhigh", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp");
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp", None);
         assert!(
             args.contains(&format!("model_reasoning_effort={effort}")),
             "{args:?}"
@@ -67,6 +70,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
             "high",
             "/repo",
             model,
+            None,
             None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
@@ -99,6 +103,7 @@ fn run_codex_model_builds_the_exact_request() {
         "xhigh",
         &work,
         config::CODEX_MODEL,
+        None,
         None,
         recorder(&mut seen, Ok(want)),
     )
@@ -139,6 +144,7 @@ fn run_codex_model_wraps_errors_with_the_public_label() {
         "high",
         "/repo",
         config::CODEX_MODEL,
+        None,
         None,
         recorder(
             &mut seen,
@@ -215,6 +221,7 @@ fn run_codex_model_runs_the_fake_with_argv_and_prompt() {
                 &work,
                 config::CODEX_MODEL,
                 None,
+                None,
                 Some(&mut out),
             )
         },
@@ -242,6 +249,7 @@ fn run_codex_model_forwards_the_log_file() {
         "low",
         &work,
         config::CODEX_MODEL,
+        None,
         Some("/home/s/sessions/x.log.repair.log"),
         recorder(&mut seen, Ok(RunResult::default())),
     )
@@ -298,6 +306,7 @@ fn run_recorded(env: &Env) -> anyhow::Result<(Spawned, Session)> {
         &work,
         config::CODEX_MODEL,
         None,
+        None,
         recorder(&mut seen, Ok(RunResult::default())),
     )?;
     Ok((seen.expect("spawned"), sess))
@@ -306,8 +315,14 @@ fn run_recorded(env: &Env) -> anyhow::Result<(Spawned, Session)> {
 /// The provider `-c` strings are pinned byte for byte.
 #[test]
 fn codex_proxy_args_pin_the_provider_values() {
-    let args =
-        codex_proxy_run_args("gpt-6-astra", "high", "/repo", "http://127.0.0.1:8999").unwrap();
+    let args = codex_proxy_run_args(
+        "gpt-6-astra",
+        "high",
+        "/repo",
+        None,
+        "http://127.0.0.1:8999",
+    )
+    .unwrap();
     assert_eq!(
         args,
         strings(&[
@@ -343,7 +358,7 @@ fn codex_proxy_args_refuse_a_toml_unsafe_url() {
         "http://h:1/a\u{7f}b",
         "http://h:1/a\u{1}b",
     ] {
-        let err = codex_proxy_run_args("gpt-6-astra", "high", "/repo", url).unwrap_err();
+        let err = codex_proxy_run_args("gpt-6-astra", "high", "/repo", None, url).unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(
@@ -577,6 +592,7 @@ fn sol_runs_direct_and_through_the_proxy() {
             &work,
             config::SOL_MODEL,
             None,
+            None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
         .unwrap();
@@ -596,4 +612,87 @@ fn sol_runs_direct_and_through_the_proxy() {
     assert_eq!(sess.wire_model, config::SOL_MODEL);
     assert!(is_codex_model(config::SOL_MODEL));
     assert!(!is_codex_model(config::GPT56_SOL_MODEL));
+}
+
+/// `--ultrafast`: the tier pairs follow `-m <model>`, after the proxy's
+/// provider pairs, on both routes and for both models. The session records
+/// the tier.
+#[test]
+fn ultrafast_tier_reaches_argv_direct_and_through_the_proxy() {
+    let tier = [
+        "-c",
+        "service_tier=\"ultrafast\"",
+        "-c",
+        "features.ultrafast_mode=true",
+    ];
+    let run = |env: &Env, model: &str| {
+        let cfg = env.config();
+        let work = env.work_str();
+        let mut sess = env.session("codex", "review", model, &work);
+        let mut seen = None;
+        run_codex_model_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "xhigh",
+            &work,
+            model,
+            Some(ULTRAFAST_TIER),
+            None,
+            recorder(&mut seen, Ok(RunResult::default())),
+        )
+        .unwrap();
+        (seen.unwrap(), sess)
+    };
+    for model in [config::CODEX_MODEL, config::SOL_MODEL] {
+        let env = Env::new();
+        let (seen, sess) = run(&env, model);
+        let mut want = argv("xhigh", &env.work_str());
+        want[4] = model.to_string();
+        want.splice(5..5, strings(&tier));
+        assert_eq!(seen.args, want, "{model}");
+        assert_eq!(sess.service_tier, "ultrafast");
+
+        let env = proxy_env_at("http://127.0.0.1:8999");
+        let (seen, sess) = run(&env, model);
+        let mut want = proxy_argv("xhigh", &env.work_str(), "http://127.0.0.1:8999");
+        want[4] = model.to_string();
+        want.splice(9..9, strings(&tier));
+        assert_eq!(seen.args, want, "{model} proxy");
+        assert_eq!(sess.service_tier, "ultrafast");
+    }
+}
+
+/// No tier: the argv has no tier pairs and the session records none.
+#[test]
+fn no_tier_leaves_argv_and_session_unchanged() {
+    let env = Env::new();
+    let (seen, sess) = run_recorded(&env).unwrap();
+    assert_eq!(seen.args, argv("xhigh", &env.work_str()));
+    assert_eq!(sess.service_tier, "");
+}
+
+/// Only Codex's whole warning line counts; the same words inside a prompt
+/// echo or a reply do not.
+#[test]
+fn ultrafast_omitted_matches_only_the_runtime_warning_line() {
+    let warning = "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.";
+    assert!(ultrafast_omitted(&format!(
+        "user\nhi\n{warning}\ncodex\nok\n"
+    )));
+    assert!(ultrafast_omitted(&format!("  {warning}  \r\n")));
+    for text in [
+        "",
+        "codex\nok\n",
+        // A prompt or a reply that quotes the words.
+        "user\nwhy does it say `ultrafast` is not advertised as supported?\n",
+        &format!("user\nexplain: {warning}\n"),
+        &format!("codex\n> {warning}\n"),
+        // Another tier, an empty slug, a cut-off line.
+        "warning: Configured service tier `priority` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.",
+        "warning: Configured service tier `ultrafast` is not advertised as supported for model `` and will be omitted from requests.",
+        "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol`",
+    ] {
+        assert!(!ultrafast_omitted(text), "{text:?}");
+    }
 }

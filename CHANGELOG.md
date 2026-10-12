@@ -11,6 +11,7 @@ Latest binary release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.
 This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. Binary publication is pending: GitHub Actions is blocked by an account billing issue. On the Dell, the Rust workspace tests, strict Clippy, CLI scenarios and release-script checks pass. Hosted macOS/Windows checks and the six-platform release snapshot remain blocked.
 
 ### Added
+- **Ultrafast skills.** `/rival-astra-ultrafast` (GPT-6 Astra) and `/rival-sol-ultrafast` (Sol 6.1) run on the Codex Ultrafast service tier, for Claude Code and Codex. They launch `rival command codex --ultrafast` and `rival command sol --ultrafast`. The new `--ultrafast` flag sends `service_tier="ultrafast"` to Codex on every call of the run, and the session records the tier. Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. When Codex omits the tier because the account's model catalog does not list it, rival prints `rival: ⚠ ultrafast not applied` after the output.
 - **Proxy support.** Claude runs (Opus, Fable) and Codex runs (Codex, Sol) can go through an HTTP gateway such as CLIProxyAPI: one `proxy.url`, one key file, and an on/off switch and model prefix for each provider. A preflight reads `/v1/models` and names the fix for a dead proxy, a rejected key or a wrong prefix. A 429 account limit names the other prefixes. `RIVAL_PROXY=off` sends one run direct.
 - `rival config`: a config window in the TUI, plus `show`, `set`, `key set`/`key clear`, `models` and `check`. `rival config check` sends a short prompt to each model through its real adapter and shows ✓, latency and reply, or the error.
 - Rival.app: a Settings window (⌘,) with Proxy, Models and Check tabs, and "Check models" in the menu bar.
@@ -25,7 +26,7 @@ This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and pr
 - Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
 
 ### Removed
-- `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills. Install/update moves existing copies outside the active skills directory, preserving local edits, extra files and earlier backups. Seven review skills remain, including `rival-sol`; the native `rival command plan` command remains available.
+- `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills. Install/update moves existing copies outside the active skills directory, preserving local edits, extra files and earlier backups. Seven review skills remain, including `rival-sol` (nine with the Ultrafast skills); the native `rival command plan` command remains available.
 
 ### Fixed
 - `rival update` verifies the Homebrew executable's version and detects a different `rival` earlier on `PATH` before installing skills or reporting success. Matching skill versions are preserved, including local edits; changed versions use the normal confirmation prompt.

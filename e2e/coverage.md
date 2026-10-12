@@ -32,6 +32,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
 | `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
 | `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
+| `command codex --ultrafast`, `command sol --ultrafast` (tier pairs after `-m`, `service_tier` on the session, the not-applied notice) | ultrafast-command | unit tests `tree::tests::ultrafast_is_a_flag_of_command_codex_and_sol_only` (other commands reject it), `executor::codex::tests`, `model_command::tests` |
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |

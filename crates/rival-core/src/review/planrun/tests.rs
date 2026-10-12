@@ -254,7 +254,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
     );
 
     let args = std::fs::read_to_string(&args_file).unwrap();
-    let mut want = codex_run_args(CODEX_MODEL, "xhigh", &repo).join("\n");
+    let mut want = codex_run_args(CODEX_MODEL, "xhigh", &repo, None).join("\n");
     want.push('\n');
     assert_eq!(args, want);
     for part in [

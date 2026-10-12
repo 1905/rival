@@ -49,6 +49,30 @@ pub const SOL_USAGE: &str = "Usage:
 Reasoning effort (-re): low, medium, high, xhigh, ultra.
 Omitted uses efforts.sol from ~/.rival/config.yaml (built-in: xhigh).";
 
+pub const ASTRA_ULTRAFAST_USAGE: &str = "Usage:
+  /rival-astra-ultrafast 'explain the auth flow' — run any prompt with GPT-6 Astra on the Ultrafast tier
+  /rival-astra-ultrafast -re high 'find bugs in src/main.go' — run with a different reasoning effort (default xhigh)
+  /rival-astra-ultrafast review — bug-hunting review of the changed files (git auto-detect)
+  /rival-astra-ultrafast review src/api/ — review specific scope
+  /rival-astra-ultrafast -re high review src/api/ — review with high reasoning
+  /rival-astra-ultrafast — show this usage info
+
+Reasoning effort (-re): low, medium, high, xhigh, ultra.
+Omitted uses efforts.codex from ~/.rival/config.yaml (built-in: xhigh).
+Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
+
+pub const SOL_ULTRAFAST_USAGE: &str = "Usage:
+  /rival-sol-ultrafast 'explain the auth flow' — run any prompt with Sol on the Ultrafast tier
+  /rival-sol-ultrafast -re high 'find bugs in src/main.go' — run with a different reasoning effort (default xhigh)
+  /rival-sol-ultrafast review — bug-hunting review of the changed files (git auto-detect)
+  /rival-sol-ultrafast review src/api/ — review specific scope
+  /rival-sol-ultrafast -re high review src/api/ — review with high reasoning
+  /rival-sol-ultrafast — show this usage info
+
+Reasoning effort (-re): low, medium, high, xhigh, ultra.
+Omitted uses efforts.sol from ~/.rival/config.yaml (built-in: xhigh).
+Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
+
 pub const FABLE_USAGE: &str = "Usage:
   /rival-fable 'explain the auth flow' — run any prompt with Fable
   /rival-fable -re high 'find bugs in src/main.go' — run with a higher reasoning effort
@@ -127,6 +151,9 @@ pub struct ModelSpec {
     pub preflight: PreflightFn,
     /// Invokes the provider.
     pub run: RunFn,
+    /// The Codex service tier every call of this spec asks for
+    /// (`--ultrafast`); `None` for every other spec.
+    pub service_tier: Option<&'static str>,
 }
 
 impl ModelSpec {
@@ -177,19 +204,41 @@ pub fn session_mode(is_review: bool) -> &'static str {
 }
 
 pub fn codex_spec() -> ModelSpec {
-    codex_runtime_spec(config::CODEX_LABEL, config::CODEX_MODEL, CODEX_USAGE)
+    codex_tier_spec(false)
+}
+
+/// Codex (GPT-6 Astra); `ultrafast` asks for the Ultrafast service tier.
+pub fn codex_tier_spec(ultrafast: bool) -> ModelSpec {
+    let usage = if ultrafast {
+        ASTRA_ULTRAFAST_USAGE
+    } else {
+        CODEX_USAGE
+    };
+    codex_runtime_spec(config::CODEX_LABEL, config::CODEX_MODEL, usage, ultrafast)
 }
 
 /// Sol 6.1 on the codex runtime.
 pub fn sol_spec() -> ModelSpec {
-    codex_runtime_spec(config::SOL_LABEL, config::SOL_MODEL, SOL_USAGE)
+    sol_tier_spec(false)
+}
+
+/// Sol 6.1; `ultrafast` asks for the Ultrafast service tier.
+pub fn sol_tier_spec(ultrafast: bool) -> ModelSpec {
+    let usage = if ultrafast {
+        SOL_ULTRAFAST_USAGE
+    } else {
+        SOL_USAGE
+    };
+    codex_runtime_spec(config::SOL_LABEL, config::SOL_MODEL, usage, ultrafast)
 }
 
 fn codex_runtime_spec(
     command_name: &'static str,
     model: &'static str,
     usage: &'static str,
+    ultrafast: bool,
 ) -> ModelSpec {
+    let tier = ultrafast.then_some(executor::ULTRAFAST_TIER);
     ModelSpec {
         command_name,
         cli: "codex",
@@ -199,9 +248,10 @@ fn codex_runtime_spec(
         preflight: Box::new(move |cfg, _| executor::codex_preflight_for(cfg, model)),
         run: Box::new(move |c| {
             executor::run_codex_model(
-                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.log, c.out,
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, tier, c.log, c.out,
             )
         }),
+        service_tier: tier,
     }
 }
 
@@ -231,6 +281,7 @@ fn claude_runtime_spec(
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.review, c.log, c.out,
             )
         }),
+        service_tier: None,
     }
 }
 
@@ -256,6 +307,7 @@ pub fn k3_spec() -> ModelSpec {
                 c.out,
             )
         }),
+        service_tier: None,
     }
 }
 
@@ -273,5 +325,6 @@ pub fn grok_spec() -> ModelSpec {
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.log, c.out,
             )
         }),
+        service_tier: None,
     }
 }

@@ -115,6 +115,11 @@ pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(deserialize_with = "json::nullable")]
     pub wire_model: String,
+    /// The Codex service tier the run asked for (`ultrafast`); "" (not
+    /// written) when it asked for none.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub service_tier: String,
     #[serde(deserialize_with = "json::nullable")]
     pub pid: i64,
     /// Start time of `pid` (Unix ns); guards against PID reuse.

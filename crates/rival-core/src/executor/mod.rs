@@ -21,10 +21,14 @@ pub mod subprocess;
 pub(crate) mod testutil;
 
 pub use claude::{
-    claude_auth_hint, claude_preflight, claude_preflight_model, is_claude_model, run_claude,
+    ROUTE_PROXY, claude_auth_hint, claude_preflight, claude_preflight_model, is_claude_model,
+    run_claude,
 };
 pub use claude_docker::claude_docker_preflight;
-pub use codex::{codex_auth_hint, codex_preflight_for, is_codex_model, run_codex_model};
+pub use codex::{
+    ULTRAFAST_TIER, codex_auth_hint, codex_preflight_for, is_codex_model, run_codex_model,
+    ultrafast_omitted,
+};
 pub use grok::{grok_effort, grok_preflight, run_grok, run_grok_model};
 pub use kimi::{kimi_preflight, run_kimi};
 pub use opencode::{

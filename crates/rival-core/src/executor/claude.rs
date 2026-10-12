@@ -16,7 +16,7 @@ use crate::proxy;
 use crate::session::{self, Session};
 
 /// The route value a proxied session records.
-pub(crate) const ROUTE_PROXY: &str = "proxy";
+pub const ROUTE_PROXY: &str = "proxy";
 
 /// The variables a proxied Claude run gets (by name in Docker).
 pub(crate) const PROXY_URL_VAR: &str = "ANTHROPIC_BASE_URL";

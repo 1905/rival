@@ -15,7 +15,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 0 updated, 0 up to date, 0 removed\n",
+        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-astra-ultrafast — installed (v<V>)\n  ✓ rival-sol-ultrafast — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-astra-ultrafast — installed (v<V>)\n  ✓ rival-sol-ultrafast — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -26,7 +26,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  · rival-codex — already up to date (v<V>)\n  · rival-sol — already up to date (v<V>)\n  · rival-claude — already up to date (v<V>)\n  · rival-fable — already up to date (v<V>)\n  · rival-k3 — already up to date (v<V>)\n  · rival-grok — already up to date (v<V>)\n  · rival-security — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 7 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  · rival-codex — already up to date (v<V>)\n  · rival-sol — already up to date (v<V>)\n  · rival-claude — already up to date (v<V>)\n  · rival-fable — already up to date (v<V>)\n  · rival-k3 — already up to date (v<V>)\n  · rival-grok — already up to date (v<V>)\n  · rival-security — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 7 up to date, 0 removed\n",
+        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  · rival-codex — already up to date (v<V>)\n  · rival-sol — already up to date (v<V>)\n  · rival-astra-ultrafast — already up to date (v<V>)\n  · rival-sol-ultrafast — already up to date (v<V>)\n  · rival-claude — already up to date (v<V>)\n  · rival-fable — already up to date (v<V>)\n  · rival-k3 — already up to date (v<V>)\n  · rival-grok — already up to date (v<V>)\n  · rival-security — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 9 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  · rival-codex — already up to date (v<V>)\n  · rival-sol — already up to date (v<V>)\n  · rival-astra-ultrafast — already up to date (v<V>)\n  · rival-sol-ultrafast — already up to date (v<V>)\n  · rival-claude — already up to date (v<V>)\n  · rival-fable — already up to date (v<V>)\n  · rival-k3 — already up to date (v<V>)\n  · rival-grok — already up to date (v<V>)\n  · rival-security — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 9 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -36,6 +36,8 @@
     "home_files": [
       ".claude/skills/rival-codex/SKILL.md",
       ".claude/skills/rival-sol/SKILL.md",
+      ".claude/skills/rival-astra-ultrafast/SKILL.md",
+      ".claude/skills/rival-sol-ultrafast/SKILL.md",
       ".claude/skills/rival-claude/SKILL.md",
       ".claude/skills/rival-fable/SKILL.md",
       ".claude/skills/rival-k3/SKILL.md",
@@ -43,6 +45,8 @@
       ".claude/skills/rival-security/SKILL.md",
       ".agents/skills/rival-codex/SKILL.md",
       ".agents/skills/rival-sol/SKILL.md",
+      ".agents/skills/rival-astra-ultrafast/SKILL.md",
+      ".agents/skills/rival-sol-ultrafast/SKILL.md",
       ".agents/skills/rival-claude/SKILL.md",
       ".agents/skills/rival-fable/SKILL.md",
       ".agents/skills/rival-k3/SKILL.md",
