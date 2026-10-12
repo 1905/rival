@@ -6,6 +6,17 @@ use super::*;
 use crate::executor::testutil::retry_busy;
 use crate::executor::testutil::{Env, Spawned, recorder, strings};
 
+/// Both Ultrafast switches off. A test whose subject is not the tier adds
+/// it, so its argv has no tier pairs (the tier is on by default).
+const TIER_OFF: &str = "ultrafast:\n  codex: false\n  sol: false\n";
+
+/// An [`Env`] whose config turns the Ultrafast tier off.
+fn tier_off_env() -> Env {
+    let env = Env::new();
+    add_config(&env, TIER_OFF);
+    env
+}
+
 fn argv(effort: &str, workdir: &str) -> Vec<String> {
     let effort_arg = format!("model_reasoning_effort={effort}");
     strings(&[
@@ -84,7 +95,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
 
 #[test]
 fn run_codex_model_builds_the_exact_request() {
-    let mut env = Env::new();
+    let mut env = tier_off_env();
     env.set("OPENAI_API_KEY", Some("kept-for-codex"));
     let cfg = env.config();
     let work = env.work_str();
@@ -197,7 +208,7 @@ fn codex_preflight_reports_missing_runtime_and_auth() {
 #[cfg(unix)]
 #[test]
 fn run_codex_model_runs_the_fake_with_argv_and_prompt() {
-    let env = Env::new();
+    let env = tier_off_env();
     let cfg = env.config();
     env.fake(
         "codex",
@@ -374,6 +385,7 @@ fn codex_proxy_args_refuse_a_toml_unsafe_url() {
 #[test]
 fn proxy_request_sets_the_provider_args_and_the_key_env() {
     let mut env = proxy_env_at("http://127.0.0.1:8999/v1");
+    add_config(&env, TIER_OFF);
     env.set("OPENAI_API_KEY", Some("kept-for-codex"));
     let (seen, sess) = run_recorded(&env).unwrap();
     assert_eq!(seen.binary, "codex");
@@ -446,7 +458,7 @@ fn proxy_key_reaches_the_child_env() {
 /// a disabled route and `RIVAL_PROXY=off`.
 #[test]
 fn direct_request_is_unchanged_when_the_proxy_is_off() {
-    let base = Env::new();
+    let base = tier_off_env();
     let (want, want_sess) = run_recorded(&base).unwrap();
     assert_eq!(want.args, argv("xhigh", &base.work_str()));
     assert_eq!(
@@ -469,7 +481,7 @@ fn direct_request_is_unchanged_when_the_proxy_is_off() {
         }
         let dir = env.home.path().join(".rival");
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("config.yaml"), yaml).unwrap();
+        std::fs::write(dir.join("config.yaml"), format!("{yaml}{TIER_OFF}")).unwrap();
         let (got, sess) = run_recorded(&env).unwrap();
         assert_eq!(got.args, argv("xhigh", &env.work_str()), "{name}");
         assert_eq!(got.env, want.env, "{name}");
@@ -600,13 +612,14 @@ fn sol_runs_direct_and_through_the_proxy() {
         .unwrap();
         (seen.unwrap(), sess)
     };
-    let env = Env::new();
+    let env = tier_off_env();
     let (seen, _) = run(&env);
     let mut want = argv("ultra", &env.work_str());
     want[4] = config::SOL_MODEL.to_string();
     assert_eq!(seen.args, want);
 
     let env = proxy_env_at("http://127.0.0.1:8999");
+    add_config(&env, TIER_OFF);
     let (seen, sess) = run(&env);
     let mut want = proxy_argv("ultra", &env.work_str(), "http://127.0.0.1:8999");
     want[4] = config::SOL_MODEL.to_string();
@@ -616,9 +629,10 @@ fn sol_runs_direct_and_through_the_proxy() {
     assert!(!is_codex_model(config::GPT56_SOL_MODEL));
 }
 
-/// A model whose `ultrafast.<label>` switch is on: the tier pairs follow
-/// `-m <model>`, after the proxy's provider pairs, on both routes, and the
-/// session records the tier. The other model's switch does not count.
+/// A model whose `ultrafast.<label>` switch is on (by default or set): the
+/// tier pairs follow `-m <model>`, after the proxy's provider pairs, on both
+/// routes, and the session records the tier. Its own switch set to false
+/// drops the tier; the other model's switch does not count.
 #[test]
 fn ultrafast_switch_reaches_argv_direct_and_through_the_proxy() {
     let tier = [
@@ -649,14 +663,16 @@ fn ultrafast_switch_reaches_argv_direct_and_through_the_proxy() {
         (config::CODEX_MODEL, "codex", "sol"),
         (config::SOL_MODEL, "sol", "codex"),
     ] {
-        let env = Env::new();
-        add_config(&env, &format!("ultrafast:\n  {on}: true\n"));
-        let (seen, sess) = run(&env, model);
-        let mut want = argv("xhigh", &env.work_str());
-        want[4] = model.to_string();
-        want.splice(5..5, strings(&tier));
-        assert_eq!(seen.args, want, "{model}");
-        assert_eq!(sess.service_tier, ULTRAFAST_TIER);
+        for config in ["", "ultrafast:\n", &format!("ultrafast:\n  {on}: true\n")] {
+            let env = Env::new();
+            add_config(&env, config);
+            let (seen, sess) = run(&env, model);
+            let mut want = argv("xhigh", &env.work_str());
+            want[4] = model.to_string();
+            want.splice(5..5, strings(&tier));
+            assert_eq!(seen.args, want, "{model} {config:?}");
+            assert_eq!(sess.service_tier, ULTRAFAST_TIER);
+        }
 
         let env = proxy_env_at("http://127.0.0.1:8999");
         add_config(&env, &format!("ultrafast:\n  {on}: true\n"));
@@ -667,13 +683,16 @@ fn ultrafast_switch_reaches_argv_direct_and_through_the_proxy() {
         assert_eq!(seen.args, want, "{model} proxy");
         assert_eq!(sess.service_tier, ULTRAFAST_TIER);
 
-        // Only the other model's switch: no tier.
+        // Its own switch off, the other one on: no tier.
         let env = Env::new();
-        add_config(&env, &format!("ultrafast:\n  {other}: true\n"));
+        add_config(
+            &env,
+            &format!("ultrafast:\n  {on}: false\n  {other}: true\n"),
+        );
         let (seen, sess) = run(&env, model);
         let mut want = argv("xhigh", &env.work_str());
         want[4] = model.to_string();
-        assert_eq!(seen.args, want, "{model} with only {other} on");
+        assert_eq!(seen.args, want, "{model} off, {other} on");
         assert_eq!(sess.service_tier, "");
     }
 }
@@ -681,7 +700,7 @@ fn ultrafast_switch_reaches_argv_direct_and_through_the_proxy() {
 /// No tier: the argv has no tier pairs and nothing is flagged.
 #[test]
 fn no_tier_leaves_argv_and_session_unchanged() {
-    let env = Env::new();
+    let env = tier_off_env();
     let (seen, sess) = run_recorded(&env).unwrap();
     assert_eq!(seen.args, argv("xhigh", &env.work_str()));
     assert!(!sess.service_tier_omitted);

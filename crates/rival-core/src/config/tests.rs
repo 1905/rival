@@ -1969,19 +1969,30 @@ fn a_draft_proxy_key_stands_in_for_the_key_file_but_not_the_env() {
     assert_eq!(route.key(), "env-key-0003");
 }
 
-/// `ultrafast.codex` and `ultrafast.sol` are off unless set; each switch
-/// covers its own model only, and no other model ever gets the tier.
+/// `ultrafast.codex` and `ultrafast.sol` are on unless set to false, also
+/// with no config file; each switch covers its own model only, and no other
+/// model ever gets the tier.
 #[test]
-fn ultrafast_is_per_codex_runtime_model_and_off_by_default() {
+fn ultrafast_is_per_codex_runtime_model_and_on_by_default() {
     let (_home, missing) = loaded("");
-    assert!(!missing.ultrafast(CODEX_MODEL) && !missing.ultrafast(SOL_MODEL));
+    assert!(missing.ultrafast(CODEX_MODEL) && missing.ultrafast(SOL_MODEL));
+    let no_file = cfg(&[]);
+    assert!(no_file.user_config().is_none());
+    assert!(no_file.ultrafast(CODEX_MODEL) && no_file.ultrafast(SOL_MODEL));
+    assert_eq!(
+        UltrafastConfig::default(),
+        UltrafastConfig {
+            codex: true,
+            sol: true
+        }
+    );
     for (body, codex, sol) in [
-        ("efforts:\n  codex: high\n", false, false),
-        ("ultrafast:\n", false, false),
-        ("ultrafast:\n  codex: true\n", true, false),
-        ("ultrafast:\n  sol: true\n", false, true),
+        ("efforts:\n  codex: high\n", true, true),
+        ("ultrafast:\n", true, true),
+        ("ultrafast:\n  codex: false\n", false, true),
+        ("ultrafast:\n  sol: false\n", true, false),
         ("ultrafast:\n  codex: true\n  sol: false\n", true, false),
-        ("ultrafast:\n  codex: true\n  sol: true\n", true, true),
+        ("ultrafast:\n  codex: false\n  sol: false\n", false, false),
     ] {
         let (_home, config) = loaded(body);
         assert!(config.user_config_error().is_none(), "{body:?}");
@@ -2000,5 +2011,81 @@ fn ultrafast_is_per_codex_runtime_model_and_off_by_default() {
     }
     let (_home, bad) = loaded("ultrafast:\n  codex: fast\n");
     assert!(bad.user_config_error().is_some());
-    assert!(!bad.ultrafast(CODEX_MODEL));
+}
+
+/// `skill.claude` defaults to sol and `skill.codex` to claude, with or
+/// without a config file.
+#[test]
+fn skill_models_default_to_the_other_vendor() {
+    let no_file = cfg(&[]);
+    assert_eq!(no_file.skill_model(SkillHost::Claude), SOL_LABEL);
+    assert_eq!(no_file.skill_model(SkillHost::Codex), CLAUDE_LABEL);
+    assert!(!no_file.skill_model_configured(SkillHost::Claude));
+    for body in ["", "skill:\n", "skill:\n  claude: \"\"\n  codex:\n"] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.skill_model(SkillHost::Claude), SOL_LABEL, "{body:?}");
+        assert_eq!(
+            config.skill_model(SkillHost::Codex),
+            CLAUDE_LABEL,
+            "{body:?}"
+        );
+        assert!(!config.skill_model_configured(SkillHost::Codex), "{body:?}");
+    }
+}
+
+/// Every model name is accepted for each host, in any case; `opus` reads
+/// as `claude`.
+#[test]
+fn skill_models_take_every_command_model_and_the_opus_alias() {
+    for (raw, want) in [
+        ("codex", "codex"),
+        ("SOL", "sol"),
+        (" claude ", "claude"),
+        ("Opus", "claude"),
+        ("fable", "fable"),
+        ("k3", "k3"),
+        ("grok", "grok"),
+    ] {
+        let (_home, config) = loaded(&format!("skill:\n  claude: {raw:?}\n  codex: {raw:?}\n"));
+        assert!(config.user_config_error().is_none(), "{raw:?}");
+        let user = config.user_config().unwrap();
+        assert_eq!(user.skill.claude, want, "{raw:?}");
+        assert_eq!(user.skill.codex, want, "{raw:?}");
+        for host in SkillHost::ALL {
+            assert_eq!(config.skill_model(host), want, "{raw:?}");
+            assert!(config.skill_model_configured(host));
+        }
+    }
+}
+
+/// A bad `skill.<host>` value is a config error that names the key and the
+/// accepted values.
+#[test]
+fn skill_model_rejects_unknown_names() {
+    for (key, body) in [
+        ("skill.claude", "skill:\n  claude: gpt5\n"),
+        ("skill.codex", "skill:\n  codex: gpt5\n"),
+    ] {
+        let (home, config) = loaded(body);
+        let err = config.user_config_error().expect("error").to_string();
+        assert_eq!(
+            err,
+            format!(
+                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, k3, grok"#,
+                config_path(home.path()).display()
+            )
+        );
+    }
+}
+
+/// `--host` takes `claude` or `codex` in any case, nothing else.
+#[test]
+fn skill_host_parses_both_hosts() {
+    assert_eq!(SkillHost::parse("claude"), Some(SkillHost::Claude));
+    assert_eq!(SkillHost::parse(" CODEX "), Some(SkillHost::Codex));
+    assert_eq!(SkillHost::parse("sol"), None);
+    assert_eq!(SkillHost::parse(""), None);
+    assert_eq!(SkillHost::Claude.key(), "skill.claude");
+    assert_eq!(SkillHost::Codex.key(), "skill.codex");
 }

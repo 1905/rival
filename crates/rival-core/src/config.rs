@@ -766,13 +766,23 @@ pub const ULTRAFAST_MODELS: [(&str, &str); 2] =
     [(CODEX_LABEL, CODEX_MODEL), (SOL_LABEL, SOL_MODEL)];
 
 /// The `ultrafast:` block: per Codex-runtime model, whether its calls ask
-/// Codex for the Ultrafast service tier. Off when unset.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// Codex for the Ultrafast service tier. On when unset.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UltrafastConfig {
     /// `ultrafast.codex`: GPT-6 Astra.
     pub codex: bool,
     /// `ultrafast.sol`: Sol 6.1.
     pub sol: bool,
+}
+
+/// Both switches on: the value of a missing `ultrafast:` block or key.
+impl Default for UltrafastConfig {
+    fn default() -> Self {
+        UltrafastConfig {
+            codex: true,
+            sol: true,
+        }
+    }
 }
 
 impl UltrafastConfig {
@@ -791,6 +801,100 @@ impl UltrafastConfig {
             CODEX_LABEL => Some(&mut self.codex),
             SOL_LABEL => Some(&mut self.sol),
             _ => None,
+        }
+    }
+}
+
+/// The app a `/rival` skill runs in. Each host has its own `skill.<host>`
+/// model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillHost {
+    Claude,
+    Codex,
+}
+
+impl SkillHost {
+    /// Both hosts, in the order `config show` and the TUI list them.
+    pub const ALL: [SkillHost; 2] = [SkillHost::Claude, SkillHost::Codex];
+
+    /// The host named `name` (`claude` or `codex`, any case).
+    pub fn parse(name: &str) -> Option<SkillHost> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "claude" => Some(SkillHost::Claude),
+            "codex" => Some(SkillHost::Codex),
+            _ => None,
+        }
+    }
+
+    /// The host name under `skill:`.
+    pub fn name(self) -> &'static str {
+        match self {
+            SkillHost::Claude => "claude",
+            SkillHost::Codex => "codex",
+        }
+    }
+
+    /// The config key of this host's model: `skill.claude` or `skill.codex`.
+    pub fn key(self) -> &'static str {
+        match self {
+            SkillHost::Claude => "skill.claude",
+            SkillHost::Codex => "skill.codex",
+        }
+    }
+
+    /// The model when `skill.<host>` is unset: the other vendor's model,
+    /// Sol 6.1 in Claude Code and Opus 5.5 in Codex.
+    pub fn default_model(self) -> &'static str {
+        match self {
+            SkillHost::Claude => SOL_LABEL,
+            SkillHost::Codex => CLAUDE_LABEL,
+        }
+    }
+}
+
+/// The models a `skill.<host>` key accepts, as `rival command <model>`
+/// names. [`skill_model_name`] also takes `opus` for `claude`.
+pub const SKILL_MODEL_NAMES: [&str; 6] = [
+    CODEX_LABEL,
+    SOL_LABEL,
+    CLAUDE_LABEL,
+    FABLE_LABEL,
+    K3_COMMAND_NAME,
+    GROK_LABEL,
+];
+
+/// The `rival command` name of a `skill.<host>` value: trimmed, any case,
+/// `opus` as `claude`. `None` for any other value.
+pub fn skill_model_name(raw: &str) -> Option<&'static str> {
+    let name = raw.trim().to_ascii_lowercase();
+    if name == OPUS_ALIAS {
+        return Some(CLAUDE_LABEL);
+    }
+    SKILL_MODEL_NAMES.iter().copied().find(|m| *m == name)
+}
+
+/// The `skill:` block: the model each host's `/rival` skill runs.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SkillConfig {
+    /// `skill.claude`; "" means [`SkillHost::default_model`].
+    pub claude: String,
+    /// `skill.codex`; "" means [`SkillHost::default_model`].
+    pub codex: String,
+}
+
+impl SkillConfig {
+    /// The value as written (normalized after validation) for `host`.
+    pub fn get(&self, host: SkillHost) -> &str {
+        match host {
+            SkillHost::Claude => &self.claude,
+            SkillHost::Codex => &self.codex,
+        }
+    }
+
+    fn get_mut(&mut self, host: SkillHost) -> &mut String {
+        match host {
+            SkillHost::Claude => &mut self.claude,
+            SkillHost::Codex => &mut self.codex,
         }
     }
 }
@@ -972,6 +1076,7 @@ pub struct UserConfig {
     /// without asking. Medium and low are never auto-fixed.
     pub auto_fix_critical_high: bool,
     pub ultrafast: UltrafastConfig,
+    pub skill: SkillConfig,
 }
 
 /// Decodes YAML null into a string as "", and any other scalar as
@@ -1050,6 +1155,14 @@ struct RawPlan {
 }
 
 #[derive(Default, Deserialize)]
+struct RawSkill {
+    #[serde(default)]
+    claude: GoString,
+    #[serde(default)]
+    codex: GoString,
+}
+
+#[derive(Default, Deserialize)]
 struct RawUltrafast {
     #[serde(default)]
     codex: Option<bool>,
@@ -1077,6 +1190,8 @@ struct RawUserConfig {
     plan: Option<RawPlan>,
     #[serde(default)]
     ultrafast: Option<RawUltrafast>,
+    #[serde(default)]
+    skill: Option<RawSkill>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -1117,8 +1232,15 @@ impl From<RawUserConfig> for UserConfig {
             ultrafast: {
                 let u = raw.ultrafast.unwrap_or_default();
                 UltrafastConfig {
-                    codex: u.codex.unwrap_or_default(),
-                    sol: u.sol.unwrap_or_default(),
+                    codex: u.codex.unwrap_or(true),
+                    sol: u.sol.unwrap_or(true),
+                }
+            },
+            skill: {
+                let s = raw.skill.unwrap_or_default();
+                SkillConfig {
+                    claude: s.claude.0,
+                    codex: s.codex.0,
                 }
             },
         }
@@ -1199,6 +1321,23 @@ pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigEr
             )));
         }
         cfg.security.reviewer = name;
+    }
+    for host in SkillHost::ALL {
+        let value = cfg.skill.get_mut(host);
+        let configured = value.trim().to_string();
+        if configured.is_empty() {
+            value.clear();
+            continue;
+        }
+        let Some(name) = skill_model_name(&configured) else {
+            return Err(ConfigError::new(format!(
+                "invalid {} {:?} in {shown}; use one of: {}",
+                host.key(),
+                configured,
+                SKILL_MODEL_NAMES.join(", ")
+            )));
+        };
+        *value = name.to_string();
     }
     if key_in_yaml {
         return Err(ConfigError::new(format!(
@@ -1430,16 +1569,33 @@ impl Config {
     }
 
     /// Whether calls of `model` ask Codex for the Ultrafast tier:
-    /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1, never
-    /// for any other model.
+    /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1 (both
+    /// on when unset, also with no config file), never for any other model.
     pub fn ultrafast(&self, model: &str) -> bool {
-        let Some(user) = self.user.as_ref() else {
-            return false;
-        };
+        let switches = self
+            .user
+            .as_ref()
+            .map_or_else(UltrafastConfig::default, |u| u.ultrafast.clone());
         ULTRAFAST_MODELS
             .iter()
             .find(|(_, id)| *id == model)
-            .is_some_and(|(label, _)| user.ultrafast.get(label))
+            .is_some_and(|(label, _)| switches.get(label))
+    }
+
+    /// The `rival command` name of the model `host`'s `/rival` skill runs:
+    /// `skill.<host>`, else [`SkillHost::default_model`].
+    pub fn skill_model(&self, host: SkillHost) -> &'static str {
+        self.user
+            .as_ref()
+            .and_then(|u| skill_model_name(u.skill.get(host)))
+            .unwrap_or_else(|| host.default_model())
+    }
+
+    /// Whether `skill.<host>` is set in the user config.
+    pub fn skill_model_configured(&self, host: SkillHost) -> bool {
+        self.user
+            .as_ref()
+            .is_some_and(|u| !u.skill.get(host).is_empty())
     }
 
     /// The configured `plan.models`; empty when unset.

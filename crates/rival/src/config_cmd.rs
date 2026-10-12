@@ -10,7 +10,7 @@ use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, PROXY_KEY_ENV,
     PROXY_KEY_MISSING, PROXY_URL_ENV, ProxyKeySource, ProxyRoute, Route, SECURITY_REVIEWER_K3,
-    SOL_LABEL,
+    SOL_LABEL, SkillHost,
 };
 use rival_core::proxy;
 use serde_json::{Value as Json, json};
@@ -172,6 +172,14 @@ fn rows(cfg: &Config) -> Result<Vec<Row>, CmdError> {
     } else {
         Row::new("security.reviewer", json!(reviewer), "file")
     });
+    for host in SkillHost::ALL {
+        let source = if cfg.skill_model_configured(host) {
+            "file"
+        } else {
+            "default"
+        };
+        rows.push(Row::new(host.key(), json!(cfg.skill_model(host)), source));
+    }
     rows.push(Row::new(
         "auto_fix_critical_high",
         json!(user.auto_fix_critical_high),

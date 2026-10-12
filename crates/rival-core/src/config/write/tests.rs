@@ -432,3 +432,27 @@ fn ultrafast_switches_are_settable_bools() {
         "{text}"
     );
 }
+
+/// `rival config set skill.claude|skill.codex` takes a model name; the
+/// load validates it and normalizes `opus` to `claude`.
+#[test]
+fn skill_models_are_settable_strings() {
+    assert!(SETTABLE_KEYS.contains(&"skill.claude"));
+    assert!(SETTABLE_KEYS.contains(&"skill.codex"));
+    let err = parse_setting("skill.grok", "sol").unwrap_err().to_string();
+    assert!(err.contains("unknown config key"), "{err}");
+    let (_dir, path) = temp();
+    set(&path, "skill.claude", "fable").unwrap();
+    let user = set(&path, "skill.codex", "opus").unwrap();
+    assert_eq!(user.skill.claude, "fable");
+    assert_eq!(user.skill.codex, "claude");
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("skill:\n  claude: fable\n  codex: opus\n"),
+        "{text}"
+    );
+    let err = set(&path, "skill.claude", "gpt5").unwrap_err().to_string();
+    assert!(err.contains("invalid skill.claude \"gpt5\""), "{err}");
+    let after = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(after, text, "a bad value leaves the file as it was");
+}

@@ -85,27 +85,62 @@ fn show_lists_each_value_with_its_source() {
     );
     assert_eq!(
         line(&out, "ultrafast.codex"),
-        "ultrafast.codex false default"
+        "ultrafast.codex true default"
     );
-    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol false default");
+    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol true default");
+    assert_eq!(line(&out, "skill.claude"), "skill.claude sol default");
+    assert_eq!(line(&out, "skill.codex"), "skill.codex claude default");
 }
 
-/// `config set ultrafast.sol true` is read back by `show` from the file.
+/// `skill.claude` and `skill.codex` show the configured model from the
+/// file (`opus` normalized), in text and JSON.
+#[test]
+fn show_lists_the_skill_models() {
+    let fix = Fixture::with_config_yaml("skill:\n  claude: Opus\n  codex: k3\n");
+    let (code, out, err) = run(&fix, "", &["config", "show"]);
+    assert_eq!((code, err.as_str()), (0, ""), "{out}");
+    assert_eq!(line(&out, "skill.claude"), "skill.claude claude file");
+    assert_eq!(line(&out, "skill.codex"), "skill.codex k3 file");
+    let (code, out, _) = run(&fix, "", &["config", "show", "--json"]);
+    assert_eq!(code, 0);
+    let v: serde_json::Value = serde_json::from_str(out.trim()).unwrap();
+    assert_eq!(
+        v["values"]["skill.claude"],
+        serde_json::json!({"value": "claude", "source": "file"})
+    );
+    assert_eq!(
+        v["values"]["skill.codex"],
+        serde_json::json!({"value": "k3", "source": "file"})
+    );
+    let fix = Fixture::new();
+    let (_, out, _) = run(&fix, "", &["config", "show", "--json"]);
+    let v: serde_json::Value = serde_json::from_str(out.trim()).unwrap();
+    assert_eq!(
+        v["values"]["skill.claude"],
+        serde_json::json!({"value": "sol", "source": "default"})
+    );
+    assert_eq!(
+        v["values"]["skill.codex"],
+        serde_json::json!({"value": "claude", "source": "default"})
+    );
+}
+
+/// `config set ultrafast.sol false` is read back by `show` from the file.
 #[test]
 fn ultrafast_switch_round_trips_through_set_and_show() {
     let fix = Fixture::new();
-    let (code, _, err) = run(&fix, "", &["config", "set", "ultrafast.sol", "true"]);
+    let (code, _, err) = run(&fix, "", &["config", "set", "ultrafast.sol", "false"]);
     assert_eq!((code, err.as_str()), (0, ""));
     // The config loads once per process, so show runs on a new fixture
     // with the file that set wrote.
     let written = std::fs::read_to_string(fix.cfg.paths().config_file()).unwrap();
-    assert!(written.contains("ultrafast:\n  sol: true\n"), "{written}");
+    assert!(written.contains("ultrafast:\n  sol: false\n"), "{written}");
     let fix = Fixture::with_config_yaml(&written);
     let (_, out, _) = run(&fix, "", &["config", "show"]);
-    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol true file");
+    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol false file");
     assert_eq!(
         line(&out, "ultrafast.codex"),
-        "ultrafast.codex false default"
+        "ultrafast.codex true default"
     );
 }
 
@@ -507,7 +542,7 @@ fn check_text_and_exit_1_on_a_failed_model() {
     assert_eq!(lines[1], "");
     assert!(
         lines[2].starts_with("  ✓ codex   direct  gpt-6-astra         ")
-            && lines[2].ends_with("s  Sure, ok  (not ok)"),
+            && lines[2].ends_with("s  Sure, ok  (not ok)  [ultrafast]"),
         "{out}"
     );
     assert_eq!(
