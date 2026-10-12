@@ -662,45 +662,30 @@ fn a_repair_that_changes_a_number_keeps_only_that_field() {
     assert!(!out.stdout.contains("reads 4"), "{}", out.stdout);
 }
 
-const TIER_WARNING: &str = "warning: Configured service tier `ultrafast` is not advertised as supported for model `sol` and will be omitted from requests.\n";
-
-/// A session whose log (and, when given, repair log) holds `log` / `repair`.
-fn tier_session(dir: &Path, route: &str, log: &str, repair: Option<&str>) -> Session {
-    let log_file = dir.join("s.log");
-    std::fs::write(&log_file, log).unwrap();
-    if let Some(repair) = repair {
-        std::fs::write(dir.join("s.log.repair.log"), repair).unwrap();
-    }
+/// A session with the tier flag Codex's warning sets, on `route`.
+fn tier_session(route: &str, omitted: bool) -> Session {
     Session {
-        log_file: s(&log_file).to_string(),
         route: route.to_string(),
+        service_tier: "ultrafast".to_string(),
+        service_tier_omitted: omitted,
         ..Session::default()
     }
 }
 
-/// Codex's warning in the session log or the repair log gives the notice;
-/// the account line shows on the direct route only.
+/// An omitted tier gives the notice; the account line shows on the direct
+/// route only.
 #[test]
-fn ultrafast_omitted_notice_reads_both_logs() {
+fn ultrafast_omitted_notice_names_the_account_on_the_direct_route_only() {
     use crate::model_specs::{codex_tier_spec, sol_tier_spec};
-    let wd = tmp();
-    let spec = sol_tier_spec(true);
-    let direct = tier_session(
-        wd.path(),
-        "",
-        &format!("user\nhi\n{TIER_WARNING}ok\n"),
-        None,
-    );
-    let notice = tier_omitted_notice(&spec, &direct).expect("notice");
+    let notice =
+        tier_omitted_notice(&sol_tier_spec(true), &tier_session("", true)).expect("notice");
     assert_eq!(
         notice,
         "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n\
          rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n"
     );
-
-    let wd = tmp();
-    let repair_only = tier_session(wd.path(), "proxy", "ok\n", Some(TIER_WARNING));
-    let notice = tier_omitted_notice(&codex_tier_spec(true), &repair_only).expect("notice");
+    let notice =
+        tier_omitted_notice(&codex_tier_spec(true), &tier_session("proxy", true)).expect("notice");
     assert!(notice.contains("for codex because"), "{notice}");
     assert!(
         !notice.contains("Pro $500"),
@@ -708,34 +693,35 @@ fn ultrafast_omitted_notice_reads_both_logs() {
     );
 }
 
-/// No notice without the tier, without the warning, or when only a prompt
-/// quotes the warning's words.
+/// No notice without the tier on the spec or without the flag.
 #[test]
-fn ultrafast_omitted_notice_needs_the_tier_and_the_runtime_line() {
+fn ultrafast_omitted_notice_needs_the_tier_and_the_flag() {
     use crate::model_specs::sol_tier_spec;
-    let wd = tmp();
-    let warned = tier_session(wd.path(), "", TIER_WARNING, None);
-    assert_eq!(tier_omitted_notice(&sol_tier_spec(false), &warned), None);
-
-    let wd = tmp();
-    let clean = tier_session(wd.path(), "", "ok\n", Some("ok\n"));
-    assert_eq!(tier_omitted_notice(&sol_tier_spec(true), &clean), None);
-
-    let wd = tmp();
-    let quoted = tier_session(wd.path(), "", &format!("user\nwhy: {TIER_WARNING}"), None);
-    assert_eq!(tier_omitted_notice(&sol_tier_spec(true), &quoted), None);
+    assert_eq!(
+        tier_omitted_notice(&sol_tier_spec(false), &tier_session("", true)),
+        None
+    );
+    assert_eq!(
+        tier_omitted_notice(&sol_tier_spec(true), &tier_session("", false)),
+        None
+    );
 }
 
-/// The whole command: a run whose log has Codex's warning prints the notice
-/// after the output on stdout and on stderr, and still succeeds.
+/// The whole command: a run that sets the flag prints the notice after the
+/// output on stdout and on stderr, and still succeeds.
 #[test]
 fn command_prints_the_ultrafast_notice_after_the_output() {
     use crate::testutil::with_env;
     let fix = Fixture::new();
     let wd = tmp();
-    let f = fake_run(&format!("user\nhi\n{TIER_WARNING}codex\nok\n"));
+    let f = fake_run("codex\nok\n");
     let mut spec = fake_spec(&f);
-    spec.service_tier = Some(executor::ULTRAFAST_TIER);
+    spec.service_tier = Some(rival_core::executor::ULTRAFAST_TIER);
+    let inner = spec.run;
+    spec.run = Box::new(move |c| {
+        c.sess.service_tier_omitted = true;
+        inner(c)
+    });
     let mut stdin = FakeStdin::new("hi");
     let out = with_env(&fix, &mut stdin, &*no_mr(), |env| {
         run_model_command(env, &spec, s(wd.path()), true)
@@ -748,5 +734,7 @@ fn command_prints_the_ultrafast_notice_after_the_output() {
         out.stdout
     );
     assert!(out.stderr.contains(notice), "{}", out.stderr);
-    assert_eq!(fix.sessions()[0].status, "completed");
+    let sessions = fix.sessions();
+    assert_eq!(sessions[0].status, "completed");
+    assert!(sessions[0].service_tier_omitted);
 }

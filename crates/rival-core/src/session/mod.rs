@@ -120,6 +120,11 @@ pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(deserialize_with = "json::nullable")]
     pub service_tier: String,
+    /// Codex warned that the account's model catalog does not list
+    /// `service_tier` and sent the run at the standard tier.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(deserialize_with = "json::nullable")]
+    pub service_tier_omitted: bool,
     #[serde(deserialize_with = "json::nullable")]
     pub pid: i64,
     /// Start time of `pid` (Unix ns); guards against PID reuse.

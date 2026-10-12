@@ -2,7 +2,7 @@
 
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::{Config, PromptKind, public_runtime_log};
-use rival_core::executor::{self, ROUTE_PROXY, RunResult};
+use rival_core::executor::{ROUTE_PROXY, RunResult};
 use rival_core::logging;
 use rival_core::paths::Paths;
 use rival_core::result::PayloadKind;
@@ -211,19 +211,11 @@ pub fn run_model_command(
 
 /// The lines that say Codex dropped the requested tier, or `None`. Codex
 /// warns, then sends the request without the tier, so the run still counts.
-/// The language pass is a second call with its own log; either log can
-/// carry the warning. Only the direct route names the account as the cause:
-/// through the proxy, the catalog and the account are the proxy's.
+/// Only the direct route names the account as the cause: through the proxy,
+/// the catalog and the account are the proxy's.
 pub(crate) fn tier_omitted_notice(spec: &ModelSpec, sess: &Session) -> Option<String> {
     let tier = spec.service_tier?;
-    let omitted = [
-        sess.log_file.clone(),
-        format!("{}.repair.log", sess.log_file),
-    ]
-    .iter()
-    .filter_map(|path| std::fs::read(path).ok())
-    .any(|log| executor::ultrafast_omitted(&String::from_utf8_lossy(&log)));
-    if !omitted {
+    if !sess.service_tier_omitted {
         return None;
     }
     let mut notice = format!(

@@ -367,6 +367,7 @@ const FULL: &str = concat!(
     "  \"route\": \"proxy\",\n",
     "  \"wire_model\": \"emcd_/gpt-6-astra\",\n",
     "  \"service_tier\": \"ultrafast\",\n",
+    "  \"service_tier_omitted\": true,\n",
     "  \"pid\": 42,\n",
     "  \"pid_start\": 7,\n",
     "  \"owner_pid\": 43,\n",
@@ -433,6 +434,7 @@ fn full_session() -> Session {
         route: "proxy".into(),
         wire_model: "emcd_/gpt-6-astra".into(),
         service_tier: "ultrafast".into(),
+        service_tier_omitted: true,
         pid: 42,
         pid_start: 7,
         owner_pid: 43,
@@ -1146,6 +1148,7 @@ fn route_fields_are_optional() {
     let old = Session::from_json(EXIT_SEVEN.as_bytes()).unwrap();
     assert_eq!((old.route.as_str(), old.wire_model.as_str()), ("", ""));
     assert_eq!(old.service_tier, "");
+    assert!(!old.service_tier_omitted);
     assert_eq!(
         String::from_utf8(old.to_json().unwrap()).unwrap(),
         EXIT_SEVEN
@@ -1154,6 +1157,7 @@ fn route_fields_are_optional() {
     assert_eq!(full.route, "proxy");
     assert_eq!(full.wire_model, "emcd_/gpt-6-astra");
     assert_eq!(full.service_tier, "ultrafast");
+    assert!(full.service_tier_omitted);
 }
 
 /// The leak guard: a registered secret never reaches the record.

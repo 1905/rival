@@ -1,6 +1,6 @@
 {
   "name": "ultrafast-command",
-  "description": "`rival command sol --ultrafast` and `rival command codex --ultrafast`: the tier pairs follow `-m <model>` and the session records `service_tier`. Sol's fake prints Codex's \"not advertised\" warning (on stdout, ahead of the answer, so the log order is fixed; rival reads the merged log either way), so rival prints the not-applied notice after the output on stdout and on stderr; the run still completes. Codex's fake prints no warning, so there is no notice.",
+  "description": "`rival command sol --ultrafast` and `rival command codex --ultrafast`: the tier pairs follow `-m <model>` and the session records `service_tier`. Sol's fake echoes the prompt and then prints Codex's \"not advertised\" warning, as Codex does (all on stdout, so the log order is fixed), so rival prints the not-applied notice after the output on stdout and on stderr; the run still completes. Codex's fake prints no warning, so there is no notice.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -40,7 +40,7 @@
               "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
               "cwd": "<ROOT>/work"
             },
-            "stdout": "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.\nA done\n",
+            "stdout": "user\nAnswer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow\nwarning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.\ncodex\nA done\n",
             "exit": 0
           },
           {
@@ -86,7 +86,7 @@
       "stdin": "explain the auth flow",
       "expect": {
         "exit_code": 0,
-        "stdout": "warning: Configured service tier `ultrafast` is not advertised as supported for model `sol` and will be omitted from requests.\nA done\n\nrival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n",
+        "stdout": "user\nAnswer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow\nwarning: Configured service tier `ultrafast` is not advertised as supported for model `sol` and will be omitted from requests.\ncodex\nA done\n\nrival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n",
         "stderr_lines": [
           "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.",
           "rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on."
@@ -153,7 +153,8 @@
           "cli": "codex",
           "model": "gpt-6.1-sol",
           "service_tier": "ultrafast",
-          "mode": "raw"
+          "mode": "raw",
+          "service_tier_omitted": true
         }
       },
       {

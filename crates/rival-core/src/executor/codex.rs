@@ -56,14 +56,24 @@ pub fn is_codex_model(model: &str) -> bool {
 }
 
 /// Whether a codex log has the runtime warning that Codex omitted the
-/// Ultrafast tier. Only a whole line matches, so the same words inside a
-/// prompt or a reply do not.
-pub fn ultrafast_omitted(log: &str) -> bool {
-    log.lines().map(str::trim).any(|line| {
-        line.strip_prefix(TIER_OMITTED_PREFIX)
-            .and_then(|rest| rest.strip_suffix(TIER_OMITTED_SUFFIX))
-            .is_some_and(|slug| !slug.is_empty() && !slug.contains('`'))
-    })
+/// Ultrafast tier. Codex prints its config warnings once, right after it
+/// echoes `prompt` and before any turn output. So only the `warning:` lines
+/// that directly follow the echo count: the same line inside the prompt or
+/// the reply does not. No echo of `prompt` in the log: false.
+pub(crate) fn ultrafast_omitted(log: &str, prompt: &str) -> bool {
+    let Some(at) = log.find(prompt) else {
+        return false;
+    };
+    log[at + prompt.len()..]
+        .lines()
+        .map(str::trim)
+        .skip_while(|line| line.is_empty())
+        .take_while(|line| line.starts_with("warning: "))
+        .any(|line| {
+            line.strip_prefix(TIER_OMITTED_PREFIX)
+                .and_then(|rest| rest.strip_suffix(TIER_OMITTED_SUFFIX))
+                .is_some_and(|slug| !slug.is_empty() && !slug.contains('`'))
+        })
 }
 
 /// Executes a prompt with one explicit model. Review
@@ -115,7 +125,7 @@ pub(crate) fn run_codex_model_with(
     if let Some(tier) = tier {
         sess.service_tier = tier.to_string();
     }
-    let result = (|| {
+    let result = (|| -> anyhow::Result<RunResult> {
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {
                 let wire = proxy::wire_id(&route.prefix, model);
@@ -142,7 +152,18 @@ pub(crate) fn run_codex_model_with(
             environ: cfg.environ(),
             log,
         };
-        spawn(sess, &req)
+        let result = spawn(sess, &req)?;
+        // The language pass is a second call on the same session; either
+        // call can find the warning, and neither clears it.
+        if tier == Some(ULTRAFAST_TIER) {
+            let path = log.unwrap_or(&sess.log_file);
+            if let Ok(text) = std::fs::read(path)
+                && ultrafast_omitted(&String::from_utf8_lossy(&text), &full_prompt)
+            {
+                sess.service_tier_omitted = true;
+            }
+        }
+        Ok(result)
     })();
     result.map_err(|err| {
         let label = config::engine_label("codex", model);

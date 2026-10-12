@@ -672,27 +672,93 @@ fn no_tier_leaves_argv_and_session_unchanged() {
     assert_eq!(sess.service_tier, "");
 }
 
-/// Only Codex's whole warning line counts; the same words inside a prompt
-/// echo or a reply do not.
+const TIER_WARNING: &str = "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.";
+
+/// A Codex log: banner, the echoed prompt, `between`, then the reply.
+fn tier_log(prompt: &str, between: &str, reply: &str) -> String {
+    format!(
+        "OpenAI Codex v0.162.1\n--------\nuser\n{prompt}\n{between}codex\n{reply}\ntokens used\n9\n{reply}\n"
+    )
+}
+
+/// Only Codex's warning lines right after the echoed prompt count. The
+/// full warning line inside the prompt or the reply does not.
 #[test]
-fn ultrafast_omitted_matches_only_the_runtime_warning_line() {
-    let warning = "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.";
-    assert!(ultrafast_omitted(&format!(
-        "user\nhi\n{warning}\ncodex\nok\n"
-    )));
-    assert!(ultrafast_omitted(&format!("  {warning}  \r\n")));
-    for text in [
-        "",
-        "codex\nok\n",
-        // A prompt or a reply that quotes the words.
-        "user\nwhy does it say `ultrafast` is not advertised as supported?\n",
-        &format!("user\nexplain: {warning}\n"),
-        &format!("codex\n> {warning}\n"),
+fn ultrafast_omitted_reads_only_the_warnings_after_the_prompt_echo() {
+    let prompt = "review the tier code";
+    let warned = format!("{TIER_WARNING}\n");
+    assert!(ultrafast_omitted(&tier_log(prompt, &warned, "ok"), prompt));
+    // Other config warnings may come first; blank lines are skipped.
+    let mixed = format!("\nwarning: something else\n  {TIER_WARNING}  \n");
+    assert!(ultrafast_omitted(&tier_log(prompt, &mixed, "ok"), prompt));
+
+    let quoted = format!("explain this line:\n{TIER_WARNING}");
+    for (log, prompt) in [
+        // The full warning line inside the prompt.
+        (tier_log(&quoted, "", "ok"), quoted.as_str()),
+        // The full warning line inside the reply.
+        (tier_log(prompt, "", TIER_WARNING), prompt),
+        // No echo of the prompt.
+        (format!("{TIER_WARNING}\n"), prompt),
         // Another tier, an empty slug, a cut-off line.
-        "warning: Configured service tier `priority` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.",
-        "warning: Configured service tier `ultrafast` is not advertised as supported for model `` and will be omitted from requests.",
-        "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol`",
+        (
+            tier_log(
+                prompt,
+                &format!("{}\n", TIER_WARNING.replace("`ultrafast`", "`priority`")),
+                "ok",
+            ),
+            prompt,
+        ),
+        (
+            tier_log(
+                prompt,
+                &format!("{}\n", TIER_WARNING.replace("`gpt-6.1-sol`", "``")),
+                "ok",
+            ),
+            prompt,
+        ),
+        (
+            tier_log(
+                prompt,
+                "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol`\n",
+                "ok",
+            ),
+            prompt,
+        ),
     ] {
-        assert!(!ultrafast_omitted(text), "{text:?}");
+        assert!(!ultrafast_omitted(&log, prompt), "{log:?}");
     }
+}
+
+/// The run reads its own log after the spawn and sets the session flag
+/// only when it asked for the tier and Codex warned.
+#[test]
+fn run_sets_service_tier_omitted_from_its_log() {
+    let run = |tier: Option<&str>, between: &str| {
+        let env = Env::new();
+        let cfg = env.config();
+        let work = env.work_str();
+        let log = std::path::Path::new(&work).join("call.log");
+        let mut sess = env.session("codex", "review", config::SOL_MODEL, &work);
+        run_codex_model_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "low",
+            &work,
+            config::SOL_MODEL,
+            tier,
+            Some(log.to_str().unwrap()),
+            |_, req| {
+                std::fs::write(&log, tier_log(req.prompt, between, "ok")).unwrap();
+                Ok(RunResult::default())
+            },
+        )
+        .unwrap();
+        sess.service_tier_omitted
+    };
+    let warned = format!("{TIER_WARNING}\n");
+    assert!(run(Some(ULTRAFAST_TIER), &warned));
+    assert!(!run(Some(ULTRAFAST_TIER), ""));
+    assert!(!run(None, &warned));
 }
