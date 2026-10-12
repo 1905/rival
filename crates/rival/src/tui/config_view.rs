@@ -1163,14 +1163,20 @@ fn message(
     match row {
         None if cancelling => (None, "cancelling".to_string(), s.dim),
         None => (None, "checking".to_string(), s.dim),
-        Some(r) if r.ok && r.unexpected => (None, format!("{}  (not ok)", r.reply), s.warn),
-        Some(r) if r.ok => (None, r.reply.clone(), s.text),
+        Some(r) if r.ok && r.unexpected => (
+            None,
+            format!("{}  (not ok){}", r.reply, r.tier_tag()),
+            s.warn,
+        ),
+        // A pass that Codex ran at the standard tier is shown in yellow.
+        Some(r) if r.ok && r.tier_omitted => (None, format!("{}{}", r.reply, r.tier_tag()), s.warn),
+        Some(r) if r.ok => (None, format!("{}{}", r.reply, r.tier_tag()), s.text),
         Some(r) if r.limit => (
             Some(Span::styled("limit", s.failed.add_modifier(Modifier::BOLD))),
-            r.error.clone(),
+            format!("{}{}", r.error, r.tier_tag()),
             s.failed,
         ),
-        Some(r) => (None, r.error.clone(), s.failed),
+        Some(r) => (None, format!("{}{}", r.error, r.tier_tag()), s.failed),
     }
 }
 

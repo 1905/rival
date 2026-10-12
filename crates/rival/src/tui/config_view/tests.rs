@@ -74,3 +74,48 @@ fn check_rows_put_long_messages_under_narrow_rows() {
     assert_eq!(narrow[i + 1], "    proxy does not serve gpt-6.1-sol");
     assert!(narrow.iter().all(|l| crate::tui::text::width(l) <= 74));
 }
+
+/// A pass that Codex ran at the standard tier says so in the TUI rows, as
+/// the text report does; a model with the switch on says `[ultrafast]`.
+#[test]
+fn check_rows_show_the_ultrafast_tag() {
+    let (_h, mut f) = form();
+    f.start_check(false).unwrap();
+    let run = f.check.run;
+    for (name, omitted) in [("sol", true), ("codex", false)] {
+        f.check_row(
+            run,
+            CheckRow {
+                name: name.into(),
+                route: "direct".into(),
+                wire_model: name.into(),
+                ok: true,
+                reply: "ok".into(),
+                called: true,
+                ultrafast: true,
+                tier_omitted: omitted,
+                ..CheckRow::default()
+            },
+        );
+    }
+    let v = ViewCtx {
+        styles: &STYLES,
+        spin: "⠋",
+    };
+    let lines: Vec<String> = check_rows(&f, 120, 2, false, &v)
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    let line = |name: &str| {
+        lines
+            .iter()
+            .find(|l| l.contains(&format!("{name} ")))
+            .unwrap()
+            .clone()
+    };
+    assert!(
+        line("sol").contains("ok  [ultrafast not applied]"),
+        "{lines:?}"
+    );
+    assert!(line("codex").contains("ok  [ultrafast]"), "{lines:?}");
+}

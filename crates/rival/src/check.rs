@@ -225,6 +225,18 @@ impl CheckRow {
         })
     }
 
+    /// What the text report and the TUI append to the row's message:
+    /// `[ultrafast not applied]`, `[ultrafast]`, or nothing.
+    pub fn tier_tag(&self) -> &'static str {
+        if self.tier_omitted {
+            "  [ultrafast not applied]"
+        } else if self.ultrafast {
+            "  [ultrafast]"
+        } else {
+            ""
+        }
+    }
+
     fn fail(mut self, error: &str) -> CheckRow {
         self.ok = false;
         self.error = scrubbed(first_line(error));
@@ -326,11 +338,7 @@ impl Report {
             } else {
                 row.error.clone()
             };
-            if row.tier_omitted {
-                message.push_str("  [ultrafast not applied]");
-            } else if row.ultrafast {
-                message.push_str("  [ultrafast]");
-            }
+            message.push_str(row.tier_tag());
             let line = format!(
                 "  {mark} {:<name_w$}  {:<route_w$}  {:<wire_w$}  {}  {message}",
                 row.name,
@@ -684,6 +692,11 @@ impl Engine<'_> {
         row.called = true;
         let timed_out = ctx.err() == Some(ContextError::DeadlineExceeded);
         cancel.cancel();
+        // Before any early return: a timed-out call that Codex already ran
+        // at the standard tier keeps that fact.
+        if let Ok(outcome) = &result {
+            row.tier_omitted = outcome.tier_omitted;
+        }
         let output = fs::read(&log)
             .map(|d| String::from_utf8_lossy(&d).into_owned())
             .unwrap_or_default();
@@ -695,10 +708,7 @@ impl Engine<'_> {
             ));
         }
         let exit_code = match result {
-            Ok(outcome) => {
-                row.tier_omitted = outcome.tier_omitted;
-                outcome.exit_code
-            }
+            Ok(outcome) => outcome.exit_code,
             Err(e) => {
                 row.hint = self.hint(t, route, served, &output, &log, &mut row.limit);
                 return row.fail(&e);

@@ -50,6 +50,9 @@ enum Reply {
     Err(&'static str),
     /// Waits until the context is done.
     Hang,
+    /// Waits until the context is done, then reports a call that Codex
+    /// ran at the standard tier.
+    HangOmitted,
 }
 
 struct Fake {
@@ -159,6 +162,13 @@ impl Runner for Fake {
             Reply::Hang => {
                 ctx.wait_timeout(Duration::from_secs(30));
                 Err(ctx.err().map_or("hung".to_string(), |e| e.to_string()))
+            }
+            Reply::HangOmitted => {
+                ctx.wait_timeout(Duration::from_secs(30));
+                Ok(CallOutcome {
+                    exit_code: 0,
+                    tier_omitted: true,
+                })
             }
         };
         self.active.fetch_sub(1, Ordering::SeqCst);
@@ -923,5 +933,24 @@ fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
     assert!(
         text.contains("      Codex used the standard tier: its model catalog does not list Ultrafast.\n      Ultrafast needs a Codex account on Pro $500"),
         "{text}"
+    );
+}
+
+/// A call that times out after Codex already ran it at the standard tier
+/// keeps that fact on the failed row.
+#[test]
+fn a_timed_out_call_keeps_its_omitted_tier() {
+    let fix = Fixture::with_config_yaml("ultrafast:\n  sol: true\n");
+    let mut fake = Fake::new();
+    fake.replies.insert("sol", Reply::HangOmitted);
+    let report = check_timeout(&fix, &["sol"], &fake, Duration::from_millis(200));
+    let sol = row(&report, "sol");
+    assert!(!sol.ok, "{sol:?}");
+    assert!(sol.error.contains("timeout"), "{}", sol.error);
+    assert!(sol.ultrafast && sol.tier_omitted, "{sol:?}");
+    assert!(
+        report.text().contains("[ultrafast not applied]"),
+        "{}",
+        report.text()
     );
 }
