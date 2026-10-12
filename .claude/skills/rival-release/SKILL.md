@@ -31,7 +31,8 @@ publish a tag without verified assets. Leave v5.0.0 unchanged.
 2. **Build + test** — from the repository root:
    create/activate a local Python venv and install `scripts/requirements-test.txt`.
    `make cli-test && make cli-release-check` (Rust workspace tests, release
-   script tests, `goreleaser check`). Must be green before tagging.
+   script tests, `goreleaser check` with only the documented `brews` warning
+   accepted). Must be green before tagging.
    Require the candidate commit's full three-OS `CI` workflow to pass too,
    including strict Clippy, CLI scenarios, the Rival.app build and all Swift tests.
 3. **Snapshot gate** — required for the first Rust release and whenever

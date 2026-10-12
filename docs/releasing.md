@@ -68,7 +68,9 @@ VERSION=3.23.0
    ```
 
    `make cli-test` runs the Rust workspace tests and the release-script tests.
-   `make cli-release-check` validates `.goreleaser.yaml`. The release workflow
+   `make cli-release-check` validates `.goreleaser.yaml`, accepting only the
+   documented `brews` deprecation so the tap keeps its formula. Invalid
+   configuration and any other deprecation still fail. The release workflow
    itself builds artifacts but does not duplicate this test gate.
 
    The candidate commit must also pass the full `CI` workflow on macOS,
