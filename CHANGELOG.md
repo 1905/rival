@@ -4,9 +4,22 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 
 Latest binary release: [v5.2.0](https://github.com/1905/rival/releases/tag/v5.2.0) — 2026-10-12.
 
-## [Unreleased]
+## [v6.0.0] — 2026-10-12
+
+Breaking: the per-model skills are replaced by one skill.
+
+### Added
+- **One `/rival` skill** for Claude Code and Codex. It names no model: `skill.claude` and `skill.codex` in `~/.rival/config.yaml` pick the model each host runs. The defaults give each host a review from the other vendor: `/rival` in Claude Code runs Sol 6.1 (`sol`), and `$rival` in Codex runs Opus 5.5 (`claude`). The values are `codex`, `sol`, `claude` (or `opus`), `fable`, `k3` and `grok`. Pick them in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. `rival config show` lists both keys.
+- `/rival security [scope]` runs the security review; `security.reviewer` still picks its model.
+- `rival command skill --host claude|codex`, which the skill launches. Input that starts with `security` goes to `rival command security`; other input runs the `rival command <model>` flow of the configured model. Empty input prints the `/rival` usage. A failed preflight names the key to change: `set another model: rival config set skill.<host> <model>`.
+
+### Changed
+- **Ultrafast is on by default.** A missing `ultrafast.codex` or `ultrafast.sol` reads as true, so Codex (GPT-6 Astra) and Sol 6.1 ask for the Ultrafast tier on every call. An account without Ultrafast gets the `rival: ⚠ ultrafast not applied` notice on each run; turn the tier off with `rival config set ultrafast.codex false` or `ultrafast.sol false`.
+- The config window's Models section drops the PLAN column and its `space` toggle. `plan.models` and `rival command plan -m` are unchanged.
+- `scripts/bump-skill-versions.sh` reads the `NAMES` array in its one-line form too.
 
 ### Removed
+- The skills `rival-codex`, `rival-sol`, `rival-claude`, `rival-fable`, `rival-k3`, `rival-grok` and `rival-security`. `rival install` and `rival update` delete installed copies. `rival command codex|sol|claude|fable|k3|grok|security|plan` and `rival run` stay.
 - Rival.app, the Swift macOS viewer, with its Makefile targets (`run`, `install`, `test`, `soak`), the `try-proxy` app mode and the `rival-app` cask in `1905/homebrew-tap`. Use `rival tui`. Remove an installed copy with `brew uninstall --cask rival-app`.
 
 ## [v5.2.0] — 2026-10-12
