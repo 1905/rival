@@ -15,8 +15,8 @@
 │    in Claude Code      ‹ sol ›   Sol 6.1 · Codex CLI                         │|
 │    in Codex            ‹ claude ›   Opus 5.5 · Claude Code                   │|
 │                                                                              │|
-│    Codex Ultrafast     ● on    every call asks for the Ultrafast tier        │|
-│    Sol Ultrafast       ● on    every call asks for the Ultrafast tier        │|
+│    Codex speed         ‹ fast ›   about 2x speed, uses more quota            │|
+│    Sol speed           ‹ fast ›   about 2x speed, uses more quota            │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK  not run · c checks the draft                     ● online · 6 models │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
@@ -40,8 +40,8 @@ d..DDDDDDDDDDD.................................................................d
 d....ddddddddddddddddddddddTTTdddddddddddddddddddddddd.........................d|
 d....ddddddddddddddddddddddTTTTTTddddddddddddddddddddddddddd...................d|
 d..............................................................................d|
-d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddddddddd........d|
-d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddddddddd........d|
+d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd............d|
+d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd............d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

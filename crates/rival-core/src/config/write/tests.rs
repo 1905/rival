@@ -399,38 +399,38 @@ fn concurrent_applies_keep_every_edit() {
     assert_eq!(user.proxy.codex.model_prefix, keys[3].1(last), "{text}");
 }
 
-/// `rival config set ultrafast.codex|sol` takes a bool and writes the
-/// nested block, which loads back.
+/// `rival config set speed.codex|sol` takes a speed name and writes the
+/// nested block, which loads back. `ultrafast.<model>` is read only.
 #[test]
-fn ultrafast_switches_are_settable_bools() {
-    assert!(SETTABLE_KEYS.contains(&"ultrafast.<model>"));
-    let err = parse_setting("ultrafast.k3", "true")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("unknown config key"), "{err}");
-    for key in ["ultrafast.codex", "ultrafast.sol"] {
-        assert_eq!(
-            parse_setting(key, "TRUE").unwrap(),
-            Edit::set(key, Value::Bool(true))
-        );
-        let err = parse_setting(key, "on").unwrap_err().to_string();
-        assert!(err.contains("use true or false"), "{err}");
+fn speeds_are_settable_strings() {
+    assert!(SETTABLE_KEYS.contains(&"speed.<model>"));
+    assert!(!SETTABLE_KEYS.iter().any(|k| k.starts_with("ultrafast")));
+    for key in ["ultrafast.codex", "ultrafast.sol", "speed.k3"] {
+        let err = parse_setting(key, "true").unwrap_err().to_string();
+        assert!(err.contains("unknown config key"), "{key}: {err}");
     }
-    let (_dir, path) = temp();
-    set(&path, "ultrafast.sol", "true").unwrap();
-    let user = set(&path, "ultrafast.codex", "false").unwrap();
     assert_eq!(
-        user.ultrafast,
-        crate::config::UltrafastConfig {
-            codex: false,
-            sol: true
+        parse_setting("speed.sol", "ultrafast").unwrap(),
+        Edit::set("speed.sol", Value::Str("ultrafast".into()))
+    );
+    let (_dir, path) = temp();
+    set(&path, "speed.sol", "ultrafast").unwrap();
+    let user = set(&path, "speed.codex", "normal").unwrap();
+    assert_eq!(
+        user.speed,
+        crate::config::SpeedConfig {
+            codex: crate::config::Speed::Normal,
+            sol: crate::config::Speed::Ultrafast,
         }
     );
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(
-        text.contains("ultrafast:\n  sol: true\n  codex: false\n"),
+        text.contains("speed:\n  sol: ultrafast\n  codex: normal\n"),
         "{text}"
     );
+    let err = set(&path, "speed.codex", "turbo").unwrap_err().to_string();
+    assert!(err.contains("use one of: normal, fast, ultrafast"), "{err}");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
 }
 
 /// `rival config set skill.claude|skill.codex` takes a model name; the

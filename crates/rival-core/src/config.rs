@@ -760,43 +760,92 @@ pub struct PlanConfig {
     pub models: Vec<String>,
 }
 
-/// The Codex-runtime models that have an `ultrafast.<label>` switch, as
+/// The Codex-runtime models that have a `speed.<label>` key, as
 /// `(label, model id)`.
-pub const ULTRAFAST_MODELS: [(&str, &str); 2] =
-    [(CODEX_LABEL, CODEX_MODEL), (SOL_LABEL, SOL_MODEL)];
+pub const SPEED_MODELS: [(&str, &str); 2] = [(CODEX_LABEL, CODEX_MODEL), (SOL_LABEL, SOL_MODEL)];
 
-/// The `ultrafast:` block: per Codex-runtime model, whether its calls ask
-/// Codex for the Ultrafast service tier. On when unset.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UltrafastConfig {
-    /// `ultrafast.codex`: GPT-6 Astra.
-    pub codex: bool,
-    /// `ultrafast.sol`: Sol 6.1.
-    pub sol: bool,
+/// The Codex service tier a Codex-runtime model asks for: `speed.<label>`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Speed {
+    /// No tier: the plain argv.
+    Normal,
+    /// The Fast tier: about 2x speed, uses more of the plan's quota.
+    #[default]
+    Fast,
+    /// The Ultrafast tier: needs the Pro $500 plan, or an Enterprise/Edu
+    /// workspace with Ultrafast on.
+    Ultrafast,
 }
 
-/// Both switches on: the value of a missing `ultrafast:` block or key.
-impl Default for UltrafastConfig {
-    fn default() -> Self {
-        UltrafastConfig {
-            codex: true,
-            sol: true,
+impl Speed {
+    /// Every speed, in the order the TUI picker steps through them.
+    pub const ALL: [Speed; 3] = [Speed::Normal, Speed::Fast, Speed::Ultrafast];
+
+    /// The speed named `raw` (trimmed, any case).
+    pub fn parse(raw: &str) -> Option<Speed> {
+        let name = raw.trim().to_ascii_lowercase();
+        Speed::ALL.into_iter().find(|s| s.name() == name)
+    }
+
+    /// The config value: `normal`, `fast` or `ultrafast`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Speed::Normal => "normal",
+            Speed::Fast => "fast",
+            Speed::Ultrafast => "ultrafast",
         }
+    }
+
+    /// The `service_tier` Codex gets; `None` for normal.
+    pub fn tier(self) -> Option<&'static str> {
+        match self {
+            Speed::Normal => None,
+            Speed::Fast => Some("fast"),
+            Speed::Ultrafast => Some("ultrafast"),
+        }
+    }
+
+    /// The speed whose [`Speed::tier`] is `tier`.
+    pub fn from_tier(tier: &str) -> Speed {
+        Speed::ALL
+            .into_iter()
+            .find(|s| s.tier() == Some(tier))
+            .unwrap_or(Speed::Normal)
     }
 }
 
-impl UltrafastConfig {
-    /// The switch of a label from [`ULTRAFAST_MODELS`]; false for any other.
-    pub fn get(&self, label: &str) -> bool {
+/// The accepted `speed.<label>` values, for error messages.
+pub fn speed_names() -> [&'static str; 3] {
+    Speed::ALL.map(Speed::name)
+}
+
+/// The warning for a model set to ultrafast: other plans run it at the
+/// standard tier.
+pub const ULTRAFAST_PLAN_WARNING: &str = "Ultrafast needs the Pro $500 plan (or Enterprise/Edu with Ultrafast on); other plans run at the standard tier.";
+
+/// The `speed:` block: per Codex-runtime model, the service tier its calls
+/// ask Codex for. Fast when unset; a 5.2 `ultrafast.<label>: true` with no
+/// `speed.<label>` reads as ultrafast.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SpeedConfig {
+    /// `speed.codex`: GPT-6 Astra.
+    pub codex: Speed,
+    /// `speed.sol`: Sol 6.1.
+    pub sol: Speed,
+}
+
+impl SpeedConfig {
+    /// The speed of a label from [`SPEED_MODELS`]; normal for any other.
+    pub fn get(&self, label: &str) -> Speed {
         match label {
             CODEX_LABEL => self.codex,
             SOL_LABEL => self.sol,
-            _ => false,
+            _ => Speed::Normal,
         }
     }
 
-    /// The switch of a label from [`ULTRAFAST_MODELS`], to flip it.
-    pub fn get_mut(&mut self, label: &str) -> Option<&mut bool> {
+    /// The speed of a label from [`SPEED_MODELS`], to change it.
+    pub fn get_mut(&mut self, label: &str) -> Option<&mut Speed> {
         match label {
             CODEX_LABEL => Some(&mut self.codex),
             SOL_LABEL => Some(&mut self.sol),
@@ -1076,7 +1125,7 @@ pub struct UserConfig {
     /// Lets the skills apply fixes for CONFIRMED critical and high findings
     /// without asking. Medium and low are never auto-fixed.
     pub auto_fix_critical_high: bool,
-    pub ultrafast: UltrafastConfig,
+    pub speed: SpeedConfig,
     pub skill: SkillConfig,
 }
 
@@ -1163,12 +1212,21 @@ struct RawSkill {
     codex: GoString,
 }
 
+/// The 5.2 `ultrafast:` block, read only for `speed` compatibility.
 #[derive(Default, Deserialize)]
 struct RawUltrafast {
     #[serde(default)]
     codex: Option<bool>,
     #[serde(default)]
     sol: Option<bool>,
+}
+
+#[derive(Default, Deserialize)]
+struct RawSpeed {
+    #[serde(default)]
+    codex: GoString,
+    #[serde(default)]
+    sol: GoString,
 }
 
 /// Unknown keys (for example the removed megareview's `review:` roster) are
@@ -1191,6 +1249,8 @@ struct RawUserConfig {
     plan: Option<RawPlan>,
     #[serde(default)]
     ultrafast: Option<RawUltrafast>,
+    #[serde(default)]
+    speed: Option<RawSpeed>,
     #[serde(default)]
     skill: Option<RawSkill>,
 }
@@ -1230,13 +1290,8 @@ impl From<RawUserConfig> for UserConfig {
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
             auto_fix_critical_high: raw.auto_fix_critical_high.unwrap_or_default(),
-            ultrafast: {
-                let u = raw.ultrafast.unwrap_or_default();
-                UltrafastConfig {
-                    codex: u.codex.unwrap_or(true),
-                    sol: u.sol.unwrap_or(true),
-                }
-            },
+            // Set by `parse_user_config`, which validates the raw values.
+            speed: SpeedConfig::default(),
             skill: {
                 let s = raw.skill.unwrap_or_default();
                 SkillConfig {
@@ -1284,8 +1339,10 @@ pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigEr
     let shown = path.display();
     let parse_err = |e: &dyn fmt::Display| ConfigError::new(format!("parse {shown}: {e}"));
     let raw: Option<RawUserConfig> = serde_saphyr::from_str(text).map_err(|e| parse_err(&e))?;
-    let raw = raw.unwrap_or_default();
+    let mut raw = raw.unwrap_or_default();
     let key_in_yaml = raw.proxy.as_ref().is_some_and(|p| p.key.0);
+    let raw_speed = raw.speed.take().unwrap_or_default();
+    let raw_ultrafast = raw.ultrafast.take().unwrap_or_default();
     let mut cfg = UserConfig::from(raw);
 
     for (label, raw) in cfg.efforts.iter_mut() {
@@ -1339,6 +1396,25 @@ pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigEr
             )));
         };
         *value = name.to_string();
+    }
+    for (label, written, old_ultrafast) in [
+        (CODEX_LABEL, &raw_speed.codex.0, raw_ultrafast.codex),
+        (SOL_LABEL, &raw_speed.sol.0, raw_ultrafast.sol),
+    ] {
+        let speed = match written.trim() {
+            "" if old_ultrafast == Some(true) => Speed::Ultrafast,
+            "" => Speed::Fast,
+            value => Speed::parse(value).ok_or_else(|| {
+                ConfigError::new(format!(
+                    "invalid speed.{label} {:?} in {shown}; use one of: {}",
+                    value,
+                    speed_names().join(", ")
+                ))
+            })?,
+        };
+        if let Some(slot) = cfg.speed.get_mut(label) {
+            *slot = speed;
+        }
     }
     if key_in_yaml {
         return Err(ConfigError::new(format!(
@@ -1569,18 +1645,18 @@ impl Config {
         }
     }
 
-    /// Whether calls of `model` ask Codex for the Ultrafast tier:
-    /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1 (both
-    /// on when unset, also with no config file), never for any other model.
-    pub fn ultrafast(&self, model: &str) -> bool {
-        let switches = self
+    /// The service tier calls of `model` ask Codex for: `speed.codex` for
+    /// GPT-6 Astra, `speed.sol` for Sol 6.1 (fast when unset, also with no
+    /// config file), normal for any other model.
+    pub fn speed(&self, model: &str) -> Speed {
+        let speeds = self
             .user
             .as_ref()
-            .map_or_else(UltrafastConfig::default, |u| u.ultrafast.clone());
-        ULTRAFAST_MODELS
+            .map_or_else(SpeedConfig::default, |u| u.speed.clone());
+        SPEED_MODELS
             .iter()
             .find(|(_, id)| *id == model)
-            .is_some_and(|(label, _)| switches.get(label))
+            .map_or(Speed::Normal, |(label, _)| speeds.get(label))
     }
 
     /// The `rival command` name of the model `host`'s `/rival` skill runs:

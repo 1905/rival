@@ -189,11 +189,12 @@ pub fn run_model_command(
     if let Err(e) = env.stdout.write_all(out.as_bytes()) {
         return Err(crate::command_plan::write_stdout_error(&e));
     }
-    if let Some(notice) = executor::ultrafast_notice(&sess) {
+    if let Some(notice) = executor::tier_notice(&sess) {
         print_notice(env, &notice);
         logging::warn()
             .str("session", sess.id.as_str())
-            .msg("codex omitted the ultrafast service tier");
+            .str("tier", sess.service_tier.as_str())
+            .msg("codex omitted the service tier");
     }
 
     if exit_code != 0 {

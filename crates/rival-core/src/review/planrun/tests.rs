@@ -255,8 +255,9 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
     );
 
     let args = std::fs::read_to_string(&args_file).unwrap();
-    // No config file: the Ultrafast tier is on by default.
-    let mut want = codex_run_args(CODEX_MODEL, "xhigh", &repo, true).join("\n");
+    // No config file: the speed is fast by default.
+    let mut want =
+        codex_run_args(CODEX_MODEL, "xhigh", &repo, crate::config::Speed::Fast).join("\n");
     want.push('\n');
     assert_eq!(args, want);
     for part in [
@@ -1623,7 +1624,7 @@ fn repaired_summary(label: &str) -> String {
 #[test]
 fn omitted_ultrafast_tiers_become_notices() {
     let mark = |sess: &mut Session| {
-        sess.service_tier = crate::executor::ULTRAFAST_TIER.to_string();
+        sess.service_tier = "ultrafast".to_string();
         sess.service_tier_omitted = true;
     };
     let (_home, cfg) = plan_test_config("");

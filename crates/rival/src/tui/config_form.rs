@@ -17,7 +17,7 @@ use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, ProxyProvider,
-    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, SkillHost, ULTRAFAST_MODELS,
+    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, SPEED_MODELS, SkillHost, Speed,
     UserConfig, VALID_EFFORTS,
 };
 use rival_core::proxy;
@@ -84,7 +84,7 @@ impl Section {
             Section::Models => (0..MODELS.len())
                 .map(Field::Model)
                 .chain(SkillHost::ALL.map(Field::Skill))
-                .chain((0..ULTRAFAST_MODELS.len()).map(Field::Ultrafast))
+                .chain((0..SPEED_MODELS.len()).map(Field::Speed))
                 .collect(),
             Section::Review => vec![Field::Reviewer, Field::AutoFix],
             Section::Check => Vec::new(),
@@ -107,8 +107,8 @@ pub enum Field {
     Skill(SkillHost),
     Reviewer,
     AutoFix,
-    /// A row of [`ULTRAFAST_MODELS`]: its `ultrafast.<label>` switch.
-    Ultrafast(usize),
+    /// A row of [`SPEED_MODELS`]: its `speed.<label>` picker.
+    Speed(usize),
 }
 
 impl Field {
@@ -125,9 +125,9 @@ impl Field {
             Field::Skill(SkillHost::Codex) => "in Codex",
             Field::Reviewer => "Security reviewer",
             Field::AutoFix => "Auto-fix crit/high",
-            Field::Ultrafast(i) => match ULTRAFAST_MODELS.get(i).map(|(label, _)| *label) {
-                Some(CODEX_LABEL) => "Codex Ultrafast",
-                Some(SOL_LABEL) => "Sol Ultrafast",
+            Field::Speed(i) => match SPEED_MODELS.get(i).map(|(label, _)| *label) {
+                Some(CODEX_LABEL) => "Codex speed",
+                Some(SOL_LABEL) => "Sol speed",
                 _ => "",
             },
         }
@@ -136,7 +136,7 @@ impl Field {
     pub fn is_toggle(self) -> bool {
         matches!(
             self,
-            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix | Field::Ultrafast(_)
+            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix
         )
     }
 
@@ -148,6 +148,7 @@ impl Field {
                 | Field::Reviewer
                 | Field::Model(_)
                 | Field::Skill(_)
+                | Field::Speed(_)
         )
     }
 
@@ -293,6 +294,8 @@ pub struct Notice {
 pub enum NoticeKind {
     Info,
     Ok,
+    /// A choice that saves but may not work as asked.
+    Warn,
     Error,
 }
 
@@ -662,14 +665,6 @@ impl ConfigForm {
                 self.draft.proxy.claude.enabled = !self.draft.proxy.claude.enabled;
             }
             Field::CodexRoute => self.draft.proxy.codex.enabled = !self.draft.proxy.codex.enabled,
-            Field::Ultrafast(i) => {
-                if let Some(on) = ULTRAFAST_MODELS
-                    .get(i)
-                    .and_then(|(label, _)| self.draft.ultrafast.get_mut(label))
-                {
-                    *on = !*on;
-                }
-            }
             Field::AutoFix => {
                 self.draft.auto_fix_critical_high = !self.draft.auto_fix_critical_high;
             }
@@ -695,6 +690,19 @@ impl ConfigForm {
             Field::Reviewer => {
                 let names: Vec<String> = REVIEWERS.iter().map(|(n, _)| n.to_string()).collect();
                 self.draft.security.reviewer = cycle(&names, self.reviewer(), delta);
+            }
+            Field::Speed(i) => {
+                let (label, _) = SPEED_MODELS.get(i)?;
+                let slot = self.draft.speed.get_mut(label)?;
+                let at = Speed::ALL.iter().position(|s| s == slot).unwrap_or(0) as isize;
+                let n = Speed::ALL.len() as isize;
+                *slot = Speed::ALL[(at + delta).rem_euclid(n) as usize];
+                if *slot == Speed::Ultrafast {
+                    self.notice = Some(Notice {
+                        text: config::ULTRAFAST_PLAN_WARNING.to_string(),
+                        kind: NoticeKind::Warn,
+                    });
+                }
             }
             Field::Skill(host) => {
                 let names: Vec<String> = MODELS.iter().map(|m| m.name.to_string()).collect();
@@ -1192,9 +1200,9 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
             json!(d.auto_fix_critical_high),
         );
     }
-    for (label, _) in ULTRAFAST_MODELS {
-        if s.ultrafast.get(label) != d.ultrafast.get(label) {
-            p.insert(format!("ultrafast.{label}"), json!(d.ultrafast.get(label)));
+    for (label, _) in SPEED_MODELS {
+        if s.speed.get(label) != d.speed.get(label) {
+            p.insert(format!("speed.{label}"), json!(d.speed.get(label).name()));
         }
     }
     p

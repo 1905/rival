@@ -1,5 +1,5 @@
 ╭─ rival · config ───┬────────────────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml ─╮|
-│                    │  MODELS   efforts, the /rival models and Ultrafast                                                                  │|
+│                    │  MODELS   efforts, the /rival models and speed                                                                      │|
 │   Proxy            │                                                                                                                     │|
 │ ▸ Models           │    MODEL   RUNTIME      ROUTE   EFFORT                                                                              │|
 │   Review           │    codex   Codex CLI    proxy     xhigh                                                                             │|
@@ -15,8 +15,8 @@
 │                    │    in Claude Code      ‹ sol ›   Sol 6.1 · Codex CLI                                                                │|
 │                    │    in Codex            ‹ claude ›   Opus 5.5 · Claude Code                                                          │|
 │                    │                                                                                                                     │|
-│                    │    Codex Ultrafast     ● on    every call asks for the Ultrafast tier                                               │|
-│                    │    Sol Ultrafast       ● on    every call asks for the Ultrafast tier                                               │|
+│                    │    Codex speed         ‹ fast ›   about 2x speed, uses more quota                                                   │|
+│                    │    Sol speed           ‹ fast ›   about 2x speed, uses more quota                                                   │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
@@ -40,7 +40,7 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
 -- styles --
 dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
-d....................d..ggggggddddddddddddddddddddddddddddddddddddddddddd..................................................................d|
+d....................d..ggggggddddddddddddddddddddddddddddddddddddddd......................................................................d|
 d.ddttttt............d.....................................................................................................................d|
 dSSSSSSSSSSSSSSSSSSS.d..DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD..............................................................................d|
 d.ddtttttt...........d....tttttttttttttttttttttaaaaaaaattttttttttttt.......................................................................d|
@@ -56,8 +56,8 @@ d....................d..DDDDDDDDDDD.............................................
 d....................d....ddddddddddddddddddddddTTTdddddddddddddddddddddddd................................................................d|
 d....................d....ddddddddddddddddddddddTTTTTTddddddddddddddddddddddddddd..........................................................d|
 d....................d.....................................................................................................................d|
-d....................d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddddddddd...............................................d|
-d....................d....ddddddddddddddddddddaaaaaddddddddddddddddddddddddddddddddddddddddd...............................................d|
+d....................d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd...................................................d|
+d....................d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd...................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|

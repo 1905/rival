@@ -14,7 +14,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Widget};
 
-use rival_core::config::{ProxyProvider, SkillHost, ULTRAFAST_MODELS};
+use rival_core::config::{ProxyProvider, SPEED_MODELS, SkillHost, Speed};
 
 use super::config_check::KeyStatus;
 use super::config_form::{
@@ -278,7 +278,7 @@ fn section_lines(form: &ConfigForm, w: usize, wide: bool, v: &ViewCtx) -> Vec<Bo
     if wide {
         let (title, about) = match form.section {
             Section::Proxy => ("PROXY", "Claude and Codex through CLIProxyAPI"),
-            Section::Models => ("MODELS", "efforts, the /rival models and Ultrafast"),
+            Section::Models => ("MODELS", "efforts, the /rival models and speed"),
             Section::Review => ("REVIEW", "the security review and the skills"),
             Section::Check => ("CHECK", "one short live call to each model"),
         };
@@ -734,19 +734,30 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
     out.push(BodyLine::plain(Line::default()));
     skill_lines(form, w, s, out);
     out.push(BodyLine::plain(Line::default()));
-    for (i, (label, _)) in ULTRAFAST_MODELS.iter().enumerate() {
+    for (i, (label, _)) in SPEED_MODELS.iter().enumerate() {
+        let f = Field::Speed(i);
+        let speed = form.draft.speed.get(label);
+        let mut value = picker(speed.name(), form.field() == Some(f), s);
+        let (about, style) = speed_about(speed, s);
+        value.push(Span::styled(format!("   {about}"), style));
         field(
             out,
             form,
-            Field::Ultrafast(i),
-            vec![
-                toggle(form.draft.ultrafast.get(label), s),
-                Span::styled("   every call asks for the Ultrafast tier", s.dim),
-            ],
-            "needs Pro $500 or Enterprise/Edu; else Codex uses the standard tier",
+            f,
+            value,
+            "the Codex service tier: normal → fast → ultrafast",
             w,
             s,
         );
+    }
+}
+
+/// What a speed does, as the picker row says it.
+fn speed_about(speed: Speed, s: &Styles) -> (&'static str, Style) {
+    match speed {
+        Speed::Normal => ("standard tier", s.dim),
+        Speed::Fast => ("about 2x speed, uses more quota", s.dim),
+        Speed::Ultrafast => ("needs Pro $500 or Enterprise/Edu", s.warn),
     }
 }
 
@@ -1184,7 +1195,7 @@ fn message(
             } else {
                 (None, r.error.clone(), s.failed)
             };
-            (label, text + r.tier_tag(), style)
+            (label, text + &r.tier_tag(), style)
         }
     }
 }
@@ -1211,6 +1222,7 @@ fn footer_line(form: &ConfigForm, w: usize, s: &Styles) -> Line<'static> {
             NoticeKind::Ok => ("✓ ", s.accent),
             NoticeKind::Error => ("✗ ", s.failed),
             NoticeKind::Info => ("· ", s.text),
+            NoticeKind::Warn => ("⚠ ", s.warn),
         };
         return fit_line(
             Line::from(vec![Span::styled(format!("{mark}{}", n.text), style)]),
@@ -1304,7 +1316,7 @@ fn help_overlay(area: Rect, buf: &mut Buffer, s: &Styles) {
         ("↑↓ j k", "move between fields"),
         ("enter", "edit a field, or toggle"),
         ("space", "toggle"),
-        ("←→ h l", "choose: prefix, effort, model, reviewer"),
+        ("←→ h l", "pick a value (prefix, effort, model…)"),
         ("e", "type a prefix the proxy does not list"),
         ("d", "import ANTHROPIC_BASE_URL into URL"),
         ("c", "check the default models on the draft"),

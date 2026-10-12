@@ -334,12 +334,12 @@ fn ultrafast_skills_are_retired_and_the_base_skills_relay_the_notice() {
     }
     for name in NAMES {
         assert!(
-            skill(name).contains("`rival: ⚠ ultrafast not applied` line"),
+            skill(name).contains("`rival: ⚠ … not applied` line"),
             "{name}"
         );
         let codex = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
         assert!(
-            codex.contains("`rival: ⚠ ultrafast not applied` line"),
+            codex.contains("`rival: ⚠ … not applied` line"),
             "codex {name}"
         );
     }

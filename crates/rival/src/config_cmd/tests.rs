@@ -83,11 +83,9 @@ fn show_lists_each_value_with_its_source() {
         line(&out, "auto_fix_critical_high"),
         "auto_fix_critical_high false default"
     );
-    assert_eq!(
-        line(&out, "ultrafast.codex"),
-        "ultrafast.codex true default"
-    );
-    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol true default");
+    assert_eq!(line(&out, "speed.codex"), "speed.codex fast default");
+    assert_eq!(line(&out, "speed.sol"), "speed.sol fast default");
+    assert!(!out.contains("ultrafast."), "{out}");
     assert_eq!(line(&out, "skill.claude"), "skill.claude sol default");
     assert_eq!(line(&out, "skill.codex"), "skill.codex claude default");
 }
@@ -125,23 +123,52 @@ fn show_lists_the_skill_models() {
     );
 }
 
-/// `config set ultrafast.sol false` is read back by `show` from the file.
+/// `config set speed.sol normal` is read back by `show` from the file;
+/// `config set speed.codex ultrafast` saves and warns on stderr; a bad
+/// value names the allowed ones; `ultrafast.<model>` is not settable.
 #[test]
-fn ultrafast_switch_round_trips_through_set_and_show() {
+fn speed_round_trips_through_set_and_show() {
     let fix = Fixture::new();
-    let (code, _, err) = run(&fix, "", &["config", "set", "ultrafast.sol", "false"]);
-    assert_eq!((code, err.as_str()), (0, ""));
+    let (code, out, err) = run(&fix, "", &["config", "set", "speed.sol", "normal"]);
+    assert_eq!(
+        (code, out.as_str(), err.as_str()),
+        (0, "speed.sol = normal\n", "")
+    );
+    let (code, out, err) = run(&fix, "", &["config", "set", "speed.codex", "ultrafast"]);
+    assert_eq!(
+        (code, out.as_str(), err.as_str()),
+        (
+            0,
+            "speed.codex = ultrafast\n",
+            "warning: Ultrafast needs the Pro $500 plan (or Enterprise/Edu with Ultrafast on); other plans run at the standard tier.\n"
+        )
+    );
+    let (code, _, err) = run(&fix, "", &["config", "set", "speed.codex", "turbo"]);
+    assert_eq!(code, 1);
+    assert!(err.contains("invalid speed.codex \"turbo\""), "{err}");
+    assert!(err.contains("use one of: normal, fast, ultrafast"), "{err}");
+    let (code, _, err) = run(&fix, "", &["config", "set", "ultrafast.sol", "true"]);
+    assert_eq!(code, 1);
+    assert!(
+        err.contains("unknown config key \"ultrafast.sol\""),
+        "{err}"
+    );
     // The config loads once per process, so show runs on a new fixture
     // with the file that set wrote.
     let written = std::fs::read_to_string(fix.cfg.paths().config_file()).unwrap();
-    assert!(written.contains("ultrafast:\n  sol: false\n"), "{written}");
+    assert!(
+        written.contains("speed:\n  sol: normal\n  codex: ultrafast\n"),
+        "{written}"
+    );
     let fix = Fixture::with_config_yaml(&written);
     let (_, out, _) = run(&fix, "", &["config", "show"]);
-    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol false file");
-    assert_eq!(
-        line(&out, "ultrafast.codex"),
-        "ultrafast.codex true default"
-    );
+    assert_eq!(line(&out, "speed.sol"), "speed.sol normal file");
+    assert_eq!(line(&out, "speed.codex"), "speed.codex ultrafast file");
+    // A 5.2 `ultrafast.sol: true` shows as ultrafast from the file.
+    let fix = Fixture::with_config_yaml("ultrafast:\n  sol: true\n  codex: false\n");
+    let (_, out, _) = run(&fix, "", &["config", "show"]);
+    assert_eq!(line(&out, "speed.sol"), "speed.sol ultrafast file");
+    assert_eq!(line(&out, "speed.codex"), "speed.codex fast default");
 }
 
 #[test]
@@ -542,7 +569,7 @@ fn check_text_and_exit_1_on_a_failed_model() {
     assert_eq!(lines[1], "");
     assert!(
         lines[2].starts_with("  ✓ codex   direct  gpt-6-astra         ")
-            && lines[2].ends_with("s  Sure, ok  (not ok)  [ultrafast]"),
+            && lines[2].ends_with("s  Sure, ok  (not ok)  [fast]"),
         "{out}"
     );
     assert_eq!(

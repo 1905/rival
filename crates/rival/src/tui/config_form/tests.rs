@@ -611,33 +611,61 @@ fn help_opens_with_question_mark_and_any_key_closes_it() {
     );
 }
 
-/// The two Ultrafast toggles close the Models section; both are on by
-/// default, and each writes its own key, only when it changed.
+/// The two speed pickers close the Models section; both are fast by
+/// default, `←→` cycles normal → fast → ultrafast, each writes its own
+/// `speed.<model>` key, only when it changed, and ultrafast warns.
 #[test]
-fn the_ultrafast_toggles_write_their_own_keys() {
+fn the_speed_pickers_write_their_own_keys() {
     let (_h, mut f) = form(None);
-    focus(&mut f, Field::Ultrafast(0));
+    focus(&mut f, Field::Speed(0));
     assert_eq!(f.section, Section::Models);
-    assert!(f.draft.ultrafast.codex && f.draft.ultrafast.sol);
-    keys(&mut f, &["space"]);
-    assert!(!f.draft.ultrafast.codex && f.draft.ultrafast.sol);
-    assert_eq!(f.patch(), json!({"ultrafast.codex": false}));
-    keys(&mut f, &["down", "space"]);
-    assert_eq!(f.field(), Some(Field::Ultrafast(1)));
+    assert_eq!(f.field().unwrap().label(), "Codex speed");
+    assert_eq!(
+        (f.draft.speed.codex, f.draft.speed.sol),
+        (Speed::Fast, Speed::Fast)
+    );
+    keys(&mut f, &["right"]);
+    assert_eq!(f.draft.speed.codex, Speed::Ultrafast);
+    assert_eq!(f.patch(), json!({"speed.codex": "ultrafast"}));
+    let notice = f.notice.clone().expect("the ultrafast warning");
+    assert_eq!(notice.kind, NoticeKind::Warn);
+    assert_eq!(notice.text, config::ULTRAFAST_PLAN_WARNING);
+    keys(&mut f, &["right"]);
+    assert_eq!(f.draft.speed.codex, Speed::Normal, "the list wraps");
+    assert!(f.notice.is_none());
+    keys(&mut f, &["down", "left"]);
+    assert_eq!(f.field(), Some(Field::Speed(1)));
+    assert_eq!(f.field().unwrap().label(), "Sol speed");
     assert_eq!(
         f.patch(),
-        json!({"ultrafast.codex": false, "ultrafast.sol": false})
+        json!({"speed.codex": "normal", "speed.sol": "normal"})
     );
+    assert_eq!(
+        f.edits().unwrap(),
+        [
+            Edit::set("speed.codex", write::Value::Str("normal".into())),
+            Edit::set("speed.sol", write::Value::Str("normal".into())),
+        ]
+    );
+    assert!(f.draft_config().is_ok());
+    keys(&mut f, &["right"]);
+    assert_eq!(
+        f.patch(),
+        json!({"speed.codex": "normal"}),
+        "fast again is no change"
+    );
+    assert_eq!(keys(&mut f, &["space"]), [None], "a picker does not toggle");
     keys(&mut f, &["down"]);
     assert_eq!(
         f.field(),
-        Some(Field::Ultrafast(1)),
+        Some(Field::Speed(1)),
         "the focus stops at the end"
     );
-    // A switch off in the file: turning it on writes true.
-    let (_h, mut f) = form(Some("ultrafast:\n  sol: false\n"));
-    assert!(!f.draft.ultrafast.sol);
-    focus(&mut f, Field::Ultrafast(1));
-    keys(&mut f, &["space"]);
-    assert_eq!(f.patch(), json!({"ultrafast.sol": true}));
+    // A 5.2 `ultrafast.sol: true` reads as ultrafast; stepping writes speed.
+    let (_h, mut f) = form(Some("ultrafast:\n  sol: true\n"));
+    assert_eq!(f.draft.speed.sol, Speed::Ultrafast);
+    assert!(!f.dirty());
+    focus(&mut f, Field::Speed(1));
+    keys(&mut f, &["left"]);
+    assert_eq!(f.patch(), json!({"speed.sol": "fast"}));
 }

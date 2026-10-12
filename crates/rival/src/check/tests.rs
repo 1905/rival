@@ -38,8 +38,8 @@ fn served() -> Vec<String> {
     .collect()
 }
 
-/// What `executor::ultrafast_notice` gives for a direct Sol session.
-const TIER_NOTICE: &str = "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n";
+/// What `executor::tier_notice` gives for a direct ultrafast Sol session.
+const TIER_NOTICE: &str = "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on.\n";
 
 /// What a fake live call does.
 #[derive(Clone)]
@@ -47,7 +47,7 @@ enum Reply {
     /// Writes the text to the log and exits with the code.
     Out(i64, &'static str),
     /// Like `Out`, but Codex ran it at the standard tier although the
-    /// model's Ultrafast switch is on.
+    /// model's speed asked for the Ultrafast tier.
     Omitted(i64, &'static str),
     /// The adapter returns this error.
     Err(&'static str),
@@ -788,7 +788,7 @@ fn text_output_matches_the_spec_layout() {
     assert_eq!(ProxyLine::Off.text(), "proxy  off");
     assert_eq!(
         report.rows[1].to_json().to_string(),
-        r#"{"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","tier_omitted":false,"ultrafast":false,"unexpected":false,"wire_model":"gpt-6.1-sol"}"#
+        r#"{"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","speed":"","tier_omitted":false,"unexpected":false,"wire_model":"gpt-6.1-sol"}"#
     );
 }
 
@@ -900,12 +900,13 @@ fn real_adapter_path_saves_no_session() {
     assert!(saved.is_empty(), "sessions/ holds {saved:?}");
 }
 
-/// A model whose Ultrafast switch is on shows `[ultrafast]`; a call that
-/// Codex ran at the standard tier shows `[ultrafast not applied]` and the
-/// account line (direct route). Models with the switch off show nothing.
+/// A model's speed shows as `[fast]` or `[ultrafast]`; a call that Codex
+/// ran at the standard tier shows `[<tier> not applied]` and, for
+/// ultrafast, the plan line (direct route). Normal and the other models
+/// show nothing.
 #[test]
-fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
-    let fix = Fixture::with_config_yaml("ultrafast:\n  codex: true\n  sol: true\n");
+fn speed_rows_show_the_tier_and_an_omitted_tier() {
+    let fix = Fixture::with_config_yaml("speed:\n  sol: ultrafast\n");
     let mut fake = Fake::new();
     fake.replies.insert("sol", Reply::Omitted(0, "ok\n"));
     let report = check(&fix, &["codex", "sol", "claude"], &fake);
@@ -915,11 +916,20 @@ fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
         row(&report, "sol"),
         row(&report, "claude"),
     );
-    assert!(codex.ultrafast && !codex.tier_omitted);
-    assert!(sol.ultrafast && sol.tier_omitted);
-    assert!(!claude.ultrafast && !claude.tier_omitted);
+    assert_eq!(
+        (codex.speed, codex.tier_omitted),
+        (Some(Speed::Fast), false)
+    );
+    assert_eq!(
+        (sol.speed, sol.tier_omitted),
+        (Some(Speed::Ultrafast), true)
+    );
+    assert_eq!((claude.speed, claude.tier_omitted), (None, false));
     assert_eq!(sol.to_json()["tier_omitted"], true);
-    assert_eq!(claude.to_json()["ultrafast"], false);
+    assert_eq!(sol.to_json()["speed"], "ultrafast");
+    assert_eq!(codex.to_json()["speed"], "fast");
+    assert_eq!(claude.to_json()["speed"], "");
+    assert!(claude.to_json().get("ultrafast").is_none());
     let text = report.text();
     let line = |name: &str| {
         text.lines()
@@ -927,31 +937,41 @@ fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
             .unwrap_or_else(|| panic!("no {name} row:\n{text}"))
             .to_string()
     };
-    assert!(line("codex").ends_with("ok  [ultrafast]"), "{text}");
+    assert!(line("codex").ends_with("ok  [fast]"), "{text}");
     assert!(
         line("sol").ends_with("ok  [ultrafast not applied]"),
         "{text}"
     );
-    assert!(!line("claude").contains("ultrafast"), "{text}");
+    assert!(!line("claude").contains('['), "{text}");
     assert!(
-        text.contains("      ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n      Ultrafast needs a Codex account on Pro $500"),
+        text.contains("      ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n      Ultrafast needs the Pro $500 plan"),
         "{text}"
     );
     assert_eq!(sol.tier_notice, TIER_NOTICE);
+
+    let fix = Fixture::with_config_yaml("speed:\n  codex: normal\n");
+    let report = check(&fix, &["codex"], &Fake::new());
+    let codex = row(&report, "codex");
+    assert_eq!(codex.speed, Some(Speed::Normal));
+    assert_eq!(codex.tier_tag(), "");
+    assert_eq!(codex.to_json()["speed"], "normal");
 }
 
 /// A call that times out after Codex already ran it at the standard tier
 /// keeps that fact on the failed row.
 #[test]
 fn a_timed_out_call_keeps_its_omitted_tier() {
-    let fix = Fixture::with_config_yaml("ultrafast:\n  sol: true\n");
+    let fix = Fixture::with_config_yaml("speed:\n  sol: ultrafast\n");
     let mut fake = Fake::new();
     fake.replies.insert("sol", Reply::HangOmitted);
     let report = check_timeout(&fix, &["sol"], &fake, Duration::from_millis(200));
     let sol = row(&report, "sol");
     assert!(!sol.ok, "{sol:?}");
     assert!(sol.error.contains("timeout"), "{}", sol.error);
-    assert!(sol.ultrafast && sol.tier_omitted, "{sol:?}");
+    assert!(
+        sol.speed == Some(Speed::Ultrafast) && sol.tier_omitted,
+        "{sol:?}"
+    );
     assert!(
         report.text().contains("[ultrafast not applied]"),
         "{}",
