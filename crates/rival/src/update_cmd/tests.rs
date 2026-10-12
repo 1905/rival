@@ -87,10 +87,7 @@ fn update_installs_from_selected_binary() {
         install_updated_skills(env, ChildIo::Capture, &bin)
     });
     assert_eq!(o.result, Ok(()));
-    assert_eq!(
-        o.stdout,
-        "install\n--force\n--target\nauto\nnew embedded skills\n"
-    );
+    assert_eq!(o.stdout, "install\n--target\nauto\nnew embedded skills\n");
 
     script(&binary, "#!/bin/sh\necho oops >&2\nexit 7\n");
     let o = run_busy(&fix, |env| {
@@ -121,7 +118,7 @@ fn windows_installer_cmd_gets_argv_and_streams() {
     assert_eq!(o.result, Ok(()));
     assert_eq!(
         o.stdout.replace("\r\n", "\n"),
-        "install\n--force\n--target\nauto\nnew embedded skills\n"
+        "install\n--target\nauto\nnew embedded skills\n"
     );
 
     script(&binary, "@echo off\r\necho oops 1>&2\r\nexit /b 7\r\n");
@@ -171,7 +168,7 @@ fn brew(brew_body: &str, rival_body: &str) -> Brew {
 #[cfg_attr(not(unix), allow(dead_code))]
 const BREW_OK: &str = "#!/bin/sh\ncase \"$1\" in\nupgrade) exit 0;;\n--prefix) printf '%s\\n' \"$RIVAL_TEST_BREW_PREFIX\";;\n*) exit 9;;\nesac\n";
 #[cfg_attr(not(unix), allow(dead_code))]
-const NEW_RIVAL: &str = "#!/bin/sh\nprintf 'new release skills\\n'\n";
+const NEW_RIVAL: &str = "#!/bin/sh\nif [ \"$1\" = version ]; then printf '%s\\n' 1.1.0; else printf 'new release skills\\n'; fi\n";
 
 /// The update uses the Homebrew binary, not the old embedded skills; the
 /// test checks the whole transcript.
@@ -179,11 +176,11 @@ const NEW_RIVAL: &str = "#!/bin/sh\nprintf 'new release skills\\n'\n";
 #[test]
 fn update_uses_homebrew_binary_not_old_embedded_skills() {
     let b = brew(BREW_OK, NEW_RIVAL);
-    let o = update(&b.fix, &b.apps, "old", "new");
+    let o = update(&b.fix, &b.apps, "1.0.0", "1.1.0");
     assert_eq!(o.result, Ok(()));
     assert_eq!(
         o.stdout,
-        "vold → vnew\n\nUpgrading via Homebrew...\n\nUpdating skills...\nnew release skills\n\n✓ Updated to vnew\n"
+        "v1.0.0 → v1.1.0\n\nUpgrading via Homebrew...\n\nUpdating skills...\nnew release skills\n\n✓ Updated to v1.1.0\n"
     );
     assert_eq!(o.stderr, "");
 }
@@ -200,7 +197,10 @@ fn brew_gets_no_stdin_and_the_installer_gets_the_commands() {
         "#!/bin/sh\n/bin/cat > '{r}/brew-'\"$1\"\ncase \"$1\" in\nupgrade) exit 1;;\nreinstall) exit 0;;\n--prefix) printf '%s\\n' \"$RIVAL_TEST_BREW_PREFIX\";;\nesac\n",
         r = rec.display()
     );
-    let rival = format!("#!/bin/sh\n/bin/cat > '{}/installer'\n", rec.display());
+    let rival = format!(
+        "#!/bin/sh\nif [ \"$1\" = version ]; then printf '2\\n'; exit; fi\n/bin/cat > '{}/installer'\n",
+        rec.display()
+    );
     let b = brew(&body, &rival);
     let o = run_busy_with(&b.fix, "y\nyes\n", |env| {
         update_to_version(env, ChildIo::Capture, "1", "2", &b.apps).map_err(|e| e.message)
@@ -253,11 +253,18 @@ fn update_error_branches() {
         o.result,
         Err("locate upgraded rival: exit status: 4".to_string())
     );
-    assert!(o.stdout.ends_with("\nUpdating skills...\n"), "{}", o.stdout);
+    assert!(
+        o.stdout.ends_with("Upgrading via Homebrew...\n"),
+        "{}",
+        o.stdout
+    );
 
     let b = brew(BREW_OK, "#!/bin/sh\nexit 7\n");
     let o = update(&b.fix, &b.apps, "1", "2");
-    assert_eq!(o.result, Err("install skills: exit status: 7".to_string()));
+    assert_eq!(
+        o.result,
+        Err("verify upgraded rival: exit status: 7".to_string())
+    );
 
     // A prefix without bin/rival: a path skips the PATH lookup and fails at
     // the exec.
@@ -265,7 +272,7 @@ fn update_error_branches() {
     std::fs::remove_file(b.prefix.join("bin").join("rival")).unwrap();
     let o = update(&b.fix, &b.apps, "1", "2");
     let want = format!(
-        "install skills: start {}: {}",
+        "verify upgraded rival: start {}: {}",
         b.prefix.join("bin").join("rival").display(),
         crate::testutil::NO_SUCH_FILE
     );
@@ -299,11 +306,16 @@ fn current_version_refreshes_skills_for_new_codex_install() {
         "codex skills installed"
     );
     assert!(home.join(".claude/skills/rival-claude/SKILL.md").exists());
-    // Forced: a second run overwrites without reading stdin, and no
-    // "Codex not detected" note is printed.
+    // Matching skill versions are preserved, including local edits.
+    let custom = home.join(".claude/skills/rival-claude/SKILL.md");
+    let original = std::fs::read_to_string(&custom).unwrap();
+    let edited = format!("{original}\nMy custom note\n");
+    std::fs::write(&custom, &edited).unwrap();
     let o = update(&fix, apps.path(), "current", "current");
     assert_eq!(o.result, Ok(()));
     assert_eq!(o.stderr, "");
+    assert_eq!(std::fs::read_to_string(custom).unwrap(), edited);
+    assert!(o.stdout.contains("0 installed, 0 updated, 7 up to date"));
 }
 
 #[test]
@@ -330,4 +342,62 @@ fn current_version_needs_a_home() {
     };
     assert_eq!(o.result, Err(want.to_string()));
     assert_eq!(o.stdout, "already on latest (vdev)\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn successful_brew_with_wrong_binary_version_does_not_install_skills() {
+    for reported in ["dev", "1.0.0", ""] {
+        let body = format!(
+            "#!/bin/sh\nif [ \"$1\" = version ]; then printf '%s\\n' '{reported}'; else echo MUST-NOT-INSTALL; fi\n"
+        );
+        let b = brew(BREW_OK, &body);
+        let o = update(&b.fix, &b.apps, "dev", "1.1.0");
+        assert!(o.result.unwrap_err().contains("Skills were not changed"));
+        assert!(!o.stdout.contains("Updated to"));
+        assert!(!o.stdout.contains("Updating skills"));
+        assert!(!o.stdout.contains("MUST-NOT-INSTALL"));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn shadowing_binary_is_reported_before_installing_skills() {
+    let b = brew(BREW_OK, NEW_RIVAL);
+    let shadow = script(&b.bin.join("rival"), "#!/bin/sh\necho dev\n");
+    let o = update(&b.fix, &b.apps, "dev", "1.1.0");
+    let error = o.result.unwrap_err();
+    assert!(
+        error.contains(&format!("PATH selects {}", shadow.display())),
+        "{error}"
+    );
+    assert!(error.contains(&format!(
+        "Run {} directly",
+        b.prefix.join("bin/rival").display()
+    )));
+    assert!(!o.stdout.contains("Updating skills"));
+    assert!(!o.stdout.contains("Updated to"));
+}
+
+#[cfg(unix)]
+#[test]
+fn homebrew_symlink_on_path_is_accepted() {
+    let b = brew(BREW_OK, NEW_RIVAL);
+    std::os::unix::fs::symlink(b.prefix.join("bin/rival"), b.bin.join("rival")).unwrap();
+    let o = update(&b.fix, &b.apps, "1.0.0", "1.1.0");
+    assert_eq!(o.result, Ok(()));
+    assert!(o.stdout.contains("Updated to v1.1.0"));
+}
+
+#[cfg(unix)]
+#[test]
+fn empty_homebrew_prefix_is_rejected() {
+    let b = brew("#!/bin/sh\nexit 0\n", NEW_RIVAL);
+    let o = update(&b.fix, &b.apps, "dev", "1.1.0");
+    assert!(
+        o.result
+            .unwrap_err()
+            .contains("empty or non-absolute prefix")
+    );
+    assert!(!o.stdout.contains("Updating skills"));
 }
