@@ -184,6 +184,13 @@ app job excludes this exact tag, so no Rival.app ZIP, DMG or app cask update
 is published for v5.1.0. Future tags retain the full pipeline above.
 
 Do not point the tap at nonexistent archives or replace its prebuilt-binary
-installation with local source compilation. GitHub Actions billing must be
-unblocked before hosted builds can finish. Publish only verified CLI archives
+installation with local source compilation. Publish only verified CLI archives
 and their checksums; leave the existing v5.0.0 release/tag unchanged.
+
+GitHub Actions stayed blocked by billing, so v5.1.0 was published from the
+MacBook Air with the pinned tools of `.github/actions/cli-release-tools/`
+(Zig 0.16.0, cargo-zigbuild 0.23.4, cargo-xwin 0.23.1, GoReleaser 2.18.2,
+Rust 1.98, Homebrew LLVM and lld, the Command Line Tools SDK):
+`goreleaser release --clean --parallelism 1` from a clean checkout of the tag,
+with `GITHUB_TOKEN` and `HOMEBREW_TAP_TOKEN` set to a `1905` token. That is the
+same command the `release` job runs. The `app` job did not run.

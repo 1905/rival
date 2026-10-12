@@ -2,13 +2,13 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest binary release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.0) — 2026-10-09.
+Latest binary release: [v5.1.0](https://github.com/1905/rival/releases/tag/v5.1.0) — 2026-10-12.
 
 ## [Unreleased]
 
-## [v5.1.0] — CLI release preparation
+## [v5.1.0] — 2026-10-12
 
-This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. Binary publication is pending: GitHub Actions is blocked by an account billing issue. On the Dell, the Rust workspace tests, strict Clippy, CLI scenarios and release-script checks pass. Hosted macOS/Windows checks and the six-platform release snapshot remain blocked.
+This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. GitHub Actions is blocked by an account billing issue, so the maintainer published this version with the same GoReleaser configuration from a local macOS host. On the Dell, the Rust workspace tests, strict Clippy, CLI scenarios and release-script checks pass. Hosted macOS/Windows checks did not run.
 
 ### Added
 - **Ultrafast skills.** `/rival-astra-ultrafast` (GPT-6 Astra) and `/rival-sol-ultrafast` (Sol 6.1) run on the Codex Ultrafast service tier, for Claude Code and Codex. They launch `rival command codex --ultrafast` and `rival command sol --ultrafast`. The new `--ultrafast` flag sends `service_tier="ultrafast"` to Codex on every call of the run, and the session records the tier. Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. When Codex omits the tier because the account's model catalog does not list it, rival prints `rival: ⚠ ultrafast not applied` after the output.
