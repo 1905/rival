@@ -387,7 +387,7 @@ fn read_errors_and_mr_scopes_fail_plainly_before_preflight() {
     assert_eq!(
         r.result,
         Err(CmdError::plain(
-            "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival-codex review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
+            "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
         ))
     );
     assert_eq!(r.stdout, "");

@@ -183,36 +183,50 @@ fn install_both_hosts_and_preserve_unrelated_skills() {
     }
 }
 
-/// Sol's review skill was retired before Sol 6.1. Upgrades must restore it
-/// for both hosts and remove only the obsolete plan variant.
+/// The 6.0.0 upgrade: install and `--force` remove the seven per-model
+/// skills on both hosts and install `rival` in their place.
 #[test]
-fn sol_review_skill_survives_upgrade_cleanup_and_forced_reinstall() {
+fn model_skills_are_removed_and_rival_is_installed() {
+    let old = [
+        "rival-codex",
+        "rival-sol",
+        "rival-claude",
+        "rival-fable",
+        "rival-k3",
+        "rival-grok",
+        "rival-security",
+    ];
     let home = tempfile::tempdir().unwrap();
     for target in skill_targets(home.path(), "all", false).unwrap() {
-        let sol = skill_file(&target, "rival-sol");
-        let retired = skill_file(&target, "rival-plan-sol");
-        for path in [&sol, &retired] {
-            write_skill(
-                path.parent().unwrap(),
-                path,
-                b"---\nversion: old\n---\nRetired Sol skill\n",
-            )
-            .unwrap();
-        }
-
-        for _ in 0..2 {
-            install(&target, true, "");
-            let got = fs::read(&sol).unwrap();
-            assert_eq!(got, want_content(&target, "rival-sol"));
-            let text = String::from_utf8(got).unwrap();
-            assert!(text.contains("Sol 6.1"), "{}: {text}", target.host);
-            assert!(
-                text.contains("rival command sol --detach --workdir"),
-                "{}: {text}",
-                target.host
+        for force in [false, true] {
+            for name in old {
+                let path = skill_file(&target, name);
+                write_skill(
+                    path.parent().unwrap(),
+                    &path,
+                    b"---
+version: 5.2.0
+---
+",
+                )
+                .unwrap();
+            }
+            let out = install(&target, force, "");
+            for name in old {
+                assert!(
+                    !target.base.join(name).exists(),
+                    "{} {name} kept (force {force})",
+                    target.host
+                );
+            }
+            assert_eq!(
+                out.matches("  🗑 deprecated skill removed\n").count(),
+                old.len(),
+                "{out}"
             );
-            assert_eq!(parse_version(&text), version("rival-sol"));
-            assert!(!retired.parent().unwrap().exists());
+            assert!(out.ends_with(", 7 removed\n"), "{out}");
+            let got = fs::read(skill_file(&target, "rival")).unwrap();
+            assert_eq!(got, want_content(&target, "rival"), "{}", target.host);
         }
     }
 }
@@ -225,15 +239,12 @@ fn install_overwrite_and_buffered_answers() {
         base: dir.path().to_path_buf(),
     };
     install(&target, false, "");
-    let paths = [
-        skill_file(&target, skills::NAMES[0]),
-        skill_file(&target, skills::NAMES[1]),
-    ];
+    let paths = [skill_file(&target, skills::NAMES[0])];
     let old = b"---\nversion: old\n---\ncustom";
     for path in &paths {
         fs::write(path, old).unwrap();
     }
-    install(&target, false, "n\nn\n");
+    install(&target, false, "n\n");
     for path in &paths {
         assert_eq!(
             fs::read(path).unwrap(),
@@ -241,7 +252,7 @@ fn install_overwrite_and_buffered_answers() {
             "declined update overwrote skill"
         );
     }
-    install(&target, false, "y\ny\n");
+    install(&target, false, "y\n");
     for path in &paths {
         assert_ne!(
             fs::read(path).unwrap(),
@@ -386,50 +397,60 @@ fn update_prompt_transcript() {
     let dir = tempfile::tempdir().unwrap();
     let target = claude_target(dir.path());
     install(&target, false, "");
-    let [first, second, third] = [skills::NAMES[0], skills::NAMES[1], skills::NAMES[2]];
-    fs::write(skill_file(&target, first), "---\nversion: 0.1\n---\n").unwrap();
-    fs::write(skill_file(&target, second), "---\nversion: 0.2\n---\n").unwrap();
-    // No frontmatter version: "unknown".
-    fs::write(skill_file(&target, third), "no frontmatter").unwrap();
+    let name = skills::NAMES[0];
+    let v = version(name);
+    let file = skill_file(&target, name);
 
     // Answers: upper-case "YES" with spaces accepts, "no" declines, EOF
-    // without a newline declines.
-    let out = install(&target, false, "  YES \nno\n");
-    let lines: Vec<&str> = out.lines().collect();
-    let (v1, v2, v3) = (version(first), version(second), version(third));
-    assert_eq!(
-        lines[2],
-        format!("  ? {first} — update v0.1 → v{v1}? [y/N]   ✓ {first} — updated (v0.1 → v{v1})")
-    );
-    assert_eq!(
-        lines[3],
-        format!("  ? {second} — update v0.2 → v{v2}? [y/N]     skipped")
-    );
-    assert_eq!(
-        lines[4],
-        format!("  ? {third} — update vunknown → v{v3}? [y/N]     skipped")
-    );
-    assert_eq!(
-        out.lines().last().unwrap(),
-        &format!(
-            "Done: 0 installed, 1 updated, {} up to date, 0 removed",
-            skills::NAMES.len() - 1
-        )
-    );
-    assert_eq!(
-        fs::read(skill_file(&target, first)).unwrap(),
-        want_content(&target, first)
-    );
+    // without a newline declines. No frontmatter version is "unknown".
+    for (old, answer, from, line) in [
+        (
+            "---\nversion: 0.1\n---\n",
+            "  YES \n",
+            "0.1",
+            format!("  ✓ {name} — updated (v0.1 → v{v})"),
+        ),
+        (
+            "---\nversion: 0.2\n---\n",
+            "no\n",
+            "0.2",
+            "    skipped".to_string(),
+        ),
+        ("no frontmatter", "", "unknown", "    skipped".to_string()),
+    ] {
+        fs::write(&file, old).unwrap();
+        let out = install(&target, false, answer);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(
+            lines[2],
+            format!("  ? {name} — update v{from} → v{v}? [y/N] {line}"),
+            "{out}"
+        );
+        // A declined update counts as up to date.
+        let updated = usize::from(from == "0.1");
+        let up_to_date = skills::NAMES.len() - updated;
+        assert_eq!(
+            out.lines().last().unwrap(),
+            &format!("Done: 0 installed, {updated} updated, {up_to_date} up to date, 0 removed"),
+            "{out}"
+        );
+        if from == "0.1" {
+            assert_eq!(fs::read(&file).unwrap(), want_content(&target, name));
+        } else {
+            assert_eq!(fs::read_to_string(&file).unwrap(), old);
+        }
+    }
 
     // --force never prompts and rewrites even same-version skills.
     let out = install(&target, true, "");
     assert!(!out.contains("[y/N]"), "{out}");
     assert!(
-        out.contains(&format!("  ✓ {first} — updated (v{v1} → v{v1})\n")),
+        out.contains(&format!("  ✓ {name} — updated (vunknown → v{v})\n")),
         "{out}"
     );
+    let out = install(&target, true, "");
     assert!(
-        out.contains(&format!("  ✓ {second} — updated (v0.2 → v{v2})\n")),
+        out.contains(&format!("  ✓ {name} — updated (v{v} → v{v})\n")),
         "{out}"
     );
     assert!(
@@ -747,7 +768,7 @@ fn auto_without_codex_installs_claude_and_says_so_on_stderr() {
         "Codex not detected; skipped (use --target codex to install explicitly).\n"
     );
     assert_eq!(stdout.matches("Installing ").count(), 1, "{stdout}");
-    assert!(home.join(".claude/skills/rival-codex/SKILL.md").is_file());
+    assert!(home.join(".claude/skills/rival/SKILL.md").is_file());
     assert!(!home.join(".agents").exists());
 }
 
@@ -835,8 +856,8 @@ fn plan_skill_upgrade_preserves_custom_files_and_previous_backups() {
                 }
             }
             assert_eq!(
-                fs::read(skill_file(&target, "rival-sol")).unwrap(),
-                want_content(&target, "rival-sol")
+                fs::read(skill_file(&target, "rival")).unwrap(),
+                want_content(&target, "rival")
             );
         }
         assert!(install(&target, false, "").ends_with("0 removed\n"));

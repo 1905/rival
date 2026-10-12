@@ -24,8 +24,8 @@ use crate::workdir::resolve_workdir_or_exit;
 mod tests;
 
 pub const SECURITY_USAGE: &str = "Usage:
-  /rival-security — security review of the changed files (git auto-detect)
-  /rival-security src/api/ — review a specific scope
+  /rival security — security review of the changed files (git auto-detect)
+  /rival security src/api/ — review a specific scope
   rival command security --which — show which model will run and why
 
 The model comes from security.reviewer in ~/.rival/config.yaml: k3 (default)

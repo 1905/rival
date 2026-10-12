@@ -22,11 +22,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILLS_DIR="$ROOT/crates/rival-core/skills"
 NAMES_FILE="$ROOT/crates/rival-core/src/skills.rs"
 
-# rustfmt keeps the array one name per line: `pub const NAMES: [&str; N] = [`,
-# then `    "rival-x",` lines, then `];`.
+# rustfmt writes a short array on one line (`pub const NAMES: [&str; 1] =
+# ["rival"];`) and a long one with one name per line, closed by `];`. Both
+# forms are read: every quoted name between the `[` and the first `];`.
 skill_names() {
-	sed -n '/^pub const NAMES: \[&str; [0-9]*\] = \[$/,/^\];$/p' "$NAMES_FILE" |
-		sed -n 's/^ *"\([^"]*\)",$/\1/p'
+	perl -0777 -ne 'if (/^pub const NAMES: \[&str; \d+\] = \[(.*?)\];/ms) { my $b = $1; print "$1\n" while $b =~ /"([^"]*)"/g }' "$NAMES_FILE"
 }
 
 NAMES="$(skill_names)" || NAMES=""

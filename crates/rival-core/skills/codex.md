@@ -23,7 +23,7 @@ low, medium, high, xhigh, ultra. Keep scope text intact and let Rival parse opti
    session with its continuation tool (for example exec_command/write_stdin).
    Use waits of at most 30 seconds and send occasional progress updates. Read
    the stderr tail for queue or runtime status when useful. Do not assume
-   Claude's background-task notification exists in Codex, and do not end the
+   Claude Code's background-task notification exists in Codex, and do not end the
    turn promising an automatic notification. Continue until completion unless
    the user asks to leave the review running. Preserve the paths for resuming.
 4. Read the output file. Verify every finding against what it cites and mark
@@ -50,8 +50,8 @@ low, medium, high, xhigh, ultra. Keep scope text intact and let Rival parse opti
 timeout. On nonzero status or empty output, read stderr and explain the failure;
 an empty file is not a clean review. Include any usable partial output. Report
 authentication, model access, or quota errors without silently choosing another
-model. Claude uses Claude's subscription login by default; do not switch to API
-billing without the user's instruction.
+model. Rival uses the Claude Code subscription login by default; do not switch
+to API billing without the user's instruction.
 
 For cancellation use the captured Rival PID, then wait and report its result.
 Keep the result files until they have been presented; they survive a detached

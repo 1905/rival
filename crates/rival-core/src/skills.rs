@@ -13,21 +13,13 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// All embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 7] = [
-    "rival-codex",
-    "rival-sol",
-    "rival-claude",
-    "rival-fable",
-    "rival-k3",
-    "rival-grok",
-    "rival-security",
-];
+pub const NAMES: [&str; 1] = ["rival"];
 
 /// Retired plan skills that install archives outside the active skill tree.
 pub const RETIRED_PLAN_SKILLS: [&str; 3] = ["rival-plan", "rival-plan-codex", "rival-plan-claude"];
 
 /// Other legacy skills that install removes.
-pub const DEPRECATED: [&str; 15] = [
+pub const DEPRECATED: [&str; 22] = [
     "rival-plan-sol", // use the native plan command
     "rival-claude-only",
     "rival-fable-only",
@@ -43,6 +35,14 @@ pub const DEPRECATED: [&str; 15] = [
     "rival-antislop",        // code-slop review removed 2026-10-08
     "rival-astra-ultrafast", // the ultrafast.codex switch, 5.2.0
     "rival-sol-ultrafast",   // the ultrafast.sol switch, 5.2.0
+    // The per-model skills, replaced by the one /rival skill in 6.0.0.
+    "rival-codex",
+    "rival-sol",
+    "rival-claude",
+    "rival-fable",
+    "rival-k3",
+    "rival-grok",
+    "rival-security",
 ];
 
 /// Reads an embedded skill file. Only the skill directories are visible, so
@@ -72,44 +72,25 @@ fn codex_workflow() -> &'static str {
         .expect("codex.md is embedded as UTF-8")
 }
 
-/// Builds a Codex skill: shares the command parsers, model defaults, and
-/// embedded release version with Claude's skills, but uses Codex's process
-/// lifecycle.
+/// The description of the Codex `/rival` skill.
+const CODEX_DESCRIPTION: &str = "Run a requested prompt, code review or security review through Rival from Codex, with the model set for Codex in rival config.";
+
+/// The input rules of the Codex `/rival` skill. Like the Claude Code skill
+/// it names no model: `skill.codex` selects it.
+const CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The model comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
+
+/// The `rival command` arguments the Codex skill launches.
+const CODEX_COMMAND: &str = "skill --host codex";
+
+/// Builds a Codex skill: the same command and parser as the Claude Code
+/// skill, with the Codex host and Codex's process lifecycle.
 pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
-    let (description, command, input): (String, &str, &str) = match name {
-        "rival-claude" => (
-            "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.".into(),
-            "claude",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
-        ),
-        "rival-fable" => (
-            "Review code with Fable 5.1 through Rival and the authenticated Claude Code CLI. Use for a requested independent Fable review from Codex.".into(),
-            "fable",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
-        ),
-        "rival-sol" => (
-            "Run a requested Sol 6.1 prompt or code review through Rival from Codex.".into(),
-            "sol",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
-        ),
-        "rival-codex" | "rival-k3" | "rival-grok" => {
-            let model = name.strip_prefix("rival-").unwrap_or(name);
-            (
-                format!("Run a requested {model} prompt or code review through Rival from Codex."),
-                model,
-                "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.",
-            )
-        }
-        "rival-security" => (
-            "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.".into(),
-            "security",
-            "First run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Pass the user's scope verbatim; empty input reviews git-detected changes. The model is selected by security.reviewer in Rival's configuration.",
-        ),
-        _ => return Err(format!("no Codex skill for {:?}", name)),
-    };
+    if name != "rival" {
+        return Err(format!("no Codex skill for {:?}", name));
+    }
     let mut content = format!(
-        "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: {version}\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"
+        "---\nname: {name}\ndescription: {CODEX_DESCRIPTION}\nmetadata:\n  version: {version}\n---\n\n# {name}\n\n## Review input\n\n{CODEX_INPUT}\n\n"
     );
-    content.push_str(&codex_workflow().replace("{{COMMAND}}", command));
+    content.push_str(&codex_workflow().replace("{{COMMAND}}", CODEX_COMMAND));
     Ok(content.into_bytes())
 }
