@@ -1,6 +1,6 @@
 {
   "name": "skill-command",
-  "description": "`rival command skill --host claude|codex` with no config file. Claude Code's /rival runs Sol 6.1 (the skill.claude default), with the Ultrafast tier pairs because ultrafast.sol is on by default. Codex's /rival runs Opus 5.5 (the skill.codex default). Empty input prints the /rival usage, which names no model, and starts nothing. 'security src/' goes to the security review: with no MOONSHOT_API_KEY its preflight fails before any session. An unknown --host is a usage error before stdin is read.",
+  "description": "`rival command skill --host claude|codex` with no config file. Claude Code's /rival runs Sol 6.1 (the skill.claude default), with the fast tier pairs because speed.sol is fast by default. Codex's /rival runs Opus 5.5 (the skill.codex default). Empty input prints the /rival usage, which names no model, and starts nothing. 'security src/' goes to the security review: with no MOONSHOT_API_KEY its preflight fails before any session. An unknown --host is a usage error before stdin is read.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -22,9 +22,9 @@
               "-m",
               "gpt-6.1-sol",
               "-c",
-              "service_tier=\"ultrafast\"",
+              "service_tier=\"fast\"",
               "-c",
-              "features.ultrafast_mode=true",
+              "features.fast_mode=true",
               "-c",
               "model_reasoning_effort=xhigh",
               "--sandbox",
@@ -214,7 +214,7 @@
           "model": "gpt-6.1-sol",
           "effort": "xhigh",
           "mode": "raw",
-          "service_tier": "ultrafast"
+          "service_tier": "fast"
         }
       },
       {

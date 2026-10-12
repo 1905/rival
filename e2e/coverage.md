@@ -32,7 +32,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
 | `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
 | `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
-| `ultrafast.sol` / `ultrafast.codex` switch (on by default: every codex/sol fake argv carries the tier pairs; tier pairs after `-m` for the model whose switch is on, `service_tier` on the session, the not-applied notice; a model whose switch is off runs without the tier) | ultrafast-command, skill-command, config-skill (`true default`) | unit tests `config::tests::ultrafast_is_per_codex_runtime_model_and_on_by_default`, `executor::codex::tests`, `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::ultrafast_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
+| `speed.sol` / `speed.codex` (fast by default: every codex/sol fake argv carries the fast tier pairs; tier pairs after `-m`, `service_tier` on the session, the not-applied notice with the plan line for ultrafast; normal runs without the tier) | speed-command (ultrafast omitted, normal, fast after `config set`), skill-command, config-skill (`fast default`) | unit tests `config::tests::speed_*`, `config::tests::old_ultrafast_switches_read_as_a_speed`, `executor::codex::tests` (fast/priority warnings), `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::speed_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
@@ -141,7 +141,7 @@ The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` 
 
 | Command / flag | ✓ | ✗ |
 |---|---|---|
-| `config show` rows `skill.claude`, `skill.codex` (default, then file) and `ultrafast.*` `true default`; `config set skill.claude <model>` | config-skill | config-skill (`config set skill.codex gpt5` refused) |
+| `config show` rows `skill.claude`, `skill.codex` (default, then file) and `speed.*` (`fast default`, then file; no `ultrafast.*` rows); `config set skill.claude <model>`; `config set speed.sol ultrafast` with the plan warning on stderr | config-skill | config-skill (`config set skill.codex gpt5`, `config set speed.codex turbo` refused) |
 
 ## config check
 

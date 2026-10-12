@@ -36,11 +36,12 @@ open the config window (`rival config`, Models), or run
 The models are `codex`, `sol`, `claude`, `fable`, `k3` and `grok`. The security
 review uses the model in `security.reviewer`.
 
-Codex (GPT-6 Astra) and Sol 6.1 use the Codex Ultrafast tier by default.
-Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace
-with Ultrafast on. Without it, Codex uses the standard tier and Rival prints a
-notice. To turn the tier off, run `rival config set ultrafast.codex false` or
-`rival config set ultrafast.sol false`.
+Codex (GPT-6 Astra) and Sol 6.1 run at the Codex fast tier by default:
+about 2x speed, using more of the plan's quota. To change it, set
+`speed.codex` or `speed.sol` to `normal`, `fast` or `ultrafast` in the config
+window or with `rival config set speed.sol normal`. Ultrafast needs the
+Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on. On other
+plans, Codex uses the standard tier and Rival prints a notice.
 
 Version 6.0.0 replaces the per-model skills (`/rival-codex`, `/rival-sol`,
 `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok` and

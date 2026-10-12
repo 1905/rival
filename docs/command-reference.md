@@ -278,7 +278,7 @@ Top-level commands (`rival --help`):
 | `skill` | `--host` (required: `claude` or `codex`), `--workdir` (`.`), `--no-queue`. Input that starts with `security` runs `security` with the rest as the scope; any other input runs `codex`, `sol`, `claude`, `fable`, `k3` or `grok` as `skill.<host>` selects. |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
-- The Codex Ultrafast tier is a config switch, not a flag: see `ultrafast` under Configuration.
+- The Codex service tier is a config key, not a flag: see `speed` under Configuration.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 
@@ -513,9 +513,9 @@ claude:
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
 
-ultrafast:            # Codex Ultrafast service tier, per model
-  codex: true         # GPT-6 Astra
-  sol: true           # Sol 6.1
+speed:                # Codex service tier, per model: normal | fast | ultrafast
+  codex: fast         # GPT-6 Astra
+  sol: fast           # Sol 6.1
 
 proxy:                # see Proxy
   url: http://127.0.0.1:8317
@@ -535,13 +535,15 @@ roles:                # optional prompt overrides
   security: "..."     # replaces the security-review instructions
 ```
 
-- The values shown for `efforts`, `skill` and `ultrafast` are the built-in defaults.
-- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, or an invalid `skill.claude` / `skill.codex` stops every command before it creates a session.
+- The values shown for `efforts`, `skill` and `speed` are the built-in defaults.
+- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, an invalid `skill.claude` / `skill.codex`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
 - `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
-- `ultrafast.codex` and `ultrafast.sol` are on by default (6.0; off before). Turn one off in the config window (`rival config`, Models: `Codex Ultrafast`, `Sol Ultrafast`) or with `rival config set ultrafast.sol false`. While a switch is on, every call of that model asks Codex for the Ultrafast tier: `/rival` reviews and prompts, `rival command codex` and `rival command sol`, their language-repair pass, `rival command plan` and `rival config check`. Rival adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true` after `-m <model>`, on the direct and the proxy route, and the session records `"service_tier": "ultrafast"`.
-  - Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. An account without it gets the not-applied notice on every run until the switch is off.
-  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival sets `"service_tier_omitted": true` on the session and prints `rival: ⚠ ultrafast not applied — …` after the output (command, plan) on stdout and stderr. `rival config check` marks the row `[ultrafast not applied]`. Exit codes do not change.
+- `speed.codex` and `speed.sol` pick the Codex service tier of each Codex-runtime model: `normal`, `fast` (the default) or `ultrafast`. Change them in the config window (`rival config`, Models: `Codex speed`, `Sol speed`; `←`/`→` cycles normal → fast → ultrafast) or with `rival config set speed.sol normal`. The speed applies to every call of that model: `/rival` reviews and prompts, `rival command codex` and `rival command sol`, their language-repair pass, `rival command plan` and `rival config check`.
+  - `normal` sends the plain argv. `fast` adds `-c service_tier="fast"` and `-c features.fast_mode=true` after `-m <model>` (after the proxy provider pairs on the proxy route). Fast runs at about 2x speed and uses more of the plan's quota; Codex sends it as its `priority` tier. `ultrafast` adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true`. The session records `"service_tier": "fast"` or `"ultrafast"`.
+  - Ultrafast needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on. `rival config set speed.<model> ultrafast` saves and prints that warning on stderr; the config window shows it as a notice.
+  - Compatibility: with no `speed.<model>`, a 5.2 `ultrafast.<model>: true` reads as `ultrafast`; `false` or absent reads as `fast`. `rival config set` writes only `speed.*`; `ultrafast.<model>` is not a settable key.
+  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival sets `"service_tier_omitted": true` on the session and prints `rival: ⚠ <tier> not applied — …` after the output (command, plan) on stdout and stderr; for ultrafast on the direct route it adds the plan line. `rival config check` marks the row `[fast]`, `[ultrafast]` or `[<tier> not applied]`; `--json` rows have `speed` (`normal`, `fast`, `ultrafast`, or "" for the other models) and `tier_omitted`. Exit codes do not change.
   - Rival cannot see a tier that a server-side requirement turns off: Codex drops it without a warning. Whether a proxy forwards `service_tier` depends on the proxy.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
@@ -590,7 +592,7 @@ Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one
 | `rival config models [--json]` | The proxy's models, grouped by prefix. |
 | `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and the security reviewer. Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
 
-The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Models has the model table (MODEL, RUNTIME, ROUTE, EFFORT; `←`/`→` picks the effort), the `/RIVAL RUNS` pickers `in Claude Code` (`skill.claude`) and `in Codex` (`skill.codex`), which cycle the six models with `←`/`→`, and the two Ultrafast toggles. The window does not set `plan.models`; use `rival config set plan.models` or `rival command plan -m`. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
+The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Models has the model table (MODEL, RUNTIME, ROUTE, EFFORT; `←`/`→` picks the effort), the `/RIVAL RUNS` pickers `in Claude Code` (`skill.claude`) and `in Codex` (`skill.codex`), which cycle the six models with `←`/`→`, and the two speed pickers (`Codex speed`, `Sol speed`). The window does not set `plan.models`; use `rival config set plan.models` or `rival command plan -m`. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
 
 ### Queue and timeouts
 
