@@ -30,7 +30,7 @@ fn argv(effort: &str, workdir: &str) -> Vec<String> {
 #[test]
 fn codex_run_args_uses_explicit_model_and_effort() {
     for effort in ["high", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo");
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo", false);
         assert_eq!(args, argv(effort, "/repo"));
         let joined = args.join(" ");
         assert!(joined.contains(&format!("-m {}", config::CODEX_MODEL)));
@@ -38,13 +38,16 @@ fn codex_run_args_uses_explicit_model_and_effort() {
         assert!(joined.contains("--sandbox read-only"));
     }
     // An empty workdir stays an empty argument after -C.
-    assert_eq!(codex_run_args(config::CODEX_MODEL, "", ""), argv("", ""));
+    assert_eq!(
+        codex_run_args(config::CODEX_MODEL, "", "", false),
+        argv("", "")
+    );
 }
 
 #[test]
 fn codex_passes_ultra_and_xhigh_through_unaliased() {
     for effort in ["xhigh", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp");
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp", false);
         assert!(
             args.contains(&format!("model_reasoning_effort={effort}")),
             "{args:?}"
@@ -306,8 +309,14 @@ fn run_recorded(env: &Env) -> anyhow::Result<(Spawned, Session)> {
 /// The provider `-c` strings are pinned byte for byte.
 #[test]
 fn codex_proxy_args_pin_the_provider_values() {
-    let args =
-        codex_proxy_run_args("gpt-6-astra", "high", "/repo", "http://127.0.0.1:8999").unwrap();
+    let args = codex_proxy_run_args(
+        "gpt-6-astra",
+        "high",
+        "/repo",
+        false,
+        "http://127.0.0.1:8999",
+    )
+    .unwrap();
     assert_eq!(
         args,
         strings(&[
@@ -343,7 +352,7 @@ fn codex_proxy_args_refuse_a_toml_unsafe_url() {
         "http://h:1/a\u{7f}b",
         "http://h:1/a\u{1}b",
     ] {
-        let err = codex_proxy_run_args("gpt-6-astra", "high", "/repo", url).unwrap_err();
+        let err = codex_proxy_run_args("gpt-6-astra", "high", "/repo", false, url).unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(
@@ -596,4 +605,201 @@ fn sol_runs_direct_and_through_the_proxy() {
     assert_eq!(sess.wire_model, config::SOL_MODEL);
     assert!(is_codex_model(config::SOL_MODEL));
     assert!(!is_codex_model(config::GPT56_SOL_MODEL));
+}
+
+/// A session on the Ultrafast tier: the tier pairs follow `-m <model>`,
+/// after the proxy's provider pairs, on both routes and for both models.
+#[test]
+fn ultrafast_tier_reaches_argv_direct_and_through_the_proxy() {
+    let tier = [
+        "-c",
+        "service_tier=\"ultrafast\"",
+        "-c",
+        "features.ultrafast_mode=true",
+    ];
+    let run = |env: &Env, model: &str| {
+        let cfg = env.config();
+        let work = env.work_str();
+        let mut sess = env.session("codex", "review", model, &work);
+        sess.service_tier = ULTRAFAST_TIER.to_string();
+        let mut seen = None;
+        run_codex_model_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "xhigh",
+            &work,
+            model,
+            None,
+            recorder(&mut seen, Ok(RunResult::default())),
+        )
+        .unwrap();
+        (seen.unwrap(), sess)
+    };
+    for model in [config::CODEX_MODEL, config::SOL_MODEL] {
+        let env = Env::new();
+        let (seen, _) = run(&env, model);
+        let mut want = argv("xhigh", &env.work_str());
+        want[4] = model.to_string();
+        want.splice(5..5, strings(&tier));
+        assert_eq!(seen.args, want, "{model}");
+
+        let env = proxy_env_at("http://127.0.0.1:8999");
+        let (seen, _) = run(&env, model);
+        let mut want = proxy_argv("xhigh", &env.work_str(), "http://127.0.0.1:8999");
+        want[4] = model.to_string();
+        want.splice(9..9, strings(&tier));
+        assert_eq!(seen.args, want, "{model} proxy");
+    }
+}
+
+/// No tier: the argv has no tier pairs and nothing is flagged.
+#[test]
+fn no_tier_leaves_argv_and_session_unchanged() {
+    let env = Env::new();
+    let (seen, sess) = run_recorded(&env).unwrap();
+    assert_eq!(seen.args, argv("xhigh", &env.work_str()));
+    assert!(!sess.service_tier_omitted);
+}
+
+const TIER_WARNING: &str = "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol` and will be omitted from requests.";
+
+/// A Codex log: banner, the echoed prompt, `between`, then the reply.
+fn tier_log(prompt: &str, between: &str, reply: &str) -> String {
+    format!(
+        "OpenAI Codex v0.162.1\n--------\nuser\n{prompt}\n{between}codex\n{reply}\ntokens used\n9\n{reply}\n"
+    )
+}
+
+/// Only Codex's warning lines right after the echoed prompt count. The
+/// full warning line inside the prompt or the reply does not.
+#[test]
+fn ultrafast_omitted_reads_only_the_warnings_after_the_prompt_echo() {
+    let prompt = "review the tier code";
+    let warned = format!("{TIER_WARNING}\n");
+    assert!(ultrafast_omitted(&tier_log(prompt, &warned, "ok"), prompt));
+    // Other config warnings may come first; blank lines are skipped.
+    let mixed = format!("\nwarning: something else\n  {TIER_WARNING}  \n");
+    assert!(ultrafast_omitted(&tier_log(prompt, &mixed, "ok"), prompt));
+
+    let quoted = format!("explain this line:\n{TIER_WARNING}");
+    for (log, prompt) in [
+        // The full warning line inside the prompt.
+        (tier_log(&quoted, "", "ok"), quoted.as_str()),
+        // The full warning line inside the reply.
+        (tier_log(prompt, "", TIER_WARNING), prompt),
+        // No echo of the prompt.
+        (format!("{TIER_WARNING}\n"), prompt),
+        // Another tier, an empty slug, a cut-off line.
+        (
+            tier_log(
+                prompt,
+                &format!("{}\n", TIER_WARNING.replace("`ultrafast`", "`priority`")),
+                "ok",
+            ),
+            prompt,
+        ),
+        (
+            tier_log(
+                prompt,
+                &format!("{}\n", TIER_WARNING.replace("`gpt-6.1-sol`", "``")),
+                "ok",
+            ),
+            prompt,
+        ),
+        (
+            tier_log(
+                prompt,
+                "warning: Configured service tier `ultrafast` is not advertised as supported for model `gpt-6.1-sol`\n",
+                "ok",
+            ),
+            prompt,
+        ),
+    ] {
+        assert!(!ultrafast_omitted(&log, prompt), "{log:?}");
+    }
+}
+
+/// The run reads its own log after the spawn and sets the session flag
+/// only when it asked for the tier and Codex warned.
+#[test]
+fn run_sets_service_tier_omitted_from_its_log() {
+    let run = |tier: &str, between: &str| {
+        let env = Env::new();
+        let cfg = env.config();
+        let work = env.work_str();
+        let log = std::path::Path::new(&work).join("call.log");
+        let mut sess = env.session("codex", "review", config::SOL_MODEL, &work);
+        sess.service_tier = tier.to_string();
+        run_codex_model_with(
+            &cfg,
+            &mut sess,
+            "p",
+            "low",
+            &work,
+            config::SOL_MODEL,
+            Some(log.to_str().unwrap()),
+            |_, req| {
+                std::fs::write(&log, tier_log(req.prompt, between, "ok")).unwrap();
+                Ok(RunResult::default())
+            },
+        )
+        .unwrap();
+        sess.service_tier_omitted
+    };
+    let warned = format!("{TIER_WARNING}\n");
+    assert!(run(ULTRAFAST_TIER, &warned));
+    assert!(!run(ULTRAFAST_TIER, ""));
+    assert!(!run("", &warned));
+}
+
+/// A session on the tier, `omitted` as Codex's warning sets it, on `route`.
+fn tier_session(route: &str, omitted: bool) -> Session {
+    Session {
+        cli: "codex".to_string(),
+        model: config::SOL_MODEL.to_string(),
+        route: route.to_string(),
+        service_tier: ULTRAFAST_TIER.to_string(),
+        service_tier_omitted: omitted,
+        ..Session::default()
+    }
+}
+
+/// An omitted tier gives the notice under the public label; the account
+/// line shows on the direct route only.
+#[test]
+fn ultrafast_notice_names_the_account_on_the_direct_route_only() {
+    assert_eq!(
+        ultrafast_notice(&tier_session("", true)).as_deref(),
+        Some(
+            "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n\
+             rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n"
+        )
+    );
+    let mut proxied = tier_session(ROUTE_PROXY, true);
+    proxied.model = config::CODEX_MODEL.to_string();
+    let notice = ultrafast_notice(&proxied).expect("notice");
+    assert!(notice.contains("for codex because"), "{notice}");
+    assert!(
+        !notice.contains("Pro $500"),
+        "proxy route names no account: {notice}"
+    );
+    assert_eq!(ultrafast_notice(&tier_session("", false)), None);
+}
+
+/// Only the head of the log is read: a warning past the window is not.
+#[test]
+fn log_head_is_bounded() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("big.log");
+    let prompt = "p";
+    let padding = "x".repeat(TIER_WARNING_WINDOW + 10);
+    std::fs::write(
+        &path,
+        format!("user\n{prompt}\n{padding}\n{TIER_WARNING}\n"),
+    )
+    .unwrap();
+    let head = log_head(path.to_str().unwrap(), prompt).unwrap();
+    assert_eq!(head.len(), prompt.len() + TIER_WARNING_WINDOW);
+    assert!(!head.contains(TIER_WARNING));
 }

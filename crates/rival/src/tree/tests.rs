@@ -126,10 +126,21 @@ fn command_subtree_matches_cli_surface() {
         detach.get_help().unwrap().to_string(),
         "run detached in a new process session; prints 'rival: detached pid=N' and exits"
     );
-    for model in ["claude", "codex", "fable", "grok", "k3", "sol"] {
+    for model in ["claude", "fable", "grok", "k3"] {
         assert_eq!(
             flags(node(&r, &["command", model])),
             [f("workdir", "."), f("no-queue", "false")],
+            "{model}"
+        );
+    }
+    for model in ["codex", "sol"] {
+        assert_eq!(
+            flags(node(&r, &["command", model])),
+            [
+                f("workdir", "."),
+                f("no-queue", "false"),
+                f("ultrafast", "false")
+            ],
             "{model}"
         );
     }
@@ -751,4 +762,21 @@ fn opus_is_an_alias_of_claude() {
         parse_err(&["run", "opuss"]).lines().next().unwrap(),
         "unknown command \"opuss\" for \"rival run\""
     );
+}
+
+/// `--ultrafast` exists on `command codex|sol` only.
+#[test]
+fn ultrafast_is_a_flag_of_command_codex_and_sol_only() {
+    for name in ["codex", "sol"] {
+        let inv = parse_ok(&["command", name, "--ultrafast"]);
+        assert!(inv.bool("ultrafast"), "{name}");
+        assert!(!parse_ok(&["command", name]).bool("ultrafast"), "{name}");
+    }
+    for name in ["claude", "opus", "fable", "grok", "k3", "plan", "security"] {
+        assert_eq!(
+            parse_err(&["command", name, "--ultrafast"]),
+            "unknown flag: --ultrafast",
+            "{name}"
+        );
+    }
 }

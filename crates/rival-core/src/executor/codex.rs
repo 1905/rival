@@ -17,6 +17,29 @@ use crate::session::Session;
 /// The provider name the proxy route gives Codex in its `-c` values.
 const PROXY_PROVIDER: &str = "rival_proxy";
 
+/// The Codex service tier of `command codex|sol --ultrafast`. A session
+/// whose `service_tier` is this value runs on it.
+pub const ULTRAFAST_TIER: &str = "ultrafast";
+
+/// Who can use Ultrafast: the usage texts, the skills and the notice.
+#[macro_export]
+macro_rules! ultrafast_requirement {
+    () => {
+        "Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on."
+    };
+}
+
+/// Codex prints this line, then sends the request without the tier, when
+/// the model catalog it loaded does not list the configured tier
+/// (openai/codex `core/src/session/mod.rs`, `unsupported_service_tier_warning`).
+const TIER_OMITTED_PREFIX: &str = "warning: Configured service tier `";
+const TIER_OMITTED_MIDDLE: &str = "` is not advertised as supported for model `";
+const TIER_OMITTED_SUFFIX: &str = "` and will be omitted from requests.";
+
+/// Codex echoes the prompt near the start of its log, so the warning is
+/// in this many bytes after the prompt's length.
+const TIER_WARNING_WINDOW: usize = 64 * 1024;
+
 /// Checks that codex is installed and authenticated,
 /// naming the given model in its errors. On the proxy route the proxy is
 /// the credential: the check asks the proxy, not `codex login status`.
@@ -45,9 +68,62 @@ pub fn is_codex_model(model: &str) -> bool {
     model == config::CODEX_MODEL || model == config::SOL_MODEL
 }
 
+/// Whether a codex log has the runtime warning that Codex omitted the
+/// Ultrafast tier. Codex prints its config warnings once, right after it
+/// echoes `prompt` and before any turn output. So only the `warning:` lines
+/// that directly follow the echo count: the same line inside the prompt or
+/// the reply does not. No echo of `prompt` in the log: false.
+pub(crate) fn ultrafast_omitted(log: &str, prompt: &str) -> bool {
+    let Some(at) = log.find(prompt) else {
+        return false;
+    };
+    log[at + prompt.len()..]
+        .lines()
+        .map(str::trim)
+        .skip_while(|line| line.is_empty())
+        .take_while(|line| line.starts_with("warning: "))
+        .any(|line| {
+            line.strip_prefix(TIER_OMITTED_PREFIX)
+                .and_then(|rest| rest.strip_prefix(ULTRAFAST_TIER))
+                .and_then(|rest| rest.strip_prefix(TIER_OMITTED_MIDDLE))
+                .and_then(|rest| rest.strip_suffix(TIER_OMITTED_SUFFIX))
+                .is_some_and(|slug| !slug.is_empty() && !slug.contains('`'))
+        })
+}
+
+/// The lines that say Codex dropped the Ultrafast tier of `sess`, or
+/// `None`. The run still counts: Codex sent it at the standard tier. Only
+/// the direct route names the account as the cause: through the proxy, the
+/// catalog and the account are the proxy's.
+pub fn ultrafast_notice(sess: &Session) -> Option<String> {
+    if !sess.service_tier_omitted {
+        return None;
+    }
+    let label = config::engine_label(&sess.cli, &sess.model);
+    let mut notice = format!(
+        "rival: ⚠ {ULTRAFAST_TIER} not applied — Codex omitted service_tier={ULTRAFAST_TIER} for {label} because its model catalog does not list the tier; the run used the standard tier.\n"
+    );
+    if sess.route != ROUTE_PROXY {
+        notice.push_str(concat!("rival: ", ultrafast_requirement!(), "\n"));
+    }
+    Some(notice)
+}
+
+/// The start of the log at `path`: enough to hold the prompt echo and the
+/// warnings after it.
+fn log_head(path: &str, prompt: &str) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut head = Vec::new();
+    std::fs::File::open(path)?
+        .take((prompt.len() + TIER_WARNING_WINDOW) as u64)
+        .read_to_end(&mut head)?;
+    Ok(String::from_utf8_lossy(&head).into_owned())
+}
+
 /// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
-/// also the model sent to the runtime. It runs Codex and Sol 6.1.
+/// also the model sent to the runtime. It runs Codex and Sol 6.1. A
+/// session whose `service_tier` is [`ULTRAFAST_TIER`] runs on that tier.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -87,17 +163,21 @@ pub(crate) fn run_codex_model_with(
     if !is_codex_model(model) {
         bail!("unsupported codex model {:?}", model);
     }
-    let result = (|| {
+    let ultrafast = sess.service_tier == ULTRAFAST_TIER;
+    let result = (|| -> anyhow::Result<RunResult> {
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {
                 let wire = proxy::wire_id(&route.prefix, model);
-                let args = codex_proxy_run_args(&wire, effort, workdir, &route.url)?;
+                let args = codex_proxy_run_args(&wire, effort, workdir, ultrafast, &route.url)?;
                 sess.route = ROUTE_PROXY.to_string();
                 sess.wire_model = wire;
                 sess.account = ROUTE_PROXY.to_string();
                 (args, proxy_env(&route))
             }
-            None => (codex_run_args(model, effort, workdir), Vec::new()),
+            None => (
+                codex_run_args(model, effort, workdir, ultrafast),
+                Vec::new(),
+            ),
         };
 
         let full_prompt = format!(
@@ -114,7 +194,18 @@ pub(crate) fn run_codex_model_with(
             environ: cfg.environ(),
             log,
         };
-        spawn(sess, &req)
+        let result = spawn(sess, &req)?;
+        // The language pass is a second call on the same session; either
+        // call can find the warning, and neither clears it.
+        if ultrafast {
+            let path = log.unwrap_or(&sess.log_file);
+            if let Ok(head) = log_head(path, &full_prompt)
+                && ultrafast_omitted(&head, &full_prompt)
+            {
+                sess.service_tier_omitted = true;
+            }
+        }
+        Ok(result)
     })();
     result.map_err(|err| {
         let label = config::engine_label("codex", model);
@@ -130,10 +221,18 @@ pub(crate) fn run_codex_model_with(
     })
 }
 
-pub(crate) fn codex_run_args(model: &str, effort: &str, workdir: &str) -> Vec<String> {
+/// The `codex exec` argv. `ultrafast` adds `-c service_tier="ultrafast"`
+/// and `-c features.ultrafast_mode=true` right after `-m <model>`, so a
+/// local config that turned the feature off cannot drop the tier unseen.
+pub(crate) fn codex_run_args(
+    model: &str,
+    effort: &str,
+    workdir: &str,
+    ultrafast: bool,
+) -> Vec<String> {
     // The codex runtime takes ultra as its own reasoning level (distinct from
     // xhigh), so preserve the requested value instead of normalizing it.
-    [
+    let mut args: Vec<String> = [
         "exec",
         "-C",
         workdir,
@@ -151,19 +250,32 @@ pub(crate) fn codex_run_args(model: &str, effort: &str, workdir: &str) -> Vec<St
     ]
     .iter()
     .map(|s| s.to_string())
-    .collect()
+    .collect();
+    if ultrafast {
+        args.splice(
+            5..5,
+            [
+                "-c".to_string(),
+                format!("service_tier=\"{ULTRAFAST_TIER}\""),
+                "-c".to_string(),
+                "features.ultrafast_mode=true".to_string(),
+            ],
+        );
+    }
+    args
 }
 
 /// [`codex_run_args`] on the proxy route: the two provider `-c` pairs go
-/// right after `-m <wire>`. The key is not here; the provider names the
-/// variable that holds it.
+/// right after `-m <wire>`, before any tier pairs. The key is not here; the
+/// provider names the variable that holds it.
 pub(crate) fn codex_proxy_run_args(
     wire: &str,
     effort: &str,
     workdir: &str,
+    ultrafast: bool,
     url: &str,
 ) -> anyhow::Result<Vec<String>> {
-    let mut args = codex_run_args(wire, effort, workdir);
+    let mut args = codex_run_args(wire, effort, workdir, ultrafast);
     args.splice(5..5, proxy_provider_args(url)?);
     Ok(args)
 }

@@ -16,7 +16,9 @@ use rival_core::{logging, queue, session, update};
 use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
-use crate::model_specs::{claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec};
+use crate::model_specs::{
+    ModelSpec, claude_spec, codex_tier_spec, fable_spec, grok_spec, k3_spec, sol_tier_spec,
+};
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
 use crate::{command_plan, command_security, config_cmd, install, queue_sessions, update_cmd};
@@ -577,12 +579,12 @@ fn dispatch(
                 .write_all(tree::render_help(root, &inv.path).as_bytes());
             Ok(())
         }
-        CommandId::CommandCodex => model_command(env, inv, codex_spec),
-        CommandId::CommandClaude => model_command(env, inv, claude_spec),
-        CommandId::CommandFable => model_command(env, inv, fable_spec),
-        CommandId::CommandSol => model_command(env, inv, sol_spec),
-        CommandId::CommandGrok => model_command(env, inv, grok_spec),
-        CommandId::CommandK3 => model_command(env, inv, k3_spec),
+        CommandId::CommandCodex => model_command(env, inv, codex_tier_spec(inv.bool("ultrafast"))),
+        CommandId::CommandClaude => model_command(env, inv, claude_spec()),
+        CommandId::CommandFable => model_command(env, inv, fable_spec()),
+        CommandId::CommandSol => model_command(env, inv, sol_tier_spec(inv.bool("ultrafast"))),
+        CommandId::CommandGrok => model_command(env, inv, grok_spec()),
+        CommandId::CommandK3 => model_command(env, inv, k3_spec()),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::Install => install::install_action(env, inv),
@@ -633,12 +635,8 @@ fn dispatch(
     }
 }
 
-fn model_command(
-    env: &mut CmdEnv<'_>,
-    inv: &Invocation,
-    spec: fn() -> crate::model_specs::ModelSpec,
-) -> Result<(), CmdError> {
-    run_model_command(env, &spec(), &inv.string("workdir"), inv.bool("no-queue"))
+fn model_command(env: &mut CmdEnv<'_>, inv: &Invocation, spec: ModelSpec) -> Result<(), CmdError> {
+    run_model_command(env, &spec, &inv.string("workdir"), inv.bool("no-queue"))
 }
 
 fn model_run(

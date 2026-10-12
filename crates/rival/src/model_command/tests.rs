@@ -661,3 +661,38 @@ fn a_repair_that_changes_a_number_keeps_only_that_field() {
     );
     assert!(!out.stdout.contains("reads 4"), "{}", out.stdout);
 }
+
+/// The whole command: an Ultrafast spec puts the tier on the session, and
+/// a run that Codex sent at the standard tier prints the notice after the
+/// output on stdout and on stderr, and still succeeds.
+#[test]
+fn command_prints_the_ultrafast_notice_after_the_output() {
+    use crate::testutil::with_env;
+    let fix = Fixture::new();
+    let wd = tmp();
+    let f = fake_run("codex\nok\n");
+    let mut spec = fake_spec(&f);
+    spec.ultrafast = true;
+    let inner = spec.run;
+    spec.run = Box::new(move |c| {
+        assert_eq!(c.sess.service_tier, "ultrafast", "the run sees the tier");
+        c.sess.service_tier_omitted = true;
+        inner(c)
+    });
+    let mut stdin = FakeStdin::new("hi");
+    let out = with_env(&fix, &mut stdin, &*no_mr(), |env| {
+        run_model_command(env, &spec, s(wd.path()), true)
+    });
+    out.result.unwrap();
+    let notice = "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for codex";
+    assert!(
+        out.stdout.ends_with("Ultrafast on.\n") && out.stdout.contains(&format!("ok\n\n{notice}")),
+        "{}",
+        out.stdout
+    );
+    assert!(out.stderr.contains(notice), "{}", out.stderr);
+    let sessions = fix.sessions();
+    assert_eq!(sessions[0].status, "completed");
+    assert_eq!(sessions[0].service_tier, "ultrafast");
+    assert!(sessions[0].service_tier_omitted);
+}

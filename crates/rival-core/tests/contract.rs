@@ -163,6 +163,8 @@ fn session_of(f: &Fields) -> Session {
         account: f.account.clone(),
         route: String::new(),
         wire_model: String::new(),
+        service_tier: String::new(),
+        service_tier_omitted: false,
         pid: f.pid,
         pid_start: f.pid_start,
         owner_pid: f.owner_pid,

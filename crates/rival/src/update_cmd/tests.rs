@@ -315,7 +315,10 @@ fn current_version_refreshes_skills_for_new_codex_install() {
     assert_eq!(o.result, Ok(()));
     assert_eq!(o.stderr, "");
     assert_eq!(std::fs::read_to_string(custom).unwrap(), edited);
-    assert!(o.stdout.contains("0 installed, 0 updated, 7 up to date"));
+    assert!(o.stdout.contains(&format!(
+        "0 installed, 0 updated, {} up to date",
+        rival_core::skills::NAMES.len()
+    )));
 }
 
 #[test]
