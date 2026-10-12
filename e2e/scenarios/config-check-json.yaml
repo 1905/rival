@@ -22,6 +22,10 @@
                 "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
               },
               "-c",
+              "service_tier=\"ultrafast\"",
+              "-c",
+              "features.ultrafast_mode=true",
+              "-c",
               "model_reasoning_effort=low",
               "--sandbox",
               "read-only",
@@ -57,6 +61,10 @@
               {
                 "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
               },
+              "-c",
+              "service_tier=\"ultrafast\"",
+              "-c",
+              "features.ultrafast_mode=true",
               "-c",
               "model_reasoning_effort=low",
               "--sandbox",
@@ -201,7 +209,7 @@
       "expect": {
         "exit_code": 1,
         "stdout": {
-          "$regex": "(?m)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"codex\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"gpt\\-6\\-astra\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"sol\",\"ok\":true,\"reply\":\"Sure:\\ ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":true,\"wire_model\":\"gpt\\-6\\.1\\-sol\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"claude\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-opus\\-5\\-5\"\\}$)(?=(?s:.*)^\\{\"error\":\"exited\\ with\\ code\\ 1:\\ API\\ Error:\\ 429\\ All\\ credentials\\ for\\ model\\ emcd_/claude\\-fable\\-5\\-1\\ are\\ cooling\\ down\\ \\(rate_limit_error:\\ monthly\\ spend\\ limit\\)\",\"hint\":\"proxy\\ account\\ emcd_\\ is\\ at\\ its\\ limit\\ \\(429\\);\\ no\\ other\\ prefix\\ serves\\ claude\\-fable\\-5\\-1\\ —\\ wait\\ for\\ the\\ limit\\ to\\ reset\",\"limit\":true,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":false,\"reply\":\"\",\"route\":\"proxy\",\"runtime\":\"claude\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}$)(?:^\\{\"error\"[^\\n]*\\}\\n){4}\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":3,\"total\":4\\}\\}\\n"
+          "$regex": "(?m)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"codex\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"tier_omitted\":false,\"ultrafast\":true,\"unexpected\":false,\"wire_model\":\"gpt\\-6\\-astra\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"sol\",\"ok\":true,\"reply\":\"Sure:\\ ok\",\"route\":\"proxy\",\"runtime\":\"codex\",\"tier_omitted\":false,\"ultrafast\":true,\"unexpected\":true,\"wire_model\":\"gpt\\-6\\.1\\-sol\"\\}$)(?=(?s:.*)^\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"claude\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-opus\\-5\\-5\"\\}$)(?=(?s:.*)^\\{\"error\":\"exited\\ with\\ code\\ 1:\\ API\\ Error:\\ 429\\ All\\ credentials\\ for\\ model\\ emcd_/claude\\-fable\\-5\\-1\\ are\\ cooling\\ down\\ \\(rate_limit_error:\\ monthly\\ spend\\ limit\\)\",\"hint\":\"proxy\\ account\\ emcd_\\ is\\ at\\ its\\ limit\\ \\(429\\);\\ no\\ other\\ prefix\\ serves\\ claude\\-fable\\-5\\-1\\ —\\ wait\\ for\\ the\\ limit\\ to\\ reset\",\"limit\":true,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":false,\"reply\":\"\",\"route\":\"proxy\",\"runtime\":\"claude\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}$)(?:^\\{\"error\"[^\\n]*\\}\\n){4}\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":3,\"total\":4\\}\\}\\n"
         },
         "stderr_lines": [
           "config check: 1 of 4 models failed"

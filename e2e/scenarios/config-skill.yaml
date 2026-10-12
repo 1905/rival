@@ -1,0 +1,80 @@
+{
+  "name": "config-skill",
+  "description": "`rival config show` lists skill.claude (sol) and skill.codex (claude) as defaults, and ultrafast.codex and ultrafast.sol as true defaults. `config set skill.claude fable` writes the skill block; a later show reads it from the file. `config set skill.codex gpt5` is refused with the accepted names, and the file keeps its text.",
+  "steps": [
+    {
+      "run": [
+        "config",
+        "show"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?m)(?s)(?=.*^skill\\.claude +sol +default$)(?=.*^skill\\.codex +claude +default$)(?=.*^ultrafast\\.codex +true +default$)(?=.*^ultrafast\\.sol +true +default$).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "skill.claude",
+        "fable"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "skill.claude = fable\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "skill.codex",
+        "gpt5"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "invalid skill.codex \"gpt5\" in <HOME>/.rival/config.yaml; use one of: codex, sol, claude, fable, k3, grok"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "show"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?m)(?s)(?=.*^skill\\.claude +fable +file$)(?=.*^skill\\.codex +claude +default$).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/config.yaml.lock"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/config.yaml",
+        "text": "# written by rival config; comments are not kept\nskill:\n  claude: fable\n"
+      }
+    ]
+  }
+}

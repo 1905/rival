@@ -32,7 +32,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
 | `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
 | `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
-| `ultrafast.sol` / `ultrafast.codex` switch (tier pairs after `-m` for the model whose switch is on, `service_tier` on the session, the not-applied notice; the other model runs without the tier) | ultrafast-command | unit tests `config::tests::ultrafast_is_per_codex_runtime_model_and_off_by_default`, `executor::codex::tests`, `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::ultrafast_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
+| `ultrafast.sol` / `ultrafast.codex` switch (on by default: every codex/sol fake argv carries the tier pairs; tier pairs after `-m` for the model whose switch is on, `service_tier` on the session, the not-applied notice; a model whose switch is off runs without the tier) | ultrafast-command, skill-command, config-skill (`true default`) | unit tests `config::tests::ultrafast_is_per_codex_runtime_model_and_on_by_default`, `executor::codex::tests`, `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::ultrafast_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
@@ -44,6 +44,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command plan` default from `plan.models` | unit test `command_plan::tests::plan_models_config_is_the_default` | — |
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |
+| `command skill --host claude\|codex` (the `/rival` skill: `skill.claude` default sol, `skill.codex` default claude, empty input prints the `/rival` usage, `security [scope]` goes to the security review, bad `--host`) | skill-command | skill-command (security preflight, bad host); configured models, `-re`, preflight hint: unit tests `skill_command::tests` |
 | `command security` | security-k3-structured | security-k3-nonzero-exit, security-missing-key |
 | `command security --which` | security-which-ready | security-which-missing-key |
 | `command security --no-queue`, `--workdir` | security-no-queue-workdir | workdir-missing |
@@ -76,6 +77,7 @@ Concurrent reviewers bind each session file by its `cli` field (plan-dual-models
 | `install --target codex --force` | install-codex-force | — |
 | `install --target all` (prompts) | install-all-prompts | — |
 | `install --target <bad>` | — | install-unknown-target |
+| one skill, `rival`, per host; the 5.2.0 per-model skills (`rival-codex`, `rival-sol`, …) are removed as deprecated | install-all-prompts, install-codex-force, update-* | unit test `install::tests::model_skills_are_removed_and_rival_is_installed` |
 | `install --target auto` (default) | update-already-latest, update-brew-upgrade (child `install --force --target auto`) | — |
 
 `install` with the host's own `/Applications/Codex.app` cannot be isolated by the runner. Every scenario that reaches `auto` puts the `codex` fake on `PATH`, so detection is deterministic. The injected-applications-dir cases are unit-tested.
@@ -134,6 +136,12 @@ The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` 
 | `command codex` review through the proxy: provider `-c` values, `RIVAL_PROXY_KEY` in the env and in no argv, no `codex login status`, repair pass on the same route, session `route`/`wire_model`/`account` | proxy-codex-review | — |
 | preflight: key rejected (401), codex never runs | — | proxy-codex-key-rejected |
 | exact `-c` strings, TOML-unsafe URL refused, prefix on the wire id, direct argv unchanged, proxy hint (429, rejected key) | unit tests `executor::codex::tests` | same |
+
+## config show / set: skill models
+
+| Command / flag | ✓ | ✗ |
+|---|---|---|
+| `config show` rows `skill.claude`, `skill.codex` (default, then file) and `ultrafast.*` `true default`; `config set skill.claude <model>` | config-skill | config-skill (`config set skill.codex gpt5` refused) |
 
 ## config check
 
