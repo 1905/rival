@@ -2,7 +2,7 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest binary release: [v5.2.0](https://github.com/1905/rival/releases/tag/v5.2.0) — 2026-10-12.
+Latest binary release: [v6.0.0](https://github.com/1905/rival/releases/tag/v6.0.0) — 2026-10-12.
 
 ## [v6.0.0] — 2026-10-12
 
