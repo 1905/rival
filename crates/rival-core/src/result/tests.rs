@@ -1,4 +1,4 @@
-//! Port of the app's `ResultParserTests.swift` (41 cases), plus grouping
+//! Ported from the retired Swift app's `ResultParserTests.swift` (41 cases), plus grouping
 //! checks for the Rust `groups` field.
 
 use std::path::Path;

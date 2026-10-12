@@ -1,6 +1,5 @@
-//! The Result tab: a finished member's parsed answer. Swift:
-//! `RivalApp/ResultPane.swift`, and the parse in `LogSnapshot.load` of
-//! `RunDetail.swift`.
+//! The Result tab: a finished member's parsed answer. Ported from the
+//! retired Swift app (`ResultPane.swift`, `RunDetail.swift`).
 //!
 //! The parse never runs in `update` or `draw`. [`ResultSlot::request`] names
 //! the member's log and the file state of its cached parse; a job worker runs

@@ -11,8 +11,8 @@ fn fg_colors(lines: &[Line<'_>]) -> HashSet<Color> {
 }
 
 #[test]
-fn palette_matches_the_app_theme() {
-    // Theme.swift values; the app and the TUI must not drift apart.
+fn palette_is_pinned() {
+    // The values from the retired Swift app's Theme.swift.
     assert_eq!(STYLES.text.fg, Some(Color::Rgb(0xB4, 0xC2, 0xB7)));
     assert_eq!(STYLES.dim.fg, Some(Color::Rgb(0x4F, 0x61, 0x54)));
     assert_eq!(STYLES.accent.fg, Some(Color::Rgb(0x6F, 0xC9, 0x85)));

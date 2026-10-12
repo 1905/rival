@@ -13,7 +13,7 @@ has no workflow files. You publish the release yourself, from the MacBook Air
 (`ssh air`, arm64 macOS, Command Line Tools SDK), with
 `scripts/release-local.sh`. One GoReleaser run publishes the GitHub release
 (six CLI archives + `checksums.txt`) and pushes `rival.rb` to
-`1905/homebrew-tap`. Rival.app is not published. Full guide:
+`1905/homebrew-tap`. Full guide:
 `docs/releasing.md`.
 
 Run the Rust gate on the Dell. Build release archives only on the Air. Never

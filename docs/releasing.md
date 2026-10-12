@@ -131,25 +131,10 @@ VERSION=5.2.0
    Homebrew one. If Homebrew refuses the tap, run `brew trust 1905/tap`.
    Restart or reload Claude Code after refreshing the embedded skills.
 
-## Rival.app
-
-Rival.app is not published by the release. Check it locally on a Mac with
-Xcode, in the repository root:
-
-```bash
-make test       # swift test in app/
-make install    # native release build into /Applications/Rival.app
-```
-
-To ship it by hand: build `app/dist/Rival-app.zip` with
-`python3 app/scripts/bundle.py --version <version>`, upload the ZIP to the
-release, render the cask with `app/scripts/render_cask.py`, and commit it as
-`Casks/rival-app.rb` in `1905/homebrew-tap`. Homebrew loads casks only from
-`Casks/`. The app is ad-hoc signed, not notarized; the cask removes the
-quarantine flag.
-
 ## History
 
 v5.1.0 (2026-10-12) was the first release published from the MacBook Air,
 while GitHub Actions was blocked by billing. Hosted CI was removed after it.
 v5.0.0 and earlier were published by the removed `release` workflow.
+Rival.app (the Swift macOS viewer) was removed after v5.2.0; its last
+published build is the `rival-app` cask from v5.0.0.

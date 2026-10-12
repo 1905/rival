@@ -20,14 +20,13 @@ Everything below is checked against the `rival` binary and its source. Commands,
 12. [Queue and timeouts](#queue-and-timeouts)
 13. [Sessions directory](#sessions-directory)
 14. [TUI](#tui)
-15. [Rival.app](#rivalapp)
-16. [Claude authentication and sandboxing](#claude-authentication-and-sandboxing)
-17. [Removed in this release](#removed-in-this-release)
-18. [Uninstall](#uninstall)
+15. [Claude authentication and sandboxing](#claude-authentication-and-sandboxing)
+16. [Removed in this release](#removed-in-this-release)
+17. [Uninstall](#uninstall)
 
 ### Install and setup
 
-Choose your system below. The CLI runs on macOS, Linux and Windows. Rival.app is available only on macOS.
+Choose your system below. The CLI runs on macOS, Linux and Windows.
 
 **Release availability:** v5.0.0 and later contain the Rust CLI for macOS, Linux and Windows. v4.2.0 and earlier support macOS and Linux only.
 
@@ -576,12 +575,12 @@ Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one
 | `rival config models [--json]` | The proxy's models, grouped by prefix. |
 | `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and the security reviewer. Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
 
-The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes). Rival.app has the same settings under ⌘, (Settings…) and "Check models" in the menu bar.
+The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
 
 ### Queue and timeouts
 
 - Rival has no daemon. A cross-process FIFO queue in `~/.rival/queue/` (ticket files plus `flock`) limits concurrent runs to `RIVAL_MAX_CONCURRENT`.
-- A waiting run shows as `queued` in the TUI and the app. A dead slot holder is reaped.
+- A waiting run shows as `queued` in the TUI. A dead slot holder is reaped.
 - A queue wait longer than `RIVAL_QUEUE_TIMEOUT`, or a run longer than `RIVAL_RUN_TIMEOUT`, fails the session. `rival wait` then exits `2`.
 - Use `--no-queue` or `RIVAL_NO_QUEUE` on NFS home directories, where `flock` is not reliable.
 
@@ -595,7 +594,7 @@ Every run writes to `~/.rival/sessions/` (`$RIVAL_HOME/sessions/` when `RIVAL_HO
 
 Main JSON fields: `id`, `group_id` (shared by the models of one plan run), `cli`, `mode`, `model`, `effort`, `review_scope`, `prompt_preview`, `status` (`queued`, `running`, `completed`, `failed`), `start_time`, `end_time`, `exit_code`, `duration`, `work_dir`, `log_file`, `error`, `pid`, `pid_start`.
 
-`rival sessions` prints them as a table. The TUI and Rival.app read the same directory.
+`rival sessions` prints them as a table. The TUI reads the same directory.
 
 ### TUI
 
@@ -629,32 +628,6 @@ Detail keys:
 
 Finished runs open on Result. Live runs open on Raw. Result shows findings by severity or formatted Markdown. If parsing fails, it offers the raw log.
 
-### Rival.app
-
-A native macOS viewer for the sessions directory. It needs macOS 14 (Sonoma) or later.
-
-```bash
-brew install --cask 1905/tap/rival-app
-```
-
-Without Homebrew, download `Rival-X.Y.Z.dmg` from the [latest release](https://github.com/1905/rival/releases/latest), open it and drag Rival to Applications. The app is not notarized, so macOS blocks the first launch. To allow it, open System Settings → Privacy & Security and click **Open Anyway** next to the Rival message. This is needed only once. The Homebrew cask does not need this step.
-
-- **Menu bar:** the icon shows the number of live runs. The popover lists up to 10 live runs (then `+N more — open Rival`), the last 5 finished runs, a "Notify on finish" checkbox, Open Rival and Quit.
-- **Window:** the run list on the left, with ALL, RUNNING, FAILED and DONE tabs, a filter field (same rules as the TUI filter) and day sections. The selected run shows on the right, with Result, Raw, Prompt and Info tabs and a member picker for groups. Result shows the model's answer as finding cards grouped by severity, or as formatted text. Raw shows the log. Finished runs open on Result and live runs on Raw. If the answer cannot be parsed, Result says why and links to Raw.
-- **Pagination:** 50 runs per page. The footer shows `‹ prev  page P/N  next ›`. Keys: `←`/`→` or `[`/`]` turn the page, `↑`/`↓` move, `Home`/`End` jump. `⌘F`, `⌘G` and `⇧⌘G` search the log.
-- **Stop:** the Stop… toolbar button opens a confirmation sheet. A live process gets SIGTERM only while its PID start time still matches the run.
-- **Notifications:** a notification is posted when a run goes from running or queued to completed or failed. Click it to open the run. Permission is requested on the first finish.
-- **Updates:** the app watches the sessions directory and polls as a fallback, so the list updates without a reload.
-- `RIVAL_HOME`: the app reads `$RIVAL_HOME/sessions` instead of `~/.rival/sessions` when this is set. The CLI uses the same variable (see [Configuration](#configuration)). The app sees it only when it is in the app's own environment.
-
-From a clone of this repository:
-
-| Command | Effect |
-|---|---|
-| `make run` | Debug build, bundled as "Rival (dev)", opened against your real `~/.rival`. |
-| `make install` | Fresh native release build, installed to `/Applications/Rival.app`. The old copy moves to `/tmp/trash`. |
-| `make test` | App unit tests, then the GUI launch soak and watchdog test. Requires a macOS GUI session. |
-
 ### Claude authentication and sandboxing
 
 Claude runs through the Claude Code CLI and bills your subscription login by default.
@@ -676,15 +649,16 @@ Claude runs through the Claude Code CLI and bills your subscription login by def
 |---|---|
 | Megareview: `rival review`, `rival command megareview`, and the consilium judge | `rival command codex review` (skill: `/rival-codex review`) |
 | `/rival-review` skill | `/rival-codex review`. `rival install` removes the old skill. |
-| `rival server` (web dashboard) | Rival.app (`brew install --cask 1905/tap/rival-app`) or `rival tui` |
+| `rival server` (web dashboard) | `rival tui` |
+| Rival.app (macOS viewer) and its `rival-app` cask | `rival tui`. Remove an installed copy with `brew uninstall --cask rival-app`. |
 
-Sessions written by older releases still render in the TUI and the app, with their old labels.
+Sessions written by older releases still render in the TUI, with their old labels.
 
 ### Uninstall
 
 ```bash
-brew uninstall --cask rival-app
 brew uninstall rival
+brew uninstall --cask rival-app   # only if an old Rival.app is installed
 ```
 
 Then delete the `rival-*` directories in `~/.claude/skills` and `~/.agents/skills`. Session history stays in `~/.rival` until you delete it.

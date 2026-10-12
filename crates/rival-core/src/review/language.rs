@@ -27,7 +27,7 @@ use crate::session::{self, Session};
 ///
 /// When the guard accepts the repair, the repaired review is appended to the
 /// session log as one JSON line. Every reader takes the last review in the
-/// log, so the CLI, the TUI and Rival.app show it. The result is the session
+/// log, so the CLI and the TUI show it. The result is the session
 /// log text after the pass: `raw` plus the line, or `raw` unchanged.
 pub fn repair_language(
     parent: &Context,

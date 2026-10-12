@@ -6,9 +6,7 @@
 #   SKIP_E2E=1 scripts/check.sh # without the e2e scenarios
 #
 # Nothing here calls a real reviewer CLI, Docker, a provider API or
-# inference: every test isolates HOME / RIVAL_HOME itself. Rival.app
-# (`swift build --product RivalApp`, `swift test`) needs a macOS host with
-# Xcode and is not part of this script.
+# inference: every test isolates HOME / RIVAL_HOME itself.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,7 +48,6 @@ step "no Go, STE or antislop names"
   ':!crates/rival-core/data/lang' ':!testdata/lang' \
   ':!testdata/logs/consilium_echoed_schema.log' \
   ':!crates/rival-core/src/review/testdata/consilium_echoed_schema.log' \
-  ':!app/Tests/Fixtures' \
   ':!crates/rival-core/src/skills.rs' ':!crates/rival-core/src/skills/tests.rs' \
   ':!crates/rival-core/src/session/tests.rs'
 

@@ -2,9 +2,8 @@
 # Try the branch build against the Dell's CLIProxyAPI from a Mac, without
 # touching the installed rival or ~/.rival.
 #
-#   scripts/try-proxy.sh app     # CLI build, tunnel, config, check, dev app
-#   scripts/try-proxy.sh tui     # the same, then the TUI config window
-#   scripts/try-proxy.sh check   # the same, then stop after the model check
+#   scripts/try-proxy.sh tui     # CLI build, tunnel, config, check, then the TUI config window
+#   scripts/try-proxy.sh check   # the same, but stop after the model check
 #   scripts/try-proxy.sh stop    # close the tunnel
 #
 # Environment:
@@ -19,7 +18,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-mode=${1:-app}
+mode=${1:-tui}
 TRY_HOME=${TRY_HOME:-$HOME/tmp-rival-try}
 PROXY_HOST=${PROXY_HOST:-dell}
 PROXY_PORT=${PROXY_PORT:-8317}
@@ -33,8 +32,8 @@ if [ "$mode" = stop ]; then
 fi
 
 case "$mode" in
-    app | tui | check) ;;
-    *) echo "usage: $0 app|tui|check|stop" >&2; exit 2 ;;
+    tui | check) ;;
+    *) echo "usage: $0 tui|check|stop" >&2; exit 2 ;;
 esac
 
 echo "→ build the branch CLI"
@@ -69,14 +68,6 @@ fi
 echo "→ model check"
 "$R" config check || true
 
-case "$mode" in
-    tui) exec "$R" config ;;
-    app)
-        echo "→ dev app"
-        python3 app/scripts/dev_bundle.py --build
-        open -n --env RIVAL_BIN="$R" --env RIVAL_HOME="$RIVAL_HOME" app/.build/Rival.app
-        echo "Rival (dev) is open. ⌘, opens Settings."
-        echo "CLI: RIVAL_HOME=$RIVAL_HOME $R config"
-        echo "Close the tunnel: make try-proxy-stop"
-        ;;
-esac
+if [ "$mode" = tui ]; then
+    exec "$R" config
+fi
