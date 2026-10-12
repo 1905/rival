@@ -2,9 +2,11 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest binary release: [v5.1.0](https://github.com/1905/rival/releases/tag/v5.1.0) — 2026-10-12.
+Latest binary release: [v5.2.0](https://github.com/1905/rival/releases/tag/v5.2.0) — 2026-10-12.
 
 ## [Unreleased]
+
+## [v5.2.0] — 2026-10-12
 
 ### Changed
 - **Ultrafast is a config switch.** `ultrafast.codex` (GPT-6 Astra) and `ultrafast.sol` (Sol 6.1) in `~/.rival/config.yaml`, off by default. Turn them on in the config window (`rival config`, Models: `Codex Ultrafast`, `Sol Ultrafast`) or with `rival config set ultrafast.sol true`. With a switch on, every call of that model asks Codex for the Ultrafast tier: `/rival-codex` and `/rival-sol`, their language-repair pass, `rival command plan` and `rival config check`. `rival config show` lists both keys.
