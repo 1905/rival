@@ -6,7 +6,12 @@ Latest binary release: [v5.1.0](https://github.com/1905/rival/releases/tag/v5.1.
 
 ## [Unreleased]
 
+### Changed
+- **Ultrafast is a config switch.** `ultrafast.codex` (GPT-6 Astra) and `ultrafast.sol` (Sol 6.1) in `~/.rival/config.yaml`, off by default. Turn them on in the config window (`rival config`, Models: `Codex Ultrafast`, `Sol Ultrafast`) or with `rival config set ultrafast.sol true`. With a switch on, every call of that model asks Codex for the Ultrafast tier: `/rival-codex` and `/rival-sol`, their language-repair pass, `rival command plan` and `rival config check`. `rival config show` lists both keys.
+- `rival command plan` prints `rival: ⚠ ultrafast not applied` for each reviewer that Codex ran at the standard tier. `rival config check` marks such a row `[ultrafast not applied]`, and a row with the switch on `[ultrafast]`; `--json` rows have `ultrafast` and `tier_omitted`.
+
 ### Removed
+- The `--ultrafast` flag of `rival command codex|sol` and the skills `rival-astra-ultrafast` and `rival-sol-ultrafast`. `rival install` and `rival update` delete installed copies. Use `/rival-codex` and `/rival-sol` with the switch on.
 - Hosted CI. GitHub Actions is turned off for the repository, and `.github/` (the `CI` and `Release` workflows and the `cli-release-tools` action) is gone. `scripts/check.sh` (`make cli-check`) is the local pre-merge gate. `scripts/release-local.sh` (`make cli-release-check`, `cli-snapshot`, `cli-publish`) builds and publishes a release from a macOS host with the same pinned tools and GoReleaser command. Rival.app is no longer published by a release; `docs/releasing.md` lists the manual steps.
 
 ## [v5.1.0] — 2026-10-12

@@ -98,7 +98,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}\\n\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":1,\"total\":1\\}\\}\\n"
+          "$regex": "\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"tier_omitted\":false,\"ultrafast\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}\\n\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":1,\"total\":1\\}\\}\\n"
         }
       }
     }

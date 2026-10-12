@@ -530,6 +530,7 @@ fn sample_result() -> PlanRunResult {
             raw: "{}".into(),
         }],
         skipped: vec![],
+        notices: vec![],
     }
 }
 
@@ -919,4 +920,27 @@ fn plan_models_config_is_the_default() {
         || Ok(sample_result()),
     );
     assert_eq!(r.seen.models, [CODEX_MODEL]);
+}
+
+/// The result's notices follow the plan output on stdout and go to stderr.
+#[test]
+fn notices_follow_the_plan_output() {
+    let fix = Fixture::new();
+    let (_dir, w, _plan) = workdir_with_plan();
+    let notice = "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for codex because its model catalog does not list the tier; the run used the standard tier.\n";
+    let r = run_plan(
+        &fix,
+        &mut FakeStdin::new("plan.md\n"),
+        &["--workdir", &w, "--no-queue", "-m", "codex"],
+        || {
+            Ok(PlanRunResult {
+                notices: vec![notice.to_string()],
+                ..sample_result()
+            })
+        },
+    );
+    r.result.unwrap();
+    assert!(r.stdout.ends_with(&format!("\n\n{notice}")), "{}", r.stdout);
+    assert!(r.stdout.contains("Solid plan."), "{}", r.stdout);
+    assert!(r.stderr.contains(notice), "{}", r.stderr);
 }

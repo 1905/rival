@@ -760,6 +760,41 @@ pub struct PlanConfig {
     pub models: Vec<String>,
 }
 
+/// The Codex-runtime models that have an `ultrafast.<label>` switch, as
+/// `(label, model id)`.
+pub const ULTRAFAST_MODELS: [(&str, &str); 2] =
+    [(CODEX_LABEL, CODEX_MODEL), (SOL_LABEL, SOL_MODEL)];
+
+/// The `ultrafast:` block: per Codex-runtime model, whether its calls ask
+/// Codex for the Ultrafast service tier. Off when unset.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UltrafastConfig {
+    /// `ultrafast.codex`: GPT-6 Astra.
+    pub codex: bool,
+    /// `ultrafast.sol`: Sol 6.1.
+    pub sol: bool,
+}
+
+impl UltrafastConfig {
+    /// The switch of a label from [`ULTRAFAST_MODELS`]; false for any other.
+    pub fn get(&self, label: &str) -> bool {
+        match label {
+            CODEX_LABEL => self.codex,
+            SOL_LABEL => self.sol,
+            _ => false,
+        }
+    }
+
+    /// The switch of a label from [`ULTRAFAST_MODELS`], to flip it.
+    pub fn get_mut(&mut self, label: &str) -> Option<&mut bool> {
+        match label {
+            CODEX_LABEL => Some(&mut self.codex),
+            SOL_LABEL => Some(&mut self.sol),
+            _ => None,
+        }
+    }
+}
+
 /// The names `plan.models` accepts.
 pub const PLAN_MODEL_NAMES: [&str; 5] = ["codex", "sol", "claude", "opus", "fable"];
 
@@ -936,6 +971,7 @@ pub struct UserConfig {
     /// Lets the skills apply fixes for CONFIRMED critical and high findings
     /// without asking. Medium and low are never auto-fixed.
     pub auto_fix_critical_high: bool,
+    pub ultrafast: UltrafastConfig,
 }
 
 /// Decodes YAML null into a string as "", and any other scalar as
@@ -1013,6 +1049,14 @@ struct RawPlan {
     models: Option<Vec<GoString>>,
 }
 
+#[derive(Default, Deserialize)]
+struct RawUltrafast {
+    #[serde(default)]
+    codex: Option<bool>,
+    #[serde(default)]
+    sol: Option<bool>,
+}
+
 /// Unknown keys (for example the removed megareview's `review:` roster) are
 /// ignored, like yaml.v3.
 #[derive(Default, Deserialize)]
@@ -1031,6 +1075,8 @@ struct RawUserConfig {
     proxy: Option<RawProxy>,
     #[serde(default)]
     plan: Option<RawPlan>,
+    #[serde(default)]
+    ultrafast: Option<RawUltrafast>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -1068,6 +1114,13 @@ impl From<RawUserConfig> for UserConfig {
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
             auto_fix_critical_high: raw.auto_fix_critical_high.unwrap_or_default(),
+            ultrafast: {
+                let u = raw.ultrafast.unwrap_or_default();
+                UltrafastConfig {
+                    codex: u.codex.unwrap_or_default(),
+                    sol: u.sol.unwrap_or_default(),
+                }
+            },
         }
     }
 }
@@ -1374,6 +1427,19 @@ impl Config {
         } else {
             "off"
         }
+    }
+
+    /// Whether calls of `model` ask Codex for the Ultrafast tier:
+    /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1, never
+    /// for any other model.
+    pub fn ultrafast(&self, model: &str) -> bool {
+        let Some(user) = self.user.as_ref() else {
+            return false;
+        };
+        ULTRAFAST_MODELS
+            .iter()
+            .find(|(_, id)| *id == model)
+            .is_some_and(|(label, _)| user.ultrafast.get(label))
     }
 
     /// The configured `plan.models`; empty when unset.

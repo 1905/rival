@@ -17,17 +17,12 @@ use crate::session::Session;
 /// The provider name the proxy route gives Codex in its `-c` values.
 const PROXY_PROVIDER: &str = "rival_proxy";
 
-/// The Codex service tier of `command codex|sol --ultrafast`. A session
-/// whose `service_tier` is this value runs on it.
-pub const ULTRAFAST_TIER: &str = "ultrafast";
+/// The Codex service tier a model gets when its `ultrafast.<label>` switch
+/// is on. The session records it in `service_tier`.
+pub(crate) const ULTRAFAST_TIER: &str = "ultrafast";
 
-/// Who can use Ultrafast: the usage texts, the skills and the notice.
-#[macro_export]
-macro_rules! ultrafast_requirement {
-    () => {
-        "Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on."
-    };
-}
+/// Who can use Ultrafast; the notice names it on the direct route.
+const ULTRAFAST_REQUIREMENT: &str = "Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
 
 /// Codex prints this line, then sends the request without the tier, when
 /// the model catalog it loaded does not list the configured tier
@@ -104,7 +99,7 @@ pub fn ultrafast_notice(sess: &Session) -> Option<String> {
         "rival: ⚠ {ULTRAFAST_TIER} not applied — Codex omitted service_tier={ULTRAFAST_TIER} for {label} because its model catalog does not list the tier; the run used the standard tier.\n"
     );
     if sess.route != ROUTE_PROXY {
-        notice.push_str(concat!("rival: ", ultrafast_requirement!(), "\n"));
+        notice.push_str(&format!("rival: {ULTRAFAST_REQUIREMENT}\n"));
     }
     Some(notice)
 }
@@ -122,8 +117,9 @@ fn log_head(path: &str, prompt: &str) -> std::io::Result<String> {
 
 /// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
-/// also the model sent to the runtime. It runs Codex and Sol 6.1. A
-/// session whose `service_tier` is [`ULTRAFAST_TIER`] runs on that tier.
+/// also the model sent to the runtime. It runs Codex and Sol 6.1. When
+/// [`Config::ultrafast`] is on for `model`, the call asks for the Ultrafast
+/// tier and the session records it.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -163,7 +159,10 @@ pub(crate) fn run_codex_model_with(
     if !is_codex_model(model) {
         bail!("unsupported codex model {:?}", model);
     }
-    let ultrafast = sess.service_tier == ULTRAFAST_TIER;
+    let ultrafast = cfg.ultrafast(model);
+    if ultrafast {
+        sess.service_tier = ULTRAFAST_TIER.to_string();
+    }
     let result = (|| -> anyhow::Result<RunResult> {
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {
@@ -197,7 +196,9 @@ pub(crate) fn run_codex_model_with(
         let result = spawn(sess, &req)?;
         // The language pass is a second call on the same session; either
         // call can find the warning, and neither clears it.
-        if ultrafast {
+        // Once a call of the session found the warning, later calls (the
+        // language pass) need not read their log for it.
+        if ultrafast && !sess.service_tier_omitted {
             let path = log.unwrap_or(&sess.log_file);
             if let Ok(head) = log_head(path, &full_prompt)
                 && ultrafast_omitted(&head, &full_prompt)

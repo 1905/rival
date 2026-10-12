@@ -239,6 +239,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
     assert_eq!(
         result,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: CODEX_MODEL.into(),
@@ -323,7 +324,7 @@ fn assemble_plan_results_all_failed() {
             ..PlanCLIRun::default()
         },
     ];
-    let err = assemble_plan_results(batch, vec![]).unwrap_err();
+    let err = assemble_plan_results(batch, vec![], Vec::new()).unwrap_err();
     assert_eq!(
         err.to_string(),
         "all plan reviewers failed or hit quota limits (see skipped reasons): codex: exited with code 1; claude: boom"
@@ -335,10 +336,11 @@ fn assemble_plan_results_one_skipped_one_ok() {
     let batch = vec![run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON)];
     // claude was unavailable at preflight → pre-run skipped list.
     let pre = vec![skipped("claude", "", "claude not found")];
-    let res = assemble_plan_results(batch, pre.clone()).unwrap();
+    let res = assemble_plan_results(batch, pre.clone(), Vec::new()).unwrap();
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: GPT56_SOL_MODEL.into(),
@@ -363,7 +365,7 @@ fn assemble_plan_results_nonzero_exit_skips() {
             ..run_ok("claude", CLAUDE_MODEL, "partial")
         },
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "codex");
     assert_eq!(
@@ -378,7 +380,7 @@ fn assemble_plan_results_quota_skips() {
         run_ok("codex", GPT56_SOL_MODEL, "error: insufficient_quota"),
         run_ok("claude", CLAUDE_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "claude");
     assert_eq!(
@@ -391,10 +393,11 @@ fn assemble_plan_results_quota_skips() {
 fn assemble_plan_results_parse_fail_keeps_raw() {
     // Exit 0, no quota, but no parseable plan payload → keep raw, no parse.
     let batch = vec![run_ok("codex", GPT56_SOL_MODEL, "just some prose, no json")];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: GPT56_SOL_MODEL.into(),
@@ -414,7 +417,7 @@ fn assemble_plan_results_empty_output_skips() {
         run_ok("claude", CLAUDE_MODEL, "   \n  "),
         run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "codex");
     assert_eq!(
@@ -461,6 +464,7 @@ fn plan_failure_reason_uses_model_name() {
 #[test]
 fn format_plan_result_single_parsed() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![PlanCLIResult {
             cli: "codex".into(),
             model: GPT56_SOL_MODEL.into(),
@@ -484,6 +488,7 @@ fn format_plan_result_single_parsed() {
 #[test]
 fn format_plan_result_single_parse_fail_returns_raw() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![PlanCLIResult {
             cli: "codex".into(),
             model: GPT56_SOL_MODEL.into(),
@@ -501,6 +506,7 @@ fn format_plan_result_single_parse_fail_returns_raw() {
 #[test]
 fn format_plan_result_multi_blocks_and_skipped() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![
             PlanCLIResult {
                 cli: "codex".into(),
@@ -559,7 +565,7 @@ fn assemble_plan_results_err_uses_reason() {
         },
         run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.skipped, vec![skipped("claude", CLAUDE_MODEL, &reason)]);
 }
 
@@ -852,10 +858,12 @@ fn codex_tool_plan_transcript(final_answer: &str) -> String {
 #[test]
 fn assemble_plan_results_parses_final_answer_not_tool_output() {
     let raw = codex_tool_plan_transcript("The plan looks broadly fine, a few nits.");
-    let res = assemble_plan_results(vec![run_ok("codex", CODEX_MODEL, &raw)], vec![]).unwrap();
+    let res = assemble_plan_results(vec![run_ok("codex", CODEX_MODEL, &raw)], vec![], Vec::new())
+        .unwrap();
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: CODEX_MODEL.into(),
@@ -1605,4 +1613,62 @@ fn two_models_on_one_runtime_run_as_two_blocks() {
 
 fn repaired_summary(label: &str) -> String {
     format!("The {label} plan can use the cache.")
+}
+
+/// A session that Codex ran at the standard tier although its switch is
+/// on (the codex executor sets both fields) gives one notice in the
+/// result, failed reviewers included. When every reviewer failed, the
+/// notices go to stderr with the error.
+#[test]
+fn omitted_ultrafast_tiers_become_notices() {
+    let mark = |sess: &mut Session| {
+        sess.service_tier = crate::executor::ULTRAFAST_TIER.to_string();
+        sess.service_tier_omitted = true;
+    };
+    let (_home, cfg) = plan_test_config("");
+    let ex = fake(|_, sess, _, _, _, _| {
+        if sess.model == SOL_MODEL {
+            mark(sess);
+            return Ok((Vec::new(), 1)); // a failed reviewer keeps its notice
+        }
+        if sess.model == CODEX_MODEL {
+            mark(sess);
+        }
+        ok_plan()
+    });
+    let result = run_plan(&cfg, &ex, "", "g", &clis(&["codex", SOL_MODEL, "claude"])).unwrap();
+    assert_eq!(result.notices.len(), 2, "{:?}", result.notices);
+    assert!(
+        result
+            .notices
+            .iter()
+            .any(|n| n.contains("for codex because"))
+    );
+    assert!(result.notices.iter().any(|n| n.contains("for sol because")));
+
+    let (_home, cfg) = plan_test_config("");
+    let ex = fake(|_, sess, _, _, _, _| {
+        mark(sess);
+        Ok((Vec::new(), 1))
+    });
+    let work = tempfile::tempdir().unwrap();
+    let mut stderr = Vec::new();
+    let err = run_plan_review_with(
+        &Context::background(),
+        &cfg,
+        &ex,
+        "/tmp/plan.md",
+        &batch("", work.path().to_str().unwrap(), "g", &clis(&["codex"])),
+        &mut stderr,
+    )
+    .unwrap_err();
+    assert!(
+        err.to_string().contains("all plan reviewers failed"),
+        "{err}"
+    );
+    let stderr = String::from_utf8(stderr).unwrap();
+    assert!(
+        stderr.contains("rival: ⚠ ultrafast not applied"),
+        "{stderr}"
+    );
 }

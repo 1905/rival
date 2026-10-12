@@ -232,8 +232,6 @@ fn codex_skill_commands() {
         ("rival-codex", "codex"),
         ("rival-fable", "fable"),
         ("rival-sol", "sol"),
-        ("rival-astra-ultrafast", "codex --ultrafast"),
-        ("rival-sol-ultrafast", "sol --ultrafast"),
         ("rival-k3", "k3"),
         ("rival-grok", "grok"),
         ("rival-security", "security"),
@@ -295,16 +293,6 @@ fn codex_skill_text_golden() {
             "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
         ),
         (
-            "rival-astra-ultrafast",
-            "Run a requested GPT-6 Astra prompt or code review on the Codex Ultrafast tier through Rival from Codex.",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects GPT-6 Astra (`gpt-6-astra`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.codex` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
-        ),
-        (
-            "rival-sol-ultrafast",
-            "Run a requested Sol 6.1 prompt or code review on the Codex Ultrafast tier through Rival from Codex.",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
-        ),
-        (
             "rival-k3",
             "Run a requested k3 prompt or code review through Rival from Codex.",
             review,
@@ -354,42 +342,30 @@ fn retired_plan_skills_are_unavailable_and_unadvertised() {
     }
 }
 
-/// The Ultrafast skills launch their base command with `--ultrafast`, name
-/// their model, and tell the agent to relay the "not applied" line.
+/// The Ultrafast skills are retired: install removes them, nothing embeds
+/// them, and the Codex-runtime skills relay the "not applied" notice.
 #[test]
-fn ultrafast_skills_are_active() {
-    for (name, command, model, slug) in [
-        (
-            "rival-astra-ultrafast",
-            "codex",
-            "GPT-6 Astra",
-            "gpt-6-astra",
-        ),
-        ("rival-sol-ultrafast", "sol", "Sol 6.1", "gpt-6.1-sol"),
-    ] {
-        assert!(NAMES.contains(&name), "{name} is not active");
-        assert!(!DEPRECATED.contains(&name), "{name} is deprecated");
-        let launch = format!("rival command {command} --ultrafast --detach --workdir");
-        let content = skill(name);
-        for want in [
-            format!("name: {name}\n"),
-            "version: ".to_string(),
-            launch.clone(),
-            format!("/{name} review"),
-            model.to_string(),
-            "rival: ⚠ ultrafast not applied".to_string(),
-            "Pro $500".to_string(),
-        ] {
-            assert!(content.contains(&want), "{name} missing {want:?}");
-        }
-        let codex = String::from_utf8(codex_skill(name, "test").unwrap()).unwrap();
-        for want in [
-            launch.as_str(),
-            model,
-            slug,
-            "rival: ⚠ ultrafast not applied",
-        ] {
-            assert!(codex.contains(want), "codex {name} missing {want:?}");
-        }
+fn ultrafast_skills_are_retired_and_the_base_skills_relay_the_notice() {
+    for name in ["rival-astra-ultrafast", "rival-sol-ultrafast"] {
+        assert!(!NAMES.contains(&name), "{name} is still active");
+        assert!(
+            DEPRECATED.contains(&name),
+            "{name} is not removed on install"
+        );
+        assert!(codex_skill(name, "1").is_err(), "{name}");
+    }
+    for name in ["rival-codex", "rival-sol"] {
+        assert!(
+            skill(name).contains("`rival: ⚠ ultrafast not applied` line"),
+            "{name}"
+        );
+        let codex = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
+        assert!(
+            codex.contains("`rival: ⚠ ultrafast not applied` line"),
+            "codex {name}"
+        );
+    }
+    for name in NAMES {
+        assert!(!skill(name).contains("--ultrafast"), "{name}");
     }
 }

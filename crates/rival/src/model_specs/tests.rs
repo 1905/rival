@@ -327,28 +327,3 @@ fn fable_and_sol_specs_follow_their_runtimes() {
     assert!(!fable_spec().auth_hint(&cfg, log).is_empty());
     assert_eq!(sol_spec().auth_hint(&cfg, log), "");
 }
-
-/// The Ultrafast specs keep their model, label and effort default, and only
-/// they ask for the tier.
-#[test]
-fn ultrafast_specs_carry_the_tier() {
-    let cfg = cfg();
-    for (plain, fast) in [
-        (codex_spec(), codex_tier_spec(true)),
-        (sol_spec(), sol_tier_spec(true)),
-    ] {
-        assert!(fast.ultrafast);
-        assert!(!plain.ultrafast);
-        assert_eq!((fast.model, fast.cli), (plain.model, plain.cli));
-        assert_eq!(fast.label(), plain.label());
-        assert_eq!(
-            fast.resolve_effort(&cfg, "").unwrap(),
-            plain.resolve_effort(&cfg, "").unwrap()
-        );
-    }
-    assert_eq!(codex_tier_spec(true).usage, ASTRA_ULTRAFAST_USAGE);
-    assert_eq!(sol_tier_spec(true).usage, SOL_ULTRAFAST_USAGE);
-    for spec in [claude_spec(), fable_spec(), k3_spec(), grok_spec()] {
-        assert!(!spec.ultrafast, "{}", spec.command_name);
-    }
-}

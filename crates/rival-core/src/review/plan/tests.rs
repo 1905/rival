@@ -274,6 +274,7 @@ fn format_plan_result_layouts() {
     );
 
     let single = PlanRunResult {
+        notices: Vec::new(),
         results: vec![result("codex", CODEX_MODEL, None, "raw text")],
         skipped: vec![],
     };
@@ -283,6 +284,7 @@ fn format_plan_result_layouts() {
     );
 
     let multi = PlanRunResult {
+        notices: Vec::new(),
         results: vec![
             result("codex", CODEX_MODEL, Some(plan("ok", 7)), ""),
             result("codex", CODEX_MODEL, None, "  prose  \n"),
@@ -299,6 +301,7 @@ fn format_plan_result_layouts() {
     );
     // One result plus a skipped model uses the multi layout.
     let one_skipped = PlanRunResult {
+        notices: Vec::new(),
         results: vec![result("codex", CODEX_MODEL, Some(plan("ok", 7)), "")],
         skipped: multi.skipped.clone(),
     };
@@ -322,6 +325,7 @@ fn blank_summary_is_invalid() {
         // The shared decoder skips the payload, so no plan answer is found.
         assert!(parse_plan_log(&raw).is_err(), "{raw}");
         let run = PlanRunResult {
+            notices: Vec::new(),
             results: vec![result(
                 "codex",
                 CODEX_MODEL,

@@ -17,7 +17,7 @@ use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{
-    ModelSpec, claude_spec, codex_tier_spec, fable_spec, grok_spec, k3_spec, sol_tier_spec,
+    ModelSpec, claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec,
 };
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
@@ -579,10 +579,10 @@ fn dispatch(
                 .write_all(tree::render_help(root, &inv.path).as_bytes());
             Ok(())
         }
-        CommandId::CommandCodex => model_command(env, inv, codex_tier_spec(inv.bool("ultrafast"))),
+        CommandId::CommandCodex => model_command(env, inv, codex_spec()),
         CommandId::CommandClaude => model_command(env, inv, claude_spec()),
         CommandId::CommandFable => model_command(env, inv, fable_spec()),
-        CommandId::CommandSol => model_command(env, inv, sol_tier_spec(inv.bool("ultrafast"))),
+        CommandId::CommandSol => model_command(env, inv, sol_spec()),
         CommandId::CommandGrok => model_command(env, inv, grok_spec()),
         CommandId::CommandK3 => model_command(env, inv, k3_spec()),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),

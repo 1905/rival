@@ -83,6 +83,30 @@ fn show_lists_each_value_with_its_source() {
         line(&out, "auto_fix_critical_high"),
         "auto_fix_critical_high false default"
     );
+    assert_eq!(
+        line(&out, "ultrafast.codex"),
+        "ultrafast.codex false default"
+    );
+    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol false default");
+}
+
+/// `config set ultrafast.sol true` is read back by `show` from the file.
+#[test]
+fn ultrafast_switch_round_trips_through_set_and_show() {
+    let fix = Fixture::new();
+    let (code, _, err) = run(&fix, "", &["config", "set", "ultrafast.sol", "true"]);
+    assert_eq!((code, err.as_str()), (0, ""));
+    // The config loads once per process, so show runs on a new fixture
+    // with the file that set wrote.
+    let written = std::fs::read_to_string(fix.cfg.paths().config_file()).unwrap();
+    assert!(written.contains("ultrafast:\n  sol: true\n"), "{written}");
+    let fix = Fixture::with_config_yaml(&written);
+    let (_, out, _) = run(&fix, "", &["config", "show"]);
+    assert_eq!(line(&out, "ultrafast.sol"), "ultrafast.sol true file");
+    assert_eq!(
+        line(&out, "ultrafast.codex"),
+        "ultrafast.codex false default"
+    );
 }
 
 #[test]

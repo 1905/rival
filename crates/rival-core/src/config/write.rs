@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use serde_saphyr::granit_parser::{Event, Parser, ScalarStyle};
 
-use super::{ConfigError, UserConfig, parse_user_config};
+use super::{ConfigError, ULTRAFAST_MODELS, UserConfig, parse_user_config};
 
 #[cfg(test)]
 mod tests;
@@ -28,7 +28,7 @@ pub const HEADER: &str = "# written by rival config; comments are not kept";
 
 /// The key paths `rival config set` accepts. `efforts.<model>` takes any
 /// effort label; the validation checks the label.
-pub const SETTABLE_KEYS: [&str; 11] = [
+pub const SETTABLE_KEYS: [&str; 12] = [
     "proxy.url",
     "proxy.key_file",
     "proxy.claude.enabled",
@@ -39,6 +39,7 @@ pub const SETTABLE_KEYS: [&str; 11] = [
     "efforts.<model>",
     "security.reviewer",
     "auto_fix_critical_high",
+    "ultrafast.<model>",
     "claude.subscription",
 ];
 
@@ -97,6 +98,12 @@ fn key_kind(key: &str) -> Result<Kind, ConfigError> {
         | "claude.subscription" => Kind::Str,
         "proxy.claude.enabled" | "proxy.codex.enabled" | "auto_fix_critical_high" => Kind::Bool,
         "plan.models" => Kind::List,
+        _ if key
+            .strip_prefix("ultrafast.")
+            .is_some_and(|label| ULTRAFAST_MODELS.iter().any(|(l, _)| *l == label)) =>
+        {
+            Kind::Bool
+        }
         _ => match key.strip_prefix("efforts.") {
             Some(label) if !label.is_empty() && !label.contains('.') => Kind::Str,
             _ => {

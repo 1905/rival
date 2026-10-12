@@ -274,6 +274,15 @@ fn proxy_env_at(url: &str) -> Env {
     env
 }
 
+/// Appends `yaml` to the env's `~/.rival/config.yaml`.
+fn add_config(env: &Env, yaml: &str) {
+    let dir = env.home.path().join(".rival");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("config.yaml");
+    let old = std::fs::read_to_string(&path).unwrap_or_default();
+    std::fs::write(&path, old + yaml).unwrap();
+}
+
 /// The direct argv with the two provider `-c` pairs after `-m <model>`,
 /// exactly as P0 ran them against Codex CLI 0.161.0.
 fn proxy_argv(effort: &str, workdir: &str, base: &str) -> Vec<String> {
@@ -607,10 +616,11 @@ fn sol_runs_direct_and_through_the_proxy() {
     assert!(!is_codex_model(config::GPT56_SOL_MODEL));
 }
 
-/// A session on the Ultrafast tier: the tier pairs follow `-m <model>`,
-/// after the proxy's provider pairs, on both routes and for both models.
+/// A model whose `ultrafast.<label>` switch is on: the tier pairs follow
+/// `-m <model>`, after the proxy's provider pairs, on both routes, and the
+/// session records the tier. The other model's switch does not count.
 #[test]
-fn ultrafast_tier_reaches_argv_direct_and_through_the_proxy() {
+fn ultrafast_switch_reaches_argv_direct_and_through_the_proxy() {
     let tier = [
         "-c",
         "service_tier=\"ultrafast\"",
@@ -621,7 +631,6 @@ fn ultrafast_tier_reaches_argv_direct_and_through_the_proxy() {
         let cfg = env.config();
         let work = env.work_str();
         let mut sess = env.session("codex", "review", model, &work);
-        sess.service_tier = ULTRAFAST_TIER.to_string();
         let mut seen = None;
         run_codex_model_with(
             &cfg,
@@ -636,20 +645,36 @@ fn ultrafast_tier_reaches_argv_direct_and_through_the_proxy() {
         .unwrap();
         (seen.unwrap(), sess)
     };
-    for model in [config::CODEX_MODEL, config::SOL_MODEL] {
+    for (model, on, other) in [
+        (config::CODEX_MODEL, "codex", "sol"),
+        (config::SOL_MODEL, "sol", "codex"),
+    ] {
         let env = Env::new();
-        let (seen, _) = run(&env, model);
+        add_config(&env, &format!("ultrafast:\n  {on}: true\n"));
+        let (seen, sess) = run(&env, model);
         let mut want = argv("xhigh", &env.work_str());
         want[4] = model.to_string();
         want.splice(5..5, strings(&tier));
         assert_eq!(seen.args, want, "{model}");
+        assert_eq!(sess.service_tier, ULTRAFAST_TIER);
 
         let env = proxy_env_at("http://127.0.0.1:8999");
-        let (seen, _) = run(&env, model);
+        add_config(&env, &format!("ultrafast:\n  {on}: true\n"));
+        let (seen, sess) = run(&env, model);
         let mut want = proxy_argv("xhigh", &env.work_str(), "http://127.0.0.1:8999");
         want[4] = model.to_string();
         want.splice(9..9, strings(&tier));
         assert_eq!(seen.args, want, "{model} proxy");
+        assert_eq!(sess.service_tier, ULTRAFAST_TIER);
+
+        // Only the other model's switch: no tier.
+        let env = Env::new();
+        add_config(&env, &format!("ultrafast:\n  {other}: true\n"));
+        let (seen, sess) = run(&env, model);
+        let mut want = argv("xhigh", &env.work_str());
+        want[4] = model.to_string();
+        assert_eq!(seen.args, want, "{model} with only {other} on");
+        assert_eq!(sess.service_tier, "");
     }
 }
 
@@ -721,16 +746,16 @@ fn ultrafast_omitted_reads_only_the_warnings_after_the_prompt_echo() {
 }
 
 /// The run reads its own log after the spawn and sets the session flag
-/// only when it asked for the tier and Codex warned.
+/// only when the switch is on and Codex warned.
 #[test]
 fn run_sets_service_tier_omitted_from_its_log() {
-    let run = |tier: &str, between: &str| {
+    let run = |on: bool, between: &str| {
         let env = Env::new();
+        add_config(&env, &format!("ultrafast:\n  sol: {on}\n"));
         let cfg = env.config();
         let work = env.work_str();
         let log = std::path::Path::new(&work).join("call.log");
         let mut sess = env.session("codex", "review", config::SOL_MODEL, &work);
-        sess.service_tier = tier.to_string();
         run_codex_model_with(
             &cfg,
             &mut sess,
@@ -748,9 +773,9 @@ fn run_sets_service_tier_omitted_from_its_log() {
         sess.service_tier_omitted
     };
     let warned = format!("{TIER_WARNING}\n");
-    assert!(run(ULTRAFAST_TIER, &warned));
-    assert!(!run(ULTRAFAST_TIER, ""));
-    assert!(!run("", &warned));
+    assert!(run(true, &warned));
+    assert!(!run(true, ""));
+    assert!(!run(false, &warned));
 }
 
 /// A session on the tier, `omitted` as Codex's warning sets it, on `route`.

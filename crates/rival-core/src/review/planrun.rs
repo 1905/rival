@@ -416,7 +416,21 @@ fn run_doc_review_with(
             .collect()
     });
 
-    assemble_plan_results(runs, skipped)
+    // After the language pass: either call of a session can set the flag.
+    // Failed reviewers keep their notice; when every reviewer failed there
+    // is no result, so the notices go to stderr.
+    let notices: Vec<String> = created
+        .sessions
+        .iter()
+        .filter_map(executor::ultrafast_notice)
+        .collect();
+    let result = assemble_plan_results(runs, skipped, notices.clone());
+    if result.is_err() {
+        for notice in &notices {
+            let _ = stderr.write_all(notice.as_bytes());
+        }
+    }
+    result
 }
 
 /// Cancels the run context when dropped, also on unwind.
@@ -597,6 +611,7 @@ fn repair_plan_language(
 fn assemble_plan_results(
     batch: Vec<PlanCLIRun>,
     mut skipped: Vec<SkippedCLI>,
+    notices: Vec<String>,
 ) -> anyhow::Result<PlanRunResult> {
     let mut results = Vec::new();
     for r in batch {
@@ -663,5 +678,9 @@ fn assemble_plan_results(
         );
     }
 
-    Ok(PlanRunResult { results, skipped })
+    Ok(PlanRunResult {
+        results,
+        skipped,
+        notices,
+    })
 }

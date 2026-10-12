@@ -108,7 +108,9 @@ partial results while you work — they belong in the final message.
 5. The final message — its final text, no tool calls after it:
    - a 2-4 line **stats summary first**: finding counts by severity (e.g.
      "1 HIGH, 3 MEDIUM, 0 LOW"), plus one line per HIGH/CRITICAL finding title,
-     and the session id/runtime if visible;
+     and the session id/runtime if visible. If the output has a
+     `rival: ⚠ ultrafast not applied` line (the `ultrafast.<model>` switch is
+     on, but Codex used the standard tier), add that line unchanged;
    - `Verified: N confirmed, N false positive, N unclear`;
    - a verdict table: `# | severity | title | verdict | evidence`;
    - what step 4 applied, with the build/test result, then the proposed

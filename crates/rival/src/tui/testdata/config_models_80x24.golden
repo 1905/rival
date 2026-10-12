@@ -12,8 +12,8 @@
 │    Opus 5.5 sends emcd2_/claude-opus-5-5                                     │|
 │    PLAN marks what rival command plan runs without -m                        │|
 │                                                                              │|
-│                                                                              │|
-│                                                                              │|
+│    Codex Ultrafast     ○ off   every call asks for the Ultrafast tier        │|
+│    Sol Ultrafast       ○ off   every call asks for the Ultrafast tier        │|
 │                                                                              │|
 │                                                                              │|
 │                                                                              │|
@@ -37,8 +37,8 @@ d..............................................................................d
 d..tttttttttttddddddTTTTTTTTTTTTTTTTTTTTTT.....................................d|
 d..dddddddddddddddddddddddddddddddddddddddddddddddddddd........................d|
 d..............................................................................d|
-d..............................................................................d|
-d..............................................................................d|
+d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd........d|
+d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd........d|
 d..............................................................................d|
 d..............................................................................d|
 d..............................................................................d|
