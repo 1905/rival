@@ -119,3 +119,47 @@ fn check_rows_show_the_ultrafast_tag() {
     );
     assert!(line("codex").contains("ok  [ultrafast]"), "{lines:?}");
 }
+
+/// A focused `/rival` picker shows its arrows, the model's display name and
+/// runtime, and its help; the key bar offers `←→ choose`.
+#[test]
+fn the_skill_picker_renders_its_model_and_help() {
+    let (_h, mut f) = form();
+    f.section = Section::Models;
+    f.focus = Section::Models
+        .fields()
+        .iter()
+        .position(|x| *x == Field::Skill(SkillHost::Codex))
+        .unwrap();
+    f.apply("right", &crate::tui::testkit::press("right"));
+    let v = ViewCtx {
+        styles: &STYLES,
+        spin: "⠋",
+    };
+    let mut out = Vec::new();
+    model_lines(&f, 120, &v, &mut out);
+    let lines: Vec<String> = out.iter().map(|b| b.line.to_string()).collect();
+    let row = lines
+        .iter()
+        .position(|l| l.contains("in Codex"))
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    assert_eq!(
+        lines[row].trim_end(),
+        "▸ in Codex            ‹ fable › ←→   Fable 5.1 · Claude Code"
+    );
+    assert!(out[row].focus);
+    assert!(
+        lines[row + 1].contains("the model /rival runs in Codex (default: claude)"),
+        "{lines:#?}"
+    );
+    assert!(
+        lines.iter().any(|l| l.trim_end() == "/RIVAL RUNS"),
+        "{lines:#?}"
+    );
+    assert!(lines.iter().all(|l| !l.contains("PLAN")), "{lines:#?}");
+    assert!(
+        footer_line(&f, 200, &STYLES)
+            .to_string()
+            .contains("←→ choose"),
+    );
+}

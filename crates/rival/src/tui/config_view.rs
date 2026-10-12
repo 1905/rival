@@ -14,7 +14,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Widget};
 
-use rival_core::config::{ProxyProvider, ULTRAFAST_MODELS};
+use rival_core::config::{ProxyProvider, SkillHost, ULTRAFAST_MODELS};
 
 use super::config_check::KeyStatus;
 use super::config_form::{
@@ -278,7 +278,7 @@ fn section_lines(form: &ConfigForm, w: usize, wide: bool, v: &ViewCtx) -> Vec<Bo
     if wide {
         let (title, about) = match form.section {
             Section::Proxy => ("PROXY", "Claude and Codex through CLIProxyAPI"),
-            Section::Models => ("MODELS", "efforts and the plan review defaults"),
+            Section::Models => ("MODELS", "efforts, the /rival models and Ultrafast"),
             Section::Review => ("REVIEW", "the security review and the skills"),
             Section::Check => ("CHECK", "one short live call to each model"),
         };
@@ -672,8 +672,8 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
     out.push(BodyLine::plain(fit_line(
         Line::from(Span::styled(
             format!(
-                "  {:<8}{:<13}{:<8}{:<13}{}",
-                "MODEL", "RUNTIME", "ROUTE", "EFFORT", "PLAN"
+                "  {:<8}{:<13}{:<8}{}",
+                "MODEL", "RUNTIME", "ROUTE", "EFFORT"
             ),
             s.column_title,
         )),
@@ -706,20 +706,6 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
         };
         spans.push(Span::styled(format!("{route:<8}"), route_style));
         spans.extend(effort_cell(form, m, focused, s));
-        spans.push(Span::styled(
-            if !m.plan {
-                " — "
-            } else if form.plan_default(m) {
-                "[■]"
-            } else {
-                "[ ]"
-            },
-            if form.plan_default(m) {
-                s.accent
-            } else {
-                s.dim
-            },
-        ));
         if !installed {
             spans.push(Span::styled("  not installed", s.dim));
         }
@@ -745,13 +731,8 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
         }
         out.push(BodyLine::plain(fit_line(Line::from(spans), w)));
     }
-    out.push(BodyLine::plain(fit_line(
-        Line::from(Span::styled(
-            "  PLAN marks what rival command plan runs without -m",
-            s.dim,
-        )),
-        w,
-    )));
+    out.push(BodyLine::plain(Line::default()));
+    skill_lines(form, w, s, out);
     out.push(BodyLine::plain(Line::default()));
     for (i, (label, _)) in ULTRAFAST_MODELS.iter().enumerate() {
         field(
@@ -766,6 +747,30 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
             w,
             s,
         );
+    }
+}
+
+/// The `/rival` pickers: the model the skill runs in each host.
+fn skill_lines(form: &ConfigForm, w: usize, s: &Styles, out: &mut Vec<BodyLine>) {
+    out.push(BodyLine::plain(Line::from(Span::styled(
+        "/RIVAL RUNS",
+        s.section,
+    ))));
+    for host in SkillHost::ALL {
+        let f = Field::Skill(host);
+        let Some(m) = form.skill_model(host) else {
+            continue;
+        };
+        let mut value = picker(m.name, form.field() == Some(f), s);
+        value.push(Span::styled(
+            format!("   {} · {}", m.display, m.runtime),
+            s.dim,
+        ));
+        let help = match host {
+            SkillHost::Claude => "the model /rival runs in Claude Code (default: sol)",
+            SkillHost::Codex => "the model /rival runs in Codex (default: claude)",
+        };
+        field(out, form, f, value, help, w, s);
     }
 }
 
@@ -1230,12 +1235,7 @@ fn footer_line(form: &ConfigForm, w: usize, s: &Styles) -> Line<'static> {
         add("↑↓", if field.is_some() { "field" } else { "scroll" }, 2);
         match field {
             Some(f) if f.is_toggle() => add("space", "toggle", 7),
-            Some(Field::Model(i)) => {
-                add("←→", "effort", 7);
-                if MODELS.get(i).is_some_and(|m| m.plan) {
-                    add("space", "plan", 7);
-                }
-            }
+            Some(Field::Model(_)) => add("←→", "effort", 7),
             Some(Field::ClaudePrefix | Field::CodexPrefix) => {
                 add("←→", "choose", 7);
                 add("e", "type", 3);
@@ -1303,8 +1303,8 @@ fn help_overlay(area: Rect, buf: &mut Buffer, s: &Styles) {
         ("1-4", "jump to a section"),
         ("↑↓ j k", "move between fields"),
         ("enter", "edit a field, or toggle"),
-        ("space", "toggle; plan default on a model"),
-        ("←→ h l", "choose: prefix, effort, reviewer"),
+        ("space", "toggle"),
+        ("←→ h l", "choose: prefix, effort, model, reviewer"),
         ("e", "type a prefix the proxy does not list"),
         ("d", "import ANTHROPIC_BASE_URL into URL"),
         ("c", "check the default models on the draft"),

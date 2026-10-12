@@ -11,8 +11,8 @@
 │                    │  REQUESTS GO TO      │ 1-4       jump to a section                      │                                           │|
 │                    │    codex  Codex      │ ↑↓ j k    move between fields                    │                                           │|
 │                    │    sol    Sol 6.1    │ enter     edit a field, or toggle                │                                           │|
-│                    │    claude Opus 5.5   │ space     toggle; plan default on a model        │                                           │|
-│                    │    fable  Fable 5.1  │ ←→ h l    choose: prefix, effort, reviewer       │                                           │|
+│                    │    claude Opus 5.5   │ space     toggle                                 │                                           │|
+│                    │    fable  Fable 5.1  │ ←→ h l    choose: prefix, effort, model, reviewer│                                           │|
 │                    │                      │ e         type a prefix the proxy does not list  │                                           │|
 │                    │                      │ d         import ANTHROPIC_BASE_URL into URL     │                                           │|
 │                    │                      │ c         check the default models on the draft  │                                           │|
@@ -52,8 +52,8 @@ d....................d......................aaaaaaaaaaaattttttttttttttttttttttt.
 d....................d..DDDDDDDDDDDDDD......aaaaaaaaaaaattttttttttttttttt......................a...........................................d|
 d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttt....................a...........................................d|
 d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttt................a...........................................d|
-d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttttttttttt........a...........................................d|
-d....................d....tttttttdddddddddddaaaaaaaaaaaatttttttttttttttttttttttttttttttt.......a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaatttttt.................................a...........................................d|
+d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttttttttttttttttttta...........................................d|
 d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
 d....................d......................aaaaaaaaaaaatttttttttttttttttttttttttttttttttt.....a...........................................d|
 d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|

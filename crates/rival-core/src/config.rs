@@ -807,7 +807,7 @@ impl UltrafastConfig {
 
 /// The app a `/rival` skill runs in. Each host has its own `skill.<host>`
 /// model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SkillHost {
     Claude,
     Codex,
@@ -891,7 +891,8 @@ impl SkillConfig {
         }
     }
 
-    fn get_mut(&mut self, host: SkillHost) -> &mut String {
+    /// The value of `host`, to change it.
+    pub fn get_mut(&mut self, host: SkillHost) -> &mut String {
         match host {
             SkillHost::Claude => &mut self.claude,
             SkillHost::Codex => &mut self.codex,
