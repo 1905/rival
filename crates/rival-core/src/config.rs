@@ -760,6 +760,11 @@ pub struct PlanConfig {
     pub models: Vec<String>,
 }
 
+/// The Codex-runtime models that have an `ultrafast.<label>` switch, as
+/// `(label, model id)`.
+pub const ULTRAFAST_MODELS: [(&str, &str); 2] =
+    [(CODEX_LABEL, CODEX_MODEL), (SOL_LABEL, SOL_MODEL)];
+
 /// The `ultrafast:` block: per Codex-runtime model, whether its calls ask
 /// Codex for the Ultrafast service tier. Off when unset.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -768,6 +773,26 @@ pub struct UltrafastConfig {
     pub codex: bool,
     /// `ultrafast.sol`: Sol 6.1.
     pub sol: bool,
+}
+
+impl UltrafastConfig {
+    /// The switch of a label from [`ULTRAFAST_MODELS`]; false for any other.
+    pub fn get(&self, label: &str) -> bool {
+        match label {
+            CODEX_LABEL => self.codex,
+            SOL_LABEL => self.sol,
+            _ => false,
+        }
+    }
+
+    /// The switch of a label from [`ULTRAFAST_MODELS`], to flip it.
+    pub fn get_mut(&mut self, label: &str) -> Option<&mut bool> {
+        match label {
+            CODEX_LABEL => Some(&mut self.codex),
+            SOL_LABEL => Some(&mut self.sol),
+            _ => None,
+        }
+    }
 }
 
 /// The names `plan.models` accepts.
@@ -1408,14 +1433,13 @@ impl Config {
     /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1, never
     /// for any other model.
     pub fn ultrafast(&self, model: &str) -> bool {
-        let Some(u) = self.user.as_ref().map(|u| &u.ultrafast) else {
+        let Some(user) = self.user.as_ref() else {
             return false;
         };
-        match model {
-            CODEX_MODEL => u.codex,
-            SOL_MODEL => u.sol,
-            _ => false,
-        }
+        ULTRAFAST_MODELS
+            .iter()
+            .find(|(_, id)| *id == model)
+            .is_some_and(|(label, _)| user.ultrafast.get(label))
     }
 
     /// The configured `plan.models`; empty when unset.

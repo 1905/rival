@@ -141,8 +141,7 @@ pub fn run_command_plan(
         .write_all(out.as_bytes())
         .map_err(|e| write_stdout_error(&e))?;
     for notice in &result.notices {
-        let _ = write!(env.stdout, "\n{notice}");
-        let _ = env.stderr.write_all(notice.as_bytes());
+        crate::model_command::print_notice(env, notice);
     }
     Ok(())
 }

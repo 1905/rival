@@ -19,15 +19,10 @@ const PROXY_PROVIDER: &str = "rival_proxy";
 
 /// The Codex service tier a model gets when its `ultrafast.<label>` switch
 /// is on. The session records it in `service_tier`.
-pub const ULTRAFAST_TIER: &str = "ultrafast";
+pub(crate) const ULTRAFAST_TIER: &str = "ultrafast";
 
-/// Who can use Ultrafast: the usage texts, the skills and the notice.
-#[macro_export]
-macro_rules! ultrafast_requirement {
-    () => {
-        "Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on."
-    };
-}
+/// Who can use Ultrafast; the notice names it on the direct route.
+const ULTRAFAST_REQUIREMENT: &str = "Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
 
 /// Codex prints this line, then sends the request without the tier, when
 /// the model catalog it loaded does not list the configured tier
@@ -104,7 +99,7 @@ pub fn ultrafast_notice(sess: &Session) -> Option<String> {
         "rival: ⚠ {ULTRAFAST_TIER} not applied — Codex omitted service_tier={ULTRAFAST_TIER} for {label} because its model catalog does not list the tier; the run used the standard tier.\n"
     );
     if sess.route != ROUTE_PROXY {
-        notice.push_str(concat!("rival: ", ultrafast_requirement!(), "\n"));
+        notice.push_str(&format!("rival: {ULTRAFAST_REQUIREMENT}\n"));
     }
     Some(notice)
 }
@@ -201,7 +196,9 @@ pub(crate) fn run_codex_model_with(
         let result = spawn(sess, &req)?;
         // The language pass is a second call on the same session; either
         // call can find the warning, and neither clears it.
-        if ultrafast {
+        // Once a call of the session found the warning, later calls (the
+        // language pass) need not read their log for it.
+        if ultrafast && !sess.service_tier_omitted {
             let path = log.unwrap_or(&sess.log_file);
             if let Ok(head) = log_head(path, &full_prompt)
                 && ultrafast_omitted(&head, &full_prompt)

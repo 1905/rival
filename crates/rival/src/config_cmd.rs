@@ -177,11 +177,13 @@ fn rows(cfg: &Config) -> Result<Vec<Row>, CmdError> {
         json!(user.auto_fix_critical_high),
         from_file("auto_fix_critical_high"),
     ));
-    for (key, on) in [
-        ("ultrafast.codex", user.ultrafast.codex),
-        ("ultrafast.sol", user.ultrafast.sol),
-    ] {
-        rows.push(Row::new(key, json!(on), from_file(key)));
+    for (label, _) in config::ULTRAFAST_MODELS {
+        let key = format!("ultrafast.{label}");
+        rows.push(Row::new(
+            &key,
+            json!(user.ultrafast.get(label)),
+            from_file(&key),
+        ));
     }
     rows.push(Row::new(
         "claude.subscription",

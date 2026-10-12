@@ -14,7 +14,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Widget};
 
-use rival_core::config::ProxyProvider;
+use rival_core::config::{ProxyProvider, ULTRAFAST_MODELS};
 
 use super::config_check::KeyStatus;
 use super::config_form::{
@@ -753,16 +753,13 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
         w,
     )));
     out.push(BodyLine::plain(Line::default()));
-    for (f, on) in [
-        (Field::CodexUltrafast, form.draft.ultrafast.codex),
-        (Field::SolUltrafast, form.draft.ultrafast.sol),
-    ] {
+    for (i, (label, _)) in ULTRAFAST_MODELS.iter().enumerate() {
         field(
             out,
             form,
-            f,
+            Field::Ultrafast(i),
             vec![
-                toggle(on, s),
+                toggle(form.draft.ultrafast.get(label), s),
                 Span::styled("   every call asks for the Ultrafast tier", s.dim),
             ],
             "needs Pro $500 or Enterprise/Edu; else Codex uses the standard tier",
@@ -1163,20 +1160,27 @@ fn message(
     match row {
         None if cancelling => (None, "cancelling".to_string(), s.dim),
         None => (None, "checking".to_string(), s.dim),
-        Some(r) if r.ok && r.unexpected => (
-            None,
-            format!("{}  (not ok){}", r.reply, r.tier_tag()),
-            s.warn,
-        ),
-        // A pass that Codex ran at the standard tier is shown in yellow.
-        Some(r) if r.ok && r.tier_omitted => (None, format!("{}{}", r.reply, r.tier_tag()), s.warn),
-        Some(r) if r.ok => (None, format!("{}{}", r.reply, r.tier_tag()), s.text),
-        Some(r) if r.limit => (
-            Some(Span::styled("limit", s.failed.add_modifier(Modifier::BOLD))),
-            format!("{}{}", r.error, r.tier_tag()),
-            s.failed,
-        ),
-        Some(r) => (None, format!("{}{}", r.error, r.tier_tag()), s.failed),
+        Some(r) => {
+            let (label, text, style) = if r.ok && r.unexpected {
+                (None, format!("{}  (not ok)", r.reply), s.warn)
+            } else if r.ok {
+                // A pass that Codex ran at the standard tier is yellow.
+                (
+                    None,
+                    r.reply.clone(),
+                    if r.tier_omitted { s.warn } else { s.text },
+                )
+            } else if r.limit {
+                (
+                    Some(Span::styled("limit", s.failed.add_modifier(Modifier::BOLD))),
+                    r.error.clone(),
+                    s.failed,
+                )
+            } else {
+                (None, r.error.clone(), s.failed)
+            };
+            (label, text + r.tier_tag(), style)
+        }
     }
 }
 

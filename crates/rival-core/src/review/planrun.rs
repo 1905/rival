@@ -424,15 +424,13 @@ fn run_doc_review_with(
         .iter()
         .filter_map(executor::ultrafast_notice)
         .collect();
-    match assemble_plan_results(runs, skipped) {
-        Ok(result) => Ok(PlanRunResult { notices, ..result }),
-        Err(err) => {
-            for notice in &notices {
-                let _ = stderr.write_all(notice.as_bytes());
-            }
-            Err(err)
+    let result = assemble_plan_results(runs, skipped, notices.clone());
+    if result.is_err() {
+        for notice in &notices {
+            let _ = stderr.write_all(notice.as_bytes());
         }
     }
+    result
 }
 
 /// Cancels the run context when dropped, also on unwind.
@@ -613,6 +611,7 @@ fn repair_plan_language(
 fn assemble_plan_results(
     batch: Vec<PlanCLIRun>,
     mut skipped: Vec<SkippedCLI>,
+    notices: Vec<String>,
 ) -> anyhow::Result<PlanRunResult> {
     let mut results = Vec::new();
     for r in batch {
@@ -682,6 +681,6 @@ fn assemble_plan_results(
     Ok(PlanRunResult {
         results,
         skipped,
-        notices: Vec::new(),
+        notices,
     })
 }

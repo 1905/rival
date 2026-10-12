@@ -38,6 +38,9 @@ fn served() -> Vec<String> {
     .collect()
 }
 
+/// What `executor::ultrafast_notice` gives for a direct Sol session.
+const TIER_NOTICE: &str = "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n";
+
 /// What a fake live call does.
 #[derive(Clone)]
 enum Reply {
@@ -148,14 +151,14 @@ impl Runner for Fake {
                 fs::write(log, text).unwrap();
                 Ok(CallOutcome {
                     exit_code: code,
-                    tier_omitted: false,
+                    tier_notice: None,
                 })
             }
             Reply::Omitted(code, text) => {
                 fs::write(log, text).unwrap();
                 Ok(CallOutcome {
                     exit_code: code,
-                    tier_omitted: true,
+                    tier_notice: Some(TIER_NOTICE.to_string()),
                 })
             }
             Reply::Err(e) => Err(e.to_string()),
@@ -167,7 +170,7 @@ impl Runner for Fake {
                 ctx.wait_timeout(Duration::from_secs(30));
                 Ok(CallOutcome {
                     exit_code: 0,
-                    tier_omitted: true,
+                    tier_notice: Some(TIER_NOTICE.to_string()),
                 })
             }
         };
@@ -931,9 +934,10 @@ fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
     );
     assert!(!line("claude").contains("ultrafast"), "{text}");
     assert!(
-        text.contains("      Codex used the standard tier: its model catalog does not list Ultrafast.\n      Ultrafast needs a Codex account on Pro $500"),
+        text.contains("      ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n      Ultrafast needs a Codex account on Pro $500"),
         "{text}"
     );
+    assert_eq!(sol.tier_notice, TIER_NOTICE);
 }
 
 /// A call that times out after Codex already ran it at the standard tier

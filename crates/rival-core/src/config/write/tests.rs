@@ -403,8 +403,12 @@ fn concurrent_applies_keep_every_edit() {
 /// nested block, which loads back.
 #[test]
 fn ultrafast_switches_are_settable_bools() {
+    assert!(SETTABLE_KEYS.contains(&"ultrafast.<model>"));
+    let err = parse_setting("ultrafast.k3", "true")
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("unknown config key"), "{err}");
     for key in ["ultrafast.codex", "ultrafast.sol"] {
-        assert!(SETTABLE_KEYS.contains(&key));
         assert_eq!(
             parse_setting(key, "TRUE").unwrap(),
             Edit::set(key, Value::Bool(true))

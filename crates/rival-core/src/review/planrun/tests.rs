@@ -324,7 +324,7 @@ fn assemble_plan_results_all_failed() {
             ..PlanCLIRun::default()
         },
     ];
-    let err = assemble_plan_results(batch, vec![]).unwrap_err();
+    let err = assemble_plan_results(batch, vec![], Vec::new()).unwrap_err();
     assert_eq!(
         err.to_string(),
         "all plan reviewers failed or hit quota limits (see skipped reasons): codex: exited with code 1; claude: boom"
@@ -336,7 +336,7 @@ fn assemble_plan_results_one_skipped_one_ok() {
     let batch = vec![run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON)];
     // claude was unavailable at preflight → pre-run skipped list.
     let pre = vec![skipped("claude", "", "claude not found")];
-    let res = assemble_plan_results(batch, pre.clone()).unwrap();
+    let res = assemble_plan_results(batch, pre.clone(), Vec::new()).unwrap();
     assert_eq!(
         res,
         PlanRunResult {
@@ -365,7 +365,7 @@ fn assemble_plan_results_nonzero_exit_skips() {
             ..run_ok("claude", CLAUDE_MODEL, "partial")
         },
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "codex");
     assert_eq!(
@@ -380,7 +380,7 @@ fn assemble_plan_results_quota_skips() {
         run_ok("codex", GPT56_SOL_MODEL, "error: insufficient_quota"),
         run_ok("claude", CLAUDE_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "claude");
     assert_eq!(
@@ -393,7 +393,7 @@ fn assemble_plan_results_quota_skips() {
 fn assemble_plan_results_parse_fail_keeps_raw() {
     // Exit 0, no quota, but no parseable plan payload → keep raw, no parse.
     let batch = vec![run_ok("codex", GPT56_SOL_MODEL, "just some prose, no json")];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(
         res,
         PlanRunResult {
@@ -417,7 +417,7 @@ fn assemble_plan_results_empty_output_skips() {
         run_ok("claude", CLAUDE_MODEL, "   \n  "),
         run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.results.len(), 1);
     assert_eq!(res.results[0].cli, "codex");
     assert_eq!(
@@ -565,7 +565,7 @@ fn assemble_plan_results_err_uses_reason() {
         },
         run_ok("codex", GPT56_SOL_MODEL, REAL_PLAN_JSON),
     ];
-    let res = assemble_plan_results(batch, vec![]).unwrap();
+    let res = assemble_plan_results(batch, vec![], Vec::new()).unwrap();
     assert_eq!(res.skipped, vec![skipped("claude", CLAUDE_MODEL, &reason)]);
 }
 
@@ -858,7 +858,8 @@ fn codex_tool_plan_transcript(final_answer: &str) -> String {
 #[test]
 fn assemble_plan_results_parses_final_answer_not_tool_output() {
     let raw = codex_tool_plan_transcript("The plan looks broadly fine, a few nits.");
-    let res = assemble_plan_results(vec![run_ok("codex", CODEX_MODEL, &raw)], vec![]).unwrap();
+    let res = assemble_plan_results(vec![run_ok("codex", CODEX_MODEL, &raw)], vec![], Vec::new())
+        .unwrap();
     assert_eq!(
         res,
         PlanRunResult {

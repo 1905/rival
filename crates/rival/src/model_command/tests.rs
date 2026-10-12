@@ -674,7 +674,7 @@ fn command_prints_the_ultrafast_notice_after_the_output() {
     let mut spec = fake_spec(&f);
     let inner = spec.run;
     spec.run = Box::new(move |c| {
-        c.sess.service_tier = rival_core::executor::ULTRAFAST_TIER.to_string();
+        c.sess.service_tier = "ultrafast".to_string();
         c.sess.service_tier_omitted = true;
         inner(c)
     });

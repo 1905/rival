@@ -577,13 +577,13 @@ fn help_opens_with_question_mark_and_any_key_closes_it() {
 #[test]
 fn the_ultrafast_toggles_write_their_own_keys() {
     let (_h, mut f) = form(None);
-    focus(&mut f, Field::CodexUltrafast);
+    focus(&mut f, Field::Ultrafast(0));
     assert_eq!(f.section, Section::Models);
     keys(&mut f, &["space"]);
     assert!(f.draft.ultrafast.codex && !f.draft.ultrafast.sol);
     assert_eq!(f.patch(), json!({"ultrafast.codex": true}));
     keys(&mut f, &["down", "space"]);
-    assert_eq!(f.field(), Some(Field::SolUltrafast));
+    assert_eq!(f.field(), Some(Field::Ultrafast(1)));
     assert_eq!(
         f.patch(),
         json!({"ultrafast.codex": true, "ultrafast.sol": true})
@@ -591,13 +591,13 @@ fn the_ultrafast_toggles_write_their_own_keys() {
     keys(&mut f, &["down"]);
     assert_eq!(
         f.field(),
-        Some(Field::SolUltrafast),
+        Some(Field::Ultrafast(1)),
         "the focus stops at the end"
     );
     // A switch already on in the file: turning it off writes false.
     let (_h, mut f) = form(Some("ultrafast:\n  sol: true\n"));
     assert!(f.draft.ultrafast.sol);
-    focus(&mut f, Field::SolUltrafast);
+    focus(&mut f, Field::Ultrafast(1));
     keys(&mut f, &["space"]);
     assert_eq!(f.patch(), json!({"ultrafast.sol": false}));
 }

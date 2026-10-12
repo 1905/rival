@@ -203,6 +203,8 @@ pub struct CheckRow {
     pub ultrafast: bool,
     /// Codex ran the call at the standard tier although `ultrafast` is on.
     pub tier_omitted: bool,
+    /// [`executor::ultrafast_notice`] of that call; "" otherwise.
+    pub tier_notice: String,
 }
 
 impl CheckRow {
@@ -351,15 +353,11 @@ impl Report {
             if !row.ok && !row.hint.is_empty() {
                 out.push_str(&format!("      {}\n", row.hint));
             }
-            if row.tier_omitted {
-                out.push_str("      Codex used the standard tier: its model catalog does not list Ultrafast.\n");
-                if row.route == "direct" {
-                    out.push_str(concat!(
-                        "      ",
-                        rival_core::ultrafast_requirement!(),
-                        "\n"
-                    ));
-                }
+            for line in row.tier_notice.lines() {
+                out.push_str(&format!(
+                    "      {}\n",
+                    line.strip_prefix("rival: ").unwrap_or(line)
+                ));
             }
         }
         out.push_str(&format!("\n{} of {} ok\n", self.passed(), self.rows.len()));
@@ -411,13 +409,12 @@ pub trait Runner: Sync {
 }
 
 /// What a live call that ran reports back.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CallOutcome {
     pub exit_code: i64,
-    /// Codex ran the call at the standard tier although the model's
-    /// `ultrafast.<label>` switch is on (the session's
-    /// `service_tier_omitted`).
-    pub tier_omitted: bool,
+    /// [`executor::ultrafast_notice`] when Codex ran the call at the
+    /// standard tier although the model's `ultrafast.<label>` switch is on.
+    pub tier_notice: Option<String>,
 }
 
 /// Checks `targets` with the real adapters. `on_row` gets each row as it
@@ -694,8 +691,13 @@ impl Engine<'_> {
         cancel.cancel();
         // Before any early return: a timed-out call that Codex already ran
         // at the standard tier keeps that fact.
-        if let Ok(outcome) = &result {
-            row.tier_omitted = outcome.tier_omitted;
+        if let Ok(CallOutcome {
+            tier_notice: Some(notice),
+            ..
+        }) = &result
+        {
+            row.tier_omitted = true;
+            row.tier_notice = scrubbed(notice);
         }
         let output = fs::read(&log)
             .map(|d| String::from_utf8_lossy(&d).into_owned())
@@ -945,7 +947,7 @@ impl Runner for SpecRunner {
         })
         .map(|r| CallOutcome {
             exit_code: r.exit_code,
-            tier_omitted: sess.service_tier_omitted,
+            tier_notice: executor::ultrafast_notice(&sess),
         })
         .map_err(|e| format!("{e:#}"))
     }

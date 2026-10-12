@@ -17,7 +17,8 @@ use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, ProxyProvider,
-    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, UserConfig, VALID_EFFORTS,
+    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, ULTRAFAST_MODELS, UserConfig,
+    VALID_EFFORTS,
 };
 use rival_core::proxy;
 
@@ -82,7 +83,7 @@ impl Section {
             ],
             Section::Models => (0..MODELS.len())
                 .map(Field::Model)
-                .chain([Field::CodexUltrafast, Field::SolUltrafast])
+                .chain((0..ULTRAFAST_MODELS.len()).map(Field::Ultrafast))
                 .collect(),
             Section::Review => vec![Field::Reviewer, Field::AutoFix],
             Section::Check => Vec::new(),
@@ -103,10 +104,8 @@ pub enum Field {
     Model(usize),
     Reviewer,
     AutoFix,
-    /// `ultrafast.codex`.
-    CodexUltrafast,
-    /// `ultrafast.sol`.
-    SolUltrafast,
+    /// A row of [`ULTRAFAST_MODELS`]: its `ultrafast.<label>` switch.
+    Ultrafast(usize),
 }
 
 impl Field {
@@ -121,19 +120,18 @@ impl Field {
             Field::Model(i) => MODELS.get(i).map_or("", |m| m.name),
             Field::Reviewer => "Security reviewer",
             Field::AutoFix => "Auto-fix crit/high",
-            Field::CodexUltrafast => "Codex Ultrafast",
-            Field::SolUltrafast => "Sol Ultrafast",
+            Field::Ultrafast(i) => match ULTRAFAST_MODELS.get(i).map(|(label, _)| *label) {
+                Some(CODEX_LABEL) => "Codex Ultrafast",
+                Some(SOL_LABEL) => "Sol Ultrafast",
+                _ => "",
+            },
         }
     }
 
     pub fn is_toggle(self) -> bool {
         matches!(
             self,
-            Field::ClaudeRoute
-                | Field::CodexRoute
-                | Field::AutoFix
-                | Field::CodexUltrafast
-                | Field::SolUltrafast
+            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix | Field::Ultrafast(_)
         )
     }
 
@@ -662,8 +660,14 @@ impl ConfigForm {
                 self.draft.proxy.claude.enabled = !self.draft.proxy.claude.enabled;
             }
             Field::CodexRoute => self.draft.proxy.codex.enabled = !self.draft.proxy.codex.enabled,
-            Field::CodexUltrafast => self.draft.ultrafast.codex = !self.draft.ultrafast.codex,
-            Field::SolUltrafast => self.draft.ultrafast.sol = !self.draft.ultrafast.sol,
+            Field::Ultrafast(i) => {
+                if let Some(on) = ULTRAFAST_MODELS
+                    .get(i)
+                    .and_then(|(label, _)| self.draft.ultrafast.get_mut(label))
+                {
+                    *on = !*on;
+                }
+            }
             Field::AutoFix => {
                 self.draft.auto_fix_critical_high = !self.draft.auto_fix_critical_high;
             }
@@ -1205,12 +1209,9 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
             json!(d.auto_fix_critical_high),
         );
     }
-    for (key, saved, draft) in [
-        ("ultrafast.codex", s.ultrafast.codex, d.ultrafast.codex),
-        ("ultrafast.sol", s.ultrafast.sol, d.ultrafast.sol),
-    ] {
-        if saved != draft {
-            p.insert(key.into(), json!(draft));
+    for (label, _) in ULTRAFAST_MODELS {
+        if s.ultrafast.get(label) != d.ultrafast.get(label) {
+            p.insert(format!("ultrafast.{label}"), json!(d.ultrafast.get(label)));
         }
     }
     p

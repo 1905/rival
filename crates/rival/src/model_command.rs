@@ -190,8 +190,7 @@ pub fn run_model_command(
         return Err(crate::command_plan::write_stdout_error(&e));
     }
     if let Some(notice) = executor::ultrafast_notice(&sess) {
-        let _ = write!(env.stdout, "\n{notice}");
-        let _ = env.stderr.write_all(notice.as_bytes());
+        print_notice(env, &notice);
         logging::warn()
             .str("session", sess.id.as_str())
             .msg("codex omitted the ultrafast service tier");
@@ -207,6 +206,13 @@ pub fn run_model_command(
         return Err(CmdError::exit(exit_code as i32, exit_msg));
     }
     Ok(())
+}
+
+/// A notice after a command's output: on stdout, where the calling skill
+/// reads it, after a blank line, and on stderr.
+pub(crate) fn print_notice(env: &mut CmdEnv<'_>, notice: &str) {
+    let _ = write!(env.stdout, "\n{notice}");
+    let _ = env.stderr.write_all(notice.as_bytes());
 }
 
 /// A review's prompt, recorded scope, and where it runs.
