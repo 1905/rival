@@ -10,7 +10,7 @@ darwin/linux archive. --run executes the archive built for this host as
 `rival version` with a private HOME/USERPROFILE/RIVAL_HOME and update checks
 off. With --only, a host that does not match the archive fails.
 
-Usage (release.yml):
+Usage (scripts/release-local.sh snapshot):
   check_release_archives.py dist --formula --run      # build host, all six
   check_release_archives.py dist --only linux_arm64 --run
 """

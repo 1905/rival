@@ -1,6 +1,6 @@
 # Developer shortcuts. Rival.app targets (logic in app/scripts/*.py), then
 # the cli-* targets for the Rust CLI.
-.PHONY: run install test soak cli-build cli-install cli-test cli-release-check try-proxy try-proxy-tui try-proxy-check try-proxy-stop
+.PHONY: run install test soak cli-build cli-install cli-test cli-check cli-release-check cli-snapshot cli-publish try-proxy try-proxy-tui try-proxy-check try-proxy-stop
 
 # Debug build, wrapped as "Rival (dev)", opened against your real ~/.rival.
 run:
@@ -36,15 +36,32 @@ cli-install:
 
 # Workspace tests plus the release-script and release-config tests. The
 # config tests need PyYAML: install scripts/requirements-test.txt into the
-# python3 on PATH (a venv), as CI does.
+# python3 on PATH (a venv).
 cli-test:
 	cargo test --workspace --locked
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
+# The full pre-merge gate (rival has no hosted CI): fmt, strict clippy,
+# workspace tests, startup fds, release-script tests, fixtures, the name
+# check and the e2e scenarios. Logic in scripts/check.sh.
+cli-check:
+	scripts/check.sh
+
+# Release builds run on a macOS host (the darwin targets need the Apple
+# SDK). Logic in scripts/release-local.sh; run its `setup` once per host.
 # Validates .goreleaser.yaml, allowing only the intentional brews deprecation.
 # Builds nothing; invalid config and any other deprecation still fail.
 cli-release-check:
-	python3 scripts/check_goreleaser.py
+	scripts/release-local.sh check
+
+# Six archives and the formula in dist/, checked. Publishes nothing.
+cli-snapshot:
+	scripts/release-local.sh snapshot
+
+# Publishes the release and the brew formula from a clean checkout of a
+# v* tag. Needs GITHUB_TOKEN (a 1905 token).
+cli-publish:
+	scripts/release-local.sh release
 
 # Mac: try the branch CLI, TUI and Rival (dev) against the Dell's
 # CLIProxyAPI through an ssh tunnel. A throwaway RIVAL_HOME

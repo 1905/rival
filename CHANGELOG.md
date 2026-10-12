@@ -6,6 +6,9 @@ Latest binary release: [v5.1.0](https://github.com/1905/rival/releases/tag/v5.1.
 
 ## [Unreleased]
 
+### Removed
+- Hosted CI. GitHub Actions is turned off for the repository, and `.github/` (the `CI` and `Release` workflows and the `cli-release-tools` action) is gone. `scripts/check.sh` (`make cli-check`) is the local pre-merge gate. `scripts/release-local.sh` (`make cli-release-check`, `cli-snapshot`, `cli-publish`) builds and publishes a release from a macOS host with the same pinned tools and GoReleaser command. Rival.app is no longer published by a release; `docs/releasing.md` lists the manual steps.
+
 ## [v5.1.0] — 2026-10-12
 
 This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. GitHub Actions is blocked by an account billing issue, so the maintainer published this version with the same GoReleaser configuration from a local macOS host. On the Dell, the Rust workspace tests, strict Clippy, CLI scenarios and release-script checks pass. Hosted macOS/Windows checks did not run.

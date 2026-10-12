@@ -1,54 +1,45 @@
 # Releasing Rival
 
-Rival's GitHub Actions release workflow (`.github/workflows/release.yml`) is
-the only publisher. A pushed `v*` tag runs two jobs:
+Rival has no hosted CI. GitHub Actions is turned off for `1905/rival`, and the
+repository has no workflow files. Checks and releases run locally:
 
-- `release` (runs on `macos-15`): GoReleaser (`.goreleaser.yaml` at the
-  repository root) builds the Rust CLI for six targets, creates the GitHub
-  release, uploads `rival_{darwin,linux}_{amd64,arm64}.tar.gz`,
-  `rival_windows_{amd64,arm64}.zip` and `checksums.txt`, and updates `rival.rb`
-  in `1905/homebrew-tap`. cargo-zigbuild builds darwin and linux; cargo-xwin
-  builds Windows. The pinned tools are in
-  `.github/actions/cli-release-tools/action.yml`.
-- `app` (needs `release`, runs on `macos-15`): runs `swift test` in `app/`,
-  builds a universal, ad-hoc signed `Rival.app` with
-  `app/scripts/bundle.py --version <tag without v>`, uploads
-  `app/dist/Rival-app.zip` to the same release, and renders
-  `Casks/rival-app.rb` into `1905/homebrew-tap` with
-  `app/scripts/render_cask.py`. Homebrew loads casks only from `Casks/`.
-  It skips the tap commit when the cask did not change.
+- `scripts/check.sh` (`make cli-check`) is the pre-merge gate. It runs on
+  Linux or macOS.
+- `scripts/release-local.sh` (`make cli-release-check`, `make cli-snapshot`,
+  `make cli-publish`) builds and publishes a release. It runs on an arm64
+  macOS host, because the darwin targets need the Apple SDK. The maintainer
+  uses the MacBook Air (`ssh air`).
 
-Do not run `goreleaser release` locally for the same tag. A second publisher
-collides with the CI-created assets and can leave an otherwise valid release
-workflow marked failed.
+A release publishes, from one GoReleaser run (`.goreleaser.yaml` at the
+repository root):
 
-## Unpublished snapshot
+- the GitHub release with `rival_{darwin,linux}_{amd64,arm64}.tar.gz`,
+  `rival_windows_{amd64,arm64}.zip` and `checksums.txt`;
+- `rival.rb` at the root of `1905/homebrew-tap` (commit message
+  `Brew formula update for rival version v<version>`).
 
-A manual run of the same workflow publishes nothing. It has no inputs, only
-read permission and no tap token:
+cargo-zigbuild builds darwin and linux; cargo-xwin builds Windows. The pinned
+tool versions are at the top of `scripts/release-local.sh`.
+
+## One-time host setup
+
+On the macOS host, from a checkout of the repository:
 
 ```bash
-gh workflow run release.yml --ref <branch>
+scripts/release-local.sh setup
 ```
 
-- `snapshot`: `goreleaser release --snapshot --clean --parallelism 1` builds
-  the six archives and renders `dist/homebrew/rival.rb`.
-  `scripts/check_release_archives.py` checks checksums, binary format and CPU,
-  bundled files and the formula, and runs the binary built for the build
-  host's OS and CPU. The archives, `checksums.txt`, `metadata.json`,
-  `artifacts.json` and `homebrew/rival.rb` are uploaded as the run artifact
-  `rival-snapshot`.
-- `snapshot-native`: one job per archive on a runner of that OS and CPU runs
-  the packaged `rival version` with a private home.
-
-The `release` and `app` jobs run only for a pushed `v*` tag.
+It installs Zig, GoReleaser, cargo-zigbuild and cargo-xwin under
+`~/tmp-rival-release/tools` (override with `RIVAL_RELEASE_TOOLS`), the pinned
+Rust toolchain with the six targets, and Homebrew `llvm` and `lld`. The
+Command Line Tools SDK is enough; Xcode is not needed.
 
 ## Release checklist
 
 Set the version without the `v` prefix:
 
 ```bash
-VERSION=3.23.0
+VERSION=5.2.0
 ```
 
 1. Update all embedded skill versions:
@@ -57,140 +48,108 @@ VERSION=3.23.0
    ./scripts/bump-skill-versions.sh "$VERSION"
    ```
 
-2. Run the release gate before creating a tag:
+2. Run the pre-merge gate on the release commit:
 
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   python3 -m pip install -r scripts/requirements-test.txt
-   make cli-test
+   make cli-check
+   ```
+
+   It must end with `CHECK OK`. It runs fmt, strict Clippy, the workspace
+   tests, the startup fd check, the release-script tests (PyYAML in `.venv`),
+   the fixture check, the name check and the e2e scenarios.
+
+3. Run the unpublished snapshot on the macOS host, from a checkout of the
+   release commit:
+
+   ```bash
    make cli-release-check
+   make cli-snapshot
    ```
 
-   `make cli-test` runs the Rust workspace tests and the release-script tests.
-   `make cli-release-check` validates `.goreleaser.yaml`, accepting only the
-   documented `brews` deprecation so the tap keeps its formula. Invalid
-   configuration and any other deprecation still fail. The release workflow
-   itself builds artifacts but does not duplicate this test gate.
+   `cli-snapshot` builds the six archives and `dist/homebrew/rival.rb`, then
+   `scripts/check_release_archives.py` checks checksums, binary format and
+   CPU, bundled files and the formula, and runs the binary built for the
+   host. It publishes nothing.
 
-   The candidate commit must also pass the full `CI` workflow on macOS,
-   Linux and Windows. This includes strict Clippy, CLI scenarios, an explicit
-   Rival.app build and the complete Swift test suite. Do not tag a commit whose required checks are pending.
-
-   Run the [unpublished snapshot](#unpublished-snapshot) on the release branch
-   before the first Rust release, and whenever `.goreleaser.yaml`,
-   `release.yml`, `.github/actions/cli-release-tools/`, the toolchain or the
-   dependencies changed. `snapshot` and all six `snapshot-native` jobs must
-   pass. Download the artifact and read the rendered formula:
-
-   ```bash
-   gh run download <run-id> -n rival-snapshot -D "/tmp/rival-snapshot-${VERSION}"
-   ```
-
-3. Review and commit the complete release state, then create a lightweight tag
-   on that commit:
+4. Update `CHANGELOG.md`, review and commit the complete release state, then
+   create a lightweight tag on that commit:
 
    ```bash
    git status --short
    git diff --check
-   git add -A
-   git diff --cached --check
-   git diff --cached --stat
-   git commit -m "release: v${VERSION}"
+   git commit -am "release: v${VERSION}"
    git tag "v${VERSION}"
    ```
 
-   Do not proceed with unrelated worktree changes. `git add -A` is appropriate
-   only after the status review confirms that the complete tree is intended for
-   this release.
+   Commits must use the `1905` GitHub noreply address
+   (`32327548+1905@users.noreply.github.com`).
 
-4. Push the release commit and tag as `1905`. Commits must use the `1905`
-   GitHub noreply address (`git config user.email`). An HTTPS token without
-   the `workflow` scope cannot push `.github/workflows/` changes, so push over
-   SSH with the maintainer's key for the `1905` account selected explicitly:
+5. Push the release commit and the tag:
 
    ```bash
-   export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i <path-to-1905-key>"
-   git push git@github.com:1905/rival.git master
-   git push git@github.com:1905/rival.git "v${VERSION}"
+   git push origin master
+   git push origin "v${VERSION}"
    ```
 
-5. Watch the `Release` workflow for that tag:
+   Nothing runs on the push.
+
+6. Publish from a clean checkout of the tag on the macOS host:
 
    ```bash
-   gh run list --workflow Release --limit 5
-   gh run watch <run-id>
+   git checkout "v${VERSION}"
+   GITHUB_TOKEN=<1905 token> make cli-publish
    ```
 
-   Select the run whose event/tag corresponds to `v${VERSION}`.
+   The script refuses a checkout with changes or a `HEAD` that is not at a
+   `v*` tag. Instead of `GITHUB_TOKEN`, the token can come as one line on
+   stdin (for example `gh auth token --user 1905 | ssh air '…'`), so it is
+   not on a command line. `HOMEBREW_TAP_TOKEN` defaults to the same token.
+   Never publish one tag twice: a second run collides with the uploaded
+   assets.
 
-6. Verify the published release:
+7. Verify the published release:
 
    ```bash
    gh release view "v${VERSION}"
    ```
 
-   It must contain archives for Darwin, Linux and Windows on both amd64 and
-   arm64, `checksums.txt`, and `Rival-app.zip`. Also confirm that `1905/homebrew-tap`
-   has commits for the same tag that update both `rival.rb` and
-   `Casks/rival-app.rb` (the app commit message is
-   `Cask update for rival-app version v${VERSION}`).
+   It must list the six archives and `checksums.txt`. `1905/homebrew-tap`
+   must have the `Brew formula update for rival version v${VERSION}` commit.
 
-7. Verify the user installation after the tap update:
+8. Verify the user installation after the tap update:
 
    ```bash
    brew update
-   brew uninstall rival
-   brew install 1905/tap/rival
+   brew upgrade rival      # or: brew install 1905/tap/rival
    rival install --force
+   which -a rival
    rival version
    ```
 
-   If Rival was not already installed, omit the uninstall command. The reported
-   version must match `v${VERSION}`. Restart or reload Claude Code after
-   refreshing the embedded skills.
+   The reported version must match `v${VERSION}`. If it does not, an older
+   `rival` earlier on `PATH` (for example `~/.local/bin/rival`) shadows the
+   Homebrew one. If Homebrew refuses the tap, run `brew trust 1905/tap`.
+   Restart or reload Claude Code after refreshing the embedded skills.
 
-8. Verify the app.
+## Rival.app
 
-   Before tagging, check the app locally from the release commit, in the
-   repository root (not `rival/`):
+Rival.app is not published by the release. Check it locally on a Mac with
+Xcode, in the repository root:
 
-   ```bash
-   make test       # swift test in app/
-   make install    # native release build into /Applications/Rival.app
-   ```
+```bash
+make test       # swift test in app/
+make install    # native release build into /Applications/Rival.app
+```
 
-   `make install` moves an existing `/Applications/Rival.app` to `/tmp/trash`
-   and opens the new build. Confirm the menu bar icon appears and the window
-   lists your runs.
+To ship it by hand: build `app/dist/Rival-app.zip` with
+`python3 app/scripts/bundle.py --version <version>`, upload the ZIP to the
+release, render the cask with `app/scripts/render_cask.py`, and commit it as
+`Casks/rival-app.rb` in `1905/homebrew-tap`. Homebrew loads casks only from
+`Casks/`. The app is ad-hoc signed, not notarized; the cask removes the
+quarantine flag.
 
-   After the `app` job finishes, verify the cask:
+## History
 
-   ```bash
-   brew update
-   brew install --cask 1905/tap/rival-app    # or: brew upgrade --cask rival-app
-   ```
-
-   The app is ad-hoc signed, not notarized. The cask removes the quarantine
-   flag in `postflight`. If Homebrew refuses the tap, run
-   `brew trust --tap 1905/tap` and retry.
-
-## v5.1.0 CLI-only exception
-
-The maintainer requested a Homebrew release with proxy support and Sol 6.1,
-without building on their Mac or publishing a DMG. The normal hosted CLI
-release job builds its archives and updates the Homebrew formula. Only the
-app job excludes this exact tag, so no Rival.app ZIP, DMG or app cask update
-is published for v5.1.0. Future tags retain the full pipeline above.
-
-Do not point the tap at nonexistent archives or replace its prebuilt-binary
-installation with local source compilation. Publish only verified CLI archives
-and their checksums; leave the existing v5.0.0 release/tag unchanged.
-
-GitHub Actions stayed blocked by billing, so v5.1.0 was published from the
-MacBook Air with the pinned tools of `.github/actions/cli-release-tools/`
-(Zig 0.16.0, cargo-zigbuild 0.23.4, cargo-xwin 0.23.1, GoReleaser 2.18.2,
-Rust 1.98, Homebrew LLVM and lld, the Command Line Tools SDK):
-`goreleaser release --clean --parallelism 1` from a clean checkout of the tag,
-with `GITHUB_TOKEN` and `HOMEBREW_TAP_TOKEN` set to a `1905` token. That is the
-same command the `release` job runs. The `app` job did not run.
+v5.1.0 (2026-10-12) was the first release published from the MacBook Air,
+while GitHub Actions was blocked by billing. Hosted CI was removed after it.
+v5.0.0 and earlier were published by the removed `release` workflow.

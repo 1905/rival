@@ -8,8 +8,8 @@ release:
 
 # GoReleaser's Rust builder runs `<tool> <command> --target=<triple> <flags>`
 # and maps each triple to the {{ .Os }} / {{ .Arch }} values the old release names used
-# (x86_64 → amd64, aarch64 → arm64). release.yml runs both entries on hosted
-# macOS: the Apple SDK and LLVM come from that host.
+# (x86_64 → amd64, aarch64 → arm64). scripts/release-local.sh runs both
+# entries on a local macOS host: the Apple SDK and LLVM come from that host.
 builds:
   # darwin/linux through cargo-zigbuild. fsevent-sys links the CoreServices
   # framework, so the darwin targets need the Apple SDK; SDKROOT is set for
@@ -73,9 +73,9 @@ archives:
 # matching the existing 1905/homebrew-tap layout (formulae at root, no Formula/
 # or Casks/ subdir). `brews:` is marked deprecated by goreleaser in favor of
 # homebrew_casks:, but a cask is the wrong artifact type for this tap, so we keep
-# the formula generator. CI (release.yml) runs this on tag push with the
-# HOMEBREW_TAP_TOKEN secret, so the formula is updated automatically — no manual
-# rival.rb edits. It takes the four darwin/linux archives; a snapshot run only
+# the formula generator. `scripts/release-local.sh release` runs this from a
+# clean checkout of the tag with HOMEBREW_TAP_TOKEN set, so the formula is
+# generated — no manual rival.rb edits. It takes the four darwin/linux archives; a snapshot run only
 # renders it to dist/homebrew/rival.rb.
 brews:
   - name: rival

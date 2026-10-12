@@ -63,16 +63,6 @@ class RenderCaskTest(unittest.TestCase):
         self.assertIn('"-dr", "com.apple.quarantine", "#{appdir}/Rival.app"', out)
         self.assertNotIn("{{", out)
 
-    def test_release_job_writes_cask_under_casks_dir(self):
-        # Homebrew loads a tap's casks only from Casks/; a root-level .rb is
-        # never seen by `brew install --cask 1905/tap/rival-app`.
-        wf = (Path(__file__).resolve().parents[2] / ".github/workflows/release.yml").read_text()
-        self.assertIn("mkdir -p tap/Casks", wf)
-        self.assertIn("> tap/Casks/rival-app.rb", wf)
-        self.assertIn("git add Casks/rival-app.rb", wf)
-        self.assertNotIn("> tap/rival-app.rb", wf)
-        self.assertNotIn("git add rival-app.rb", wf)
-
     def test_local_zip(self):
         out = render_cask.render("0.0.0-dev", SHA, self.BASE, local_zip="/tmp/x/Rival-app.zip")
         self.assertIn('url "file:///', out)
