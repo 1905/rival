@@ -86,8 +86,7 @@ printf '%s\n' 'docs/plan.md' |
   rival command plan --model claude --effort high --workdir .
 ```
 
-Operational views are `rival tui`, `rival sessions`, and Rival.app
-(`brew install --cask 1905/tap/rival-app`).
+Operational views are `rival tui` and `rival sessions`.
 
 ## Authentication
 

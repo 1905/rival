@@ -110,7 +110,7 @@ fn member_id(m: &Model) -> String {
     m.detail.current(m.list.selected()).unwrap().id.clone()
 }
 
-// --- RivalKitTests/RunDetailModelTests ----------------------------------------------
+// --- Ported from the retired Swift app: RunDetailModelTests -------------------------
 
 // Swift: testOpeningARunResets.
 #[test]

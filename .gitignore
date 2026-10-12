@@ -16,8 +16,6 @@ oauth_link.txt
 worktrees/
 
 # swift package build output
-app/.build/
-app/dist/
 __pycache__/
 
 # rust build output

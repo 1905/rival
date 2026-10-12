@@ -1,4 +1,4 @@
-//! Session record contract shared with Swift (`app/Tests`).
+//! The session record contract.
 //! `testdata/expected.json` holds the typed values; `testdata/written/`
 //! holds the writer's golden bytes. The tests here never rewrite the golden
 //! files; regenerate them on purpose with

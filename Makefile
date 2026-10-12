@@ -1,26 +1,5 @@
-# Developer shortcuts. Rival.app targets (logic in app/scripts/*.py), then
-# the cli-* targets for the Rust CLI.
-.PHONY: run install test soak cli-build cli-install cli-test cli-check cli-release-check cli-snapshot cli-publish try-proxy try-proxy-tui try-proxy-check try-proxy-stop
-
-# Debug build, wrapped as "Rival (dev)", opened against your real ~/.rival.
-run:
-	python3 app/scripts/dev_bundle.py --build
-	open -n app/.build/Rival.app
-
-# Fresh release build (native arch) installed to /Applications/Rival.app.
-# The old copy is moved to /tmp/trash, never deleted.
-install:
-	python3 app/scripts/install_local.py
-
-# Unit tests, then the launch soak test: shows the dev app on screen for
-# about a minute. Needs a GUI session; see app/scripts/soak_test.py.
-test:
-	cd app && swift test
-	$(MAKE) soak
-
-# The soak test alone (builds first).
-soak:
-	python3 app/scripts/soak_test.py
+# Developer shortcuts for the Rust CLI.
+.PHONY: cli-build cli-install cli-test cli-check cli-release-check cli-snapshot cli-publish try-proxy try-proxy-check try-proxy-stop
 
 # CLI (Rust). `rival version` prints RIVAL_VERSION; the default is the git
 # description.
@@ -63,16 +42,13 @@ cli-snapshot:
 cli-publish:
 	scripts/release-local.sh release
 
-# Mac: try the branch CLI, TUI and Rival (dev) against the Dell's
+# Mac: try the branch CLI and TUI against the Dell's
 # CLIProxyAPI through an ssh tunnel. A throwaway RIVAL_HOME
 # (~/tmp-rival-try) keeps the installed rival and ~/.rival untouched. The
 # first run reads the proxy key over ssh from the proxy host (or
 # PROXY_KEY=...).
 # Logic in scripts/try-proxy.sh.
 try-proxy:
-	scripts/try-proxy.sh app
-
-try-proxy-tui:
 	scripts/try-proxy.sh tui
 
 try-proxy-check:

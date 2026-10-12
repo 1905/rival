@@ -1,8 +1,9 @@
 //! Markdown → styled terminal text for the result view.
 //!
-//! Swift: `RivalKit/MarkdownBlocks.swift` and `ResultPane.swift`. The Swift
-//! app splits blocks with a small line parser; this port reads CommonMark
-//! through pulldown-cmark, so a few inputs come out differently:
+//! Ported from the retired Swift app (`MarkdownBlocks.swift`,
+//! `ResultPane.swift`), which split blocks with a small line parser. This
+//! port reads CommonMark through pulldown-cmark, so a few inputs come out
+//! differently:
 //!
 //! - Inside a paragraph only "1." starts an ordered list: "text\n12. x" is one
 //!   paragraph. Swift starts an item.

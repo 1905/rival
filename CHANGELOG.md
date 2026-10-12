@@ -6,6 +6,9 @@ Latest binary release: [v5.2.0](https://github.com/1905/rival/releases/tag/v5.2.
 
 ## [Unreleased]
 
+### Removed
+- Rival.app, the Swift macOS viewer, with its Makefile targets (`run`, `install`, `test`, `soak`), the `try-proxy` app mode and the `rival-app` cask in `1905/homebrew-tap`. Use `rival tui`. Remove an installed copy with `brew uninstall --cask rival-app`.
+
 ## [v5.2.0] — 2026-10-12
 
 ### Changed

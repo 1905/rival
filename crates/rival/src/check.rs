@@ -1,6 +1,6 @@
 //! The model check: one short live call to each model, through the same
-//! adapter path a review takes ([`ModelSpec::run`]). `rival config check`,
-//! the TUI config window and the app all use it.
+//! adapter path a review takes ([`ModelSpec::run`]). `rival config check`
+//! and the TUI config window use it.
 //!
 //! Each model goes through four steps, and the first failure ends its row:
 //! static (the runtime binary, the proxy URL and key), the shared proxy model

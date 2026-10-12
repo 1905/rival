@@ -1,9 +1,9 @@
-//! What a finished run's Result view shows. Port of the app's
-//! `RivalKit/ResultParser.swift`.
+//! What a finished run's Result view shows. Ported from the retired Swift
+//! app's `ResultParser.swift`.
 //!
 //! It holds the one answer finder ([`final_answer`]) and the one payload
-//! decoder ([`log_payload`], [`find_payload`]) for every reader: the TUI and
-//! Rival.app ([`parse_run_result`]) and the CLI review, security and plan
+//! decoder ([`log_payload`], [`find_payload`]) for every reader: the TUI
+//! ([`parse_run_result`]) and the CLI review, security and plan
 //! commands (`review::parse_reviewer_log`, `review::parse_plan_log`).
 
 use std::collections::HashMap;

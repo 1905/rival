@@ -1,7 +1,7 @@
 //! The dim-phosphor theme, the gradient logo and the header.
 //!
-//! The colour values match Rival.app's
-//! `Theme.swift`. Colour marks state only: running amber, failed red;
+//! The colour values came from the retired Swift app's `Theme.swift`.
+//! Colour marks state only: running amber, failed red;
 //! completed stays quiet.
 
 use std::sync::OnceLock;
