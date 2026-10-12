@@ -49,7 +49,7 @@ pub const SOL_USAGE: &str = "Usage:
 Reasoning effort (-re): low, medium, high, xhigh, ultra.
 Omitted uses efforts.sol from ~/.rival/config.yaml (built-in: xhigh).";
 
-pub const ASTRA_ULTRAFAST_USAGE: &str = "Usage:
+pub const ASTRA_ULTRAFAST_USAGE: &str = concat!("Usage:
   /rival-astra-ultrafast 'explain the auth flow' — run any prompt with GPT-6 Astra on the Ultrafast tier
   /rival-astra-ultrafast -re high 'find bugs in src/main.go' — run with a different reasoning effort (default xhigh)
   /rival-astra-ultrafast review — bug-hunting review of the changed files (git auto-detect)
@@ -59,9 +59,9 @@ pub const ASTRA_ULTRAFAST_USAGE: &str = "Usage:
 
 Reasoning effort (-re): low, medium, high, xhigh, ultra.
 Omitted uses efforts.codex from ~/.rival/config.yaml (built-in: xhigh).
-Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
+", rival_core::ultrafast_requirement!());
 
-pub const SOL_ULTRAFAST_USAGE: &str = "Usage:
+pub const SOL_ULTRAFAST_USAGE: &str = concat!("Usage:
   /rival-sol-ultrafast 'explain the auth flow' — run any prompt with Sol on the Ultrafast tier
   /rival-sol-ultrafast -re high 'find bugs in src/main.go' — run with a different reasoning effort (default xhigh)
   /rival-sol-ultrafast review — bug-hunting review of the changed files (git auto-detect)
@@ -71,7 +71,7 @@ pub const SOL_ULTRAFAST_USAGE: &str = "Usage:
 
 Reasoning effort (-re): low, medium, high, xhigh, ultra.
 Omitted uses efforts.sol from ~/.rival/config.yaml (built-in: xhigh).
-Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.";
+", rival_core::ultrafast_requirement!());
 
 pub const FABLE_USAGE: &str = "Usage:
   /rival-fable 'explain the auth flow' — run any prompt with Fable
@@ -151,9 +151,9 @@ pub struct ModelSpec {
     pub preflight: PreflightFn,
     /// Invokes the provider.
     pub run: RunFn,
-    /// The Codex service tier every call of this spec asks for
-    /// (`--ultrafast`); `None` for every other spec.
-    pub service_tier: Option<&'static str>,
+    /// `command codex|sol --ultrafast`: the session asks Codex for the
+    /// Ultrafast tier, so every call of the run gets it.
+    pub ultrafast: bool,
 }
 
 impl ModelSpec {
@@ -238,7 +238,6 @@ fn codex_runtime_spec(
     usage: &'static str,
     ultrafast: bool,
 ) -> ModelSpec {
-    let tier = ultrafast.then_some(executor::ULTRAFAST_TIER);
     ModelSpec {
         command_name,
         cli: "codex",
@@ -248,10 +247,10 @@ fn codex_runtime_spec(
         preflight: Box::new(move |cfg, _| executor::codex_preflight_for(cfg, model)),
         run: Box::new(move |c| {
             executor::run_codex_model(
-                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, tier, c.log, c.out,
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.log, c.out,
             )
         }),
-        service_tier: tier,
+        ultrafast,
     }
 }
 
@@ -281,7 +280,7 @@ fn claude_runtime_spec(
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.review, c.log, c.out,
             )
         }),
-        service_tier: None,
+        ultrafast: false,
     }
 }
 
@@ -307,7 +306,7 @@ pub fn k3_spec() -> ModelSpec {
                 c.out,
             )
         }),
-        service_tier: None,
+        ultrafast: false,
     }
 }
 
@@ -325,6 +324,6 @@ pub fn grok_spec() -> ModelSpec {
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.log, c.out,
             )
         }),
-        service_tier: None,
+        ultrafast: false,
     }
 }

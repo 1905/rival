@@ -329,7 +329,7 @@ fn fable_and_sol_specs_follow_their_runtimes() {
 }
 
 /// The Ultrafast specs keep their model, label and effort default, and only
-/// they carry the tier.
+/// they ask for the tier.
 #[test]
 fn ultrafast_specs_carry_the_tier() {
     let cfg = cfg();
@@ -337,8 +337,8 @@ fn ultrafast_specs_carry_the_tier() {
         (codex_spec(), codex_tier_spec(true)),
         (sol_spec(), sol_tier_spec(true)),
     ] {
-        assert_eq!(fast.service_tier, Some("ultrafast"));
-        assert_eq!(plain.service_tier, None);
+        assert!(fast.ultrafast);
+        assert!(!plain.ultrafast);
         assert_eq!((fast.model, fast.cli), (plain.model, plain.cli));
         assert_eq!(fast.label(), plain.label());
         assert_eq!(
@@ -349,6 +349,6 @@ fn ultrafast_specs_carry_the_tier() {
     assert_eq!(codex_tier_spec(true).usage, ASTRA_ULTRAFAST_USAGE);
     assert_eq!(sol_tier_spec(true).usage, SOL_ULTRAFAST_USAGE);
     for spec in [claude_spec(), fable_spec(), k3_spec(), grok_spec()] {
-        assert_eq!(spec.service_tier, None, "{}", spec.command_name);
+        assert!(!spec.ultrafast, "{}", spec.command_name);
     }
 }

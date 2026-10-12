@@ -662,52 +662,8 @@ fn a_repair_that_changes_a_number_keeps_only_that_field() {
     assert!(!out.stdout.contains("reads 4"), "{}", out.stdout);
 }
 
-/// A session with the tier flag Codex's warning sets, on `route`.
-fn tier_session(route: &str, omitted: bool) -> Session {
-    Session {
-        route: route.to_string(),
-        service_tier: "ultrafast".to_string(),
-        service_tier_omitted: omitted,
-        ..Session::default()
-    }
-}
-
-/// An omitted tier gives the notice; the account line shows on the direct
-/// route only.
-#[test]
-fn ultrafast_omitted_notice_names_the_account_on_the_direct_route_only() {
-    use crate::model_specs::{codex_tier_spec, sol_tier_spec};
-    let notice =
-        tier_omitted_notice(&sol_tier_spec(true), &tier_session("", true)).expect("notice");
-    assert_eq!(
-        notice,
-        "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\n\
-         rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n"
-    );
-    let notice =
-        tier_omitted_notice(&codex_tier_spec(true), &tier_session("proxy", true)).expect("notice");
-    assert!(notice.contains("for codex because"), "{notice}");
-    assert!(
-        !notice.contains("Pro $500"),
-        "proxy route names no account: {notice}"
-    );
-}
-
-/// No notice without the tier on the spec or without the flag.
-#[test]
-fn ultrafast_omitted_notice_needs_the_tier_and_the_flag() {
-    use crate::model_specs::sol_tier_spec;
-    assert_eq!(
-        tier_omitted_notice(&sol_tier_spec(false), &tier_session("", true)),
-        None
-    );
-    assert_eq!(
-        tier_omitted_notice(&sol_tier_spec(true), &tier_session("", false)),
-        None
-    );
-}
-
-/// The whole command: a run that sets the flag prints the notice after the
+/// The whole command: an Ultrafast spec puts the tier on the session, and
+/// a run that Codex sent at the standard tier prints the notice after the
 /// output on stdout and on stderr, and still succeeds.
 #[test]
 fn command_prints_the_ultrafast_notice_after_the_output() {
@@ -716,9 +672,10 @@ fn command_prints_the_ultrafast_notice_after_the_output() {
     let wd = tmp();
     let f = fake_run("codex\nok\n");
     let mut spec = fake_spec(&f);
-    spec.service_tier = Some(rival_core::executor::ULTRAFAST_TIER);
+    spec.ultrafast = true;
     let inner = spec.run;
     spec.run = Box::new(move |c| {
+        assert_eq!(c.sess.service_tier, "ultrafast", "the run sees the tier");
         c.sess.service_tier_omitted = true;
         inner(c)
     });
@@ -736,5 +693,6 @@ fn command_prints_the_ultrafast_notice_after_the_output() {
     assert!(out.stderr.contains(notice), "{}", out.stderr);
     let sessions = fix.sessions();
     assert_eq!(sessions[0].status, "completed");
+    assert_eq!(sessions[0].service_tier, "ultrafast");
     assert!(sessions[0].service_tier_omitted);
 }

@@ -353,7 +353,10 @@ fn fresh_install_transcript() {
     for name in skills::NAMES {
         want.push_str(&format!("  ✓ {name} — installed (v{})\n", version(name)));
     }
-    want.push_str("\nDone: 9 installed, 0 updated, 0 up to date, 0 removed\n");
+    want.push_str(&format!(
+        "\nDone: {} installed, 0 updated, 0 up to date, 0 removed\n",
+        skills::NAMES.len()
+    ));
     assert_eq!(install(&target, false, ""), want);
 
     // Same version again: every skill is up to date and the reader is not
@@ -365,7 +368,10 @@ fn fresh_install_transcript() {
             version(name)
         ));
     }
-    want.push_str("\nDone: 0 installed, 0 updated, 9 up to date, 0 removed\n");
+    want.push_str(&format!(
+        "\nDone: 0 installed, 0 updated, {} up to date, 0 removed\n",
+        skills::NAMES.len()
+    ));
     let mut answers = reader("y\n");
     let mut out = Vec::new();
     install_skills(&target, false, &mut answers, &mut out).unwrap();
@@ -405,7 +411,10 @@ fn update_prompt_transcript() {
     );
     assert_eq!(
         out.lines().last().unwrap(),
-        "Done: 0 installed, 1 updated, 8 up to date, 0 removed"
+        &format!(
+            "Done: 0 installed, 1 updated, {} up to date, 0 removed",
+            skills::NAMES.len() - 1
+        )
     );
     assert_eq!(
         fs::read(skill_file(&target, first)).unwrap(),
@@ -424,7 +433,10 @@ fn update_prompt_transcript() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 9 updated, 0 up to date, 0 removed\n"),
+        out.ends_with(&format!(
+            "Done: 0 installed, {} updated, 0 up to date, 0 removed\n",
+            skills::NAMES.len()
+        )),
         "{out}"
     );
 }
@@ -484,7 +496,7 @@ fn cleanup_counts_deprecated_and_retired() {
         3,
         "{out}"
     );
-    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 9 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
+    assert!(out.contains(&format!("  🗑 1 retired skill(s) removed\n\nDone: {} installed, 0 updated, 0 up to date, 4 removed\n", skills::NAMES.len())), "{out}");
     for gone in [
         "rival-plan-sol",
         "rival-astra",
@@ -521,7 +533,10 @@ fn cleanup_failure_is_reported_and_not_counted() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 0 updated, 9 up to date, 0 removed\n"),
+        out.ends_with(&format!(
+            "Done: 0 installed, 0 updated, {} up to date, 0 removed\n",
+            skills::NAMES.len()
+        )),
         "{out}"
     );
 }
@@ -616,7 +631,10 @@ fn cleanup_removes_a_dangling_deprecated_link() {
     let out = String::from_utf8(out).unwrap();
     assert!(fs::symlink_metadata(&link).is_err(), "link still there");
     assert!(
-        out.ends_with("Done: 9 installed, 0 updated, 0 up to date, 1 removed\n"),
+        out.ends_with(&format!(
+            "Done: {} installed, 0 updated, 0 up to date, 1 removed\n",
+            skills::NAMES.len()
+        )),
         "{out}"
     );
 }
@@ -677,7 +695,10 @@ fn install_command_writes_under_home_not_rival_home() {
         "{stdout}"
     );
     assert!(
-        stdout.ends_with("Done: 9 installed, 0 updated, 0 up to date, 0 removed\n"),
+        stdout.ends_with(&format!(
+            "Done: {} installed, 0 updated, 0 up to date, 0 removed\n",
+            skills::NAMES.len()
+        )),
         "{stdout}"
     );
     for name in skills::NAMES {

@@ -159,7 +159,7 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
             let model = sess.model.clone();
             let result = match cli {
                 "codex" => executor::run_codex_model(
-                    ctx, cfg, sess, prompt, effort, workdir, &model, None, log, None,
+                    ctx, cfg, sess, prompt, effort, workdir, &model, log, None,
                 )?,
                 "claude" => executor::run_claude(
                     ctx, cfg, sess, prompt, effort, workdir, &model, true, log, None,

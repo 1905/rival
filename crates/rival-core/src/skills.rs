@@ -76,6 +76,8 @@ fn codex_workflow() -> &'static str {
 /// embedded release version with Claude's skills, but uses Codex's process
 /// lifecycle.
 pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
+    // The Ultrafast input is built here; the match borrows it.
+    let ultrafast_input: String;
     let (description, command, input): (String, &str, &str) = match name {
         "rival-claude" => (
             "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.".into(),
@@ -92,16 +94,22 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
             "sol",
             "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
         ),
-        "rival-astra-ultrafast" => (
-            "Run a requested GPT-6 Astra prompt or code review on the Codex Ultrafast tier through Rival from Codex.".into(),
-            "codex --ultrafast",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects GPT-6 Astra (`gpt-6-astra`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.codex` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
-        ),
-        "rival-sol-ultrafast" => (
-            "Run a requested Sol 6.1 prompt or code review on the Codex Ultrafast tier through Rival from Codex.".into(),
-            "sol --ultrafast",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI with `service_tier=\"ultrafast\"`; Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
-        ),
+        "rival-astra-ultrafast" | "rival-sol-ultrafast" => {
+            let (model, slug, command, effort) = if name == "rival-sol-ultrafast" {
+                ("Sol 6.1", "gpt-6.1-sol", "sol --ultrafast", "efforts.sol")
+            } else {
+                ("GPT-6 Astra", "gpt-6-astra", "codex --ultrafast", "efforts.codex")
+            };
+            ultrafast_input = format!(
+                    "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects {model} (`{slug}`) on the Codex CLI with `service_tier=\"ultrafast\"`; {} Omitted effort uses `{effort}` from Rival's configuration (xhigh fallback). When the output has a `rival: ⚠ ultrafast not applied` line, the run used the standard tier: repeat that line in your summary. Do not invent flags or substitute another model.",
+                crate::ultrafast_requirement!()
+            );
+            (
+                format!("Run a requested {model} prompt or code review on the Codex Ultrafast tier through Rival from Codex."),
+                command,
+                &ultrafast_input,
+            )
+        }
         "rival-codex" | "rival-k3" | "rival-grok" => {
             let model = name.strip_prefix("rival-").unwrap_or(name);
             (
