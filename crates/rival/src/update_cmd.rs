@@ -72,7 +72,7 @@ pub fn update_to_version(
         );
         let targets = skill_targets(home, "auto", has_codex).map_err(CmdError::plain)?;
         let mut reader = env.stdin.reader();
-        return install_targets(&targets, true, &mut *reader, env.stdout).map_err(CmdError::plain);
+        return install_targets(&targets, false, &mut *reader, env.stdout).map_err(CmdError::plain);
     }
 
     let _ = write!(env.stdout, "v{current} → v{latest}\n\n");
@@ -91,15 +91,61 @@ pub fn update_to_version(
         .map_err(|e| CmdError::plain(format!("brew reinstall: {e}")))?;
     }
 
-    let _ = writeln!(env.stdout, "\nUpdating skills...");
     let prefix = output(env, "brew", &["--prefix", "rival"])
         .map_err(|e| CmdError::plain(format!("locate upgraded rival: {e}")))?;
     let prefix = String::from_utf8_lossy(&prefix);
-    let binary = paths::clean(&Path::new(prefix.trim()).join("bin").join("rival"));
+    let prefix = Path::new(prefix.trim());
+    if !prefix.is_absolute() {
+        return Err(CmdError::plain(
+            "locate upgraded rival: Homebrew returned an empty or non-absolute prefix",
+        ));
+    }
+    let binary = paths::clean(&prefix.join("bin").join("rival"));
+    verify_upgraded_binary(env, &binary, latest).map_err(CmdError::plain)?;
+    let _ = writeln!(env.stdout, "\nUpdating skills...");
     install_updated_skills(env, io, &binary.to_string_lossy())
         .map_err(|e| CmdError::plain(format!("install skills: {e}")))?;
 
     let _ = write!(env.stdout, "\n✓ Updated to v{latest}\n");
+    Ok(())
+}
+
+/// Verify the executable before it can overwrite any skills or claim success.
+fn verify_upgraded_binary(env: &CmdEnv<'_>, binary: &Path, latest: &str) -> Result<(), String> {
+    let bytes = output(env, &binary.to_string_lossy(), &["version"])
+        .map_err(|e| format!("verify upgraded rival: {e}"))?;
+    let stdout = String::from_utf8_lossy(&bytes);
+    let installed = stdout
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .map(str::trim)
+        .unwrap_or("");
+    if installed != latest {
+        return Err(format!(
+            "Homebrew rival at {} reports version {:?}; expected {:?}. Skills were not changed.",
+            binary.display(),
+            installed,
+            latest
+        ));
+    }
+    // PATH can still select a separate development install after brew succeeds.
+    // Canonical paths accept Homebrew's normal bin/opt/Cellar symlink chain.
+    // No PATH entry is valid for callers that invoke rival by absolute path.
+    if let Ok(selected) = oscmd::look_path(env.cfg, "rival") {
+        let selected_real =
+            std::fs::canonicalize(&selected).map_err(|e| format!("verify rival on PATH: {e}"))?;
+        let binary_real =
+            std::fs::canonicalize(binary).map_err(|e| format!("verify upgraded rival: {e}"))?;
+        if selected_real != binary_real {
+            return Err(format!(
+                "Homebrew rival v{latest} is at {}, but PATH selects {}. Run {} directly or put its bin directory first on PATH. Skills were not changed.",
+                binary.display(),
+                selected.display(),
+                binary.display()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -115,7 +161,7 @@ pub fn install_updated_skills(
         io,
         Input::Command,
         binary,
-        &["install", "--force", "--target", "auto"],
+        &["install", "--target", "auto"],
     )
 }
 

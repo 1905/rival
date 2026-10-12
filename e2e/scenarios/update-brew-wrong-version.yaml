@@ -1,0 +1,92 @@
+{
+  "name": "update-brew-wrong-version",
+  "description": "A successful brew command must not cause false update success or skill changes when its selected binary still reports dev.",
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "fixtures": [
+    {
+      "copy_bin": "brew/opt/rival/bin/rival"
+    },
+    {
+      "write": "home/.claude/skills/rival-codex/SKILL.md",
+      "text": "my personal skill"
+    }
+  ],
+  "fakes": {
+    "scripts": {
+      "brew": {
+        "responses": [
+          {
+            "argv": [
+              "upgrade",
+              "1905/tap/rival"
+            ],
+            "times": 1,
+            "stdout": "==> Upgrading 1905/tap/rival\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--prefix",
+              "rival"
+            ],
+            "times": 1,
+            "stdout": "<ROOT>/brew/opt/rival\n",
+            "stderr": "prefix noise\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 1,
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\n==> Upgrading 1905/tap/rival\n",
+        "stderr_lines": [
+          "Homebrew rival at <ROOT>/brew/opt/rival/bin/rival reports version \"dev\"; expected \"9.9.9\". Skills were not changed."
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".claude/skills/rival-codex/SKILL.md"
+    ],
+    "calls": {
+      "brew": 2
+    },
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.claude/skills/rival-codex/SKILL.md",
+        "text": "my personal skill"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "v9.9.9"
+        }
+      }
+    }
+  }
+}

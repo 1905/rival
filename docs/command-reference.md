@@ -206,6 +206,23 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 | Grok (`grok-4.6`) | [Grok CLI](https://docs.x.ai/) with `grok login`. `XAI_API_KEY` is not supported. |
 | Grok via OpenRouter (`x-ai/grok-4.6`) | OpenCode plus `OPENROUTER_API_KEY`. Used only by the security review. |
 
+### Updating
+
+`rival update` upgrades the Homebrew installation and checks that its executable
+reports the requested release version. Before installing skills, it also checks
+whether `PATH` selects a different executable. A mismatch stops the update with
+the two paths and leaves skills untouched.
+
+If `rival version` still reports `dev` while Homebrew says the release is
+installed, compare `command -v rival` with `$(brew --prefix rival)/bin/rival`.
+Run the Homebrew executable directly or put its bin directory ahead of the
+other installation on `PATH`. The updater does not delete development binaries
+or change shell configuration.
+
+Matching skill versions are left unchanged. Missing skills are installed, and
+changed versions use the normal confirmation prompt. Use `rival install --force`
+only when you intend to overwrite your installed skill contents.
+
 ### Skills
 
 `rival install` installs seven skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).

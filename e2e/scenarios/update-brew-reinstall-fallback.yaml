@@ -1,6 +1,6 @@
 {
   "name": "update-brew-reinstall-fallback",
-  "description": "`rival update` where `brew upgrade` exits 1 (its stderr passes through). Output: 'brew upgrade failed, trying reinstall...', then `brew reinstall 1905/tap/rival` runs and succeeds; the rest is the normal upgrade path.",
+  "description": "`rival update` where `brew upgrade` exits 1 (its stderr passes through). Output: 'brew upgrade failed, trying reinstall...', then `brew reinstall 1905/tap/rival` runs and succeeds; the rest is the normal upgrade path. The updater verifies the selected binary version before installing skills.",
   "normalise": [
     {
       "regex": "v(\\d+\\.\\d+\\.\\d+)",
@@ -10,7 +10,9 @@
   ],
   "fixtures": [
     {
-      "copy_bin": "brew/opt/rival/bin/rival"
+      "write": "brew/opt/rival/bin/rival",
+      "mode": "0755",
+      "text": "#!/bin/sh\nif [ \"$1\" = version ]; then printf '  9.9.9\\n'; else exec '<BIN>' \"$@\"; fi\n"
     }
   ],
   "fakes": {

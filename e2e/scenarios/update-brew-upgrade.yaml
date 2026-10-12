@@ -1,6 +1,6 @@
 {
   "name": "update-brew-upgrade",
-  "description": "`rival update` with release tag v9.9.9 on a dev build. Output: 'vdev → v9.9.9' and a blank line, 'Upgrading via Homebrew...', `brew upgrade 1905/tap/rival` with brew's stdout/stderr on the terminal, '\\nUpdating skills...', then `brew --prefix rival` (its stderr is not shown). It then runs <prefix>/bin/rival install --force --target auto (a copy of the binary under test in a safe temp prefix) with the same stdio, and ends with '\\n✓ Updated to v9.9.9'. The child's own update check is skipped by CI=1.",
+  "description": "`rival update` with release tag v9.9.9 on a dev build. Output: 'vdev → v9.9.9' and a blank line, 'Upgrading via Homebrew...', `brew upgrade 1905/tap/rival` with brew's stdout/stderr on the terminal, '\\nUpdating skills...', then `brew --prefix rival` (its stderr is not shown). It then runs <prefix>/bin/rival install --target auto (a wrapper that reports the candidate version and delegates installation to the binary under test) with the same stdio, and ends with '\\n✓ Updated to v9.9.9'. The child's own update check is skipped by CI=1. The updater verifies the selected binary version before installing skills.",
   "normalise": [
     {
       "regex": "v(\\d+\\.\\d+\\.\\d+)",
@@ -10,7 +10,9 @@
   ],
   "fixtures": [
     {
-      "copy_bin": "brew/opt/rival/bin/rival"
+      "write": "brew/opt/rival/bin/rival",
+      "mode": "0755",
+      "text": "#!/bin/sh\nif [ \"$1\" = version ]; then printf '  9.9.9\\n'; else exec '<BIN>' \"$@\"; fi\n"
     }
   ],
   "fakes": {
