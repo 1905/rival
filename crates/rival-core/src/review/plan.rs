@@ -86,6 +86,9 @@ fn format_plan_body(out: &PlanOutput, sb: &mut String, rating_label: &str, empty
 pub struct PlanRunResult {
     pub results: Vec<PlanCLIResult>,
     pub skipped: Vec<SkippedCLI>,
+    /// One [`crate::executor::ultrafast_notice`] per session that Codex ran
+    /// at the standard tier although its `ultrafast.<model>` switch is on.
+    pub notices: Vec<String>,
 }
 
 /// One CLI's plan-review outcome. `parsed` is `None` when the CLI's output

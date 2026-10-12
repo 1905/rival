@@ -80,7 +80,10 @@ impl Section {
                 Field::ClaudePrefix,
                 Field::CodexPrefix,
             ],
-            Section::Models => (0..MODELS.len()).map(Field::Model).collect(),
+            Section::Models => (0..MODELS.len())
+                .map(Field::Model)
+                .chain([Field::CodexUltrafast, Field::SolUltrafast])
+                .collect(),
             Section::Review => vec![Field::Reviewer, Field::AutoFix],
             Section::Check => Vec::new(),
         }
@@ -100,6 +103,10 @@ pub enum Field {
     Model(usize),
     Reviewer,
     AutoFix,
+    /// `ultrafast.codex`.
+    CodexUltrafast,
+    /// `ultrafast.sol`.
+    SolUltrafast,
 }
 
 impl Field {
@@ -114,13 +121,19 @@ impl Field {
             Field::Model(i) => MODELS.get(i).map_or("", |m| m.name),
             Field::Reviewer => "Security reviewer",
             Field::AutoFix => "Auto-fix crit/high",
+            Field::CodexUltrafast => "Codex Ultrafast",
+            Field::SolUltrafast => "Sol Ultrafast",
         }
     }
 
     pub fn is_toggle(self) -> bool {
         matches!(
             self,
-            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix
+            Field::ClaudeRoute
+                | Field::CodexRoute
+                | Field::AutoFix
+                | Field::CodexUltrafast
+                | Field::SolUltrafast
         )
     }
 
@@ -649,6 +662,8 @@ impl ConfigForm {
                 self.draft.proxy.claude.enabled = !self.draft.proxy.claude.enabled;
             }
             Field::CodexRoute => self.draft.proxy.codex.enabled = !self.draft.proxy.codex.enabled,
+            Field::CodexUltrafast => self.draft.ultrafast.codex = !self.draft.ultrafast.codex,
+            Field::SolUltrafast => self.draft.ultrafast.sol = !self.draft.ultrafast.sol,
             Field::AutoFix => {
                 self.draft.auto_fix_critical_high = !self.draft.auto_fix_critical_high;
             }
@@ -1189,6 +1204,14 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
             "auto_fix_critical_high".into(),
             json!(d.auto_fix_critical_high),
         );
+    }
+    for (key, saved, draft) in [
+        ("ultrafast.codex", s.ultrafast.codex, d.ultrafast.codex),
+        ("ultrafast.sol", s.ultrafast.sol, d.ultrafast.sol),
+    ] {
+        if saved != draft {
+            p.insert(key.into(), json!(draft));
+        }
     }
     p
 }

@@ -1968,3 +1968,37 @@ fn a_draft_proxy_key_stands_in_for_the_key_file_but_not_the_env() {
     let route = env.proxy_route(ProxyProvider::Claude).unwrap().unwrap();
     assert_eq!(route.key(), "env-key-0003");
 }
+
+/// `ultrafast.codex` and `ultrafast.sol` are off unless set; each switch
+/// covers its own model only, and no other model ever gets the tier.
+#[test]
+fn ultrafast_is_per_codex_runtime_model_and_off_by_default() {
+    let (_home, missing) = loaded("");
+    assert!(!missing.ultrafast(CODEX_MODEL) && !missing.ultrafast(SOL_MODEL));
+    for (body, codex, sol) in [
+        ("efforts:\n  codex: high\n", false, false),
+        ("ultrafast:\n", false, false),
+        ("ultrafast:\n  codex: true\n", true, false),
+        ("ultrafast:\n  sol: true\n", false, true),
+        ("ultrafast:\n  codex: true\n  sol: false\n", true, false),
+        ("ultrafast:\n  codex: true\n  sol: true\n", true, true),
+    ] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.ultrafast(CODEX_MODEL), codex, "{body:?}");
+        assert_eq!(config.ultrafast(SOL_MODEL), sol, "{body:?}");
+        for other in [
+            CLAUDE_MODEL,
+            FABLE_MODEL,
+            GPT56_SOL_MODEL,
+            "",
+            "codex",
+            "sol",
+        ] {
+            assert!(!config.ultrafast(other), "{body:?} {other:?}");
+        }
+    }
+    let (_home, bad) = loaded("ultrafast:\n  codex: fast\n");
+    assert!(bad.user_config_error().is_some());
+    assert!(!bad.ultrafast(CODEX_MODEL));
+}

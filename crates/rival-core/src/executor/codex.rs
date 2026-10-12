@@ -17,8 +17,8 @@ use crate::session::Session;
 /// The provider name the proxy route gives Codex in its `-c` values.
 const PROXY_PROVIDER: &str = "rival_proxy";
 
-/// The Codex service tier of `command codex|sol --ultrafast`. A session
-/// whose `service_tier` is this value runs on it.
+/// The Codex service tier a model gets when its `ultrafast.<label>` switch
+/// is on. The session records it in `service_tier`.
 pub const ULTRAFAST_TIER: &str = "ultrafast";
 
 /// Who can use Ultrafast: the usage texts, the skills and the notice.
@@ -122,8 +122,9 @@ fn log_head(path: &str, prompt: &str) -> std::io::Result<String> {
 
 /// Executes a prompt with one explicit model. Review
 /// pipelines use this entry point so the model recorded in the session is
-/// also the model sent to the runtime. It runs Codex and Sol 6.1. A
-/// session whose `service_tier` is [`ULTRAFAST_TIER`] runs on that tier.
+/// also the model sent to the runtime. It runs Codex and Sol 6.1. When
+/// [`Config::ultrafast`] is on for `model`, the call asks for the Ultrafast
+/// tier and the session records it.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -163,7 +164,10 @@ pub(crate) fn run_codex_model_with(
     if !is_codex_model(model) {
         bail!("unsupported codex model {:?}", model);
     }
-    let ultrafast = sess.service_tier == ULTRAFAST_TIER;
+    let ultrafast = cfg.ultrafast(model);
+    if ultrafast {
+        sess.service_tier = ULTRAFAST_TIER.to_string();
+    }
     let result = (|| -> anyhow::Result<RunResult> {
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {

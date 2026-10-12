@@ -43,6 +43,9 @@ fn served() -> Vec<String> {
 enum Reply {
     /// Writes the text to the log and exits with the code.
     Out(i64, &'static str),
+    /// Like `Out`, but Codex ran it at the standard tier although the
+    /// model's Ultrafast switch is on.
+    Omitted(i64, &'static str),
     /// The adapter returns this error.
     Err(&'static str),
     /// Waits until the context is done.
@@ -123,7 +126,7 @@ impl Runner for Fake {
         t: &Target,
         log: &Path,
         workdir: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<CallOutcome, String> {
         self.calls.lock().unwrap().push((
             t.name.to_string(),
             log.to_path_buf(),
@@ -140,7 +143,17 @@ impl Runner for Fake {
         let result = match reply {
             Reply::Out(code, text) => {
                 fs::write(log, text).unwrap();
-                Ok(code)
+                Ok(CallOutcome {
+                    exit_code: code,
+                    tier_omitted: false,
+                })
+            }
+            Reply::Omitted(code, text) => {
+                fs::write(log, text).unwrap();
+                Ok(CallOutcome {
+                    exit_code: code,
+                    tier_omitted: true,
+                })
             }
             Reply::Err(e) => Err(e.to_string()),
             Reply::Hang => {
@@ -762,7 +775,7 @@ fn text_output_matches_the_spec_layout() {
     assert_eq!(ProxyLine::Off.text(), "proxy  off");
     assert_eq!(
         report.rows[1].to_json().to_string(),
-        r#"{"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","unexpected":false,"wire_model":"gpt-6.1-sol"}"#
+        r#"{"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","tier_omitted":false,"ultrafast":false,"unexpected":false,"wire_model":"gpt-6.1-sol"}"#
     );
 }
 
@@ -872,4 +885,43 @@ fn real_adapter_path_saves_no_session() {
         .map(|e| e.file_name())
         .collect();
     assert!(saved.is_empty(), "sessions/ holds {saved:?}");
+}
+
+/// A model whose Ultrafast switch is on shows `[ultrafast]`; a call that
+/// Codex ran at the standard tier shows `[ultrafast not applied]` and the
+/// account line (direct route). Models with the switch off show nothing.
+#[test]
+fn ultrafast_rows_show_the_tier_and_an_omitted_tier() {
+    let fix = Fixture::with_config_yaml("ultrafast:\n  codex: true\n  sol: true\n");
+    let mut fake = Fake::new();
+    fake.replies.insert("sol", Reply::Omitted(0, "ok\n"));
+    let report = check(&fix, &["codex", "sol", "claude"], &fake);
+    assert!(report.all_ok());
+    let (codex, sol, claude) = (
+        row(&report, "codex"),
+        row(&report, "sol"),
+        row(&report, "claude"),
+    );
+    assert!(codex.ultrafast && !codex.tier_omitted);
+    assert!(sol.ultrafast && sol.tier_omitted);
+    assert!(!claude.ultrafast && !claude.tier_omitted);
+    assert_eq!(sol.to_json()["tier_omitted"], true);
+    assert_eq!(claude.to_json()["ultrafast"], false);
+    let text = report.text();
+    let line = |name: &str| {
+        text.lines()
+            .find(|l| l.trim_start().starts_with(&format!("✓ {name} ")))
+            .unwrap_or_else(|| panic!("no {name} row:\n{text}"))
+            .to_string()
+    };
+    assert!(line("codex").ends_with("ok  [ultrafast]"), "{text}");
+    assert!(
+        line("sol").ends_with("ok  [ultrafast not applied]"),
+        "{text}"
+    );
+    assert!(!line("claude").contains("ultrafast"), "{text}");
+    assert!(
+        text.contains("      Codex used the standard tier: its model catalog does not list Ultrafast.\n      Ultrafast needs a Codex account on Pro $500"),
+        "{text}"
+    );
 }

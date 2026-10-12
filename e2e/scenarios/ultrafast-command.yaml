@@ -1,6 +1,6 @@
 {
   "name": "ultrafast-command",
-  "description": "`rival command sol --ultrafast` and `rival command codex --ultrafast`: the tier pairs follow `-m <model>` and the session records `service_tier`. Sol's fake echoes the prompt and then prints Codex's \"not advertised\" warning, as Codex does (all on stdout, so the log order is fixed), so rival prints the not-applied notice after the output on stdout and on stderr; the run still completes. Codex's fake prints no warning, so there is no notice.",
+  "description": "The `ultrafast.sol` switch is on and `ultrafast.codex` is off. `rival command sol` gets the tier pairs after `-m` and records `service_tier`; Sol's fake echoes the prompt and then prints Codex's \"not advertised\" warning, as Codex does (all on stdout, so the log order is fixed), so rival prints the not-applied notice after the output on stdout and on stderr, and the run still completes. `rival command codex` runs without the tier: its switch is off.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -51,10 +51,6 @@
               "-m",
               "gpt-6-astra",
               "-c",
-              "service_tier=\"ultrafast\"",
-              "-c",
-              "features.ultrafast_mode=true",
-              "-c",
               "model_reasoning_effort=xhigh",
               "--sandbox",
               "read-only",
@@ -76,12 +72,17 @@
       }
     }
   },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "ultrafast:\n  sol: true\n  codex: false\n"
+    }
+  ],
   "steps": [
     {
       "run": [
         "command",
-        "sol",
-        "--ultrafast"
+        "sol"
       ],
       "stdin": "explain the auth flow",
       "expect": {
@@ -114,8 +115,7 @@
     {
       "run": [
         "command",
-        "codex",
-        "--ultrafast"
+        "codex"
       ],
       "stdin": "explain the auth flow",
       "expect": {
@@ -138,6 +138,7 @@
   ],
   "expect": {
     "home_files": [
+      ".rival/config.yaml",
       ".rival/queue/.lock",
       ".rival/sessions/<UUID1>.json",
       ".rival/sessions/<UUID1>.log",
@@ -164,7 +165,6 @@
           "exit_code": 0,
           "cli": "codex",
           "model": "gpt-6-astra",
-          "service_tier": "ultrafast",
           "mode": "raw"
         }
       }

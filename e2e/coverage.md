@@ -32,7 +32,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
 | `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
 | `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
-| `command codex --ultrafast`, `command sol --ultrafast` (tier pairs after `-m`, `service_tier` on the session, the not-applied notice) | ultrafast-command | unit tests `tree::tests::ultrafast_is_a_flag_of_command_codex_and_sol_only` (other commands reject it), `executor::codex::tests`, `model_command::tests` |
+| `ultrafast.sol` / `ultrafast.codex` switch (tier pairs after `-m` for the model whose switch is on, `service_tier` on the session, the not-applied notice; the other model runs without the tier) | ultrafast-command | unit tests `config::tests::ultrafast_is_per_codex_runtime_model_and_off_by_default`, `executor::codex::tests`, `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::ultrafast_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |

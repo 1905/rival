@@ -139,7 +139,12 @@ pub fn run_command_plan(
     let out = review::format_plan_result(Some(&result), &abs_path);
     env.stdout
         .write_all(out.as_bytes())
-        .map_err(|e| write_stdout_error(&e))
+        .map_err(|e| write_stdout_error(&e))?;
+    for notice in &result.notices {
+        let _ = write!(env.stdout, "\n{notice}");
+        let _ = env.stderr.write_all(notice.as_bytes());
+    }
+    Ok(())
 }
 
 /// Prints `msg` on stdout, where the calling skill captures it, and fails

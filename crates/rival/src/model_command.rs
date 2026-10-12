@@ -99,9 +99,6 @@ pub fn run_model_command(
             group_id: "",
         },
     )?;
-    if spec.ultrafast {
-        sess.service_tier = executor::ULTRAFAST_TIER.to_string();
-    }
     // Opus and Fable both run on the Claude runtime.
     if spec.cli == "claude" {
         sess.account = cfg.claude_subscription().to_string();

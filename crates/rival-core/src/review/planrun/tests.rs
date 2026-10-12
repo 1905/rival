@@ -239,6 +239,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
     assert_eq!(
         result,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: CODEX_MODEL.into(),
@@ -339,6 +340,7 @@ fn assemble_plan_results_one_skipped_one_ok() {
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: GPT56_SOL_MODEL.into(),
@@ -395,6 +397,7 @@ fn assemble_plan_results_parse_fail_keeps_raw() {
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: GPT56_SOL_MODEL.into(),
@@ -461,6 +464,7 @@ fn plan_failure_reason_uses_model_name() {
 #[test]
 fn format_plan_result_single_parsed() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![PlanCLIResult {
             cli: "codex".into(),
             model: GPT56_SOL_MODEL.into(),
@@ -484,6 +488,7 @@ fn format_plan_result_single_parsed() {
 #[test]
 fn format_plan_result_single_parse_fail_returns_raw() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![PlanCLIResult {
             cli: "codex".into(),
             model: GPT56_SOL_MODEL.into(),
@@ -501,6 +506,7 @@ fn format_plan_result_single_parse_fail_returns_raw() {
 #[test]
 fn format_plan_result_multi_blocks_and_skipped() {
     let res = PlanRunResult {
+        notices: Vec::new(),
         results: vec![
             PlanCLIResult {
                 cli: "codex".into(),
@@ -856,6 +862,7 @@ fn assemble_plan_results_parses_final_answer_not_tool_output() {
     assert_eq!(
         res,
         PlanRunResult {
+            notices: Vec::new(),
             results: vec![PlanCLIResult {
                 cli: "codex".into(),
                 model: CODEX_MODEL.into(),
@@ -1605,4 +1612,62 @@ fn two_models_on_one_runtime_run_as_two_blocks() {
 
 fn repaired_summary(label: &str) -> String {
     format!("The {label} plan can use the cache.")
+}
+
+/// A session that Codex ran at the standard tier although its switch is
+/// on (the codex executor sets both fields) gives one notice in the
+/// result, failed reviewers included. When every reviewer failed, the
+/// notices go to stderr with the error.
+#[test]
+fn omitted_ultrafast_tiers_become_notices() {
+    let mark = |sess: &mut Session| {
+        sess.service_tier = crate::executor::ULTRAFAST_TIER.to_string();
+        sess.service_tier_omitted = true;
+    };
+    let (_home, cfg) = plan_test_config("");
+    let ex = fake(|_, sess, _, _, _, _| {
+        if sess.model == SOL_MODEL {
+            mark(sess);
+            return Ok((Vec::new(), 1)); // a failed reviewer keeps its notice
+        }
+        if sess.model == CODEX_MODEL {
+            mark(sess);
+        }
+        ok_plan()
+    });
+    let result = run_plan(&cfg, &ex, "", "g", &clis(&["codex", SOL_MODEL, "claude"])).unwrap();
+    assert_eq!(result.notices.len(), 2, "{:?}", result.notices);
+    assert!(
+        result
+            .notices
+            .iter()
+            .any(|n| n.contains("for codex because"))
+    );
+    assert!(result.notices.iter().any(|n| n.contains("for sol because")));
+
+    let (_home, cfg) = plan_test_config("");
+    let ex = fake(|_, sess, _, _, _, _| {
+        mark(sess);
+        Ok((Vec::new(), 1))
+    });
+    let work = tempfile::tempdir().unwrap();
+    let mut stderr = Vec::new();
+    let err = run_plan_review_with(
+        &Context::background(),
+        &cfg,
+        &ex,
+        "/tmp/plan.md",
+        &batch("", work.path().to_str().unwrap(), "g", &clis(&["codex"])),
+        &mut stderr,
+    )
+    .unwrap_err();
+    assert!(
+        err.to_string().contains("all plan reviewers failed"),
+        "{err}"
+    );
+    let stderr = String::from_utf8(stderr).unwrap();
+    assert!(
+        stderr.contains("rival: ⚠ ultrafast not applied"),
+        "{stderr}"
+    );
 }

@@ -760,6 +760,16 @@ pub struct PlanConfig {
     pub models: Vec<String>,
 }
 
+/// The `ultrafast:` block: per Codex-runtime model, whether its calls ask
+/// Codex for the Ultrafast service tier. Off when unset.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UltrafastConfig {
+    /// `ultrafast.codex`: GPT-6 Astra.
+    pub codex: bool,
+    /// `ultrafast.sol`: Sol 6.1.
+    pub sol: bool,
+}
+
 /// The names `plan.models` accepts.
 pub const PLAN_MODEL_NAMES: [&str; 5] = ["codex", "sol", "claude", "opus", "fable"];
 
@@ -936,6 +946,7 @@ pub struct UserConfig {
     /// Lets the skills apply fixes for CONFIRMED critical and high findings
     /// without asking. Medium and low are never auto-fixed.
     pub auto_fix_critical_high: bool,
+    pub ultrafast: UltrafastConfig,
 }
 
 /// Decodes YAML null into a string as "", and any other scalar as
@@ -1013,6 +1024,14 @@ struct RawPlan {
     models: Option<Vec<GoString>>,
 }
 
+#[derive(Default, Deserialize)]
+struct RawUltrafast {
+    #[serde(default)]
+    codex: Option<bool>,
+    #[serde(default)]
+    sol: Option<bool>,
+}
+
 /// Unknown keys (for example the removed megareview's `review:` roster) are
 /// ignored, like yaml.v3.
 #[derive(Default, Deserialize)]
@@ -1031,6 +1050,8 @@ struct RawUserConfig {
     proxy: Option<RawProxy>,
     #[serde(default)]
     plan: Option<RawPlan>,
+    #[serde(default)]
+    ultrafast: Option<RawUltrafast>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -1068,6 +1089,13 @@ impl From<RawUserConfig> for UserConfig {
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
             auto_fix_critical_high: raw.auto_fix_critical_high.unwrap_or_default(),
+            ultrafast: {
+                let u = raw.ultrafast.unwrap_or_default();
+                UltrafastConfig {
+                    codex: u.codex.unwrap_or_default(),
+                    sol: u.sol.unwrap_or_default(),
+                }
+            },
         }
     }
 }
@@ -1373,6 +1401,20 @@ impl Config {
             "critical+high"
         } else {
             "off"
+        }
+    }
+
+    /// Whether calls of `model` ask Codex for the Ultrafast tier:
+    /// `ultrafast.codex` for GPT-6 Astra, `ultrafast.sol` for Sol 6.1, never
+    /// for any other model.
+    pub fn ultrafast(&self, model: &str) -> bool {
+        let Some(u) = self.user.as_ref().map(|u| &u.ultrafast) else {
+            return false;
+        };
+        match model {
+            CODEX_MODEL => u.codex,
+            SOL_MODEL => u.sol,
+            _ => false,
         }
     }
 

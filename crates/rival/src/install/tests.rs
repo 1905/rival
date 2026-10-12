@@ -878,3 +878,26 @@ fn plan_skill_archive_failure_keeps_original() {
         "keep"
     );
 }
+
+/// The 5.1.0 Ultrafast skills are removed on install: the
+/// `ultrafast.<model>` config switch replaced them.
+#[test]
+fn install_removes_the_retired_ultrafast_skills() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = claude_target(dir.path());
+    for name in ["rival-astra-ultrafast", "rival-sol-ultrafast"] {
+        fs::create_dir_all(dir.path().join(name)).unwrap();
+        fs::write(dir.path().join(name).join("SKILL.md"), "version: 5.1.0\n").unwrap();
+    }
+    let mut out = Vec::new();
+    install_skills_with(&target, false, &mut reader(""), &mut out, &[]).unwrap();
+    let out = String::from_utf8(out).unwrap();
+    assert_eq!(
+        out.matches("  🗑 deprecated skill removed\n").count(),
+        2,
+        "{out}"
+    );
+    for name in ["rival-astra-ultrafast", "rival-sol-ultrafast"] {
+        assert!(!dir.path().join(name).exists(), "{name}");
+    }
+}

@@ -184,7 +184,7 @@ rival install --force           # overwrite without prompting
 
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
-- `rival install` removes retired skills: `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable` and older names. `rival-fable` and `rival-sol` are back in 5.1.
+- `rival install` removes retired skills: `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable`, `rival-astra-ultrafast`, `rival-sol-ultrafast` and older names. `rival-fable` and `rival-sol` are back in 5.1. The 5.1.0 Ultrafast skills are replaced by the `ultrafast` switch in 5.2.
 
 The retired `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills are
 no longer installed. On `rival install` or `rival update`, existing copies are
@@ -225,7 +225,7 @@ only when you intend to overwrite your installed skill contents.
 
 ### Skills
 
-`rival install` installs nine skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs seven skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
 
 | Skill | Syntax | Runs | Default model and effort |
 |---|---|---|---|
@@ -233,8 +233,6 @@ only when you intend to overwrite your installed skill contents.
 | `/rival-claude` | `[-re level] [scope]` (always a review) | `rival command claude` | Claude, medium |
 | `/rival-fable` | `[-re level] [scope]` (always a review) | `rival command fable` | Fable, medium |
 | `/rival-sol` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol` | Sol, xhigh |
-| `/rival-astra-ultrafast` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command codex --ultrafast` | Codex (GPT-6 Astra) on the Ultrafast tier, xhigh |
-| `/rival-sol-ultrafast` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol --ultrafast` | Sol on the Ultrafast tier, xhigh |
 | `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
 | `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
 | `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
@@ -266,16 +264,12 @@ Top-level commands (`rival --help`):
 
 | Subcommand | Flags (defaults) |
 |---|---|
-| `codex`, `sol` | `--workdir` (`.`), `--no-queue`, `--ultrafast` |
-| `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
+| `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
 | `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`plan.models`, else `codex`; accepts `codex`, `sol`, `claude`/`opus`, `fable`, comma-separated), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
-- `--ultrafast` (codex and sol only) asks Codex for the Ultrafast service tier: it adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true` after `-m <model>`, on the direct and the proxy route. Every call of the run gets it, including the language-repair pass. The session records `"service_tier": "ultrafast"`.
-  - Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.
-  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival then prints `rival: ⚠ ultrafast not applied — …` after the output, on stdout and stderr. The exit code does not change.
-  - Rival cannot see a tier that a server-side requirement turns off: Codex drops it without a warning. Whether a proxy forwards `service_tier` depends on the proxy.
+- The Codex Ultrafast tier is a config switch, not a flag: see `ultrafast` under Configuration.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 
@@ -505,6 +499,10 @@ claude:
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
 
+ultrafast:            # Codex Ultrafast service tier, per model
+  codex: false        # GPT-6 Astra
+  sol: false          # Sol 6.1
+
 proxy:                # see Proxy
   url: http://127.0.0.1:8317
   key_file: ~/.rival/proxy.key   # default; the key never goes in this file
@@ -527,6 +525,10 @@ roles:                # optional prompt overrides
 - An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
 - `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
+- `ultrafast.codex` and `ultrafast.sol` are off by default. Turn one on in the config window (`rival config`, Models: `Codex Ultrafast`, `Sol Ultrafast`) or with `rival config set ultrafast.sol true`. Then every call of that model asks Codex for the Ultrafast tier: `/rival-codex` and `/rival-sol` reviews and prompts, their language-repair pass, `rival command plan` and `rival config check`. Rival adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true` after `-m <model>`, on the direct and the proxy route, and the session records `"service_tier": "ultrafast"`.
+  - Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.
+  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival sets `"service_tier_omitted": true` on the session and prints `rival: ⚠ ultrafast not applied — …` after the output (command, plan) on stdout and stderr. `rival config check` marks the row `[ultrafast not applied]`. Exit codes do not change.
+  - Rival cannot see a tier that a server-side requirement turns off: Codex drops it without a warning. Whether a proxy forwards `service_tier` depends on the proxy.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
 Environment variables:

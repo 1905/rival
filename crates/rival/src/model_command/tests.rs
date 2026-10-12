@@ -662,9 +662,9 @@ fn a_repair_that_changes_a_number_keeps_only_that_field() {
     assert!(!out.stdout.contains("reads 4"), "{}", out.stdout);
 }
 
-/// The whole command: an Ultrafast spec puts the tier on the session, and
-/// a run that Codex sent at the standard tier prints the notice after the
-/// output on stdout and on stderr, and still succeeds.
+/// The whole command: a run whose session Codex sent at the standard tier
+/// (the executor sets both fields) prints the notice after the output on
+/// stdout and on stderr, and still succeeds.
 #[test]
 fn command_prints_the_ultrafast_notice_after_the_output() {
     use crate::testutil::with_env;
@@ -672,10 +672,9 @@ fn command_prints_the_ultrafast_notice_after_the_output() {
     let wd = tmp();
     let f = fake_run("codex\nok\n");
     let mut spec = fake_spec(&f);
-    spec.ultrafast = true;
     let inner = spec.run;
     spec.run = Box::new(move |c| {
-        assert_eq!(c.sess.service_tier, "ultrafast", "the run sees the tier");
+        c.sess.service_tier = rival_core::executor::ULTRAFAST_TIER.to_string();
         c.sess.service_tier_omitted = true;
         inner(c)
     });

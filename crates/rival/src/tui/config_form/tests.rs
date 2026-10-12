@@ -571,3 +571,33 @@ fn help_opens_with_question_mark_and_any_key_closes_it() {
         "the closing key does nothing else"
     );
 }
+
+/// The two Ultrafast toggles close the Models section; each writes its own
+/// key, and only when it changed.
+#[test]
+fn the_ultrafast_toggles_write_their_own_keys() {
+    let (_h, mut f) = form(None);
+    focus(&mut f, Field::CodexUltrafast);
+    assert_eq!(f.section, Section::Models);
+    keys(&mut f, &["space"]);
+    assert!(f.draft.ultrafast.codex && !f.draft.ultrafast.sol);
+    assert_eq!(f.patch(), json!({"ultrafast.codex": true}));
+    keys(&mut f, &["down", "space"]);
+    assert_eq!(f.field(), Some(Field::SolUltrafast));
+    assert_eq!(
+        f.patch(),
+        json!({"ultrafast.codex": true, "ultrafast.sol": true})
+    );
+    keys(&mut f, &["down"]);
+    assert_eq!(
+        f.field(),
+        Some(Field::SolUltrafast),
+        "the focus stops at the end"
+    );
+    // A switch already on in the file: turning it off writes false.
+    let (_h, mut f) = form(Some("ultrafast:\n  sol: true\n"));
+    assert!(f.draft.ultrafast.sol);
+    focus(&mut f, Field::SolUltrafast);
+    keys(&mut f, &["space"]);
+    assert_eq!(f.patch(), json!({"ultrafast.sol": false}));
+}

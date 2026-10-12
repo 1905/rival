@@ -234,14 +234,6 @@ fn no_queue() -> Arg {
     bool_flag("no-queue", "bypass the review queue")
 }
 
-/// `command codex|sol` only: clap rejects it on every other command.
-fn ultrafast() -> Arg {
-    bool_flag(
-        "ultrafast",
-        "run on the Ultrafast service tier (needs a Codex account with Ultrafast)",
-    )
-}
-
 fn effort(help: &'static str) -> Arg {
     string_flag("effort", "", help)
 }
@@ -300,7 +292,7 @@ pub fn build(defaults: &Defaults) -> Command {
         // `opus` is another name for `claude`; clap reports the canonical
         // name, so the command path stays `command claude`.
         model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
-        model_command("codex", "Skill-facing Codex executor").arg(ultrafast()),
+        model_command("codex", "Skill-facing Codex executor"),
         model_command("fable", "Skill-facing Fable executor"),
         model_command("grok", "Skill-facing Grok executor"),
         model_command("k3", "Run Kimi K3 prompts from stdin"),
@@ -315,7 +307,7 @@ pub fn build(defaults: &Defaults) -> Command {
             no_queue(),
             bool_flag("which", "print the resolved model and exit"),
         ]),
-        model_command("sol", "Skill-facing Sol executor").arg(ultrafast()),
+        model_command("sol", "Skill-facing Sol executor"),
     ]);
 
     // `key set` keeps its stray words: the action refuses them without

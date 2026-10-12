@@ -752,6 +752,24 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
         )),
         w,
     )));
+    out.push(BodyLine::plain(Line::default()));
+    for (f, on) in [
+        (Field::CodexUltrafast, form.draft.ultrafast.codex),
+        (Field::SolUltrafast, form.draft.ultrafast.sol),
+    ] {
+        field(
+            out,
+            form,
+            f,
+            vec![
+                toggle(on, s),
+                Span::styled("   every call asks for the Ultrafast tier", s.dim),
+            ],
+            "needs Pro $500 or Enterprise/Edu; else Codex uses the standard tier",
+            w,
+            s,
+        );
+    }
 }
 
 /// The effort column, 13 cells: a picker on the focused row.

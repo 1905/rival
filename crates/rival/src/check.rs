@@ -198,6 +198,11 @@ pub struct CheckRow {
     pub unexpected: bool,
     /// Whether the live call ran.
     pub called: bool,
+    /// The model's `ultrafast.<label>` switch is on: the call asked for the
+    /// Ultrafast tier.
+    pub ultrafast: bool,
+    /// Codex ran the call at the standard tier although `ultrafast` is on.
+    pub tier_omitted: bool,
 }
 
 impl CheckRow {
@@ -215,6 +220,8 @@ impl CheckRow {
             "hint": self.hint,
             "limit": self.limit,
             "unexpected": self.unexpected,
+            "ultrafast": self.ultrafast,
+            "tier_omitted": self.tier_omitted,
         })
     }
 
@@ -310,7 +317,7 @@ impl Report {
         let mut out = format!("{}\n\n", self.proxy.text());
         for (row, time) in self.rows.iter().zip(&times) {
             let mark = if row.ok { "✓" } else { "✗" };
-            let message = if row.ok && row.unexpected {
+            let mut message = if row.ok && row.unexpected {
                 format!("{}  (not ok)", row.reply)
             } else if row.ok {
                 row.reply.clone()
@@ -319,6 +326,11 @@ impl Report {
             } else {
                 row.error.clone()
             };
+            if row.tier_omitted {
+                message.push_str("  [ultrafast not applied]");
+            } else if row.ultrafast {
+                message.push_str("  [ultrafast]");
+            }
             let line = format!(
                 "  {mark} {:<name_w$}  {:<route_w$}  {:<wire_w$}  {}  {message}",
                 row.name,
@@ -330,6 +342,16 @@ impl Report {
             out.push('\n');
             if !row.ok && !row.hint.is_empty() {
                 out.push_str(&format!("      {}\n", row.hint));
+            }
+            if row.tier_omitted {
+                out.push_str("      Codex used the standard tier: its model catalog does not list Ultrafast.\n");
+                if row.route == "direct" {
+                    out.push_str(concat!(
+                        "      ",
+                        rival_core::ultrafast_requirement!(),
+                        "\n"
+                    ));
+                }
             }
         }
         out.push_str(&format!("\n{} of {} ok\n", self.passed(), self.rows.len()));
@@ -367,7 +389,7 @@ pub trait Runner: Sync {
     /// once `ctx` is done.
     fn preflight(&self, ctx: &Context, cfg: &Config, t: &Target) -> Result<(), String>;
     /// The live call: [`CHECK_PROMPT`] with review permissions, its output
-    /// in `log`, in `workdir`. `Ok` is the exit code.
+    /// in `log`, in `workdir`.
     fn call(
         &self,
         ctx: &Context,
@@ -375,9 +397,19 @@ pub trait Runner: Sync {
         t: &Target,
         log: &Path,
         workdir: &str,
-    ) -> Result<i64, String>;
+    ) -> Result<CallOutcome, String>;
     /// The provider's hint for a failed call (its `auth_hint`); "" for none.
     fn hint(&self, cfg: &Config, t: &Target, log: &Path) -> String;
+}
+
+/// What a live call that ran reports back.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CallOutcome {
+    pub exit_code: i64,
+    /// Codex ran the call at the standard tier although the model's
+    /// `ultrafast.<label>` switch is on (the session's
+    /// `service_tier_omitted`).
+    pub tier_omitted: bool,
 }
 
 /// Checks `targets` with the real adapters. `on_row` gets each row as it
@@ -567,6 +599,7 @@ fn base_row(cfg: &Config, t: &Target) -> CheckRow {
         runtime: t.runtime.to_string(),
         route: route_name.to_string(),
         wire_model,
+        ultrafast: cfg.ultrafast(t.model),
         ..CheckRow::default()
     }
 }
@@ -662,7 +695,10 @@ impl Engine<'_> {
             ));
         }
         let exit_code = match result {
-            Ok(code) => code,
+            Ok(outcome) => {
+                row.tier_omitted = outcome.tier_omitted;
+                outcome.exit_code
+            }
             Err(e) => {
                 row.hint = self.hint(t, route, served, &output, &log, &mut row.limit);
                 return row.fail(&e);
@@ -873,7 +909,7 @@ impl Runner for SpecRunner {
         t: &Target,
         log: &Path,
         workdir: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<CallOutcome, String> {
         let spec = spec_for(t);
         let effort = if t.name == SECURITY_GROK_NAME {
             security_grok_entry().variant.to_string()
@@ -897,7 +933,10 @@ impl Runner for SpecRunner {
             log: Some(&log),
             out: None,
         })
-        .map(|r| r.exit_code)
+        .map(|r| CallOutcome {
+            exit_code: r.exit_code,
+            tier_omitted: sess.service_tier_omitted,
+        })
         .map_err(|e| format!("{e:#}"))
     }
 
