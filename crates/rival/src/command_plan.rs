@@ -20,18 +20,16 @@ use crate::workdir::{getwd_error, resolve_workdir_or_exit};
 mod tests;
 
 pub const PLAN_USAGE: &str = "Usage:
-  /rival-plan path/to/plan.md — review with Codex at xhigh effort
-  /rival-plan-codex path/to/plan.md — review with Codex at xhigh effort
-  /rival-plan-claude path/to/plan.md — review with Claude
-  /rival-plan -m opus,fable,sol path/to/plan.md — review with several models
+  printf '%s\\n' 'path/to/plan.md' | rival command plan --model codex
+  printf '%s\\n' 'path/to/plan.md' | rival command plan --model claude
+  printf '%s\\n' 'path/to/plan.md' | rival command plan --model opus,fable,sol
   rival command plan --help — show native command options
 
-Input is a single path to a markdown plan/spec file. The /rival-plan and
-/rival-plan-codex skills always use xhigh. Native Codex and Sol effort defaults
-to xhigh, Claude and Fable to medium, unless overridden per model in
-~/.rival/config.yaml. --model accepts codex, sol, claude (or opus) and fable;
-without it, plan.models from ~/.rival/config.yaml, else codex. An unavailable
-model is skipped, not fatal.";
+Input is a single path to a markdown plan/spec file, read from stdin. Codex
+and Sol effort defaults to xhigh, Claude and Fable to medium, unless overridden
+per model in ~/.rival/config.yaml. --model accepts codex, sol, claude (or opus)
+and fable; without it, plan.models from ~/.rival/config.yaml, else codex.
+An unavailable model is skipped, not fatal.";
 
 /// Runs the plan review; tests inject a fake.
 pub type PlanRunner<'a> = dyn Fn(&Context, &Config, &str, &ReviewBatch<'_>, &mut dyn Write) -> anyhow::Result<PlanRunResult>

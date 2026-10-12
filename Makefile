@@ -41,9 +41,10 @@ cli-test:
 	cargo test --workspace --locked
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
-# Validates .goreleaser.yaml. Builds nothing.
+# Validates .goreleaser.yaml, allowing only the intentional brews deprecation.
+# Builds nothing; invalid config and any other deprecation still fail.
 cli-release-check:
-	goreleaser check
+	python3 scripts/check_goreleaser.py
 
 # Mac: try the branch CLI, TUI and Rival (dev) against the Dell's
 # CLIProxyAPI through an ssh tunnel. A throwaway RIVAL_HOME

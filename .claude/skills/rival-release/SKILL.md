@@ -1,6 +1,6 @@
 ---
 name: rival-release
-version: 3.11.0
+version: 5.1.0
 description: Release rival — bump skills, commit, tag, push; CI (goreleaser) publishes the GitHub release + brew formula. Then reinstall, verify, notify. Use when user says "release" or "commit push release".
 argument-hint: "<version>"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
@@ -17,6 +17,13 @@ locally — a second goreleaser run on the same tag collides with the
 CI-published assets (`422 already_exists`) and turns CI red. The skill's job is
 to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`.
 
+For v5.1.0, only CLI archives and the Homebrew formula are published. The
+app job is excluded for this tag: skip the app ZIP, DMG, cask and local app
+checks. Run Rust tests/builds on the Dell; do not build on the maintainer's
+Mac. Hosted CI still owns macOS/Windows checks and six-target snapshots.
+A billing lock is a blocker to publication, not permission to skip gates or
+publish a tag without verified assets. Leave v5.0.0 unchanged.
+
 ## Steps
 
 1. **Bump skill versions** — run `./scripts/bump-skill-versions.sh <version>` to
@@ -24,7 +31,8 @@ to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`
 2. **Build + test** — from the repository root:
    create/activate a local Python venv and install `scripts/requirements-test.txt`.
    `make cli-test && make cli-release-check` (Rust workspace tests, release
-   script tests, `goreleaser check`). Must be green before tagging.
+   script tests, `goreleaser check` with only the documented `brews` warning
+   accepted). Must be green before tagging.
    Require the candidate commit's full three-OS `CI` workflow to pass too,
    including strict Clippy, CLI scenarios, the Rival.app build and all Swift tests.
 3. **Snapshot gate** — required for the first Rust release and whenever
@@ -51,7 +59,7 @@ to prepare the tag, then wait for CI and verify. Full guide: `docs/releasing.md`
    cargo-zigbuild, windows with cargo-xwin — publishes the GitHub release +
    assets, and pushes the updated formula to `1905/homebrew-tap` (`rival.rb` at
    root). The `app` job then uploads Rival.app and updates `Casks/rival-app.rb`.
-   - If CI fails, inspect with `gh run view --log-failed`, fix, re-tag if needed.
+   - If CI fails, inspect with `gh run view --log-failed`, fix and rerun the checks before publishing a new tag. Never move a published release tag.
 8. **Verify release published** — `gh release view v<version>` should list
    `rival_{darwin,linux}_{amd64,arm64}.tar.gz`,
    `rival_windows_{amd64,arm64}.zip`, `checksums.txt`, `Rival-app.zip` and the

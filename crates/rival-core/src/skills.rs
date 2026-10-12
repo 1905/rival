@@ -13,12 +13,9 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// All embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 10] = [
+pub const NAMES: [&str; 7] = [
     "rival-codex",
     "rival-sol",
-    "rival-plan",
-    "rival-plan-codex",
-    "rival-plan-claude",
     "rival-claude",
     "rival-fable",
     "rival-k3",
@@ -26,11 +23,12 @@ pub const NAMES: [&str; 10] = [
     "rival-security",
 ];
 
-/// Legacy or superseded skills that install removes.
-/// Re-enable a skill by adding it back to [`NAMES`] and its directory to
-/// the embedded tree.
+/// Retired plan skills that install archives outside the active skill tree.
+pub const RETIRED_PLAN_SKILLS: [&str; 3] = ["rival-plan", "rival-plan-codex", "rival-plan-claude"];
+
+/// Other legacy skills that install removes.
 pub const DEPRECATED: [&str; 13] = [
-    "rival-plan-sol", // rival-plan takes --model sol
+    "rival-plan-sol", // use the native plan command
     "rival-claude-only",
     "rival-fable-only",
     "rival-codex-only",
@@ -38,7 +36,7 @@ pub const DEPRECATED: [&str; 13] = [
     "rival-claude-fable",
     "rival-astra",         // renamed to rival-codex in 3.34
     "rival-plan-astra",    // renamed to rival-plan-codex in 3.34
-    "rival-plan-fable",    // rival-plan takes --model fable
+    "rival-plan-fable",    // use the native plan command
     "rival-kimi",          // renamed to rival-k3 before release
     "rival-antislop-plan", // plan mode dropped on 2026-08-20
     "rival-review",        // megareview removed 2026-09-26
@@ -80,12 +78,12 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
         "rival-claude" => (
             "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.".into(),
             "claude",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). For a plan document use $rival-plan-claude. Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
         ),
         "rival-fable" => (
             "Review code with Fable 5.1 through Rival and the authenticated Claude Code CLI. Use for a requested independent Fable review from Codex.".into(),
             "fable",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). For a plan document use $rival-plan with `--model fable`. Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
         ),
         "rival-sol" => (
             "Run a requested Sol 6.1 prompt or code review through Rival from Codex.".into(),
@@ -100,17 +98,6 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
                 "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.",
             )
         }
-        "rival-plan" | "rival-plan-codex" | "rival-plan-claude" => (
-            "Review a plan or specification document through Rival from Codex, returning ratings and findings.".into(),
-            match name {
-                "rival-plan-claude" => "plan --model claude",
-                _ => "plan --model codex --effort xhigh",
-            },
-            match name {
-                "rival-plan" => "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh. To use other models, replace `--model codex --effort xhigh` with `--model <list>`: codex, sol, claude (or opus), fable, comma-separated, for example `--model opus,fable,sol`; each model then uses its configured effort unless the user supplies -re.",
-                _ => "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.",
-            },
-        ),
         "rival-security" => (
             "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.".into(),
             "security",

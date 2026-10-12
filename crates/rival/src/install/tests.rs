@@ -353,7 +353,7 @@ fn fresh_install_transcript() {
     for name in skills::NAMES {
         want.push_str(&format!("  ✓ {name} — installed (v{})\n", version(name)));
     }
-    want.push_str("\nDone: 10 installed, 0 updated, 0 up to date, 0 removed\n");
+    want.push_str("\nDone: 7 installed, 0 updated, 0 up to date, 0 removed\n");
     assert_eq!(install(&target, false, ""), want);
 
     // Same version again: every skill is up to date and the reader is not
@@ -365,7 +365,7 @@ fn fresh_install_transcript() {
             version(name)
         ));
     }
-    want.push_str("\nDone: 0 installed, 0 updated, 10 up to date, 0 removed\n");
+    want.push_str("\nDone: 0 installed, 0 updated, 7 up to date, 0 removed\n");
     let mut answers = reader("y\n");
     let mut out = Vec::new();
     install_skills(&target, false, &mut answers, &mut out).unwrap();
@@ -405,7 +405,7 @@ fn update_prompt_transcript() {
     );
     assert_eq!(
         out.lines().last().unwrap(),
-        "Done: 0 installed, 1 updated, 9 up to date, 0 removed"
+        "Done: 0 installed, 1 updated, 6 up to date, 0 removed"
     );
     assert_eq!(
         fs::read(skill_file(&target, first)).unwrap(),
@@ -424,7 +424,7 @@ fn update_prompt_transcript() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 10 updated, 0 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 7 updated, 0 up to date, 0 removed\n"),
         "{out}"
     );
 }
@@ -484,7 +484,7 @@ fn cleanup_counts_deprecated_and_retired() {
         3,
         "{out}"
     );
-    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 10 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
+    assert!(out.contains("  🗑 1 retired skill(s) removed\n\nDone: 7 installed, 0 updated, 0 up to date, 4 removed\n"), "{out}");
     for gone in [
         "rival-plan-sol",
         "rival-astra",
@@ -521,7 +521,7 @@ fn cleanup_failure_is_reported_and_not_counted() {
         "{out}"
     );
     assert!(
-        out.ends_with("Done: 0 installed, 0 updated, 10 up to date, 0 removed\n"),
+        out.ends_with("Done: 0 installed, 0 updated, 7 up to date, 0 removed\n"),
         "{out}"
     );
 }
@@ -616,7 +616,7 @@ fn cleanup_removes_a_dangling_deprecated_link() {
     let out = String::from_utf8(out).unwrap();
     assert!(fs::symlink_metadata(&link).is_err(), "link still there");
     assert!(
-        out.ends_with("Done: 10 installed, 0 updated, 0 up to date, 1 removed\n"),
+        out.ends_with("Done: 7 installed, 0 updated, 0 up to date, 1 removed\n"),
         "{out}"
     );
 }
@@ -677,7 +677,7 @@ fn install_command_writes_under_home_not_rival_home() {
         "{stdout}"
     );
     assert!(
-        stdout.ends_with("Done: 10 installed, 0 updated, 0 up to date, 0 removed\n"),
+        stdout.ends_with("Done: 7 installed, 0 updated, 0 up to date, 0 removed\n"),
         "{stdout}"
     );
     for name in skills::NAMES {
@@ -780,4 +780,80 @@ fn empty_home_fails_before_any_target() {
     };
     assert_eq!(result.unwrap_err(), CmdError::plain(want));
     assert_eq!((stdout.as_str(), stderr.as_str()), ("", ""));
+}
+
+#[test]
+fn plan_skill_upgrade_preserves_custom_files_and_previous_backups() {
+    let home = tempfile::tempdir().unwrap();
+    for target in skill_targets(home.path(), "all", false).unwrap() {
+        for pass in 1..=2 {
+            for name in skills::RETIRED_PLAN_SKILLS {
+                let source = target.base.join(name);
+                fs::create_dir_all(source.join("notes")).unwrap();
+                fs::write(source.join("SKILL.md"), format!("custom skill {pass}")).unwrap();
+                fs::write(source.join("notes/personal.txt"), "keep my data").unwrap();
+            }
+            let out = install(&target, true, "");
+            assert!(out.ends_with("3 removed\n"), "{out}");
+            for name in skills::RETIRED_PLAN_SKILLS {
+                assert!(!target.base.join(name).exists());
+                for backup in 1..=pass {
+                    let saved = target
+                        .base
+                        .with_file_name("rival-retired-skills")
+                        .join(format!("{name}-{backup}"))
+                        .join(name);
+                    assert_eq!(
+                        fs::read_to_string(saved.join("SKILL.md")).unwrap(),
+                        format!("custom skill {backup}")
+                    );
+                    assert_eq!(
+                        fs::read_to_string(saved.join("notes/personal.txt")).unwrap(),
+                        "keep my data"
+                    );
+                }
+            }
+            assert_eq!(
+                fs::read(skill_file(&target, "rival-sol")).unwrap(),
+                want_content(&target, "rival-sol")
+            );
+        }
+        assert!(install(&target, false, "").ends_with("0 removed\n"));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn plan_skill_archive_does_not_follow_symlinks() {
+    let home = tempfile::tempdir().unwrap();
+    let target = claude_target(&home.path().join("skills"));
+    fs::create_dir_all(&target.base).unwrap();
+    let custom = home.path().join("personal");
+    fs::create_dir(&custom).unwrap();
+    fs::write(custom.join("SKILL.md"), "personal").unwrap();
+    std::os::unix::fs::symlink(&custom, target.base.join("rival-plan")).unwrap();
+    let archived = archive_retired_plan_skill(&target.base, "rival-plan")
+        .unwrap()
+        .unwrap();
+    assert_eq!(fs::read_link(archived).unwrap(), custom);
+    assert_eq!(
+        fs::read_to_string(custom.join("SKILL.md")).unwrap(),
+        "personal"
+    );
+}
+
+#[test]
+fn plan_skill_archive_failure_keeps_original() {
+    let home = tempfile::tempdir().unwrap();
+    let base = home.path().join("skills");
+    fs::create_dir_all(base.join("rival-plan")).unwrap();
+    fs::write(base.join("rival-plan/SKILL.md"), "keep").unwrap();
+    fs::write(base.with_file_name("rival-retired-skills"), "blocker").unwrap();
+    let out = install(&claude_target(&base), false, "");
+    assert!(out.contains("retirement failed — original files kept"));
+    assert!(out.ends_with("0 removed\n"));
+    assert_eq!(
+        fs::read_to_string(base.join("rival-plan/SKILL.md")).unwrap(),
+        "keep"
+    );
 }

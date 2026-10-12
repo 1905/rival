@@ -7,25 +7,6 @@ fn skill(name: &str) -> String {
 }
 
 #[test]
-fn plan_codex_skill_pins_xhigh_effort() {
-    let content = skill("rival-plan-codex");
-    for want in [
-        "version: ",
-        "argument-hint: \"<path-to-plan.md>\"",
-        "rival command plan --model codex --effort xhigh --detach",
-        "Always run at **xhigh**",
-    ] {
-        assert!(content.contains(want), "plan-codex skill missing {want:?}");
-    }
-    for forbidden in ["defaults to **high**", "[-re high|ultra]"] {
-        assert!(
-            !content.contains(forbidden),
-            "plan-codex skill still advertises optional effort {forbidden:?}"
-        );
-    }
-}
-
-#[test]
 fn grok_skill_is_embedded() {
     let name = "rival-grok";
     assert!(NAMES.contains(&name), "grok skill {name:?} is not active");
@@ -49,27 +30,6 @@ fn grok_skill_is_embedded() {
         !content.contains("rival wait --log <rival_err> --timeout"),
         "grok skill hardcodes a --timeout on the watcher"
     );
-}
-
-#[test]
-fn plan_skill_runs_codex_at_xhigh() {
-    let name = "rival-plan";
-    assert!(
-        NAMES.contains(&name),
-        "paired plan skill {name:?} is not active"
-    );
-    assert!(
-        !DEPRECATED.contains(&name),
-        "paired plan skill {name:?} is still deprecated"
-    );
-    let content = skill(name);
-    for want in [
-        "name: rival-plan",
-        "Codex",
-        "rival command plan --model codex --effort xhigh --detach",
-    ] {
-        assert!(content.contains(want), "paired plan skill missing {want:?}");
-    }
 }
 
 // Plan mode was dropped on 2026-08-20. The skill must stay deprecated so
@@ -108,8 +68,7 @@ fn antislop_skill_is_deprecated() {
     );
 }
 
-/// Only the plan variants of Sol and Fable stay retired: `rival-plan`
-/// takes `-m sol` and `-m fable`.
+/// The earlier plan variants stay retired.
 #[test]
 fn plan_sol_and_fable_skills_stay_retired() {
     for name in ["rival-plan-sol", "rival-plan-fable"] {
@@ -169,11 +128,6 @@ fn fable_and_sol_skills_are_active() {
             "{name} launches the wrong command from Codex"
         );
     }
-    // rival-plan documents the model list.
-    let plan = skill("rival-plan");
-    assert!(plan.contains("--model opus,fable,sol"), "{plan}");
-    let codex = String::from_utf8(codex_skill("rival-plan", "1").unwrap()).unwrap();
-    assert!(codex.contains("--model opus,fable,sol"), "{codex}");
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -270,21 +224,6 @@ fn codex_skill_errors_quote_the_name() {
     );
 }
 
-/// The whole generated file for one skill: the frontmatter, the input,
-/// and `codex.md` with `{{COMMAND}}` replaced.
-#[test]
-fn codex_skill_full_output_for_plan_claude() {
-    let got = String::from_utf8(codex_skill("rival-plan-claude", "1.2.3").unwrap()).unwrap();
-    let want = format!(
-        "---\nname: rival-plan-claude\ndescription: Review a plan or specification document through Rival from Codex, returning ratings and findings.\nmetadata:\n  version: 1.2.3\n---\n\n# rival-plan-claude\n\n## Review input\n\nPass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.\n\n{}",
-        codex_workflow().replace("{{COMMAND}}", "plan --model claude")
-    );
-    assert_eq!(got, want);
-    assert!(got.contains(
-        "rival command plan --model claude --detach --workdir <absolute-repository> < <input.txt>"
-    ));
-}
-
 /// The command each Codex skill launches.
 #[test]
 fn codex_skill_commands() {
@@ -295,9 +234,6 @@ fn codex_skill_commands() {
         ("rival-sol", "sol"),
         ("rival-k3", "k3"),
         ("rival-grok", "grok"),
-        ("rival-plan", "plan --model codex --effort xhigh"),
-        ("rival-plan-codex", "plan --model codex --effort xhigh"),
-        ("rival-plan-claude", "plan --model claude"),
         ("rival-security", "security"),
     ] {
         let data = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
@@ -335,19 +271,16 @@ fn embedded_files_are_codex_md_and_skill_md() {
 #[test]
 fn codex_skill_text_golden() {
     let review = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.";
-    let plan_description = "Review a plan or specification document through Rival from Codex, returning ratings and findings.";
-    let plan_multi = "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh. To use other models, replace `--model codex --effort xhigh` with `--model <list>`: codex, sol, claude (or opus), fable, comma-separated, for example `--model opus,fable,sol`; each model then uses its configured effort unless the user supplies -re.";
-    let plan = "Pass the document path and any requested options verbatim. If no document is specified, ask for its path before launching. Show all model results and report any skipped model. Codex plan reviews pin xhigh; Claude-only uses its configured effort (medium fallback) unless the user supplies -re.";
     let cases = [
         (
             "rival-claude",
             "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). For a plan document use $rival-plan-claude. Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
         ),
         (
             "rival-fable",
             "Review code with Fable 5.1 through Rival and the authenticated Claude Code CLI. Use for a requested independent Fable review from Codex.",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). For a plan document use $rival-plan with `--model fable`. Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
+            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
         ),
         (
             "rival-codex",
@@ -369,9 +302,6 @@ fn codex_skill_text_golden() {
             "Run a requested grok prompt or code review through Rival from Codex.",
             review,
         ),
-        ("rival-plan", plan_description, plan_multi),
-        ("rival-plan-codex", plan_description, plan),
-        ("rival-plan-claude", plan_description, plan),
         (
             "rival-security",
             "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.",
@@ -389,5 +319,25 @@ fn codex_skill_text_golden() {
             "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: 1\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"
         );
         assert!(data.starts_with(&head), "{name}:\n{data}");
+    }
+}
+
+#[test]
+fn retired_plan_skills_are_unavailable_and_unadvertised() {
+    for name in RETIRED_PLAN_SKILLS {
+        assert!(!NAMES.contains(&name));
+        assert!(read_file(&format!("{name}/SKILL.md")).is_err());
+        assert!(codex_skill(name, "5.1.0").is_err());
+    }
+    for name in NAMES {
+        for text in [
+            skill(name),
+            String::from_utf8(codex_skill(name, "5.1.0").unwrap()).unwrap(),
+        ] {
+            assert!(
+                !text.contains("rival-plan"),
+                "{name} advertises a retired skill"
+            );
+        }
     }
 }

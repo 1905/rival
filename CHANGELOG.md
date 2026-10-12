@@ -8,7 +8,7 @@ Latest binary release: [v5.0.0](https://github.com/1905/rival/releases/tag/v5.0.
 
 ## [v5.1.0] — CLI release preparation
 
-This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. Binary publication is pending: GitHub Actions is blocked by an account billing issue. Rust/Clippy, full CLI scenarios and cross-platform release verification have not yet passed for this candidate.
+This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and proxy support. Rival.app, its DMG and the app cask are excluded from this version at the maintainer's request. Binary publication is pending: GitHub Actions is blocked by an account billing issue. On the Dell, 1,450 Rust tests, strict Clippy, all 100 CLI scenarios and 42 release-script checks pass. Hosted macOS/Windows checks and the six-platform release snapshot remain blocked.
 
 ### Added
 - **Proxy support.** Claude runs (Opus, Fable) and Codex runs (Codex, Sol) can go through an HTTP gateway such as CLIProxyAPI: one `proxy.url`, one key file, and an on/off switch and model prefix for each provider. A preflight reads `/v1/models` and names the fix for a dead proxy, a rejected key or a wrong prefix. A 429 account limit names the other prefixes. `RIVAL_PROXY=off` sends one run direct.
@@ -24,7 +24,11 @@ This version targets the Rust CLI and Homebrew formula, including Sol 6.1 and pr
 - Secrets are scrubbed: the proxy key never appears in logs, session files or errors.
 - Repository `.env` files cannot set `RIVAL_PROXY`, `RIVAL_PROXY_URL` or `RIVAL_PROXY_KEY`. Set them in the process environment.
 
+### Removed
+- `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills. Install/update moves existing copies outside the active skills directory, preserving local edits, extra files and earlier backups. Seven review skills remain, including `rival-sol`; the native `rival command plan` command remains available.
+
 ### Fixed
+- The release configuration check accepts only the documented Homebrew formula (`brews`) deprecation; invalid configuration and other deprecations still fail.
 - Sol 6.1 identity and setup are explicit in the generated Codex skill; upgrade/reinstall tests cover both skill hosts.
 - Settings serializes writes and startup lookup, preserves edits during saves and respects cancellation.
 - Login-shell lookup no longer hangs on inherited stdout or a large startup banner.

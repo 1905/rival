@@ -1,0 +1,236 @@
+{
+  "name": "update-retired-plan-skills",
+  "description": "An already-current update installs the seven active skills and archives all three retired plan skills for both hosts, preserving extra files and unrelated skills.",
+  "normalise": [
+    {
+      "regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "kind": "replace",
+      "replace": "<V>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "update"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 7 installed, 0 updated, 0 up to date, 3 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 7 installed, 0 updated, 0 up to date, 3 removed\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".claude/skills/rival-codex/SKILL.md",
+      ".claude/skills/rival-sol/SKILL.md",
+      ".claude/skills/rival-claude/SKILL.md",
+      ".claude/skills/rival-fable/SKILL.md",
+      ".claude/skills/rival-k3/SKILL.md",
+      ".claude/skills/rival-grok/SKILL.md",
+      ".claude/skills/rival-security/SKILL.md",
+      ".agents/skills/rival-codex/SKILL.md",
+      ".agents/skills/rival-sol/SKILL.md",
+      ".agents/skills/rival-claude/SKILL.md",
+      ".agents/skills/rival-fable/SKILL.md",
+      ".agents/skills/rival-k3/SKILL.md",
+      ".agents/skills/rival-grok/SKILL.md",
+      ".agents/skills/rival-security/SKILL.md",
+      ".claude/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
+      ".claude/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
+      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+      ".claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
+      ".claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+      ".claude/skills/rival-personal/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
+      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+      ".agents/skills/rival-personal/SKILL.md"
+    ],
+    "http_requests": [
+      {
+        "method": "GET",
+        "path": "/repos/1905/rival/releases/latest"
+      }
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.claude/skills/rival-plan/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
+        "text": "---\nname: rival-plan\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-plan/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-plan-codex/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+        "text": "---\nname: rival-plan-codex\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-plan-codex/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-plan-claude/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
+        "text": "---\nname: rival-plan-claude\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-plan-claude/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.claude/skills/rival-personal/SKILL.md",
+        "text": "unrelated"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
+        "text": "---\nname: rival-plan\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan-codex/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+        "text": "---\nname: rival-plan-codex\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan-codex/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan-claude/SKILL.md",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
+        "text": "---\nname: rival-plan-claude\nversion: 5.0.0\n---\nMy edited skill\n"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-plan-claude/notes.txt",
+        "absent": true
+      },
+      {
+        "path": "<HOME>/.agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+        "text": "personal notes"
+      },
+      {
+        "path": "<HOME>/.agents/skills/rival-personal/SKILL.md",
+        "text": "unrelated"
+      }
+    ]
+  },
+  "update_server": {
+    "routes": {
+      "/repos/1905/rival/releases/latest": {
+        "status": 200,
+        "json": {
+          "tag_name": "vdev"
+        }
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "home/.claude/skills/rival-plan/SKILL.md",
+      "text": "---\nname: rival-plan\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.claude/skills/rival-plan/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.claude/skills/rival-plan-codex/SKILL.md",
+      "text": "---\nname: rival-plan-codex\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.claude/skills/rival-plan-codex/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.claude/skills/rival-plan-claude/SKILL.md",
+      "text": "---\nname: rival-plan-claude\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.claude/skills/rival-plan-claude/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.claude/skills/rival-personal/SKILL.md",
+      "text": "unrelated"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan/SKILL.md",
+      "text": "---\nname: rival-plan\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan-codex/SKILL.md",
+      "text": "---\nname: rival-plan-codex\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan-codex/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan-claude/SKILL.md",
+      "text": "---\nname: rival-plan-claude\nversion: 5.0.0\n---\nMy edited skill\n"
+    },
+    {
+      "write": "home/.agents/skills/rival-plan-claude/notes.txt",
+      "text": "personal notes"
+    },
+    {
+      "write": "home/.agents/skills/rival-personal/SKILL.md",
+      "text": "unrelated"
+    }
+  ]
+}

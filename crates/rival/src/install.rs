@@ -224,6 +224,25 @@ fn install_skills_with(
 
     // Clean up deprecated skills.
     let mut removed = 0;
+    for name in skills::RETIRED_PLAN_SKILLS {
+        match archive_retired_plan_skill(target_base, name) {
+            Ok(Some(archive)) => {
+                let _ = writeln!(
+                    out,
+                    "  ✓ {name} — retired; files preserved in {}",
+                    archive.display()
+                );
+                removed += 1;
+            }
+            Ok(None) => {}
+            Err(_) => {
+                let _ = writeln!(
+                    out,
+                    "  ✗ {name} retirement failed — original files kept; check permissions in the skills directory"
+                );
+            }
+        }
+    }
     for name in skills::DEPRECATED {
         let target_dir = target_base.join(name);
         // symlink_metadata: a dangling link is removed too.
@@ -259,6 +278,35 @@ fn install_skills_with(
         "Done: {installed} installed, {updated} updated, {skipped} up to date, {removed} removed"
     );
     Ok(())
+}
+
+/// Move the complete retired entry outside skill discovery. Reserve a fresh
+/// backup directory so repeated upgrades never overwrite an earlier backup.
+/// Rename preserves local additions and moves symlinks without following them.
+fn archive_retired_plan_skill(base: &Path, name: &str) -> io::Result<Option<PathBuf>> {
+    let source = base.join(name);
+    match fs::symlink_metadata(&source) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+        Ok(_) => {}
+    }
+    let archive_root = base.with_file_name("rival-retired-skills");
+    fs::create_dir_all(&archive_root)?;
+    for index in 1u64.. {
+        let reservation = archive_root.join(format!("{name}-{index}"));
+        match fs::create_dir(&reservation) {
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+            Ok(()) => {}
+        }
+        let destination = reservation.join(name);
+        if let Err(e) = fs::rename(&source, &destination) {
+            let _ = fs::remove_dir(&reservation);
+            return Err(e);
+        }
+        return Ok(Some(destination));
+    }
+    Err(io::Error::other("retired skill backup names exhausted"))
 }
 
 /// Removes every entry of `target_base` whose
