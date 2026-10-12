@@ -57,7 +57,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n==> Reinstalling 1905/tap/rival\n\nUpdating skills...\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — installed (v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 7 installed, 0 updated, 0 up to date, 0 removed\n\n✓ Updated to v<V>\n",
+        "stdout": "Checking for updates... vdev → v<V>\n\nUpgrading via Homebrew...\nbrew upgrade failed, trying reinstall...\n==> Reinstalling 1905/tap/rival\n\nUpdating skills...\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival — installed (v<V>)\n\nDone: 1 installed, 0 updated, 0 up to date, 0 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival — installed (v<V>)\n\nDone: 1 installed, 0 updated, 0 up to date, 0 removed\n\n✓ Updated to v<V>\n",
         "stderr_lines": [
           "Error: rival is already installed"
         ],
@@ -67,20 +67,8 @@
   ],
   "expect": {
     "home_files": [
-      ".claude/skills/rival-codex/SKILL.md",
-      ".claude/skills/rival-sol/SKILL.md",
-      ".claude/skills/rival-claude/SKILL.md",
-      ".claude/skills/rival-fable/SKILL.md",
-      ".claude/skills/rival-k3/SKILL.md",
-      ".claude/skills/rival-grok/SKILL.md",
-      ".claude/skills/rival-security/SKILL.md",
-      ".agents/skills/rival-codex/SKILL.md",
-      ".agents/skills/rival-sol/SKILL.md",
-      ".agents/skills/rival-claude/SKILL.md",
-      ".agents/skills/rival-fable/SKILL.md",
-      ".agents/skills/rival-k3/SKILL.md",
-      ".agents/skills/rival-grok/SKILL.md",
-      ".agents/skills/rival-security/SKILL.md"
+      ".claude/skills/rival/SKILL.md",
+      ".agents/skills/rival/SKILL.md"
     ],
     "calls": {
       "brew": 3

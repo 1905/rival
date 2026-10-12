@@ -1,0 +1,237 @@
+{
+  "name": "skill-command",
+  "description": "`rival command skill --host claude|codex` with no config file. Claude Code's /rival runs Sol 6.1 (the skill.claude default), with the fast tier pairs because speed.sol is fast by default. Codex's /rival runs Opus 5.5 (the skill.codex default). Empty input prints the /rival usage, which names no model, and starts nothing. 'security src/' goes to the security review: with no MOONSHOT_API_KEY its preflight fails before any session. An unknown --host is a usage error before stdin is read.",
+  "fakes": {
+    "scripts": {
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 1,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.1-sol",
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "S done\n",
+            "exit": 0
+          }
+        ]
+      },
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--dangerously-skip-permissions"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "You are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "C done\n",
+            "exit": 0
+          }
+        ]
+      },
+      "opencode": {
+        "responses": [
+          {
+            "argv_prefix": [],
+            "stderr": "fake must not run\n",
+            "exit": 97
+          }
+        ]
+      }
+    }
+  },
+  "env": {
+    "MOONSHOT_API_KEY": null,
+    "KIMI_API": null
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "skill",
+        "--host",
+        "claude",
+        "--no-queue"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "S done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting sol (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "command",
+        "skill",
+        "--host",
+        "codex",
+        "--no-queue"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "C done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting claude (command mode)",
+            "fields": {
+              "session": "<UUID2>",
+              "effort": "medium",
+              "mode": "raw"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<UUID2>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "command",
+        "skill",
+        "--host",
+        "claude"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Usage:\n  /rival 'explain the auth flow' — run any prompt with the configured model\n  /rival -re high 'find bugs in src/main.go' — run with a different reasoning effort\n  /rival review — bug-hunting review of the changed files (git auto-detect)\n  /rival review src/api/ — review specific scope\n  /rival -re high review src/api/ — review with high reasoning\n  /rival security — security review of the changed files (git auto-detect)\n  /rival security src/api/ — security review of a specific scope\n  /rival — show this usage info\n\nThe model comes from skill.claude (in Claude Code) or skill.codex (in Codex)\nin ~/.rival/config.yaml. Pick it in rival config (Models), or run:\n  rival config set skill.claude <model>\nReasoning effort (-re): low, medium, high, xhigh, ultra.\nOmitted uses efforts.<model> from ~/.rival/config.yaml.\nThe security review model comes from security.reviewer.\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "skill",
+        "--host",
+        "codex"
+      ],
+      "stdin": "security src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it\n\nsecurity.reviewer selects the model; accepted values: k3, grok\n",
+        "stderr_lines": [
+          "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "skill",
+        "--host",
+        "sol"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "rival command skill: invalid --host \"sol\"; use claude or codex"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID2>.json",
+      ".rival/sessions/<UUID2>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "cli": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "mode": "raw",
+          "service_tier": "fast"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.json",
+        "json": {
+          "status": "completed",
+          "cli": "claude",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "account": "subscription"
+        }
+      }
+    ],
+    "calls": {
+      "codex": 2,
+      "claude": 1,
+      "opencode": 0
+    }
+  }
+}

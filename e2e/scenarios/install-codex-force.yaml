@@ -1,10 +1,14 @@
 {
   "name": "install-codex-force",
-  "description": "`rival install --target codex --force` installs only under <HOME>/.agents/skills. An existing rival-codex with 'version: old' is rewritten without a prompt ('  ✓ rival-codex — updated (vold → v<version>)'). The other eight skills are installed. No prompt text is printed, stdin is not read, and no .claude directory is created.",
+  "description": "`rival install --target codex --force` installs only under <HOME>/.agents/skills. An existing rival skill with 'version: old' is rewritten without a prompt ('  ✓ rival — updated (vold → v<version>)'). The 5.2.0 per-model skill rival-sol is deprecated and removed. No prompt text is printed, stdin is not read, and no .claude directory is created.",
   "fixtures": [
     {
-      "write": "home/.agents/skills/rival-codex/SKILL.md",
+      "write": "home/.agents/skills/rival/SKILL.md",
       "text": "---\nversion: old\n---\ncustom"
+    },
+    {
+      "write": "home/.agents/skills/rival-sol/SKILL.md",
+      "text": "---\nversion: 5.2.0\n---\nold model skill"
     }
   ],
   "normalise": [
@@ -25,7 +29,7 @@
       "stdin": "",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival-codex — updated (vold → v<V>)\n  ✓ rival-sol — installed (v<V>)\n  ✓ rival-claude — installed (v<V>)\n  ✓ rival-fable — installed (v<V>)\n  ✓ rival-k3 — installed (v<V>)\n  ✓ rival-grok — installed (v<V>)\n  ✓ rival-security — installed (v<V>)\n\nDone: 6 installed, 1 updated, 0 up to date, 0 removed\n",
+        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival — updated (vold → v<V>)\n  🗑 deprecated skill removed\n\nDone: 0 installed, 1 updated, 0 up to date, 1 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -33,13 +37,7 @@
   ],
   "expect": {
     "home_files": [
-      ".agents/skills/rival-codex/SKILL.md",
-      ".agents/skills/rival-sol/SKILL.md",
-      ".agents/skills/rival-claude/SKILL.md",
-      ".agents/skills/rival-fable/SKILL.md",
-      ".agents/skills/rival-k3/SKILL.md",
-      ".agents/skills/rival-grok/SKILL.md",
-      ".agents/skills/rival-security/SKILL.md"
+      ".agents/skills/rival/SKILL.md"
     ]
   }
 }

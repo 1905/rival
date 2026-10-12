@@ -207,6 +207,10 @@
                 "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
               },
               "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
               "model_reasoning_effort=xhigh",
               "--sandbox",
               "read-only",
@@ -242,6 +246,10 @@
               {
                 "$regex": "model_providers\\.rival_proxy=\\{ name = \"rival proxy\", base_url = \"http://127\\.0\\.0\\.1:[0-9]+/v1\", env_key = \"RIVAL_PROXY_KEY\", wire_api = \"responses\" \\}"
               },
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
               "-c",
               "model_reasoning_effort=low",
               "--sandbox",

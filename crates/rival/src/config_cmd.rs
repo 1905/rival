@@ -10,7 +10,7 @@ use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, PROXY_KEY_ENV,
     PROXY_KEY_MISSING, PROXY_URL_ENV, ProxyKeySource, ProxyRoute, Route, SECURITY_REVIEWER_K3,
-    SOL_LABEL,
+    SOL_LABEL, SkillHost, Speed,
 };
 use rival_core::proxy;
 use serde_json::{Value as Json, json};
@@ -172,18 +172,32 @@ fn rows(cfg: &Config) -> Result<Vec<Row>, CmdError> {
     } else {
         Row::new("security.reviewer", json!(reviewer), "file")
     });
+    for host in SkillHost::ALL {
+        let source = if cfg.skill_model_configured(host) {
+            "file"
+        } else {
+            "default"
+        };
+        rows.push(Row::new(host.key(), json!(cfg.skill_model(host)), source));
+    }
     rows.push(Row::new(
         "auto_fix_critical_high",
         json!(user.auto_fix_critical_high),
         from_file("auto_fix_critical_high"),
     ));
-    for (label, _) in config::ULTRAFAST_MODELS {
-        let key = format!("ultrafast.{label}");
-        rows.push(Row::new(
-            &key,
-            json!(user.ultrafast.get(label)),
-            from_file(&key),
-        ));
+    for (label, _) in config::SPEED_MODELS {
+        let key = format!("speed.{label}");
+        // A 5.2 `ultrafast.<label>: true` sets the speed when `speed.<label>`
+        // is absent: that value comes from the file too.
+        let old = format!("ultrafast.{label}");
+        let speed = user.speed.get(label);
+        let source =
+            if in_file.contains(&key) || (speed == Speed::Ultrafast && in_file.contains(&old)) {
+                "file"
+            } else {
+                "default"
+            };
+        rows.push(Row::new(&key, json!(speed.name()), source));
     }
     rows.push(Row::new(
         "claude.subscription",
@@ -229,10 +243,11 @@ pub fn set_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError
         let patch: Json = serde_json::from_slice(&data)
             .map_err(|e| CmdError::plain(format!("parse the JSON patch: {e}")))?;
         let edits = write::edits_from_json(&patch).map_err(plain)?;
-        write::apply(&path, &edits).map_err(plain)?;
+        let user = write::apply(&path, &edits).map_err(plain)?;
         let keys: Vec<&str> = edits.iter().map(|e| e.key.as_str()).collect();
         let out = json!({"saved": path.to_string_lossy(), "keys": keys});
         let _ = writeln!(env.stdout, "{out}");
+        warn_ultrafast(env, &edits, &user);
         return Ok(());
     }
     let edit: Edit = match inv.args.as_slice() {
@@ -248,9 +263,23 @@ pub fn set_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError
             ));
         }
     };
-    write::apply(&path, std::slice::from_ref(&edit)).map_err(plain)?;
+    let user = write::apply(&path, std::slice::from_ref(&edit)).map_err(plain)?;
     let _ = writeln!(env.stdout, "{} = {}", inv.args[0], inv.args[1]);
+    warn_ultrafast(env, std::slice::from_ref(&edit), &user);
     Ok(())
+}
+
+/// After a save that set a `speed.<model>` to ultrafast: the plan warning on
+/// stderr. The save stands; most plans run the model at the standard tier.
+fn warn_ultrafast(env: &mut CmdEnv<'_>, edits: &[Edit], user: &config::UserConfig) {
+    let set_ultrafast = edits.iter().any(|e| {
+        e.key
+            .strip_prefix("speed.")
+            .is_some_and(|label| user.speed.get(label) == Speed::Ultrafast)
+    });
+    if set_ultrafast {
+        let _ = writeln!(env.stderr, "warning: {}", config::ULTRAFAST_PLAN_WARNING);
+    }
 }
 
 /// `rival config key set`: reads the key from stdin, never from an

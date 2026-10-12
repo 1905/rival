@@ -422,7 +422,7 @@ fn run_doc_review_with(
     let notices: Vec<String> = created
         .sessions
         .iter()
-        .filter_map(executor::ultrafast_notice)
+        .filter_map(executor::tier_notice)
         .collect();
     let result = assemble_plan_results(runs, skipped, notices.clone());
     if result.is_err() {

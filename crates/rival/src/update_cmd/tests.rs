@@ -302,12 +302,12 @@ fn current_version_refreshes_skills_for_new_codex_install() {
             .starts_with("already on latest (vcurrent)\nInstalling claude skills to ")
     );
     assert!(
-        home.join(".agents/skills/rival-claude/SKILL.md").exists(),
+        home.join(".agents/skills/rival/SKILL.md").exists(),
         "codex skills installed"
     );
-    assert!(home.join(".claude/skills/rival-claude/SKILL.md").exists());
+    assert!(home.join(".claude/skills/rival/SKILL.md").exists());
     // Matching skill versions are preserved, including local edits.
-    let custom = home.join(".claude/skills/rival-claude/SKILL.md");
+    let custom = home.join(".claude/skills/rival/SKILL.md");
     let original = std::fs::read_to_string(&custom).unwrap();
     let edited = format!("{original}\nMy custom note\n");
     std::fs::write(&custom, &edited).unwrap();
@@ -329,7 +329,7 @@ fn current_version_without_codex_installs_claude_only() {
     let o = update(&fix, apps.path(), "dev", "dev");
     assert_eq!(o.result, Ok(()));
     assert_eq!(o.stderr, "");
-    assert!(home.join(".claude/skills/rival-claude/SKILL.md").exists());
+    assert!(home.join(".claude/skills/rival/SKILL.md").exists());
     assert!(!home.join(".agents").exists());
 }
 

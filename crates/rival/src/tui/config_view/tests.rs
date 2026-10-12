@@ -78,11 +78,14 @@ fn check_rows_put_long_messages_under_narrow_rows() {
 /// A pass that Codex ran at the standard tier says so in the TUI rows, as
 /// the text report does; a model with the switch on says `[ultrafast]`.
 #[test]
-fn check_rows_show_the_ultrafast_tag() {
+fn check_rows_show_the_speed_tag() {
     let (_h, mut f) = form();
     f.start_check(false).unwrap();
     let run = f.check.run;
-    for (name, omitted) in [("sol", true), ("codex", false)] {
+    for (name, speed, omitted) in [
+        ("sol", Speed::Ultrafast, true),
+        ("codex", Speed::Fast, false),
+    ] {
         f.check_row(
             run,
             CheckRow {
@@ -92,7 +95,7 @@ fn check_rows_show_the_ultrafast_tag() {
                 ok: true,
                 reply: "ok".into(),
                 called: true,
-                ultrafast: true,
+                speed: Some(speed),
                 tier_omitted: omitted,
                 ..CheckRow::default()
             },
@@ -117,5 +120,91 @@ fn check_rows_show_the_ultrafast_tag() {
         line("sol").contains("ok  [ultrafast not applied]"),
         "{lines:?}"
     );
-    assert!(line("codex").contains("ok  [ultrafast]"), "{lines:?}");
+    assert!(line("codex").contains("ok  [fast]"), "{lines:?}");
+}
+
+/// A focused speed picker shows its value, what it does, and its help.
+#[test]
+fn the_speed_picker_renders_its_value_and_help() {
+    let (_h, mut f) = form();
+    f.section = Section::Models;
+    f.focus = Section::Models
+        .fields()
+        .iter()
+        .position(|x| *x == Field::Speed(1))
+        .unwrap();
+    let v = ViewCtx {
+        styles: &STYLES,
+        spin: "⠋",
+    };
+    let render = |f: &ConfigForm| -> Vec<String> {
+        let mut out = Vec::new();
+        model_lines(f, 120, &v, &mut out);
+        out.iter().map(|b| b.line.to_string()).collect()
+    };
+    let lines = render(&f);
+    let row = lines.iter().position(|l| l.contains("Sol speed")).unwrap();
+    assert_eq!(
+        lines[row].trim_end(),
+        "▸ Sol speed           ‹ fast › ←→   about 2x speed, uses more quota"
+    );
+    assert!(
+        lines[row + 1].contains("the Codex service tier: normal → fast → ultrafast"),
+        "{lines:#?}"
+    );
+    f.apply("right", &crate::tui::testkit::press("right"));
+    let lines = render(&f);
+    assert!(
+        lines.iter().any(|l| l.trim_end()
+            == "▸ Sol speed           ‹ ultrafast › ←→   needs Pro $500 or Enterprise/Edu"),
+        "{lines:#?}"
+    );
+    assert_eq!(
+        footer_line(&f, 200, &STYLES).to_string(),
+        format!("⚠ {}", rival_core::config::ULTRAFAST_PLAN_WARNING)
+    );
+}
+
+/// A focused `/rival` picker shows its arrows, the model's display name and
+/// runtime, and its help; the key bar offers `←→ choose`.
+#[test]
+fn the_skill_picker_renders_its_model_and_help() {
+    let (_h, mut f) = form();
+    f.section = Section::Models;
+    f.focus = Section::Models
+        .fields()
+        .iter()
+        .position(|x| *x == Field::Skill(SkillHost::Codex))
+        .unwrap();
+    f.apply("right", &crate::tui::testkit::press("right"));
+    let v = ViewCtx {
+        styles: &STYLES,
+        spin: "⠋",
+    };
+    let mut out = Vec::new();
+    model_lines(&f, 120, &v, &mut out);
+    let lines: Vec<String> = out.iter().map(|b| b.line.to_string()).collect();
+    let row = lines
+        .iter()
+        .position(|l| l.contains("in Codex"))
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    assert_eq!(
+        lines[row].trim_end(),
+        "▸ in Codex            ‹ fable › ←→   Fable 5.1 · Claude Code"
+    );
+    assert!(out[row].focus);
+    assert!(
+        lines[row + 1].contains("the model /rival runs in Codex (default: claude)"),
+        "{lines:#?}"
+    );
+    assert!(
+        lines.iter().any(|l| l.trim_end() == "/RIVAL RUNS"),
+        "{lines:#?}"
+    );
+    assert!(lines.iter().all(|l| !l.contains("PLAN")), "{lines:#?}");
+    assert!(
+        footer_line(&f, 200, &STYLES)
+            .to_string()
+            .contains("←→ choose"),
+    );
 }

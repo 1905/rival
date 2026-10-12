@@ -6,30 +6,96 @@ fn skill(name: &str) -> String {
     String::from_utf8(read_file(&format!("{name}/SKILL.md")).unwrap().to_vec()).unwrap()
 }
 
+/// The one active skill is `rival`; it launches `rival command skill`
+/// for its host and watches the run in the background.
 #[test]
-fn grok_skill_is_embedded() {
-    let name = "rival-grok";
-    assert!(NAMES.contains(&name), "grok skill {name:?} is not active");
-    assert!(
-        !DEPRECATED.contains(&name),
-        "grok skill {name:?} is deprecated"
-    );
-    let content = skill(name);
+fn rival_skill_is_embedded() {
+    assert_eq!(NAMES, ["rival"]);
+    assert!(!DEPRECATED.contains(&"rival"));
+    let content = skill("rival");
     for want in [
         "version: ",
-        "name: rival-grok",
-        "rival command grok --detach --workdir",
+        "name: rival\n",
+        "rival command skill --host claude --detach --workdir",
+        "rival command security --which --workdir",
         "rival wait --log <rival_err>",
-        "grok login",
+        "/rival security src/api/",
+        "skill.claude",
     ] {
-        assert!(content.contains(want), "grok skill missing {want:?}");
+        assert!(content.contains(want), "rival skill missing {want:?}");
     }
     // A hardcoded watcher timeout re-introduces the bound that
     // RIVAL_QUEUE_TIMEOUT/RIVAL_RUN_TIMEOUT already own.
     assert!(
         !content.contains("rival wait --log <rival_err> --timeout"),
-        "grok skill hardcodes a --timeout on the watcher"
+        "rival skill hardcodes a --timeout on the watcher"
     );
+    let codex = String::from_utf8(codex_skill("rival", "1").unwrap()).unwrap();
+    for want in [
+        "   rival command skill --host codex --detach --workdir <absolute-repository>",
+        "rival command security --which --workdir <absolute-repository>",
+        "skill.codex",
+    ] {
+        assert!(codex.contains(want), "codex rival skill missing {want:?}");
+    }
+}
+
+/// The per-model skills are gone: nothing embeds them and install removes
+/// them on both hosts.
+#[test]
+fn model_skills_are_retired() {
+    for name in [
+        "rival-codex",
+        "rival-sol",
+        "rival-claude",
+        "rival-fable",
+        "rival-k3",
+        "rival-grok",
+        "rival-security",
+    ] {
+        assert!(!NAMES.contains(&name), "{name} is still active");
+        assert!(
+            DEPRECATED.contains(&name),
+            "{name} is not removed on install"
+        );
+        assert!(read_file(&format!("{name}/SKILL.md")).is_err(), "{name}");
+        assert!(codex_skill(name, "1").is_err(), "{name}");
+    }
+}
+
+/// No skill text names a model: the user picks it in the config, and the
+/// output names the model that ran. "Claude Code" and "Codex" as host app
+/// names are allowed.
+#[test]
+fn skill_text_names_no_model() {
+    for name in NAMES {
+        let claude = skill(name);
+        let codex = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
+        for (host, text) in [("claude", &claude), ("codex", &codex)] {
+            let lower = text.to_lowercase();
+            for word in [
+                "opus", "sol 6", "sol ", "astra", "gpt-", "gpt6", "fable", "kimi", "k3", "grok",
+                "sonnet",
+            ] {
+                assert!(!lower.contains(word), "{host} {name} names {word:?}");
+            }
+            // "Claude" only as "Claude Code", "codex" only as the host app,
+            // its CLI, a config key or the host flag.
+            let without_hosts = text
+                .replace("Claude Code", "")
+                .replace("rival command skill --host claude", "");
+            assert!(
+                !without_hosts.contains("Claude"),
+                "{host} {name} names Claude as a model"
+            );
+            for line in text.lines() {
+                let l = line.to_lowercase();
+                for model_phrase in ["with codex", "run codex", "codex review", "codex default"] {
+                    assert!(!l.contains(model_phrase), "{host} {name}: {line:?}");
+                }
+            }
+        }
+    }
 }
 
 // Plan mode was dropped on 2026-08-20. The skill must stay deprecated so
@@ -96,37 +162,6 @@ fn plan_sol_and_fable_skills_stay_retired() {
                 );
             }
         }
-    }
-}
-
-/// Fable 5.1 and Sol 6.1 have their own skills again.
-#[test]
-fn fable_and_sol_skills_are_active() {
-    for (name, command, model) in [
-        ("rival-fable", "fable", "Fable 5.1"),
-        ("rival-sol", "sol", "Sol 6.1"),
-    ] {
-        assert!(NAMES.contains(&name), "{name} is not active");
-        assert!(!DEPRECATED.contains(&name), "{name} is still deprecated");
-        let content = skill(name);
-        for want in [
-            format!("name: {name}\n"),
-            "version: ".to_string(),
-            format!("rival command {command} --detach --workdir"),
-            format!("/{name}"),
-            model.to_string(),
-        ] {
-            assert!(content.contains(&want), "{name} missing {want:?}");
-        }
-        for forbidden in ["rival command claude", "rival command codex", "Opus 5.5"] {
-            assert!(!content.contains(forbidden), "{name} has {forbidden:?}");
-        }
-        let codex = String::from_utf8(codex_skill(name, "test").unwrap()).unwrap();
-        assert!(codex.contains(model), "{name} does not name {model}");
-        assert!(
-            codex.contains(&format!("rival command {command} --detach --workdir")),
-            "{name} launches the wrong command from Codex"
-        );
     }
 }
 
@@ -213,7 +248,7 @@ fn read_file_hides_root_files_and_reports_not_exist_error() {
         read_file("rival-nope/SKILL.md").unwrap_err(),
         "open rival-nope/SKILL.md: file does not exist"
     );
-    assert!(read_file("rival-codex/../codex.md").is_err());
+    assert!(read_file("rival/../codex.md").is_err());
 }
 
 #[test]
@@ -224,26 +259,12 @@ fn codex_skill_errors_quote_the_name() {
     );
 }
 
-/// The command each Codex skill launches.
+/// The command the Codex skill launches.
 #[test]
 fn codex_skill_commands() {
-    for (name, command) in [
-        ("rival-claude", "claude"),
-        ("rival-codex", "codex"),
-        ("rival-fable", "fable"),
-        ("rival-sol", "sol"),
-        ("rival-k3", "k3"),
-        ("rival-grok", "grok"),
-        ("rival-security", "security"),
-    ] {
-        let data = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
-        let line = format!("   rival command {command} --detach --workdir <absolute-repository>");
-        assert!(data.contains(&line), "{name}: missing {line:?}");
-    }
-    let k3 = String::from_utf8(codex_skill("rival-k3", "1").unwrap()).unwrap();
-    assert!(k3.contains(
-        "description: Run a requested k3 prompt or code review through Rival from Codex.\n"
-    ));
+    let data = String::from_utf8(codex_skill("rival", "1").unwrap()).unwrap();
+    let line = "   rival command skill --host codex --detach --workdir <absolute-repository>";
+    assert!(data.contains(line), "missing {line:?}");
 }
 
 /// The embedded tree is `codex.md` plus one `SKILL.md` per name, nothing
@@ -267,59 +288,16 @@ fn embedded_files_are_codex_md_and_skill_md() {
     assert_eq!(got, want);
 }
 
-/// The description and input of every Codex skill, pinned as golden text.
+/// The description and input of the Codex skill, pinned as golden text.
 #[test]
 fn codex_skill_text_golden() {
-    let review = "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Model defaults and provider setup are owned by Rival; do not invent flags or substitute another model.";
-    let cases = [
-        (
-            "rival-claude",
-            "Review code with Opus 5.5 through Rival and the authenticated Claude Code CLI. Use for a requested independent Claude review from Codex.",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Claude default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, or Rival's configured Docker transport. Rival selects Opus 5.5; do not replace it with another model.",
-        ),
-        (
-            "rival-fable",
-            "Review code with Fable 5.1 through Rival and the authenticated Claude Code CLI. Use for a requested independent Fable review from Codex.",
-            "Always run a code review. No arguments means `review`. A scope means `review <scope>`. If the user already supplied `review`, do not duplicate it. Move an explicit effort before review: `-re high review src/`. Omitted effort uses the configured Fable default (medium fallback). Requires the Claude Code CLI authenticated with `claude auth login`, Rival's configured Docker transport, or Rival's proxy. Rival selects Fable 5.1; do not replace it with another model.",
-        ),
-        (
-            "rival-codex",
-            "Run a requested codex prompt or code review through Rival from Codex.",
-            review,
-        ),
-        (
-            "rival-sol",
-            "Run a requested Sol 6.1 prompt or code review through Rival from Codex.",
-            "Pass the user's arguments verbatim: `[-re level] review [scope]` for reviews, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. Rival selects Sol 6.1 (`gpt-6.1-sol`) on the Codex CLI. Omitted effort uses `efforts.sol` from Rival's configuration (xhigh fallback). Requires the Codex CLI authenticated with `codex login`, or Rival's configured Codex proxy route. Do not invent flags or substitute another model.",
-        ),
-        (
-            "rival-k3",
-            "Run a requested k3 prompt or code review through Rival from Codex.",
-            review,
-        ),
-        (
-            "rival-grok",
-            "Run a requested grok prompt or code review through Rival from Codex.",
-            review,
-        ),
-        (
-            "rival-security",
-            "Run Rival's dedicated security reviewer on changed code or a specified scope from Codex. Use for requested vulnerability reviews.",
-            "First run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Pass the user's scope verbatim; empty input reviews git-detected changes. The model is selected by security.reviewer in Rival's configuration.",
-        ),
-    ];
-    let mut names: Vec<&str> = cases.iter().map(|(name, _, _)| *name).collect();
-    names.sort_unstable();
-    let mut active = NAMES.to_vec();
-    active.sort_unstable();
-    assert_eq!(names, active);
-    for (name, description, input) in cases {
-        let data = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
-        let head = format!(
-            "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: 1\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"
-        );
-        assert!(data.starts_with(&head), "{name}:\n{data}");
-    }
+    let description = "Run a requested prompt, code review or security review through Rival from Codex, with the model set for Codex in rival config.";
+    let input = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The model comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
+    let data = String::from_utf8(codex_skill("rival", "1").unwrap()).unwrap();
+    let head = format!(
+        "---\nname: rival\ndescription: {description}\nmetadata:\n  version: 1\n---\n\n# rival\n\n## Review input\n\n{input}\n\n"
+    );
+    assert!(data.starts_with(&head), "{data}");
 }
 
 #[test]
@@ -343,7 +321,7 @@ fn retired_plan_skills_are_unavailable_and_unadvertised() {
 }
 
 /// The Ultrafast skills are retired: install removes them, nothing embeds
-/// them, and the Codex-runtime skills relay the "not applied" notice.
+/// them, and the `/rival` skill relays the "not applied" notice.
 #[test]
 fn ultrafast_skills_are_retired_and_the_base_skills_relay_the_notice() {
     for name in ["rival-astra-ultrafast", "rival-sol-ultrafast"] {
@@ -354,14 +332,14 @@ fn ultrafast_skills_are_retired_and_the_base_skills_relay_the_notice() {
         );
         assert!(codex_skill(name, "1").is_err(), "{name}");
     }
-    for name in ["rival-codex", "rival-sol"] {
+    for name in NAMES {
         assert!(
-            skill(name).contains("`rival: ⚠ ultrafast not applied` line"),
+            skill(name).contains("`rival: ⚠ … not applied` line"),
             "{name}"
         );
         let codex = String::from_utf8(codex_skill(name, "1").unwrap()).unwrap();
         assert!(
-            codex.contains("`rival: ⚠ ultrafast not applied` line"),
+            codex.contains("`rival: ⚠ … not applied` line"),
             "codex {name}"
         );
     }

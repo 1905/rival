@@ -94,8 +94,8 @@ When multiple agents work in parallel (worktrees, branches), these bugs appear o
 
 ### Role prompt checklists
 
-Every single-model code review (`/rival-codex review`, `/rival-claude review`,
-`/rival-k3 review`, `/rival-grok review`) uses the bug-hunter role. That role's
+Every single-model code review (`/rival review`, `rival command codex review`,
+`rival command claude review` and the other models) uses the bug-hunter role. That role's
 prompt includes the implementation-focused patterns most useful for
 high-confidence findings:
 
@@ -108,7 +108,7 @@ high-confidence findings:
 
 Every finding must also carry a `failure_scenario`: the input or state that
 triggers it and the wrong result. Security patterns (pattern 3) have their own
-lens, `/rival-security`.
+lens, `/rival security`.
 
 ### Diff context in review preamble
 

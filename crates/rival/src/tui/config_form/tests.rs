@@ -312,27 +312,66 @@ fn effort_pickers_step_through_each_ladder() {
     assert_eq!(f.patch(), json!({"efforts.grok": "medium"}));
 }
 
+/// `space` on a model row does nothing: the plan toggle is gone from the
+/// window, and `plan.models` in the file is never written.
 #[test]
-fn space_sets_the_plan_defaults_and_keeps_one() {
+fn space_on_a_model_row_changes_nothing() {
+    let (_h, mut f) = form(Some("plan:\n  models: [opus, codex]\n"));
+    keys(&mut f, &["tab"]);
+    assert_eq!(f.field(), Some(Field::Model(0)));
+    assert_eq!(keys(&mut f, &["space", "enter"]), [None, None]);
+    assert!(!f.dirty(), "{:?}", f.patch());
+    assert_eq!(f.draft.plan.models, ["opus", "codex"]);
+}
+
+/// The two `/rival` pickers follow the model rows: each cycles the six
+/// models from the host's default and writes its own `skill.<host>` key.
+#[test]
+fn the_skill_pickers_write_their_own_keys() {
     let (_h, mut f) = form(None);
     keys(&mut f, &["tab"]);
-    assert!(
-        f.plan_default(&MODELS[0]),
-        "codex is the default plan model"
+    keys(&mut f, &["down"; 6]);
+    assert_eq!(f.field(), Some(Field::Skill(SkillHost::Claude)));
+    assert_eq!(f.skill_model(SkillHost::Claude).unwrap().name, "sol");
+    assert_eq!(f.skill_model(SkillHost::Codex).unwrap().name, "claude");
+    keys(&mut f, &["right"]);
+    assert_eq!(f.skill_model(SkillHost::Claude).unwrap().name, "claude");
+    assert_eq!(f.patch(), json!({"skill.claude": "claude"}));
+    keys(&mut f, &["left", "left"]);
+    assert_eq!(f.skill_model(SkillHost::Claude).unwrap().name, "codex");
+    keys(&mut f, &["left"]);
+    assert_eq!(
+        f.skill_model(SkillHost::Claude).unwrap().name,
+        "grok",
+        "the list wraps"
     );
-    keys(&mut f, &["space"]);
-    assert!(f.plan_default(&MODELS[0]), "the last plan model stays");
-    assert_eq!(f.notice.as_ref().unwrap().kind, NoticeKind::Error);
-    keys(&mut f, &["down", "down", "space"]);
-    assert_eq!(f.patch(), json!({"plan.models": ["codex", "claude"]}));
-    keys(&mut f, &["up", "up", "space"]);
-    assert_eq!(f.patch(), json!({"plan.models": ["claude"]}));
-    // K3 is not a plan reviewer.
-    keys(&mut f, &["down", "down", "down", "down", "space"]);
-    assert_eq!(f.notice.as_ref().unwrap().text, "k3 is not a plan reviewer");
-    // `opus` in the file is `claude`.
-    let (_h, f) = form(Some("plan:\n  models: [opus, codex]\n"));
-    assert!(f.plan_default(&MODELS[2]) && f.plan_default(&MODELS[0]));
+    keys(&mut f, &["down", "right"]);
+    assert_eq!(f.field(), Some(Field::Skill(SkillHost::Codex)));
+    assert_eq!(
+        f.patch(),
+        json!({"skill.claude": "grok", "skill.codex": "fable"})
+    );
+    let edits = f.edits().unwrap();
+    assert_eq!(
+        edits,
+        [
+            Edit::set("skill.claude", write::Value::Str("grok".into())),
+            Edit::set("skill.codex", write::Value::Str("fable".into())),
+        ]
+    );
+    assert!(f.draft_config().is_ok());
+    keys(&mut f, &["left"]);
+    assert_eq!(
+        f.patch(),
+        json!({"skill.claude": "grok"}),
+        "the default again is no change"
+    );
+    // `opus` in the file is `claude`, and picking claude again is no change.
+    let (_h, mut f) = form(Some("skill:\n  codex: opus\n"));
+    assert_eq!(f.skill_model(SkillHost::Codex).unwrap().name, "claude");
+    focus(&mut f, Field::Skill(SkillHost::Codex));
+    keys(&mut f, &["right", "left"]);
+    assert!(!f.dirty(), "{:?}", f.patch());
 }
 
 #[test]
@@ -572,32 +611,61 @@ fn help_opens_with_question_mark_and_any_key_closes_it() {
     );
 }
 
-/// The two Ultrafast toggles close the Models section; each writes its own
-/// key, and only when it changed.
+/// The two speed pickers close the Models section; both are fast by
+/// default, `←→` cycles normal → fast → ultrafast, each writes its own
+/// `speed.<model>` key, only when it changed, and ultrafast warns.
 #[test]
-fn the_ultrafast_toggles_write_their_own_keys() {
+fn the_speed_pickers_write_their_own_keys() {
     let (_h, mut f) = form(None);
-    focus(&mut f, Field::Ultrafast(0));
+    focus(&mut f, Field::Speed(0));
     assert_eq!(f.section, Section::Models);
-    keys(&mut f, &["space"]);
-    assert!(f.draft.ultrafast.codex && !f.draft.ultrafast.sol);
-    assert_eq!(f.patch(), json!({"ultrafast.codex": true}));
-    keys(&mut f, &["down", "space"]);
-    assert_eq!(f.field(), Some(Field::Ultrafast(1)));
+    assert_eq!(f.field().unwrap().label(), "Codex speed");
+    assert_eq!(
+        (f.draft.speed.codex, f.draft.speed.sol),
+        (Speed::Fast, Speed::Fast)
+    );
+    keys(&mut f, &["right"]);
+    assert_eq!(f.draft.speed.codex, Speed::Ultrafast);
+    assert_eq!(f.patch(), json!({"speed.codex": "ultrafast"}));
+    let notice = f.notice.clone().expect("the ultrafast warning");
+    assert_eq!(notice.kind, NoticeKind::Warn);
+    assert_eq!(notice.text, config::ULTRAFAST_PLAN_WARNING);
+    keys(&mut f, &["right"]);
+    assert_eq!(f.draft.speed.codex, Speed::Normal, "the list wraps");
+    assert!(f.notice.is_none());
+    keys(&mut f, &["down", "left"]);
+    assert_eq!(f.field(), Some(Field::Speed(1)));
+    assert_eq!(f.field().unwrap().label(), "Sol speed");
     assert_eq!(
         f.patch(),
-        json!({"ultrafast.codex": true, "ultrafast.sol": true})
+        json!({"speed.codex": "normal", "speed.sol": "normal"})
     );
+    assert_eq!(
+        f.edits().unwrap(),
+        [
+            Edit::set("speed.codex", write::Value::Str("normal".into())),
+            Edit::set("speed.sol", write::Value::Str("normal".into())),
+        ]
+    );
+    assert!(f.draft_config().is_ok());
+    keys(&mut f, &["right"]);
+    assert_eq!(
+        f.patch(),
+        json!({"speed.codex": "normal"}),
+        "fast again is no change"
+    );
+    assert_eq!(keys(&mut f, &["space"]), [None], "a picker does not toggle");
     keys(&mut f, &["down"]);
     assert_eq!(
         f.field(),
-        Some(Field::Ultrafast(1)),
+        Some(Field::Speed(1)),
         "the focus stops at the end"
     );
-    // A switch already on in the file: turning it off writes false.
+    // A 5.2 `ultrafast.sol: true` reads as ultrafast; stepping writes speed.
     let (_h, mut f) = form(Some("ultrafast:\n  sol: true\n"));
-    assert!(f.draft.ultrafast.sol);
-    focus(&mut f, Field::Ultrafast(1));
-    keys(&mut f, &["space"]);
-    assert_eq!(f.patch(), json!({"ultrafast.sol": false}));
+    assert_eq!(f.draft.speed.sol, Speed::Ultrafast);
+    assert!(!f.dirty());
+    focus(&mut f, Field::Speed(1));
+    keys(&mut f, &["left"]);
+    assert_eq!(f.patch(), json!({"speed.sol": "fast"}));
 }

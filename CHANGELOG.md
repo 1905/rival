@@ -4,9 +4,22 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 
 Latest binary release: [v5.2.0](https://github.com/1905/rival/releases/tag/v5.2.0) — 2026-10-12.
 
-## [Unreleased]
+## [v6.0.0] — 2026-10-12
+
+Breaking: the per-model skills are replaced by one skill.
+
+### Added
+- **One `/rival` skill** for Claude Code and Codex. It names no model: `skill.claude` and `skill.codex` in `~/.rival/config.yaml` pick the model each host runs. The defaults give each host a review from the other vendor: `/rival` in Claude Code runs Sol 6.1 (`sol`), and `$rival` in Codex runs Opus 5.5 (`claude`). The values are `codex`, `sol`, `claude` (or `opus`), `fable`, `k3` and `grok`. Pick them in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. `rival config show` lists both keys.
+- `/rival security [scope]` runs the security review; `security.reviewer` still picks its model.
+- `rival command skill --host claude|codex`, which the skill launches. Input that starts with `security` goes to `rival command security`; other input runs the `rival command <model>` flow of the configured model. Empty input prints the `/rival` usage. A failed preflight names the key to change: `set another model: rival config set skill.<host> <model>`.
+
+### Changed
+- **Speed tiers replace the Ultrafast switch.** `speed.codex` and `speed.sol` take `normal`, `fast` or `ultrafast`; the default is **fast** (about 2x speed, uses more of the plan's quota): `-c service_tier="fast"` and `-c features.fast_mode=true`. `normal` sends the plain argv; `ultrafast` sends the 5.2 Ultrafast pairs and needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on. `rival config set speed.<model> ultrafast` prints that warning on stderr; the config window's `Codex speed` / `Sol speed` pickers show it as a notice. A 5.2 `ultrafast.<model>: true` with no `speed.<model>` reads as ultrafast; `ultrafast.<model>` is no longer settable. The not-applied notice names the tier (`rival: ⚠ fast not applied — …`), with the plan line for ultrafast only. `rival config show` lists `speed.*` instead of `ultrafast.*`; `rival config check` tags rows `[fast]`, `[ultrafast]` or `[<tier> not applied]`, and `--json` rows have `speed` instead of `ultrafast`.
+- The config window's Models section drops the PLAN column and its `space` toggle. `plan.models` and `rival command plan -m` are unchanged.
+- `scripts/bump-skill-versions.sh` reads the `NAMES` array in its one-line form too.
 
 ### Removed
+- The skills `rival-codex`, `rival-sol`, `rival-claude`, `rival-fable`, `rival-k3`, `rival-grok` and `rival-security`. `rival install` and `rival update` delete installed copies. `rival command codex|sol|claude|fable|k3|grok|security|plan` and `rival run` stay.
 - Rival.app, the Swift macOS viewer, with its Makefile targets (`run`, `install`, `test`, `soak`), the `try-proxy` app mode and the `rival-app` cask in `1905/homebrew-tap`. Use `rival tui`. Remove an installed copy with `brew uninstall --cask rival-app`.
 
 ## [v5.2.0] — 2026-10-12

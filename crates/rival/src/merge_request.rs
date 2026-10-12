@@ -107,7 +107,7 @@ pub fn prepare_review_target_with(
 /// checkout first.
 pub fn reject_unresolved_mr(prompt: &str) -> Result<(), String> {
     if mergerequest::contains(prompt) {
-        return Err("GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival-codex review <MR-URL>) from a repository with the MR's remote; no reviewer was started".to_string());
+        return Err("GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival review <MR-URL>) from a repository with the MR's remote; no reviewer was started".to_string());
     }
     Ok(())
 }

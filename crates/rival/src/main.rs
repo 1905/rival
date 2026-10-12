@@ -14,6 +14,7 @@ mod model_specs;
 mod queue_sessions;
 mod root;
 mod signals;
+mod skill_command;
 mod startup_fds;
 #[cfg(test)]
 mod testutil;

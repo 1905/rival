@@ -84,6 +84,25 @@ and ignores the value. Needs MOONSHOT_API_KEY in the project .env (or exported).
 Review mode runs read-only sandboxed (same profile as the other reviewers);
 raw prompts run full auto and can edit files and run commands in the workdir.";
 
+/// The usage of the `/rival` skill, for both hosts. It names no model: the
+/// model comes from `skill.<host>`.
+pub const RIVAL_USAGE: &str = "Usage:
+  /rival 'explain the auth flow' — run any prompt with the configured model
+  /rival -re high 'find bugs in src/main.go' — run with a different reasoning effort
+  /rival review — bug-hunting review of the changed files (git auto-detect)
+  /rival review src/api/ — review specific scope
+  /rival -re high review src/api/ — review with high reasoning
+  /rival security — security review of the changed files (git auto-detect)
+  /rival security src/api/ — security review of a specific scope
+  /rival — show this usage info
+
+The model comes from skill.claude (in Claude Code) or skill.codex (in Codex)
+in ~/.rival/config.yaml. Pick it in rival config (Models), or run:
+  rival config set skill.claude <model>
+Reasoning effort (-re): low, medium, high, xhigh, ultra.
+Omitted uses efforts.<model> from ~/.rival/config.yaml.
+The security review model comes from security.reviewer.";
+
 /// One provider run, as the workflows hand it to [`ModelSpec::run`].
 pub struct RunCall<'a, 'm> {
     pub ctx: &'a Context,
@@ -274,4 +293,19 @@ pub fn grok_spec() -> ModelSpec {
             )
         }),
     }
+}
+
+/// The spec of a `rival command` model name (a [`config::SKILL_MODEL_NAMES`]
+/// entry), or `None` for any other name.
+pub fn spec_for_name(name: &str) -> Option<ModelSpec> {
+    let spec = match name {
+        config::CODEX_LABEL => codex_spec(),
+        config::SOL_LABEL => sol_spec(),
+        config::CLAUDE_LABEL => claude_spec(),
+        config::FABLE_LABEL => fable_spec(),
+        config::K3_COMMAND_NAME => k3_spec(),
+        config::GROK_LABEL => grok_spec(),
+        _ => return None,
+    };
+    Some(spec)
 }

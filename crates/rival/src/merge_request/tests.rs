@@ -23,7 +23,7 @@ fn model_command_rejects_mr_in_raw_prompt() {
     assert!(err.contains("rival command codex review <MR-URL>"), "{err}");
     assert_eq!(
         err,
-        "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival-codex review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
+        "GitLab MR URLs need a pinned review: use rival command codex review <MR-URL> (or /rival review <MR-URL>) from a repository with the MR's remote; no reviewer was started"
     );
     // Any MR-shaped text counts, even a malformed URL.
     assert!(reject_unresolved_mr("see /-/merge_requests/ for details").is_err());

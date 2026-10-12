@@ -33,6 +33,7 @@ pub enum CommandId {
     CommandK3,
     CommandPlan,
     CommandSecurity,
+    CommandSkill,
     CommandSol,
     Config,
     ConfigShow,
@@ -76,6 +77,7 @@ impl CommandId {
             ["rival", "command", "k3"] => CommandK3,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
+            ["rival", "command", "skill"] => CommandSkill,
             ["rival", "command", "sol"] => CommandSol,
             ["rival", "config"] => Config,
             ["rival", "config", "show"] => ConfigShow,
@@ -306,6 +308,11 @@ pub fn build(defaults: &Defaults) -> Command {
             workdir(),
             no_queue(),
             bool_flag("which", "print the resolved model and exit"),
+        ]),
+        with_args(command("skill", "Run the /rival skill with the model set for its host")).args([
+            string_flag("host", "", "the app the skill runs in: claude or codex (required)"),
+            workdir(),
+            no_queue(),
         ]),
         model_command("sol", "Skill-facing Sol executor"),
     ]);

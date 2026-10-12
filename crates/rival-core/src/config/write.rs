@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use serde_saphyr::granit_parser::{Event, Parser, ScalarStyle};
 
-use super::{ConfigError, ULTRAFAST_MODELS, UserConfig, parse_user_config};
+use super::{ConfigError, SPEED_MODELS, UserConfig, parse_user_config};
 
 #[cfg(test)]
 mod tests;
@@ -28,7 +28,7 @@ pub const HEADER: &str = "# written by rival config; comments are not kept";
 
 /// The key paths `rival config set` accepts. `efforts.<model>` takes any
 /// effort label; the validation checks the label.
-pub const SETTABLE_KEYS: [&str; 12] = [
+pub const SETTABLE_KEYS: [&str; 14] = [
     "proxy.url",
     "proxy.key_file",
     "proxy.claude.enabled",
@@ -39,7 +39,9 @@ pub const SETTABLE_KEYS: [&str; 12] = [
     "efforts.<model>",
     "security.reviewer",
     "auto_fix_critical_high",
-    "ultrafast.<model>",
+    "speed.<model>",
+    "skill.claude",
+    "skill.codex",
     "claude.subscription",
 ];
 
@@ -95,14 +97,18 @@ fn key_kind(key: &str) -> Result<Kind, ConfigError> {
         | "proxy.claude.model_prefix"
         | "proxy.codex.model_prefix"
         | "security.reviewer"
+        | "skill.claude"
+        | "skill.codex"
         | "claude.subscription" => Kind::Str,
         "proxy.claude.enabled" | "proxy.codex.enabled" | "auto_fix_critical_high" => Kind::Bool,
         "plan.models" => Kind::List,
+        // `speed.<model>` takes normal, fast or ultrafast; the load
+        // validates it. The 5.2 `ultrafast.<model>` is read, never written.
         _ if key
-            .strip_prefix("ultrafast.")
-            .is_some_and(|label| ULTRAFAST_MODELS.iter().any(|(l, _)| *l == label)) =>
+            .strip_prefix("speed.")
+            .is_some_and(|label| SPEED_MODELS.iter().any(|(l, _)| *l == label)) =>
         {
-            Kind::Bool
+            Kind::Str
         }
         _ => match key.strip_prefix("efforts.") {
             Some(label) if !label.is_empty() && !label.contains('.') => Kind::Str,

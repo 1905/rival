@@ -1,0 +1,114 @@
+{
+  "name": "config-skill",
+  "description": "`rival config show` lists skill.claude (sol) and skill.codex (claude) as defaults, and speed.codex and speed.sol as fast defaults, with no ultrafast rows. `config set skill.claude fable` writes the skill block. `config set speed.sol ultrafast` saves and prints the plan warning on stderr; a later show reads both from the file. `config set skill.codex gpt5` and `config set speed.codex turbo` are refused with the accepted names, and the file keeps its text.",
+  "steps": [
+    {
+      "run": [
+        "config",
+        "show"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?m)(?s)(?!.*^ultrafast\\.)(?=.*^skill\\.claude +sol +default$)(?=.*^skill\\.codex +claude +default$)(?=.*^speed\\.codex +fast +default$)(?=.*^speed\\.sol +fast +default$).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "skill.claude",
+        "fable"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "skill.claude = fable\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "speed.sol",
+        "ultrafast"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "speed.sol = ultrafast\n",
+        "stderr_lines": [
+          "warning: Ultrafast needs the Pro $500 plan (or Enterprise/Edu with Ultrafast on); other plans run at the standard tier."
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "skill.codex",
+        "gpt5"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "invalid skill.codex \"gpt5\" in <HOME>/.rival/config.yaml; use one of: codex, sol, claude, fable, k3, grok"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "speed.codex",
+        "turbo"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr_lines": [
+          "invalid speed.codex \"turbo\" in <HOME>/.rival/config.yaml; use one of: normal, fast, ultrafast"
+        ],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "config",
+        "show"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?m)(?s)(?=.*^skill\\.claude +fable +file$)(?=.*^skill\\.codex +claude +default$)(?=.*^speed\\.sol +ultrafast +file$)(?=.*^speed\\.codex +fast +default$).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml",
+      ".rival/config.yaml.lock"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/config.yaml",
+        "text": "# written by rival config; comments are not kept\nskill:\n  claude: fable\nspeed:\n  sol: ultrafast\n"
+      }
+    ]
+  }
+}

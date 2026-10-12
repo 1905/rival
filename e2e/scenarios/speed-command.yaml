@@ -1,6 +1,6 @@
 {
-  "name": "ultrafast-command",
-  "description": "The `ultrafast.sol` switch is on and `ultrafast.codex` is off. `rival command sol` gets the tier pairs after `-m` and records `service_tier`; Sol's fake echoes the prompt and then prints Codex's \"not advertised\" warning, as Codex does (all on stdout, so the log order is fixed), so rival prints the not-applied notice after the output on stdout and on stderr, and the run still completes. `rival command codex` runs without the tier: its switch is off.",
+  "name": "speed-command",
+  "description": "`speed.sol` is ultrafast and `speed.codex` is normal. `rival command sol` gets the ultrafast tier pairs after `-m` and records `service_tier`; Sol's fake echoes the prompt and then prints Codex's \"not advertised\" warning, as Codex does (all on stdout, so the log order is fixed), so rival prints the ultrafast not-applied notice with the plan line after the output on stdout and on stderr, and the run still completes. `rival command codex` runs without the tier: its speed is normal. `config set speed.codex fast` (no plan warning), then `rival command codex` gets the fast tier pairs and records `service_tier: fast`.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -10,7 +10,7 @@
               "login",
               "status"
             ],
-            "times": 2,
+            "times": 3,
             "stdout": "Logged in using ChatGPT\n",
             "exit": 0
           },
@@ -67,6 +67,35 @@
             },
             "stdout": "B done\n",
             "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6-astra",
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "F done\n",
+            "exit": 0
           }
         ]
       }
@@ -75,7 +104,7 @@
   "fixtures": [
     {
       "write": "home/.rival/config.yaml",
-      "text": "ultrafast:\n  sol: true\n  codex: false\n"
+      "text": "speed:\n  sol: ultrafast\n  codex: normal\n"
     }
   ],
   "steps": [
@@ -87,10 +116,10 @@
       "stdin": "explain the auth flow",
       "expect": {
         "exit_code": 0,
-        "stdout": "user\nAnswer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow\nwarning: Configured service tier `ultrafast` is not advertised as supported for model `sol` and will be omitted from requests.\ncodex\nA done\n\nrival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.\n",
+        "stdout": "user\nAnswer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.\n\nYou are working in project directory: <ROOT>/work\nUse your tools to read files, run git commands, and explore the codebase as needed.\n\nexplain the auth flow\nwarning: Configured service tier `ultrafast` is not advertised as supported for model `sol` and will be omitted from requests.\ncodex\nA done\n\nrival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.\nrival: Ultrafast needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on.\n",
         "stderr_lines": [
           "rival: ⚠ ultrafast not applied — Codex omitted service_tier=ultrafast for sol because its model catalog does not list the tier; the run used the standard tier.",
-          "rival: Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on."
+          "rival: Ultrafast needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on."
         ],
         "log_events": [
           {
@@ -104,9 +133,10 @@
           },
           {
             "level": "warn",
-            "message": "codex omitted the ultrafast service tier",
+            "message": "codex omitted the service tier",
             "fields": {
-              "session": "<UUID1>"
+              "session": "<UUID1>",
+              "tier": "ultrafast"
             }
           }
         ]
@@ -134,16 +164,58 @@
           }
         ]
       }
+    },
+    {
+      "run": [
+        "config",
+        "set",
+        "speed.codex",
+        "fast"
+      ],
+      "stdin": "",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "speed.codex = fast\n",
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "codex"
+      ],
+      "stdin": "explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "F done\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting codex (command mode)",
+            "fields": {
+              "session": "<UUID3>",
+              "effort": "xhigh",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
     }
   ],
   "expect": {
     "home_files": [
       ".rival/config.yaml",
+      ".rival/config.yaml.bak",
+      ".rival/config.yaml.lock",
       ".rival/queue/.lock",
       ".rival/sessions/<UUID1>.json",
       ".rival/sessions/<UUID1>.log",
       ".rival/sessions/<UUID2>.json",
-      ".rival/sessions/<UUID2>.log"
+      ".rival/sessions/<UUID2>.log",
+      ".rival/sessions/<UUID3>.json",
+      ".rival/sessions/<UUID3>.log"
     ],
     "files": [
       {
@@ -167,10 +239,25 @@
           "model": "gpt-6-astra",
           "mode": "raw"
         }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID3>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "model": "gpt-6-astra",
+          "mode": "raw",
+          "service_tier": "fast"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/config.yaml",
+        "text": "# written by rival config; comments are not kept\nspeed:\n  sol: ultrafast\n  codex: fast\n"
       }
     ],
     "calls": {
-      "codex": 4
+      "codex": 6
     }
   }
 }

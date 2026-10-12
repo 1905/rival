@@ -17,8 +17,8 @@ use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
     self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, ProxyProvider,
-    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, ULTRAFAST_MODELS, UserConfig,
-    VALID_EFFORTS,
+    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, SPEED_MODELS, SkillHost, Speed,
+    UserConfig, VALID_EFFORTS,
 };
 use rival_core::proxy;
 
@@ -83,7 +83,8 @@ impl Section {
             ],
             Section::Models => (0..MODELS.len())
                 .map(Field::Model)
-                .chain((0..ULTRAFAST_MODELS.len()).map(Field::Ultrafast))
+                .chain(SkillHost::ALL.map(Field::Skill))
+                .chain((0..SPEED_MODELS.len()).map(Field::Speed))
                 .collect(),
             Section::Review => vec![Field::Reviewer, Field::AutoFix],
             Section::Check => Vec::new(),
@@ -100,12 +101,14 @@ pub enum Field {
     Key,
     ClaudePrefix,
     CodexPrefix,
-    /// A row of [`MODELS`]: its effort picker and plan default.
+    /// A row of [`MODELS`]: its effort picker.
     Model(usize),
+    /// The `skill.<host>` picker: the model `/rival` runs in that host.
+    Skill(SkillHost),
     Reviewer,
     AutoFix,
-    /// A row of [`ULTRAFAST_MODELS`]: its `ultrafast.<label>` switch.
-    Ultrafast(usize),
+    /// A row of [`SPEED_MODELS`]: its `speed.<label>` picker.
+    Speed(usize),
 }
 
 impl Field {
@@ -118,11 +121,13 @@ impl Field {
             Field::ClaudePrefix => "Claude prefix",
             Field::CodexPrefix => "Codex prefix",
             Field::Model(i) => MODELS.get(i).map_or("", |m| m.name),
+            Field::Skill(SkillHost::Claude) => "in Claude Code",
+            Field::Skill(SkillHost::Codex) => "in Codex",
             Field::Reviewer => "Security reviewer",
             Field::AutoFix => "Auto-fix crit/high",
-            Field::Ultrafast(i) => match ULTRAFAST_MODELS.get(i).map(|(label, _)| *label) {
-                Some(CODEX_LABEL) => "Codex Ultrafast",
-                Some(SOL_LABEL) => "Sol Ultrafast",
+            Field::Speed(i) => match SPEED_MODELS.get(i).map(|(label, _)| *label) {
+                Some(CODEX_LABEL) => "Codex speed",
+                Some(SOL_LABEL) => "Sol speed",
                 _ => "",
             },
         }
@@ -131,14 +136,19 @@ impl Field {
     pub fn is_toggle(self) -> bool {
         matches!(
             self,
-            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix | Field::Ultrafast(_)
+            Field::ClaudeRoute | Field::CodexRoute | Field::AutoFix
         )
     }
 
     pub fn is_picker(self) -> bool {
         matches!(
             self,
-            Field::ClaudePrefix | Field::CodexPrefix | Field::Reviewer | Field::Model(_)
+            Field::ClaudePrefix
+                | Field::CodexPrefix
+                | Field::Reviewer
+                | Field::Model(_)
+                | Field::Skill(_)
+                | Field::Speed(_)
         )
     }
 
@@ -172,8 +182,6 @@ pub struct ModelInfo {
     pub model: &'static str,
     /// The efforts `←→` steps through.
     pub ladder: &'static [&'static str],
-    /// Whether `plan.models` takes it.
-    pub plan: bool,
     /// Any one of them runs the model.
     pub binaries: &'static [&'static str],
 }
@@ -181,7 +189,8 @@ pub struct ModelInfo {
 const GROK_LADDER: [&str; 3] = ["low", "medium", "high"];
 const K3_LADDER: [&str; 1] = ["max"];
 
-/// The window's models, in row order.
+/// The window's models, in row order. The names are the
+/// [`config::SKILL_MODEL_NAMES`], so the skill pickers cycle through them.
 pub const MODELS: [ModelInfo; 6] = [
     ModelInfo {
         name: CODEX_LABEL,
@@ -191,7 +200,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: Some(ProxyProvider::Codex),
         model: config::CODEX_MODEL,
         ladder: &VALID_EFFORTS,
-        plan: true,
         binaries: &["codex"],
     },
     ModelInfo {
@@ -202,7 +210,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: Some(ProxyProvider::Codex),
         model: config::SOL_MODEL,
         ladder: &VALID_EFFORTS,
-        plan: true,
         binaries: &["codex"],
     },
     ModelInfo {
@@ -213,7 +220,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: Some(ProxyProvider::Claude),
         model: config::CLAUDE_MODEL,
         ladder: &VALID_EFFORTS,
-        plan: true,
         binaries: &["claude", "docker"],
     },
     ModelInfo {
@@ -224,7 +230,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: Some(ProxyProvider::Claude),
         model: config::FABLE_MODEL,
         ladder: &VALID_EFFORTS,
-        plan: true,
         binaries: &["claude", "docker"],
     },
     ModelInfo {
@@ -235,7 +240,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: None,
         model: config::KIMI_MODEL,
         ladder: &K3_LADDER,
-        plan: false,
         binaries: &["opencode"],
     },
     ModelInfo {
@@ -246,7 +250,6 @@ pub const MODELS: [ModelInfo; 6] = [
         provider: None,
         model: config::GROK_MODEL,
         ladder: &GROK_LADDER,
-        plan: false,
         binaries: &["grok"],
     },
 ];
@@ -291,6 +294,8 @@ pub struct Notice {
 pub enum NoticeKind {
     Info,
     Ok,
+    /// A choice that saves but may not work as asked.
+    Warn,
     Error,
 }
 
@@ -660,45 +665,13 @@ impl ConfigForm {
                 self.draft.proxy.claude.enabled = !self.draft.proxy.claude.enabled;
             }
             Field::CodexRoute => self.draft.proxy.codex.enabled = !self.draft.proxy.codex.enabled,
-            Field::Ultrafast(i) => {
-                if let Some(on) = ULTRAFAST_MODELS
-                    .get(i)
-                    .and_then(|(label, _)| self.draft.ultrafast.get_mut(label))
-                {
-                    *on = !*on;
-                }
-            }
             Field::AutoFix => {
                 self.draft.auto_fix_critical_high = !self.draft.auto_fix_critical_high;
             }
-            Field::Model(i) => self.toggle_plan(i),
             _ => return None,
         }
         self.validate();
         None
-    }
-
-    fn toggle_plan(&mut self, i: usize) {
-        let Some(m) = MODELS.get(i) else { return };
-        if !m.plan {
-            self.info(&format!("{} is not a plan reviewer", m.name));
-            return;
-        }
-        let mut chosen = plan_set(&self.draft);
-        if chosen.contains(&m.name) {
-            if chosen.len() == 1 {
-                self.error_notice("the plan review needs at least one model");
-                return;
-            }
-            chosen.retain(|n| *n != m.name);
-        } else {
-            chosen.push(m.name);
-        }
-        self.draft.plan.models = MODELS
-            .iter()
-            .filter(|m| chosen.contains(&m.name))
-            .map(|m| m.name.to_string())
-            .collect();
     }
 
     /// `←→` on a picker.
@@ -717,6 +690,24 @@ impl ConfigForm {
             Field::Reviewer => {
                 let names: Vec<String> = REVIEWERS.iter().map(|(n, _)| n.to_string()).collect();
                 self.draft.security.reviewer = cycle(&names, self.reviewer(), delta);
+            }
+            Field::Speed(i) => {
+                let (label, _) = SPEED_MODELS.get(i)?;
+                let slot = self.draft.speed.get_mut(label)?;
+                let at = Speed::ALL.iter().position(|s| s == slot).unwrap_or(0) as isize;
+                let n = Speed::ALL.len() as isize;
+                *slot = Speed::ALL[(at + delta).rem_euclid(n) as usize];
+                if *slot == Speed::Ultrafast {
+                    self.notice = Some(Notice {
+                        text: config::ULTRAFAST_PLAN_WARNING.to_string(),
+                        kind: NoticeKind::Warn,
+                    });
+                }
+            }
+            Field::Skill(host) => {
+                let names: Vec<String> = MODELS.iter().map(|m| m.name.to_string()).collect();
+                let next = cycle(&names, skill_model(&self.draft, host), delta);
+                *self.draft.skill.get_mut(host) = next;
             }
             Field::Model(i) => {
                 let m = MODELS.get(i)?;
@@ -895,9 +886,10 @@ impl ConfigForm {
         effective_reviewer(&self.draft)
     }
 
-    /// Whether `m` is a plan default in the draft.
-    pub fn plan_default(&self, m: &ModelInfo) -> bool {
-        m.plan && plan_set(&self.draft).contains(&m.name)
+    /// The draft's `/rival` model for `host`, as a [`MODELS`] row.
+    pub fn skill_model(&self, host: SkillHost) -> Option<&'static ModelInfo> {
+        let name = skill_model(&self.draft, host);
+        MODELS.iter().find(|m| m.name == name)
     }
 
     /// The draft's difference from the saved config as a `config set --json`
@@ -1157,8 +1149,8 @@ impl ConfigForm {
 }
 
 /// The difference of `d` from `s` as a patch with dotted keys. Efforts,
-/// plan models and the reviewer compare by their effective values, so a
-/// default chosen again is no change.
+/// the skill models and the reviewer compare by their effective values, so
+/// a default chosen again is no change.
 fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
     let mut p = Map::new();
     let url = d.proxy.url.trim();
@@ -1194,11 +1186,10 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
             p.insert(format!("efforts.{}", m.effort_label), json!(effort(d)));
         }
     }
-    let (mut sp, mut dp) = (plan_set(s), plan_set(d));
-    sp.sort_unstable();
-    dp.sort_unstable();
-    if sp != dp {
-        p.insert("plan.models".into(), json!(d.plan.models));
+    for host in SkillHost::ALL {
+        if skill_model(s, host) != skill_model(d, host) {
+            p.insert(host.key().into(), json!(skill_model(d, host)));
+        }
     }
     if effective_reviewer(s) != effective_reviewer(d) {
         p.insert("security.reviewer".into(), json!(effective_reviewer(d)));
@@ -1209,9 +1200,9 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
             json!(d.auto_fix_critical_high),
         );
     }
-    for (label, _) in ULTRAFAST_MODELS {
-        if s.ultrafast.get(label) != d.ultrafast.get(label) {
-            p.insert(format!("ultrafast.{label}"), json!(d.ultrafast.get(label)));
+    for (label, _) in SPEED_MODELS {
+        if s.speed.get(label) != d.speed.get(label) {
+            p.insert(format!("speed.{label}"), json!(d.speed.get(label).name()));
         }
     }
     p
@@ -1229,29 +1220,10 @@ fn effective_reviewer(u: &UserConfig) -> &str {
     }
 }
 
-/// The plan models of `u` as row names: `opus` is `claude`; none set means
-/// `codex`.
-fn plan_set(u: &UserConfig) -> Vec<&'static str> {
-    let names: Vec<&str> = if u.plan.models.is_empty() {
-        vec![CODEX_LABEL]
-    } else {
-        u.plan
-            .models
-            .iter()
-            .map(|n| {
-                if n == config::OPUS_ALIAS {
-                    CLAUDE_LABEL
-                } else {
-                    n.as_str()
-                }
-            })
-            .collect()
-    };
-    MODELS
-        .iter()
-        .filter(|m| m.plan && names.contains(&m.name))
-        .map(|m| m.name)
-        .collect()
+/// The `/rival` model of `host` in `u`: `skill.<host>` (`opus` is
+/// `claude`), else the host's default.
+fn skill_model(u: &UserConfig, host: SkillHost) -> &'static str {
+    config::skill_model_name(u.skill.get(host)).unwrap_or_else(|| host.default_model())
 }
 
 /// The value `delta` steps from `current` in `values`, wrapping. A value

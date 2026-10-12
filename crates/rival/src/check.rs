@@ -25,7 +25,7 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use rival_core::cancel::{Context, ContextError};
-use rival_core::config::{self, Config, ProxyProvider, Route, SecurityModel};
+use rival_core::config::{self, Config, ProxyProvider, Route, SecurityModel, Speed};
 use rival_core::duration;
 use rival_core::executor::{self, OpencodeRunOpts};
 use rival_core::leakguard;
@@ -198,12 +198,12 @@ pub struct CheckRow {
     pub unexpected: bool,
     /// Whether the live call ran.
     pub called: bool,
-    /// The model's `ultrafast.<label>` switch is on: the call asked for the
-    /// Ultrafast tier.
-    pub ultrafast: bool,
-    /// Codex ran the call at the standard tier although `ultrafast` is on.
+    /// The `speed.<label>` of a Codex-runtime model; `None` for any other.
+    pub speed: Option<Speed>,
+    /// Codex ran the call at the standard tier although `speed` asked for a
+    /// tier.
     pub tier_omitted: bool,
-    /// [`executor::ultrafast_notice`] of that call; "" otherwise.
+    /// [`executor::tier_notice`] of that call; "" otherwise.
     pub tier_notice: String,
 }
 
@@ -222,20 +222,19 @@ impl CheckRow {
             "hint": self.hint,
             "limit": self.limit,
             "unexpected": self.unexpected,
-            "ultrafast": self.ultrafast,
+            "speed": self.speed.map_or("", Speed::name),
             "tier_omitted": self.tier_omitted,
         })
     }
 
     /// What the text report and the TUI append to the row's message:
-    /// `[ultrafast not applied]`, `[ultrafast]`, or nothing.
-    pub fn tier_tag(&self) -> &'static str {
-        if self.tier_omitted {
-            "  [ultrafast not applied]"
-        } else if self.ultrafast {
-            "  [ultrafast]"
-        } else {
-            ""
+    /// `[<tier> not applied]`, `[<tier>]` (`fast`, `ultrafast`), or nothing
+    /// for normal and the other models.
+    pub fn tier_tag(&self) -> String {
+        match self.speed.and_then(Speed::tier) {
+            Some(tier) if self.tier_omitted => format!("  [{tier} not applied]"),
+            Some(tier) => format!("  [{tier}]"),
+            None => String::new(),
         }
     }
 
@@ -340,7 +339,7 @@ impl Report {
             } else {
                 row.error.clone()
             };
-            message.push_str(row.tier_tag());
+            message.push_str(&row.tier_tag());
             let line = format!(
                 "  {mark} {:<name_w$}  {:<route_w$}  {:<wire_w$}  {}  {message}",
                 row.name,
@@ -412,8 +411,8 @@ pub trait Runner: Sync {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CallOutcome {
     pub exit_code: i64,
-    /// [`executor::ultrafast_notice`] when Codex ran the call at the
-    /// standard tier although the model's `ultrafast.<label>` switch is on.
+    /// [`executor::tier_notice`] when Codex ran the call at the standard
+    /// tier although the model's `speed.<label>` asked for a tier.
     pub tier_notice: Option<String>,
 }
 
@@ -604,7 +603,7 @@ fn base_row(cfg: &Config, t: &Target) -> CheckRow {
         runtime: t.runtime.to_string(),
         route: route_name.to_string(),
         wire_model,
-        ultrafast: cfg.ultrafast(t.model),
+        speed: executor::is_codex_model(t.model).then(|| cfg.speed(t.model)),
         ..CheckRow::default()
     }
 }
@@ -947,7 +946,7 @@ impl Runner for SpecRunner {
         })
         .map(|r| CallOutcome {
             exit_code: r.exit_code,
-            tier_notice: executor::ultrafast_notice(&sess),
+            tier_notice: executor::tier_notice(&sess),
         })
         .map_err(|e| format!("{e:#}"))
     }

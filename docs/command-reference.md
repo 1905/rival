@@ -183,7 +183,7 @@ rival install --force           # overwrite without prompting
 
 - Claude Code skills go to `~/.claude/skills`. Codex skills go to `~/.agents/skills`. On Windows, `~` means `%USERPROFILE%`.
 - `--target auto` always installs for Claude Code. It adds Codex when one of these exists: `codex` on `PATH`, `$CODEX_HOME`, `~/.codex`, or `Codex.app` in `~/Applications` or `/Applications`.
-- `rival install` removes retired skills: `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable`, `rival-astra-ultrafast`, `rival-sol-ultrafast` and older names. `rival-fable` and `rival-sol` are back in 5.1. The 5.1.0 Ultrafast skills are replaced by the `ultrafast` switch in 5.2.
+- `rival install` removes retired skills: the 5.x per-model skills `rival-codex`, `rival-sol`, `rival-claude`, `rival-fable`, `rival-k3`, `rival-grok` and `rival-security` (replaced by `rival` in 6.0), `rival-review`, `rival-plan-sol`, `rival-astra`, `rival-plan-astra`, `rival-plan-fable`, `rival-astra-ultrafast`, `rival-sol-ultrafast` and older names. The 5.1.0 Ultrafast skills are replaced by the `ultrafast` switch in 5.2.
 
 The retired `rival-plan`, `rival-plan-codex` and `rival-plan-claude` skills are
 no longer installed. On `rival install` or `rival update`, existing copies are
@@ -224,17 +224,26 @@ only when you intend to overwrite your installed skill contents.
 
 ### Skills
 
-`rival install` installs seven skills. In Claude Code they are slash commands (`/rival-codex`). In Codex they are `$rival-codex` and so on. Every skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)).
+`rival install` installs one skill, `rival`, for each host. In Claude Code it is the slash command `/rival`; in Codex it is `$rival`. The skill launches a detached run (see [Detached flow](#detached-flow-and-rival-wait)). It names no model: the model comes from the config.
 
-| Skill | Syntax | Runs | Default model and effort |
+| Syntax | Runs |
+|---|---|
+| `/rival [-re low\|medium\|high\|xhigh\|ultra] review [scope]` | A code review with the model of `skill.<host>`. |
+| `/rival [-re level] <prompt>` | Any prompt with the model of `skill.<host>`. |
+| `/rival security [scope]` | The security review with the model of `security.reviewer` (default `k3`). |
+| `/rival` | Prints the usage. |
+
+| Host | Config key | Default model | Launches |
 |---|---|---|---|
-| `/rival-codex` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command codex` | Codex, xhigh |
-| `/rival-claude` | `[-re level] [scope]` (always a review) | `rival command claude` | Claude, medium |
-| `/rival-fable` | `[-re level] [scope]` (always a review) | `rival command fable` | Fable, medium |
-| `/rival-sol` | `[-re low\|medium\|high\|xhigh\|ultra] [review [scope] \| prompt]` | `rival command sol` | Sol, xhigh |
-| `/rival-k3` | `[review [scope] \| prompt]` | `rival command k3` | Kimi K3, max (fixed) |
-| `/rival-grok` | `[-re low\|medium\|high] [review [scope] \| prompt]` | `rival command grok` | Grok, high |
-| `/rival-security` | `[scope]` | `rival command security` | `security.reviewer` (default `k3`) |
+| Claude Code | `skill.claude` | `sol` (Sol 6.1) | `rival command skill --host claude` |
+| Codex | `skill.codex` | `claude` (Opus 5.5) | `rival command skill --host codex` |
+
+- By default each host gets a review from the other vendor.
+- Pick a model in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. The values are `codex`, `sol`, `claude` (or `opus`), `fable`, `k3` and `grok`.
+- An omitted `-re` uses `efforts.<model>` of the resolved model. K3 runs at max only; grok clamps levels above high.
+- The review header names the model that ran (`Model: sol (gpt-6.1-sol)`).
+- If the runtime of the configured model is missing, the preflight error is followed by `set another model: rival config set skill.<host> <model> (…)`.
+- 6.0 removes the per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok` and `/rival-security`. `rival command codex|sol|claude|fable|k3|grok|security|plan` stay for the CLI.
 
 - `review` with no scope reviews the changed files found by git. A scope may be a path or plain language, for example `review the auth middleware`.
 - Git scope detection: tracked changes against `HEAD` plus untracked files first. If the tree is clean, the files of the last commit. If there are none, the entire project.
@@ -247,7 +256,7 @@ Top-level commands (`rival --help`):
 
 | Command | Purpose |
 |---|---|
-| `rival command <x>` | Skill-facing commands. They read raw skill arguments from stdin. |
+| `rival command <x>` | Skill-facing commands. They read raw skill arguments from stdin. `rival command skill --host claude\|codex` is the one the `/rival` skill runs. |
 | `rival run <x>` | Terminal runners with explicit flags. |
 | `rival wait` | Blocks until detached runs finish. |
 | `rival tui` | Full-screen session monitor. |
@@ -259,16 +268,17 @@ Top-level commands (`rival --help`):
 `rival command` subcommands. Each reads its input from stdin.
 
 - If stdin is a terminal or `/dev/null`, every subcommand prints its usage and starts no model.
-- Empty piped input prints usage for `codex`, `claude`, `grok`, `k3` and `plan`. For `security`, empty piped input reviews the changed files.
+- Empty piped input prints usage for `skill`, `codex`, `claude`, `grok`, `k3` and `plan`. For `security`, empty piped input reviews the changed files.
 
 | Subcommand | Flags (defaults) |
 |---|---|
 | `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
 | `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`plan.models`, else `codex`; accepts `codex`, `sol`, `claude`/`opus`, `fable`, comma-separated), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
+| `skill` | `--host` (required: `claude` or `codex`), `--workdir` (`.`), `--no-queue`. Input that starts with `security` runs `security` with the rest as the scope; any other input runs `codex`, `sol`, `claude`, `fable`, `k3` or `grok` as `skill.<host>` selects. |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
-- The Codex Ultrafast tier is a config switch, not a flag: see `ultrafast` under Configuration.
+- The Codex service tier is a config key, not a flag: see `speed` under Configuration.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 
@@ -288,6 +298,7 @@ echo 'review src/api/'             | rival command codex --workdir .
 echo '-re high review'             | rival command claude --workdir .
 echo 'explain the auth flow'       | rival command codex --workdir .
 echo 'docs/plan.md'                | rival command plan --workdir .
+echo 'review'                      | rival command skill --host claude --workdir .
 echo 'explain the auth flow'       | rival run claude --prompt-stdin --workdir .
 rival run grok --review src/api/ --workdir .
 rival command security --which
@@ -443,7 +454,7 @@ Log: ~/.rival/sessions/<session-id>.log
 
 ### Security review
 
-`/rival-security [scope]` runs `rival command security`. It hunts exploitable vulnerabilities in twelve classes: injection, authorization (including IDOR), authentication, crypto, path traversal, SSRF, deserialization, secret exposure, input validation, CSRF, open redirect, and resource exhaustion. It does not report style or ordinary logic bugs.
+`/rival security [scope]` runs `rival command security`. It hunts exploitable vulnerabilities in twelve classes: injection, authorization (including IDOR), authentication, crypto, path traversal, SSRF, deserialization, secret exposure, input validation, CSRF, open redirect, and resource exhaustion. It does not report style or ordinary logic bugs.
 
 The model comes from `security.reviewer` in `~/.rival/config.yaml`:
 
@@ -464,7 +475,7 @@ The model comes from `security.reviewer` in `~/.rival/config.yaml`:
 A single-model review accepts a GitLab merge request URL as its whole scope:
 
 ```bash
-/rival-codex review https://gitlab.example.com/group/project/-/merge_requests/123
+/rival review https://gitlab.example.com/group/project/-/merge_requests/123
 echo 'review https://gitlab.example.com/group/project/-/merge_requests/123' | rival command codex --workdir .
 rival run claude --review https://gitlab.example.com/group/project/-/merge_requests/123 --workdir .
 ```
@@ -493,14 +504,18 @@ efforts:              # per-model default effort
 security:
   reviewer: k3        # k3 (default) | grok
 
+skill:                # the model the /rival skill runs, per host
+  claude: sol         # in Claude Code: codex | sol | claude (or opus) | fable | k3 | grok
+  codex: claude       # in Codex: the same values
+
 claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
 
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
 
-ultrafast:            # Codex Ultrafast service tier, per model
-  codex: false        # GPT-6 Astra
-  sol: false          # Sol 6.1
+speed:                # Codex service tier, per model: normal | fast | ultrafast
+  codex: fast         # GPT-6 Astra
+  sol: fast           # Sol 6.1
 
 proxy:                # see Proxy
   url: http://127.0.0.1:8317
@@ -520,13 +535,15 @@ roles:                # optional prompt overrides
   security: "..."     # replaces the security-review instructions
 ```
 
-- The values shown for `efforts` are the built-in defaults.
-- An unknown `efforts` key, an invalid effort, or an invalid `security.reviewer` stops every command before it creates a session.
+- The values shown for `efforts`, `skill` and `speed` are the built-in defaults.
+- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, an invalid `skill.claude` / `skill.codex`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
 - `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
-- `ultrafast.codex` and `ultrafast.sol` are off by default. Turn one on in the config window (`rival config`, Models: `Codex Ultrafast`, `Sol Ultrafast`) or with `rival config set ultrafast.sol true`. Then every call of that model asks Codex for the Ultrafast tier: `/rival-codex` and `/rival-sol` reviews and prompts, their language-repair pass, `rival command plan` and `rival config check`. Rival adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true` after `-m <model>`, on the direct and the proxy route, and the session records `"service_tier": "ultrafast"`.
-  - Ultrafast needs a Codex account on Pro $500, or an Enterprise/Edu workspace with Ultrafast on.
-  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival sets `"service_tier_omitted": true` on the session and prints `rival: ⚠ ultrafast not applied — …` after the output (command, plan) on stdout and stderr. `rival config check` marks the row `[ultrafast not applied]`. Exit codes do not change.
+- `speed.codex` and `speed.sol` pick the Codex service tier of each Codex-runtime model: `normal`, `fast` (the default) or `ultrafast`. Change them in the config window (`rival config`, Models: `Codex speed`, `Sol speed`; `←`/`→` cycles normal → fast → ultrafast) or with `rival config set speed.sol normal`. The speed applies to every call of that model: `/rival` reviews and prompts, `rival command codex` and `rival command sol`, their language-repair pass, `rival command plan` and `rival config check`.
+  - `normal` sends the plain argv. `fast` adds `-c service_tier="fast"` and `-c features.fast_mode=true` after `-m <model>` (after the proxy provider pairs on the proxy route). Fast runs at about 2x speed and uses more of the plan's quota; Codex sends it as its `priority` tier. `ultrafast` adds `-c service_tier="ultrafast"` and `-c features.ultrafast_mode=true`. The session records `"service_tier": "fast"` or `"ultrafast"`.
+  - Ultrafast needs the Pro $500 plan, or an Enterprise/Edu workspace with Ultrafast on. `rival config set speed.<model> ultrafast` saves and prints that warning on stderr; the config window shows it as a notice.
+  - Compatibility: with no `speed.<model>`, a 5.2 `ultrafast.<model>: true` reads as `ultrafast`; `false` or absent reads as `fast`. `rival config set` writes only `speed.*`; `ultrafast.<model>` is not a settable key.
+  - When the account's model catalog does not list the tier, Codex prints a warning and sends the request at the standard tier. Rival sets `"service_tier_omitted": true` on the session and prints `rival: ⚠ <tier> not applied — …` after the output (command, plan) on stdout and stderr; for ultrafast on the direct route it adds the plan line. `rival config check` marks the row `[fast]`, `[ultrafast]` or `[<tier> not applied]`; `--json` rows have `speed` (`normal`, `fast`, `ultrafast`, or "" for the other models) and `tier_omitted`. Exit codes do not change.
   - Rival cannot see a tier that a server-side requirement turns off: Codex drops it without a warning. Whether a proxy forwards `service_tier` depends on the proxy.
 - A `roles` override replaces the role instructions only. Rival still appends the JSON contract. An empty override is ignored.
 
@@ -575,7 +592,7 @@ Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one
 | `rival config models [--json]` | The proxy's models, grouped by prefix. |
 | `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and the security reviewer. Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
 
-The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
+The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Models has the model table (MODEL, RUNTIME, ROUTE, EFFORT; `←`/`→` picks the effort), the `/RIVAL RUNS` pickers `in Claude Code` (`skill.claude`) and `in Codex` (`skill.codex`), which cycle the six models with `←`/`→`, and the two speed pickers (`Codex speed`, `Sol speed`). The window does not set `plan.models`; use `rival config set plan.models` or `rival command plan -m`. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
 
 ### Queue and timeouts
 
@@ -647,8 +664,10 @@ Claude runs through the Claude Code CLI and bills your subscription login by def
 
 | Removed | Replacement |
 |---|---|
-| Megareview: `rival review`, `rival command megareview`, and the consilium judge | `rival command codex review` (skill: `/rival-codex review`) |
-| `/rival-review` skill | `/rival-codex review`. `rival install` removes the old skill. |
+| Per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok`, `/rival-security` (6.0) | `/rival` with `skill.claude` / `skill.codex`; `/rival security`. `rival install` removes the old skills. |
+| The PLAN column and plan toggles of the config window (6.0) | `rival config set plan.models <models>` |
+| Megareview: `rival review`, `rival command megareview`, and the consilium judge | `rival command codex review` (skill: `/rival review`) |
+| `/rival-review` skill | `/rival review`. `rival install` removes the old skill. |
 | `rival server` (web dashboard) | `rival tui` |
 | Rival.app (macOS viewer) and its `rival-app` cask | `rival tui`. Remove an installed copy with `brew uninstall --cask rival-app`. |
 

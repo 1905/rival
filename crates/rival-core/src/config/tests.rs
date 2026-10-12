@@ -1969,24 +1969,35 @@ fn a_draft_proxy_key_stands_in_for_the_key_file_but_not_the_env() {
     assert_eq!(route.key(), "env-key-0003");
 }
 
-/// `ultrafast.codex` and `ultrafast.sol` are off unless set; each switch
-/// covers its own model only, and no other model ever gets the tier.
+/// `speed.codex` and `speed.sol` are fast unless set, also with no config
+/// file; each key covers its own model only, and no other model ever gets
+/// a tier.
 #[test]
-fn ultrafast_is_per_codex_runtime_model_and_off_by_default() {
+fn speed_is_per_codex_runtime_model_and_fast_by_default() {
     let (_home, missing) = loaded("");
-    assert!(!missing.ultrafast(CODEX_MODEL) && !missing.ultrafast(SOL_MODEL));
+    assert_eq!(missing.speed(CODEX_MODEL), Speed::Fast);
+    assert_eq!(missing.speed(SOL_MODEL), Speed::Fast);
+    let no_file = cfg(&[]);
+    assert!(no_file.user_config().is_none());
+    assert_eq!(no_file.speed(CODEX_MODEL), Speed::Fast);
+    assert_eq!(SpeedConfig::default().sol, Speed::Fast);
+    use Speed::*;
     for (body, codex, sol) in [
-        ("efforts:\n  codex: high\n", false, false),
-        ("ultrafast:\n", false, false),
-        ("ultrafast:\n  codex: true\n", true, false),
-        ("ultrafast:\n  sol: true\n", false, true),
-        ("ultrafast:\n  codex: true\n  sol: false\n", true, false),
-        ("ultrafast:\n  codex: true\n  sol: true\n", true, true),
+        ("efforts:\n  codex: high\n", Fast, Fast),
+        ("speed:\n", Fast, Fast),
+        ("speed:\n  codex: normal\n", Normal, Fast),
+        ("speed:\n  sol: ULTRAFAST\n", Fast, Ultrafast),
+        (
+            "speed:\n  codex: ultrafast\n  sol: normal\n",
+            Ultrafast,
+            Normal,
+        ),
+        ("speed:\n  codex: \" fast \"\n", Fast, Fast),
     ] {
         let (_home, config) = loaded(body);
         assert!(config.user_config_error().is_none(), "{body:?}");
-        assert_eq!(config.ultrafast(CODEX_MODEL), codex, "{body:?}");
-        assert_eq!(config.ultrafast(SOL_MODEL), sol, "{body:?}");
+        assert_eq!(config.speed(CODEX_MODEL), codex, "{body:?}");
+        assert_eq!(config.speed(SOL_MODEL), sol, "{body:?}");
         for other in [
             CLAUDE_MODEL,
             FABLE_MODEL,
@@ -1995,10 +2006,140 @@ fn ultrafast_is_per_codex_runtime_model_and_off_by_default() {
             "codex",
             "sol",
         ] {
-            assert!(!config.ultrafast(other), "{body:?} {other:?}");
+            assert_eq!(config.speed(other), Normal, "{body:?} {other:?}");
         }
+    }
+}
+
+/// The 5.2 `ultrafast.<model>: true` reads as ultrafast while
+/// `speed.<model>` is absent; `false` falls through to the default fast;
+/// `speed.<model>` always wins.
+#[test]
+fn old_ultrafast_switches_read_as_a_speed() {
+    use Speed::*;
+    for (body, codex, sol) in [
+        ("ultrafast:\n  codex: true\n", Ultrafast, Fast),
+        ("ultrafast:\n  codex: false\n  sol: true\n", Fast, Ultrafast),
+        (
+            "ultrafast:\n  sol: true\nspeed:\n  sol: normal\n",
+            Fast,
+            Normal,
+        ),
+        (
+            "ultrafast:\n  codex: false\nspeed:\n  codex: ultrafast\n",
+            Ultrafast,
+            Fast,
+        ),
+    ] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.speed(CODEX_MODEL), codex, "{body:?}");
+        assert_eq!(config.speed(SOL_MODEL), sol, "{body:?}");
     }
     let (_home, bad) = loaded("ultrafast:\n  codex: fast\n");
     assert!(bad.user_config_error().is_some());
-    assert!(!bad.ultrafast(CODEX_MODEL));
+}
+
+/// A bad `speed.<model>` value is a config error that names the key and the
+/// accepted values.
+#[test]
+fn speed_rejects_unknown_values() {
+    let (home, config) = loaded("speed:\n  sol: turbo\n");
+    assert_eq!(
+        config.user_config_error().expect("error").to_string(),
+        format!(
+            r#"invalid speed.sol "turbo" in {}; use one of: normal, fast, ultrafast"#,
+            config_path(home.path()).display()
+        )
+    );
+}
+
+/// Each speed's tier and name.
+#[test]
+fn speed_tiers_and_names() {
+    assert_eq!(Speed::Normal.tier(), None);
+    assert_eq!(Speed::Fast.tier(), Some("fast"));
+    assert_eq!(Speed::Ultrafast.tier(), Some("ultrafast"));
+    assert_eq!(speed_names(), ["normal", "fast", "ultrafast"]);
+    assert_eq!(Speed::parse(" Fast "), Some(Speed::Fast));
+    assert_eq!(Speed::parse("priority"), None);
+    assert_eq!(Speed::from_tier("ultrafast"), Speed::Ultrafast);
+    assert_eq!(Speed::from_tier(""), Speed::Normal);
+}
+
+/// `skill.claude` defaults to sol and `skill.codex` to claude, with or
+/// without a config file.
+#[test]
+fn skill_models_default_to_the_other_vendor() {
+    let no_file = cfg(&[]);
+    assert_eq!(no_file.skill_model(SkillHost::Claude), SOL_LABEL);
+    assert_eq!(no_file.skill_model(SkillHost::Codex), CLAUDE_LABEL);
+    assert!(!no_file.skill_model_configured(SkillHost::Claude));
+    for body in ["", "skill:\n", "skill:\n  claude: \"\"\n  codex:\n"] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.skill_model(SkillHost::Claude), SOL_LABEL, "{body:?}");
+        assert_eq!(
+            config.skill_model(SkillHost::Codex),
+            CLAUDE_LABEL,
+            "{body:?}"
+        );
+        assert!(!config.skill_model_configured(SkillHost::Codex), "{body:?}");
+    }
+}
+
+/// Every model name is accepted for each host, in any case; `opus` reads
+/// as `claude`.
+#[test]
+fn skill_models_take_every_command_model_and_the_opus_alias() {
+    for (raw, want) in [
+        ("codex", "codex"),
+        ("SOL", "sol"),
+        (" claude ", "claude"),
+        ("Opus", "claude"),
+        ("fable", "fable"),
+        ("k3", "k3"),
+        ("grok", "grok"),
+    ] {
+        let (_home, config) = loaded(&format!("skill:\n  claude: {raw:?}\n  codex: {raw:?}\n"));
+        assert!(config.user_config_error().is_none(), "{raw:?}");
+        let user = config.user_config().unwrap();
+        assert_eq!(user.skill.claude, want, "{raw:?}");
+        assert_eq!(user.skill.codex, want, "{raw:?}");
+        for host in SkillHost::ALL {
+            assert_eq!(config.skill_model(host), want, "{raw:?}");
+            assert!(config.skill_model_configured(host));
+        }
+    }
+}
+
+/// A bad `skill.<host>` value is a config error that names the key and the
+/// accepted values.
+#[test]
+fn skill_model_rejects_unknown_names() {
+    for (key, body) in [
+        ("skill.claude", "skill:\n  claude: gpt5\n"),
+        ("skill.codex", "skill:\n  codex: gpt5\n"),
+    ] {
+        let (home, config) = loaded(body);
+        let err = config.user_config_error().expect("error").to_string();
+        assert_eq!(
+            err,
+            format!(
+                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, k3, grok"#,
+                config_path(home.path()).display()
+            )
+        );
+    }
+}
+
+/// `--host` takes `claude` or `codex` in any case, nothing else.
+#[test]
+fn skill_host_parses_both_hosts() {
+    assert_eq!(SkillHost::parse("claude"), Some(SkillHost::Claude));
+    assert_eq!(SkillHost::parse(" CODEX "), Some(SkillHost::Codex));
+    assert_eq!(SkillHost::parse("sol"), None);
+    assert_eq!(SkillHost::parse(""), None);
+    assert_eq!(SkillHost::Claude.key(), "skill.claude");
+    assert_eq!(SkillHost::Codex.key(), "skill.codex");
 }

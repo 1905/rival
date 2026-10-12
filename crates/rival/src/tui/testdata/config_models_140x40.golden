@@ -1,22 +1,22 @@
 ╭─ rival · config ───┬────────────────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml ─╮|
-│                    │  MODELS   efforts and the plan review defaults                                                                      │|
+│                    │  MODELS   efforts, the /rival models and speed                                                                      │|
 │   Proxy            │                                                                                                                     │|
-│ ▸ Models           │    MODEL   RUNTIME      ROUTE   EFFORT       PLAN                                                                   │|
-│   Review           │    codex   Codex CLI    proxy     xhigh      [■]                                                                    │|
-│   Check            │    sol     Codex CLI    proxy     xhigh      [ ]                                                                    │|
-│                    │  ▸ claude  Claude Code  proxy   ‹ medium ›   [ ]                                                                    │|
-│                    │    fable   Claude Code  proxy     medium     [ ]                                                                    │|
-│                    │    k3      OpenCode     direct    max fixed   —                                                                     │|
-│                    │    grok    grok CLI     direct    high        —   not installed                                                     │|
+│ ▸ Models           │    MODEL   RUNTIME      ROUTE   EFFORT                                                                              │|
+│   Review           │    codex   Codex CLI    proxy     xhigh                                                                             │|
+│   Check            │    sol     Codex CLI    proxy     xhigh                                                                             │|
+│                    │  ▸ claude  Claude Code  proxy   ‹ medium ›                                                                          │|
+│                    │    fable   Claude Code  proxy     medium                                                                            │|
+│                    │    k3      OpenCode     direct    max fixed                                                                         │|
+│                    │    grok    grok CLI     direct    high         not installed                                                        │|
 │                    │                                                                                                                     │|
 │                    │    Opus 5.5 sends emcd2_/claude-opus-5-5                                                                            │|
-│                    │    PLAN marks what rival command plan runs without -m                                                               │|
 │                    │                                                                                                                     │|
-│                    │    Codex Ultrafast     ○ off   every call asks for the Ultrafast tier                                               │|
-│                    │    Sol Ultrafast       ○ off   every call asks for the Ultrafast tier                                               │|
+│                    │  /RIVAL RUNS                                                                                                        │|
+│                    │    in Claude Code      ‹ sol ›   Sol 6.1 · Codex CLI                                                                │|
+│                    │    in Codex            ‹ claude ›   Opus 5.5 · Claude Code                                                          │|
 │                    │                                                                                                                     │|
-│                    │                                                                                                                     │|
-│                    │                                                                                                                     │|
+│                    │    Codex speed         ‹ fast ›   about 2x speed, uses more quota                                                   │|
+│                    │    Sol speed           ‹ fast ›   about 2x speed, uses more quota                                                   │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
@@ -36,28 +36,28 @@
 │  CHECK   ● online · 6 models                                                                                                             │|
 │  not run yet · c checks the default models on the draft, a every model                                                                   │|
 ├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
-│ tab section  ↑↓ field  ←→ effort  space plan  c check  a all  s save  ? help  esc back                                                   │|
+│ tab section  ↑↓ field  ←→ effort  c check  a all  s save  ? help  esc back                                                               │|
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
 -- styles --
 dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d....................d..ggggggddddddddddddddddddddddddddddddddddddddd......................................................................d|
 d.ddttttt............d.....................................................................................................................d|
-dSSSSSSSSSSSSSSSSSSS.d..DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD...................................................................d|
-d.ddtttttt...........d....tttttttttttttttttttttaaaaaaaatttttttttttttaaa....................................................................d|
-d.ddttttt............d....tttttttttttttttttttttaaaaaaaatttttttttttttddd....................................................................d|
+dSSSSSSSSSSSSSSSSSSS.d..DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD..............................................................................d|
+d.ddtttttt...........d....tttttttttttttttttttttaaaaaaaattttttttttttt.......................................................................d|
+d.ddttttt............d....tttttttttttttttttttttaaaaaaaattttttttttttt.......................................................................d|
 d....................d.???????????????????????????????????????????????????????????????????????????????????????????????????????????????????.d|
-d....................d....tttttttttttttttttttttaaaaaaaatttttttttttttddd....................................................................d|
-d....................d....tttttttttttttttttttttdddddddddddddddddddddddd....................................................................d|
-d....................d....dddddddddddddddddddddddddddddtttttttttttttdddddddddddddddddd.....................................................d|
+d....................d....tttttttttttttttttttttaaaaaaaattttttttttttt.......................................................................d|
+d....................d....tttttttttttttttttttttddddddddddddddddddddd.......................................................................d|
+d....................d....dddddddddddddddddddddddddddddtttttttttttttddddddddddddddd........................................................d|
 d....................d.....................................................................................................................d|
 d....................d..tttttttttttddddddTTTTTTTTTTTTTTTTTTTTTT............................................................................d|
-d....................d..dddddddddddddddddddddddddddddddddddddddddddddddddddd...............................................................d|
 d....................d.....................................................................................................................d|
-d....................d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd...............................................d|
-d....................d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd...............................................d|
+d....................d..DDDDDDDDDDD........................................................................................................d|
+d....................d....ddddddddddddddddddddddTTTdddddddddddddddddddddddd................................................................d|
+d....................d....ddddddddddddddddddddddTTTTTTddddddddddddddddddddddddddd..........................................................d|
 d....................d.....................................................................................................................d|
-d....................d.....................................................................................................................d|
-d....................d.....................................................................................................................d|
+d....................d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd...................................................d|
+d....................d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd...................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|
@@ -77,5 +77,5 @@ dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 d..DDDDD...aaaaaaaaddddddddddd.............................................................................................................d|
 d..ddddddddddddddadddddddddddddddddddddddddddddddddddddddddadddddddddddd...................................................................d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
-d.aaa.ddddddd..aa.ddddd..aa.dddddd..aaaaa.dddd..a.ddddd..a.ddd..a.dddd..a.dddd..aaa.dddd...................................................d|
+d.aaa.ddddddd..aa.ddddd..aa.dddddd..a.ddddd..a.ddd..a.dddd..a.dddd..aaa.dddd...............................................................d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
