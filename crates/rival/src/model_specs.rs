@@ -84,6 +84,21 @@ and ignores the value. Needs MOONSHOT_API_KEY in the project .env (or exported).
 Review mode runs read-only sandboxed (same profile as the other reviewers);
 raw prompts run full auto and can edit files and run commands in the workdir.";
 
+pub const CHINA_USAGE: &str = "Usage:
+  /china 'explain the auth flow' — run any prompt with the China model
+  /china -re high 'find bugs in src/main.rs' — run with a lower reasoning effort
+  /china review — bug-hunting review of the changed files (git auto-detect)
+  /china review src/api/ — review specific scope
+  /china — show this usage info
+
+The model is china.model in ~/.rival/config.yaml, an opencode provider/model
+(default moonshot/kimi-k3.1-pro). Change it with:
+  rival config set china.model <provider/model>
+It runs through opencode v2 with opencode's own provider auth.
+Reasoning effort (-re): low, medium, high, xhigh, ultra; Moonshot takes
+low, high or max (medium -> high, xhigh/ultra -> max). Omitted: max.
+Review mode runs read-only; raw prompts can edit files in the workdir.";
+
 /// The usage of the `/rival` skill, for both hosts. It names no model: the
 /// model comes from `skill.<host>`.
 pub const RIVAL_USAGE: &str = "Usage:
@@ -159,6 +174,11 @@ impl ModelSpec {
     pub fn resolve_effort(&self, cfg: &Config, requested: &str) -> Result<String, String> {
         if self.command_name == config::K3_COMMAND_NAME {
             return Ok("max".to_string());
+        }
+        if self.command_name == config::CHINA_LABEL {
+            return executor::china_effort(requested)
+                .map(str::to_string)
+                .map_err(|e| format!("{e:#}"));
         }
         // The Claude and codex runtimes (Opus, Fable, Codex, Sol) resolve
         // their own configured defaults rather than the shared review one: a
@@ -273,6 +293,25 @@ pub fn k3_spec() -> ModelSpec {
                 c.cred_workdir,
                 c.log,
                 c.out,
+            )
+        }),
+    }
+}
+
+/// The `china.model` on opencode v2. The model comes from the config, so
+/// this spec is built per run; the selector is leaked once to fit the
+/// `&'static` field.
+pub fn china_spec(cfg: &Config) -> ModelSpec {
+    ModelSpec {
+        command_name: config::CHINA_LABEL,
+        cli: config::CHINA_LABEL,
+        model: Box::leak(cfg.china_model().to_string().into_boxed_str()),
+        usage: CHINA_USAGE,
+        parse: parser::parse_codex_args,
+        preflight: Box::new(|cfg, _| executor::china_preflight(cfg)),
+        run: Box::new(|c| {
+            executor::run_china(
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.log, c.out,
             )
         }),
     }

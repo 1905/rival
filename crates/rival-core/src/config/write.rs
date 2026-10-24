@@ -28,7 +28,7 @@ pub const HEADER: &str = "# written by rival config; comments are not kept";
 
 /// The key paths `rival config set` accepts. `efforts.<model>` takes any
 /// effort label; the validation checks the label.
-pub const SETTABLE_KEYS: [&str; 14] = [
+pub const SETTABLE_KEYS: [&str; 15] = [
     "proxy.url",
     "proxy.key_file",
     "proxy.claude.enabled",
@@ -42,6 +42,7 @@ pub const SETTABLE_KEYS: [&str; 14] = [
     "speed.<model>",
     "skill.claude",
     "skill.codex",
+    "china.model",
     "claude.subscription",
 ];
 
@@ -99,6 +100,7 @@ fn key_kind(key: &str) -> Result<Kind, ConfigError> {
         | "security.reviewer"
         | "skill.claude"
         | "skill.codex"
+        | "china.model"
         | "claude.subscription" => Kind::Str,
         "proxy.claude.enabled" | "proxy.codex.enabled" | "auto_fix_critical_high" => Kind::Bool,
         "plan.models" => Kind::List,

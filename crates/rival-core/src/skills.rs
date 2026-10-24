@@ -13,7 +13,7 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// All embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 1] = ["rival"];
+pub const NAMES: [&str; 2] = ["rival", "china"];
 
 /// Retired plan skills that install archives outside the active skill tree.
 pub const RETIRED_PLAN_SKILLS: [&str; 3] = ["rival-plan", "rival-plan-codex", "rival-plan-claude"];
@@ -82,15 +82,23 @@ const CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] revi
 /// The `rival command` arguments the Codex skill launches.
 const CODEX_COMMAND: &str = "skill --host codex";
 
+/// The description of the Codex `/china` skill.
+const CHINA_CODEX_DESCRIPTION: &str = "Run a code review or a prompt with the China model (china.model in rival config, an opencode provider/model) through Rival from Codex. Use when the user invokes $china or asks to review or ask \"with china\".";
+
+/// The input rules of the Codex `/china` skill.
+const CHINA_CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review or `[-re level] <prompt>` for a raw prompt. A request in words (\"review with china\") becomes `review` plus any scope it names. With no review or prompt show usage and do not launch. The model comes from `china.model` in Rival's configuration (an opencode provider/model; `rival config show` lists it); the output names the model that ran. Do not invent flags or substitute another model.";
+
 /// Builds a Codex skill: the same command and parser as the Claude Code
 /// skill, with the Codex host and Codex's process lifecycle.
 pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
-    if name != "rival" {
-        return Err(format!("no Codex skill for {:?}", name));
-    }
+    let (description, input, command) = match name {
+        "rival" => (CODEX_DESCRIPTION, CODEX_INPUT, CODEX_COMMAND),
+        "china" => (CHINA_CODEX_DESCRIPTION, CHINA_CODEX_INPUT, "china"),
+        _ => return Err(format!("no Codex skill for {:?}", name)),
+    };
     let mut content = format!(
-        "---\nname: {name}\ndescription: {CODEX_DESCRIPTION}\nmetadata:\n  version: {version}\n---\n\n# {name}\n\n## Review input\n\n{CODEX_INPUT}\n\n"
+        "---\nname: {name}\ndescription: {description}\nmetadata:\n  version: {version}\n---\n\n# {name}\n\n## Review input\n\n{input}\n\n"
     );
-    content.push_str(&codex_workflow().replace("{{COMMAND}}", CODEX_COMMAND));
+    content.push_str(&codex_workflow().replace("{{COMMAND}}", command));
     Ok(content.into_bytes())
 }

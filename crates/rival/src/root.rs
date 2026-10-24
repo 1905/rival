@@ -17,7 +17,7 @@ use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{
-    ModelSpec, claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec,
+    ModelSpec, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec,
 };
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
@@ -587,6 +587,10 @@ fn dispatch(
         CommandId::CommandSol => model_command(env, inv, sol_spec()),
         CommandId::CommandGrok => model_command(env, inv, grok_spec()),
         CommandId::CommandK3 => model_command(env, inv, k3_spec()),
+        CommandId::CommandChina => {
+            let spec = china_spec(env.cfg);
+            model_command(env, inv, spec)
+        }
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::CommandSkill => skill_command::skill_command_action(env, inv),

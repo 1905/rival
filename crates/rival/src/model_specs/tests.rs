@@ -327,3 +327,29 @@ fn fable_and_sol_specs_follow_their_runtimes() {
     assert!(!fable_spec().auth_hint(&cfg, log).is_empty());
     assert_eq!(sol_spec().auth_hint(&cfg, log), "");
 }
+
+/// China runs the configured `china.model`, labels it by its model name and
+/// maps the effort onto Moonshot's menu (default max).
+#[test]
+fn china_spec_follows_china_model() {
+    let cfg = cfg();
+    let spec = china_spec(&cfg);
+    assert_eq!(spec.command_name, "china");
+    assert_eq!(spec.cli, "china");
+    assert_eq!(spec.model, config::CHINA_DEFAULT_MODEL);
+    assert_eq!(spec.label(), "kimi-k3.1-pro");
+    assert_eq!(spec.resolve_effort(&cfg, "").unwrap(), "max");
+    assert_eq!(spec.resolve_effort(&cfg, "medium").unwrap(), "high");
+    assert_eq!(spec.resolve_effort(&cfg, "ultra").unwrap(), "max");
+    assert!(spec.resolve_effort(&cfg, "bogus").is_err());
+
+    let configured = cfg.with_user_config(Some(UserConfig {
+        china: config::ChinaConfig {
+            model: "opencode-go/kimi-k3.1-pro".to_string(),
+        },
+        ..UserConfig::default()
+    }));
+    let spec = china_spec(&configured);
+    assert_eq!(spec.model, "opencode-go/kimi-k3.1-pro");
+    assert_eq!(spec.label(), "kimi-k3.1-pro");
+}

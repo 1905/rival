@@ -7,6 +7,7 @@
 //! the preflight lookups, the env getters for credentials, and `environ()`
 //! for the child. Nothing reads or mutates the process environment.
 
+pub mod china;
 pub mod claude;
 pub mod claude_docker;
 pub mod codex;
@@ -20,6 +21,7 @@ pub mod subprocess;
 #[cfg(test)]
 pub(crate) mod testutil;
 
+pub use china::{china_effort, china_preflight, run_china};
 pub use claude::{
     claude_auth_hint, claude_preflight, claude_preflight_model, is_claude_model, run_claude,
 };

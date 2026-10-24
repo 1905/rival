@@ -2143,3 +2143,66 @@ fn skill_host_parses_both_hosts() {
     assert_eq!(SkillHost::Claude.key(), "skill.claude");
     assert_eq!(SkillHost::Codex.key(), "skill.codex");
 }
+
+/// `china.model` defaults to Kimi K3.1 Pro on the moonshot provider; a
+/// configured `provider/model` wins, trimmed.
+#[test]
+fn china_model_defaults_and_overrides() {
+    let no_file = cfg(&[]);
+    assert_eq!(no_file.china_model(), CHINA_DEFAULT_MODEL);
+    assert!(!no_file.china_model_configured());
+    for body in ["", "china:\n", "china:\n  model: \"\"\n"] {
+        let (_home, config) = loaded(body);
+        assert!(config.user_config_error().is_none(), "{body:?}");
+        assert_eq!(config.china_model(), CHINA_DEFAULT_MODEL, "{body:?}");
+    }
+    let (_home, config) = loaded("china:\n  model: \" openrouter/moonshotai/kimi-k3.1-pro \"\n");
+    assert!(config.user_config_error().is_none());
+    assert_eq!(config.china_model(), "openrouter/moonshotai/kimi-k3.1-pro");
+    assert!(config.china_model_configured());
+}
+
+/// A `china.model` without a provider or a model is a config error that
+/// names the key.
+#[test]
+fn china_model_rejects_bad_selectors() {
+    for raw in [
+        "kimi-k3.1-pro",
+        "/kimi",
+        "moonshot/",
+        "moonshot/a/",
+        "moon shot/kimi",
+    ] {
+        let (home, config) = loaded(&format!("china:\n  model: {raw:?}\n"));
+        let err = config.user_config_error().expect("error").to_string();
+        assert_eq!(
+            err,
+            format!(
+                "invalid china.model {raw:?} in {}; use an opencode provider/model, for example moonshot/kimi-k3.1-pro",
+                config_path(home.path()).display()
+            )
+        );
+    }
+}
+
+#[test]
+fn china_label_is_the_model_name() {
+    assert_eq!(
+        parse_china_model("moonshot/kimi-k3.1-pro"),
+        Some(("moonshot", "kimi-k3.1-pro"))
+    );
+    assert_eq!(
+        parse_china_model("openrouter/moonshotai/kimi-k3.1-pro"),
+        Some(("openrouter", "moonshotai/kimi-k3.1-pro"))
+    );
+    assert_eq!(china_label("moonshot/kimi-k3.1-pro"), "kimi-k3.1-pro");
+    assert_eq!(
+        china_label("openrouter/moonshotai/kimi-k3.1-pro"),
+        "kimi-k3.1-pro"
+    );
+    assert_eq!(china_label(""), CHINA_LABEL);
+    assert_eq!(
+        engine_label(CHINA_LABEL, CHINA_DEFAULT_MODEL),
+        "kimi-k3.1-pro"
+    );
+}

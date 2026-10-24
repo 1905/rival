@@ -31,6 +31,7 @@ pub enum CommandId {
     CommandFable,
     CommandGrok,
     CommandK3,
+    CommandChina,
     CommandPlan,
     CommandSecurity,
     CommandSkill,
@@ -75,6 +76,7 @@ impl CommandId {
             ["rival", "command", "fable"] => CommandFable,
             ["rival", "command", "grok"] => CommandGrok,
             ["rival", "command", "k3"] => CommandK3,
+            ["rival", "command", "china"] => CommandChina,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
             ["rival", "command", "skill"] => CommandSkill,
@@ -293,6 +295,7 @@ pub fn build(defaults: &Defaults) -> Command {
     .subcommands([
         // `opus` is another name for `claude`; clap reports the canonical
         // name, so the command path stays `command claude`.
+        model_command("china", "Run the china.model (default Kimi K3.1 Pro) via opencode v2"),
         model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
         model_command("codex", "Skill-facing Codex executor"),
         model_command("fable", "Skill-facing Fable executor"),

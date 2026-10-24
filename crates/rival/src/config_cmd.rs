@@ -181,6 +181,15 @@ fn rows(cfg: &Config) -> Result<Vec<Row>, CmdError> {
         rows.push(Row::new(host.key(), json!(cfg.skill_model(host)), source));
     }
     rows.push(Row::new(
+        "china.model",
+        json!(cfg.china_model()),
+        if cfg.china_model_configured() {
+            "file"
+        } else {
+            "default"
+        },
+    ));
+    rows.push(Row::new(
         "auto_fix_critical_high",
         json!(user.auto_fix_critical_high),
         from_file("auto_fix_critical_high"),

@@ -51,6 +51,12 @@ pub const K3_COMMAND_NAME: &str = "k3";
 /// Kimi K3 via OpenCode's built-in Moonshot AI provider.
 pub const KIMI_MODEL: &str = "moonshotai/kimi-k3";
 pub const GROK_MODEL: &str = "grok-4.6";
+/// The `/china` model: `rival command china`, the session adapter and the
+/// `china:` config block.
+pub const CHINA_LABEL: &str = "china";
+/// The model `china.model` defaults to: Kimi K3.1 Pro on opencode's
+/// `moonshot` provider.
+pub const CHINA_DEFAULT_MODEL: &str = "moonshot/kimi-k3.1-pro";
 pub const GROK_LABEL: &str = "grok";
 pub const CLAUDE_DOCKER_IMAGE: &str = "rival-claude";
 pub const CLAUDE_DOCKER_TOKEN_ENV: &str = "RIVAL_CLAUDE_TOKEN";
@@ -138,6 +144,7 @@ pub fn engine_label(cli: &str, model: &str) -> String {
     // Adapter identity is the reliable fallback for sessions written by older
     // releases with now-obsolete model ids.
     match cli {
+        CHINA_LABEL => return china_label(model).to_string(),
         "codex" => return SOL_LABEL.to_string(), // read-compat
         GROK_LABEL => return GROK_LABEL.to_string(),
         "claude" | "fable" | "opencode" => return "retired-model".to_string(),
@@ -922,6 +929,40 @@ pub fn skill_model_name(raw: &str) -> Option<&'static str> {
     SKILL_MODEL_NAMES.iter().copied().find(|m| *m == name)
 }
 
+/// The provider and model of a `china.model` selector (`provider/model`),
+/// split at the first `/`. The model may hold more slashes
+/// (`openrouter/moonshotai/kimi-k3.1-pro`). `None` for an empty part or any
+/// whitespace or control character.
+pub fn parse_china_model(selector: &str) -> Option<(&str, &str)> {
+    if selector
+        .chars()
+        .any(|c| c.is_whitespace() || c.is_control())
+    {
+        return None;
+    }
+    let (provider, model) = selector.split_once('/')?;
+    if provider.is_empty() || model.is_empty() || model.ends_with('/') {
+        return None;
+    }
+    Some((provider, model))
+}
+
+/// The public name of a `china.model` selector: the text after its last
+/// `/` (`kimi-k3.1-pro`), else [`CHINA_LABEL`].
+pub fn china_label(selector: &str) -> &str {
+    match selector.rsplit_once('/') {
+        Some((_, name)) if !name.is_empty() => name,
+        _ => CHINA_LABEL,
+    }
+}
+
+/// The `china:` block.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChinaConfig {
+    /// `china.model`; "" means [`CHINA_DEFAULT_MODEL`].
+    pub model: String,
+}
+
 /// The `skill:` block: the model each host's `/rival` skill runs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SkillConfig {
@@ -1127,6 +1168,7 @@ pub struct UserConfig {
     pub auto_fix_critical_high: bool,
     pub speed: SpeedConfig,
     pub skill: SkillConfig,
+    pub china: ChinaConfig,
 }
 
 /// Decodes YAML null into a string as "", and any other scalar as
@@ -1212,6 +1254,12 @@ struct RawSkill {
     codex: GoString,
 }
 
+#[derive(Default, Deserialize)]
+struct RawChina {
+    #[serde(default)]
+    model: GoString,
+}
+
 /// The 5.2 `ultrafast:` block, read only for `speed` compatibility.
 #[derive(Default, Deserialize)]
 struct RawUltrafast {
@@ -1253,6 +1301,8 @@ struct RawUserConfig {
     speed: Option<RawSpeed>,
     #[serde(default)]
     skill: Option<RawSkill>,
+    #[serde(default)]
+    china: Option<RawChina>,
 }
 
 impl From<RawUserConfig> for UserConfig {
@@ -1298,6 +1348,9 @@ impl From<RawUserConfig> for UserConfig {
                     claude: s.claude.0,
                     codex: s.codex.0,
                 }
+            },
+            china: ChinaConfig {
+                model: raw.china.unwrap_or_default().model.0,
             },
         }
     }
@@ -1397,6 +1450,14 @@ pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigEr
         };
         *value = name.to_string();
     }
+    let china = cfg.china.model.trim().to_string();
+    if !china.is_empty() && parse_china_model(&china).is_none() {
+        return Err(ConfigError::new(format!(
+            "invalid china.model {:?} in {shown}; use an opencode provider/model, for example {CHINA_DEFAULT_MODEL}",
+            cfg.china.model
+        )));
+    }
+    cfg.china.model = china;
     for (label, written, old_ultrafast) in [
         (CODEX_LABEL, &raw_speed.codex.0, raw_ultrafast.codex),
         (SOL_LABEL, &raw_speed.sol.0, raw_ultrafast.sol),
@@ -1666,6 +1727,23 @@ impl Config {
             .as_ref()
             .and_then(|u| skill_model_name(u.skill.get(host)))
             .unwrap_or_else(|| host.default_model())
+    }
+
+    /// The opencode `provider/model` that `/china` runs: `china.model`, else
+    /// [`CHINA_DEFAULT_MODEL`].
+    pub fn china_model(&self) -> &str {
+        self.user
+            .as_ref()
+            .map(|u| u.china.model.as_str())
+            .filter(|m| !m.is_empty())
+            .unwrap_or(CHINA_DEFAULT_MODEL)
+    }
+
+    /// Whether `china.model` is set in the user config.
+    pub fn china_model_configured(&self) -> bool {
+        self.user
+            .as_ref()
+            .is_some_and(|u| !u.china.model.is_empty())
     }
 
     /// Whether `skill.<host>` is set in the user config.

@@ -456,3 +456,21 @@ fn skill_models_are_settable_strings() {
     let after = std::fs::read_to_string(&path).unwrap();
     assert_eq!(after, text, "a bad value leaves the file as it was");
 }
+
+/// `rival config set china.model` takes an opencode `provider/model`; the
+/// load validates it.
+#[test]
+fn china_model_is_a_settable_string() {
+    assert!(SETTABLE_KEYS.contains(&"china.model"));
+    let (_dir, path) = temp();
+    let user = set(&path, "china.model", "kimi-code-plan-cn/k3.1-pro").unwrap();
+    assert_eq!(user.china.model, "kimi-code-plan-cn/k3.1-pro");
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("china:\n  model: kimi-code-plan-cn/k3.1-pro\n"),
+        "{text}"
+    );
+    let err = set(&path, "china.model", "kimi").unwrap_err().to_string();
+    assert!(err.contains("invalid china.model \"kimi\""), "{err}");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+}

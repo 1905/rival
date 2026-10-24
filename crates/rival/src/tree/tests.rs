@@ -114,7 +114,7 @@ fn command_subtree_matches_cli_surface() {
     assert_eq!(
         names(command),
         [
-            "claude", "codex", "fable", "grok", "k3", "plan", "security", "skill", "sol"
+            "china", "claude", "codex", "fable", "grok", "k3", "plan", "security", "skill", "sol"
         ]
     );
     let detach = command

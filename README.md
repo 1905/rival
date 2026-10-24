@@ -49,6 +49,29 @@ Version 6.0.0 replaces the per-model skills (`/rival-codex`, `/rival-sol`,
 reviews remain available through `rival command plan`. See the
 [skill migration details](docs/command-reference.md#skills).
 
+## The /china skill
+
+`rival install` also provides `/china` for Claude Code and Codex. It runs
+one model through opencode v2: Kimi K3.1 Pro on opencode's `moonshot`
+provider by default. Ask "review with china", or use the same input as
+`/rival`:
+
+| Command | What it does |
+|---|---|
+| `/china review` | Review the changed code. |
+| `/china review src/api/` | Review a specific scope. |
+| `/china -re high review` | Review with high instead of max reasoning. |
+| `/china 'explain the auth flow'` | Run any prompt. |
+
+The model is `china.model`, an opencode `provider/model` (default
+`moonshot/kimi-k3.1-pro`). To change it, run
+`rival config set china.model <provider/model>`. The provider must be set up
+in opencode, for example with `opencode auth login`; Rival sends no key.
+`-re` maps onto Moonshot's levels: `low` → low, `medium`/`high` → high,
+`xhigh`/`ultra` → max. The default is max. Reviews run read-only, and the
+reviewed repository's own opencode config is ignored. Raw prompts can edit
+files in the workdir. The command behind the skill is `rival command china`.
+
 ## View the results
 
 Run `rival tui` to browse reviews and their findings.

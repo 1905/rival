@@ -245,6 +245,23 @@ only when you intend to overwrite your installed skill contents.
 - If the runtime of the configured model is missing, the preflight error is followed by `set another model: rival config set skill.<host> <model> (…)`.
 - 6.0 removes the per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok` and `/rival-security`. `rival command codex|sol|claude|fable|k3|grok|security|plan` stay for the CLI.
 
+#### `/china`
+
+`rival install` also installs `china` (`/china` in Claude Code, `$china` in Codex). It launches `rival command china` detached. "review with china" in words also triggers it.
+
+| Syntax | Runs |
+|---|---|
+| `/china [-re low\|medium\|high\|xhigh\|ultra] review [scope]` | A code review with `china.model`. |
+| `/china [-re level] <prompt>` | Any prompt with `china.model`. |
+| `/china` | Prints the usage. |
+
+- `china.model` is an opencode `provider/model`, split at the first `/` (the model may hold more slashes). Default: `moonshot/kimi-k3.1-pro`. Set it with `rival config set china.model <provider/model>`.
+- The runtime is opencode v2 or later: `opencode run --standalone -m <china.model>`, prompt on stdin, the workdir as cwd. The preflight reads `opencode --version`.
+- Auth is opencode's own (`opencode auth login` or the opencode config). Rival sends no key.
+- `OPENCODE_CONFIG_CONTENT` declares the model under its provider with `options.reasoningEffort`, plus the permission profile: read-only for reviews, full auto for raw prompts. `OPENCODE_DISABLE_PROJECT_CONFIG=1` keeps the reviewed repository's opencode config out. Raw prompts also drop the credential variables that `rival command k3` drops.
+- `-re` maps onto Moonshot's levels: `low` → low, `medium`/`high` → high, `xhigh`/`ultra` → max. Omitted: max. A provider that does not accept these values rejects the run.
+- The review header names the model by the text after the last `/` (`kimi-k3.1-pro`).
+
 - `review` with no scope reviews the changed files found by git. A scope may be a path or plain language, for example `review the auth middleware`.
 - Git scope detection: tracked changes against `HEAD` plus untracked files first. If the tree is clean, the files of the last commit. If there are none, the entire project.
 - The scope is a focus hint. Reviewers can read the whole repository.
@@ -508,6 +525,9 @@ skill:                # the model the /rival skill runs, per host
   claude: sol         # in Claude Code: codex | sol | claude (or opus) | fable | k3 | grok
   codex: claude       # in Codex: the same values
 
+china:                # the model the /china skill runs
+  model: moonshot/kimi-k3.1-pro   # an opencode provider/model
+
 claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
 
@@ -536,7 +556,7 @@ roles:                # optional prompt overrides
 ```
 
 - The values shown for `efforts`, `skill` and `speed` are the built-in defaults.
-- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, an invalid `skill.claude` / `skill.codex`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
+- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, an invalid `skill.claude` / `skill.codex`, an invalid `china.model`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
 - `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
 - `speed.codex` and `speed.sol` pick the Codex service tier of each Codex-runtime model: `normal`, `fast` (the default) or `ultrafast`. Change them in the config window (`rival config`, Models: `Codex speed`, `Sol speed`; `←`/`→` cycles normal → fast → ultrafast) or with `rival config set speed.sol normal`. The speed applies to every call of that model: `/rival` reviews and prompts, `rival command codex` and `rival command sol`, their language-repair pass, `rival command plan` and `rival config check`.

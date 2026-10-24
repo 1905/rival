@@ -10,7 +10,7 @@ fn skill(name: &str) -> String {
 /// for its host and watches the run in the background.
 #[test]
 fn rival_skill_is_embedded() {
-    assert_eq!(NAMES, ["rival"]);
+    assert_eq!(NAMES, ["rival", "china"]);
     assert!(!DEPRECATED.contains(&"rival"));
     let content = skill("rival");
     for want in [
@@ -224,6 +224,34 @@ fn review_skill_is_retired() {
         codex_skill(name, "test").is_err(),
         "retired Codex skill {name} remains available"
     );
+}
+
+/// `china` launches `rival command china` on both hosts and names its
+/// config key; it has no security branch.
+#[test]
+fn china_skill_is_embedded() {
+    let claude = skill("china");
+    let codex = String::from_utf8(codex_skill("china", "1.2.3").unwrap()).unwrap();
+    for want in [
+        "name: china\n",
+        "rival command china --detach --workdir",
+        "rival wait --log <rival_err>",
+        "china.model",
+        "review with china",
+    ] {
+        assert!(claude.contains(want), "china skill missing {want:?}");
+    }
+    for want in [
+        "name: china\n",
+        "rival command china --detach --workdir",
+        "china.model",
+    ] {
+        assert!(codex.contains(want), "codex china skill missing {want:?}");
+    }
+    for text in [&claude, &codex] {
+        assert!(!text.contains("rival command security"), "{text}");
+        assert!(!text.contains("skill --host"), "{text}");
+    }
 }
 
 /// The embedded skill dirs are exactly `NAMES`.
