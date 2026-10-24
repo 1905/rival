@@ -295,7 +295,7 @@ pub fn build(defaults: &Defaults) -> Command {
     .subcommands([
         // `opus` is another name for `claude`; clap reports the canonical
         // name, so the command path stays `command claude`.
-        model_command("china", "Run the china.model (default Kimi K3.1 Pro) via opencode v2"),
+        model_command("china", "Run the china.model via opencode v2"),
         model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
         model_command("codex", "Skill-facing Codex executor"),
         model_command("fable", "Skill-facing Fable executor"),

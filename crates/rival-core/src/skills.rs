@@ -82,6 +82,9 @@ const CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] revi
 /// The `rival command` arguments the Codex skill launches.
 const CODEX_COMMAND: &str = "skill --host codex";
 
+/// The `rival command` arguments the Codex `/china` skill launches.
+const CHINA_CODEX_COMMAND: &str = "china";
+
 /// The description of the Codex `/china` skill.
 const CHINA_CODEX_DESCRIPTION: &str = "Run a code review or a prompt with the China model (china.model in rival config, an opencode provider/model) through Rival from Codex. Use when the user invokes $china or asks to review or ask \"with china\".";
 
@@ -93,7 +96,11 @@ const CHINA_CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level
 pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
     let (description, input, command) = match name {
         "rival" => (CODEX_DESCRIPTION, CODEX_INPUT, CODEX_COMMAND),
-        "china" => (CHINA_CODEX_DESCRIPTION, CHINA_CODEX_INPUT, "china"),
+        "china" => (
+            CHINA_CODEX_DESCRIPTION,
+            CHINA_CODEX_INPUT,
+            CHINA_CODEX_COMMAND,
+        ),
         _ => return Err(format!("no Codex skill for {:?}", name)),
     };
     let mut content = format!(

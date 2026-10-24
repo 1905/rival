@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail};
 
 use super::Mirror;
 use super::kimi::KIMI_DROP_ENV;
-use super::opencode::OPENCODE_FULL_AUTO_PERMISSION;
+use super::opencode::{OPENCODE_FULL_AUTO_PERMISSION, opencode_db_env, require_opencode};
 use super::oscmd::{self, Output};
 use super::subprocess::{Request, RunResult, run_subprocess, safe_env};
 use crate::cancel::Context;
@@ -26,17 +26,13 @@ pub(crate) const CHINA_READ_ONLY_PERMISSION: &str = r#"{"*":"deny","read":"allow
 /// `permission` block, so the run gets an agent of its own with the profile.
 pub(crate) const CHINA_AGENT: &str = "rival-china";
 
-/// The effort `/china` runs at when `-re` is omitted.
-pub const CHINA_DEFAULT_EFFORT: &str = "max";
-
 /// Maps a rival effort onto Moonshot's menu (low, high, max). "" is the
 /// default, max.
 pub fn china_effort(requested: &str) -> anyhow::Result<&'static str> {
     Ok(match requested {
-        "" => CHINA_DEFAULT_EFFORT,
         "low" => "low",
         "medium" | "high" => "high",
-        "xhigh" | "ultra" | "max" => "max",
+        "" | "xhigh" | "ultra" | "max" => "max",
         other => bail!("invalid effort {other:?}; use one of: low, medium, high, xhigh, ultra"),
     })
 }
@@ -44,9 +40,7 @@ pub fn china_effort(requested: &str) -> anyhow::Result<&'static str> {
 /// Checks that opencode v2 or later is installed. Auth is opencode's own
 /// (`opencode auth login` or its config), so no key is checked here.
 pub fn china_preflight(cfg: &Config) -> anyhow::Result<()> {
-    if oscmd::look_path(cfg, "opencode").is_err() {
-        bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
-    }
+    require_opencode(cfg)?;
     // The filtered env of the provider run: a reviewed repo's .env must not
     // reach this child either (LD_PRELOAD, NODE_OPTIONS).
     let environ = safe_env(cfg.environ());
@@ -106,7 +100,17 @@ pub(crate) fn run_china_with(
     };
     let raw = sess.mode == "raw";
     let args = china_run_args(&selector);
-    let env = china_run_env(&sess.id, provider, model, effort, raw);
+    // opencode v2 has no `OPENCODE_PERMISSION` and no `--pure`: the profile
+    // goes into the config, and `OPENCODE_DISABLE_PROJECT_CONFIG` stops a
+    // reviewed repo's own opencode config from re-enabling tools.
+    let env = [
+        format!(
+            "OPENCODE_CONFIG_CONTENT={}",
+            china_config_content(provider, model, effort, raw)
+        ),
+        "OPENCODE_DISABLE_PROJECT_CONFIG=1".to_string(),
+        opencode_db_env(&sess.id),
+    ];
     let full_prompt = format!(
         "{}\n\n{}\n{prompt}",
         config::SYSTEM_PROMPT,
@@ -140,30 +144,6 @@ pub(crate) fn china_run_args(selector: &str) -> Vec<String> {
     ]
     .map(String::from)
     .to_vec()
-}
-
-/// The `KEY=VALUE` entries appended to the child env.
-///
-/// opencode v2 has no `OPENCODE_PERMISSION` and no `--pure`: the permission
-/// profile goes into `OPENCODE_CONFIG_CONTENT`, and
-/// `OPENCODE_DISABLE_PROJECT_CONFIG` stops a reviewed repo's own opencode
-/// config from re-enabling tools.
-pub(crate) fn china_run_env(
-    session_id: &str,
-    provider: &str,
-    model: &str,
-    effort: &str,
-    raw: bool,
-) -> Vec<String> {
-    vec![
-        format!(
-            "OPENCODE_CONFIG_CONTENT={}",
-            china_config_content(provider, model, effort, raw)
-        ),
-        "OPENCODE_DISABLE_PROJECT_CONFIG=1".to_string(),
-        // A private session DB per run, like the other opencode runs.
-        format!("OPENCODE_DB=rival-{session_id}.db"),
-    ]
 }
 
 /// The config merged over the user's opencode config. It declares the model

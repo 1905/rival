@@ -956,6 +956,17 @@ pub fn china_label(selector: &str) -> &str {
     }
 }
 
+/// The model a dashboard shows for a session's `cli` and stored `model`:
+/// the stored id verbatim, except a china `provider/model`, which shows its
+/// model part ([`china_label`]).
+pub fn display_model<'a>(cli: &str, model: &'a str) -> &'a str {
+    if cli == CHINA_LABEL {
+        china_label(model)
+    } else {
+        model
+    }
+}
+
 /// The `china:` block.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChinaConfig {

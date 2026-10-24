@@ -6,8 +6,9 @@ use std::path::Path;
 use anyhow::bail;
 
 use super::Mirror;
-use super::opencode::{OPENCODE_FULL_AUTO_PERMISSION, OpencodeRunOpts, run_opencode_model_with};
-use super::oscmd;
+use super::opencode::{
+    OPENCODE_FULL_AUTO_PERMISSION, OpencodeRunOpts, require_opencode, run_opencode_model_with,
+};
 use super::subprocess::{Request, RunResult, run_subprocess};
 use crate::cancel::Context;
 use crate::config::{self, Config};
@@ -20,9 +21,7 @@ use crate::session::Session;
 /// without it the run fails mid-flight with an opaque provider auth error,
 /// so preflight turns that into one clear hint.
 pub fn kimi_preflight(cfg: &Config, workdir: &str) -> anyhow::Result<()> {
-    if oscmd::look_path(cfg, "opencode").is_err() {
-        bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
-    }
+    require_opencode(cfg)?;
     if cfg.kimi_api_key_from(Path::new(workdir)).is_empty() {
         bail!("MOONSHOT_API_KEY is not set — add it to the project .env or export it");
     }

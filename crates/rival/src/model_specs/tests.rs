@@ -337,6 +337,10 @@ fn china_spec_follows_china_model() {
     assert_eq!(spec.command_name, "china");
     assert_eq!(spec.cli, "china");
     assert_eq!(spec.model, config::CHINA_DEFAULT_MODEL);
+    assert!(
+        CHINA_USAGE.contains(config::CHINA_DEFAULT_MODEL),
+        "usage names the default"
+    );
     assert_eq!(spec.label(), "kimi-k3.1-pro");
     assert_eq!(spec.resolve_effort(&cfg, "").unwrap(), "max");
     assert_eq!(spec.resolve_effort(&cfg, "medium").unwrap(), "high");

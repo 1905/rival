@@ -33,9 +33,7 @@ pub fn opencode_preflight_entry(
     entry: &SecurityModel,
     workdir: &str,
 ) -> anyhow::Result<()> {
-    if oscmd::look_path(cfg, "opencode").is_err() {
-        bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
-    }
+    require_opencode(cfg)?;
     if cfg
         .security_api_key_from(entry, Path::new(workdir))
         .is_empty()
@@ -47,6 +45,20 @@ pub fn opencode_preflight_entry(
         );
     }
     Ok(())
+}
+
+/// Fails with the install hint when the opencode CLI is not on `$PATH`.
+pub(crate) fn require_opencode(cfg: &Config) -> anyhow::Result<()> {
+    if oscmd::look_path(cfg, "opencode").is_err() {
+        bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
+    }
+    Ok(())
+}
+
+/// The `OPENCODE_DB` entry of one run: a private session DB per rival
+/// session (see [`opencode_run_env_with`]).
+pub(crate) fn opencode_db_env(session_id: &str) -> String {
+    format!("OPENCODE_DB=rival-{session_id}.db")
 }
 
 /// A read-only, workdir-scoped permission profile passed to opencode via
@@ -311,7 +323,7 @@ pub(crate) fn opencode_run_env_with(
         // write lock — observed as a reviewer failing with "database is
         // locked" (exit 1). A per-session DB (keyed on the unique session ID)
         // removes all contention.
-        format!("OPENCODE_DB=rival-{session_id}.db"),
+        opencode_db_env(session_id),
     ];
 
     // Inject the entry's key into its provider config. A caller may supply

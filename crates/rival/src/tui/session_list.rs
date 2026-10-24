@@ -68,10 +68,8 @@ pub fn format_elapsed(s: &Session, now: DateTime<FixedOffset>) -> String {
 pub fn model_name(s: &Session) -> &str {
     if s.model.is_empty() {
         &s.cli
-    } else if s.cli == config::CHINA_LABEL {
-        config::china_label(&s.model)
     } else {
-        &s.model
+        config::display_model(&s.cli, &s.model)
     }
 }
 
