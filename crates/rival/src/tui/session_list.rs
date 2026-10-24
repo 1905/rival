@@ -12,6 +12,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
+use rival_core::config;
 use rival_core::session::{self, Session};
 use rival_core::sessionview;
 
@@ -61,9 +62,17 @@ pub fn format_elapsed(s: &Session, now: DateTime<FixedOffset>) -> String {
 
 /// The model id the TUI shows: the stored id verbatim, so "gpt-6-astra" and
 /// "claude-fable-5" stay readable instead of collapsing to a public label or
-/// "retired-model". The CLI stands in when no model was recorded.
+/// "retired-model". A china session stores an opencode `provider/model`, so
+/// it shows the model part, which fits the column. The CLI stands in when no
+/// model was recorded.
 pub fn model_name(s: &Session) -> &str {
-    if s.model.is_empty() { &s.cli } else { &s.model }
+    if s.model.is_empty() {
+        &s.cli
+    } else if s.cli == config::CHINA_LABEL {
+        config::china_label(&s.model)
+    } else {
+        &s.model
+    }
 }
 
 /// The MODEL cell: the first member's model plus "+N" for the other

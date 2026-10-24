@@ -51,7 +51,7 @@ fn china_preflight_needs_opencode_v2() {
 fn china_config_content_declares_model_and_profile() {
     let review = china_config_content("moonshot", "kimi-k3.1-pro", "max", false);
     let want = format!(
-        r#"{{"$schema":"https://opencode.ai/config.json","permission":{CHINA_READ_ONLY_PERMISSION},"provider":{{"moonshot":{{"models":{{"kimi-k3.1-pro":{{"options":{{"reasoningEffort":"max"}}}}}}}}}}}}"#
+        r#"{{"$schema":"https://opencode.ai/config.json","permission":{CHINA_READ_ONLY_PERMISSION},"agent":{{"rival-china":{{"mode":"primary","permission":{CHINA_READ_ONLY_PERMISSION}}}}},"provider":{{"moonshot":{{"models":{{"kimi-k3.1-pro":{{"options":{{"reasoningEffort":"max"}}}}}}}}}}}}"#
     );
     // The deny-all rule comes first, as tested live: later, more specific
     // rules then allow the native reads.
@@ -68,6 +68,7 @@ fn china_config_content_declares_model_and_profile() {
         raw["permission"],
         serde_json::from_str::<serde_json::Value>(OPENCODE_FULL_AUTO_PERMISSION).unwrap()
     );
+    assert_eq!(raw["agent"]["rival-china"]["permission"], raw["permission"]);
     assert_eq!(
         raw["provider"]["p"]["models"]["a/b"]["options"]["reasoningEffort"],
         "low"
@@ -104,7 +105,14 @@ fn run_china_request_per_mode() {
         assert_eq!(seen.binary, "opencode");
         assert_eq!(
             seen.args,
-            strings(&["run", "--standalone", "-m", "moonshot/kimi-k3.1-pro"])
+            strings(&[
+                "run",
+                "--standalone",
+                "--agent",
+                "rival-china",
+                "-m",
+                "moonshot/kimi-k3.1-pro"
+            ])
         );
         assert_eq!(
             seen.env,
@@ -140,4 +148,18 @@ fn run_china_rejects_a_bad_selector() {
     })
     .unwrap_err();
     assert!(err.to_string().contains("invalid china.model"), "{err}");
+}
+
+/// The version check gets the filtered env: a blocked variable from a
+/// reviewed repo's .env (here NODE_OPTIONS) never reaches it.
+#[cfg(unix)]
+#[test]
+fn china_preflight_filters_the_env() {
+    let mut env = Env::new();
+    env.set("NODE_OPTIONS", Some("--require ./evil.js"));
+    env.fake(
+        "opencode",
+        "#!/bin/sh\nif [ -n \"$NODE_OPTIONS\" ]; then echo leaked; exit 1; fi\necho 'opencode v2.1.3'\n",
+    );
+    china_preflight(&env.config()).unwrap();
 }

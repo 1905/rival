@@ -6,7 +6,7 @@
 //! `$PATH` and the child gets its `environ()` as the full environment.
 
 use std::cell::RefCell;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs::{File, OpenOptions};
 use std::io::{self, PipeReader, Read};
 use std::path::PathBuf;
@@ -52,6 +52,18 @@ pub(crate) fn run(
     args: &[&str],
     out: Output,
 ) -> (Vec<u8>, Result<(), String>) {
+    run_env(cfg, name, args, out, cfg.environ())
+}
+
+/// [`run`] with the child's environment given (`KEY=VALUE`) instead of
+/// `cfg`'s, for example [`super::safe_env`] of it.
+pub(crate) fn run_env(
+    cfg: &Config,
+    name: &str,
+    args: &[&str],
+    out: Output,
+    environ: &[OsString],
+) -> (Vec<u8>, Result<(), String>) {
     let path = match look_path(cfg, name) {
         Ok(path) => path,
         Err(e) => return (Vec::new(), Err(e.to_string())),
@@ -59,7 +71,7 @@ pub(crate) fn run(
     if let Some(e) = current_context().and_then(|ctx| ctx.err()) {
         return (Vec::new(), Err(e.to_string()));
     }
-    let env = match dedup_env(cfg.environ()) {
+    let env = match dedup_env(environ) {
         Ok(env) => env,
         Err(e) => return (Vec::new(), Err(e)),
     };

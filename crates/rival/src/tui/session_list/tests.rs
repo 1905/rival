@@ -182,6 +182,12 @@ fn model_name_shows_the_raw_id() {
         ("claude", "claude-fable-5", "claude-fable-5"),
         ("codex", "gpt-5.5", "gpt-5.5"),
         ("codex", "", "codex"),
+        ("china", "moonshot/kimi-k3.1-pro", "kimi-k3.1-pro"),
+        (
+            "china",
+            "openrouter/moonshotai/kimi-k3.1-pro",
+            "kimi-k3.1-pro",
+        ),
     ] {
         let s = sess("", cli, model, "");
         assert_eq!(model_name(&s), want, "{cli}/{model}");

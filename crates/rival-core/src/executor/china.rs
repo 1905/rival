@@ -9,7 +9,7 @@ use super::Mirror;
 use super::kimi::KIMI_DROP_ENV;
 use super::opencode::OPENCODE_FULL_AUTO_PERMISSION;
 use super::oscmd::{self, Output};
-use super::subprocess::{Request, RunResult, run_subprocess};
+use super::subprocess::{Request, RunResult, run_subprocess, safe_env};
 use crate::cancel::Context;
 use crate::config::{self, Config};
 use crate::session::Session;
@@ -20,6 +20,11 @@ use crate::session::Session;
 /// with network access, plus `skill`, `question`, `worktree_create`), which
 /// would stay allowed.
 pub(crate) const CHINA_READ_ONLY_PERMISSION: &str = r#"{"*":"deny","read":"allow","grep":"allow","glob":"allow","list":"allow","external_directory":"deny"}"#;
+
+/// The opencode agent every china run uses. The user's own agents (such as
+/// the default `build`) can carry permissions that override the top-level
+/// `permission` block, so the run gets an agent of its own with the profile.
+pub(crate) const CHINA_AGENT: &str = "rival-china";
 
 /// The effort `/china` runs at when `-re` is omitted.
 pub const CHINA_DEFAULT_EFFORT: &str = "max";
@@ -42,7 +47,10 @@ pub fn china_preflight(cfg: &Config) -> anyhow::Result<()> {
     if oscmd::look_path(cfg, "opencode").is_err() {
         bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
     }
-    let (out, res) = oscmd::run(cfg, "opencode", &["--version"], Output::Combined);
+    // The filtered env of the provider run: a reviewed repo's .env must not
+    // reach this child either (LD_PRELOAD, NODE_OPTIONS).
+    let environ = safe_env(cfg.environ());
+    let (out, res) = oscmd::run_env(cfg, "opencode", &["--version"], Output::Combined, &environ);
     res.map_err(|e| anyhow!("opencode --version: {e}"))?;
     let version = String::from_utf8_lossy(&out);
     match opencode_major(&version) {
@@ -122,9 +130,16 @@ pub(crate) fn run_china_with(
 /// child's cwd, the workdir. `--standalone` starts a private server, so the
 /// env below applies to this run and not to a shared background service.
 pub(crate) fn china_run_args(selector: &str) -> Vec<String> {
-    ["run", "--standalone", "-m", selector]
-        .map(String::from)
-        .to_vec()
+    [
+        "run",
+        "--standalone",
+        "--agent",
+        CHINA_AGENT,
+        "-m",
+        selector,
+    ]
+    .map(String::from)
+    .to_vec()
 }
 
 /// The `KEY=VALUE` entries appended to the child env.
@@ -153,7 +168,8 @@ pub(crate) fn china_run_env(
 
 /// The config merged over the user's opencode config. It declares the model
 /// under its provider (v2 refuses an undeclared model) with the effort,
-/// which reaches the API as `reasoning_effort`. It holds no key.
+/// which reaches the API as `reasoning_effort`, and the [`CHINA_AGENT`] with
+/// the permission profile. It holds no key.
 pub(crate) fn china_config_content(provider: &str, model: &str, effort: &str, raw: bool) -> String {
     let profile = if raw {
         OPENCODE_FULL_AUTO_PERMISSION
@@ -165,6 +181,9 @@ pub(crate) fn china_config_content(provider: &str, model: &str, effort: &str, ra
     serde_json::json!({
         "$schema": "https://opencode.ai/config.json",
         "permission": permission,
+        "agent": {
+            CHINA_AGENT: { "mode": "primary", "permission": permission }
+        },
         "provider": {
             provider: {
                 "models": {
