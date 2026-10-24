@@ -66,7 +66,8 @@ provider by default. Ask "review with china", or use the same input as
 The model is `china.model`, an opencode `provider/model` (default
 `moonshot/kimi-k3.1-pro`). To change it, run
 `rival config set china.model <provider/model>`. The provider must be set up
-in opencode, for example with `opencode auth login`; Rival sends no key.
+in opencode with `opencode auth login` or a `{file:…}` key; Rival sends no
+key and strips `MOONSHOT_*` variables from the child.
 `-re` maps onto Moonshot's levels: `low` → low, `medium`/`high` → high,
 `xhigh`/`ultra` → max. The default is max. Reviews run read-only, and the
 reviewed repository's own opencode config is ignored. Raw prompts can edit

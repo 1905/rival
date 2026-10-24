@@ -257,7 +257,7 @@ only when you intend to overwrite your installed skill contents.
 
 - `china.model` is an opencode `provider/model`, split at the first `/` (the model may hold more slashes). Default: `moonshot/kimi-k3.1-pro`. Set it with `rival config set china.model <provider/model>`.
 - The runtime is opencode v2 or later: `opencode run --standalone -m <china.model>`, prompt on stdin, the workdir as cwd. The preflight reads `opencode --version`.
-- Auth is opencode's own (`opencode auth login` or the opencode config). Rival sends no key.
+- Auth is opencode's own (`opencode auth login` or the opencode config). Rival sends no key. Rival strips every `MOONSHOT_*`, `KIMI_*` and `OPENCODE_*` variable from the child, so an opencode config that reads `{env:MOONSHOT_API_KEY}` fails: use `opencode auth login` or `{file:…}`.
 - `OPENCODE_CONFIG_CONTENT` declares the model under its provider with `options.reasoningEffort`, plus the permission profile: read-only for reviews, full auto for raw prompts. `OPENCODE_DISABLE_PROJECT_CONFIG=1` keeps the reviewed repository's opencode config out. Raw prompts also drop the credential variables that `rival command k3` drops. So a provider whose opencode config reads its key from one of them (`{env:OPENAI_API_KEY}`) authenticates in reviews but not in raw prompts: store the key with `opencode auth login` instead. Every run uses its own opencode agent, `rival-china`, with the same profile, so permissions on the user's own agents (`build`) do not apply.
 - `-re` maps onto Moonshot's levels: `low` → low, `medium`/`high` → high, `xhigh`/`ultra` → max. Omitted: max. A provider that does not accept these values rejects the run.
 - The review header names the model by the text after the last `/` (`kimi-k3.1-pro`).
