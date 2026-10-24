@@ -29,7 +29,7 @@
       "stdin": "",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival — updated (vold → v<V>)\n  🗑 deprecated skill removed\n\nDone: 0 installed, 1 updated, 0 up to date, 1 removed\n",
+        "stdout": "Installing codex skills to <HOME>/.agents/skills\n\n  ✓ rival — updated (vold → v<V>)\n  ✓ china — installed (v<V>)\n  🗑 deprecated skill removed\n\nDone: 1 installed, 1 updated, 0 up to date, 1 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -37,6 +37,7 @@
   ],
   "expect": {
     "home_files": [
+      ".agents/skills/china/SKILL.md",
       ".agents/skills/rival/SKILL.md"
     ]
   }

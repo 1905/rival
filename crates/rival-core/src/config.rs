@@ -122,6 +122,10 @@ pub fn model_label(model: &str) -> &'static str {
 /// A human-facing reviewer label. Review output names the selected model
 /// instead of the executable adapter used to launch it.
 pub fn engine_label(cli: &str, model: &str) -> String {
+    // A china model is any opencode id, known ones included.
+    if cli == CHINA_LABEL {
+        return china_label(model).to_string();
+    }
     // Exact current ids win first.
     match model {
         SOL_MODEL => return SOL_LABEL.to_string(),
@@ -144,7 +148,6 @@ pub fn engine_label(cli: &str, model: &str) -> String {
     // Adapter identity is the reliable fallback for sessions written by older
     // releases with now-obsolete model ids.
     match cli {
-        CHINA_LABEL => return china_label(model).to_string(),
         "codex" => return SOL_LABEL.to_string(), // read-compat
         GROK_LABEL => return GROK_LABEL.to_string(),
         "claude" | "fable" | "opencode" => return "retired-model".to_string(),
@@ -931,12 +934,13 @@ pub fn skill_model_name(raw: &str) -> Option<&'static str> {
 
 /// The provider and model of a `china.model` selector (`provider/model`),
 /// split at the first `/`. The model may hold more slashes
-/// (`openrouter/moonshotai/kimi-k3.1-pro`). `None` for an empty part or any
-/// whitespace or control character.
+/// (`openrouter/moonshotai/kimi-k3.1-pro`). `None` for an empty part, any
+/// whitespace or control character, or a `#variant` suffix: `-re` sets the
+/// effort, and the suffix would end up in the declared model id.
 pub fn parse_china_model(selector: &str) -> Option<(&str, &str)> {
     if selector
         .chars()
-        .any(|c| c.is_whitespace() || c.is_control())
+        .any(|c| c.is_whitespace() || c.is_control() || c == '#')
     {
         return None;
     }

@@ -15,7 +15,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 1 installed, 0 updated, 0 up to date, 3 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 1 installed, 0 updated, 0 up to date, 3 removed\n",
+        "stdout": "Checking for updates... already on latest (vdev)\nInstalling claude skills to <HOME>/.claude/skills\n\n  ✓ rival — installed (v<V>)\n  ✓ china — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 2 installed, 0 updated, 0 up to date, 3 removed\nInstalling codex skills to <HOME>/.agents/skills\n\n  ✓ rival — installed (v<V>)\n  ✓ china — installed (v<V>)\n  ✓ rival-plan — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-1/rival-plan\n  ✓ rival-plan-codex — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex\n  ✓ rival-plan-claude — retired; files preserved in <HOME>/.agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude\n\nDone: 2 installed, 0 updated, 0 up to date, 3 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -23,22 +23,24 @@
   ],
   "expect": {
     "home_files": [
-      ".claude/skills/rival/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
+      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+      ".agents/skills/china/SKILL.md",
+      ".agents/skills/rival-personal/SKILL.md",
       ".agents/skills/rival/SKILL.md",
       ".claude/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
       ".claude/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
-      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
-      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
       ".claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
       ".claude/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
+      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
+      ".claude/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
+      ".claude/skills/china/SKILL.md",
       ".claude/skills/rival-personal/SKILL.md",
-      ".agents/rival-retired-skills/rival-plan-1/rival-plan/SKILL.md",
-      ".agents/rival-retired-skills/rival-plan-1/rival-plan/notes.txt",
-      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/SKILL.md",
-      ".agents/rival-retired-skills/rival-plan-codex-1/rival-plan-codex/notes.txt",
-      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/SKILL.md",
-      ".agents/rival-retired-skills/rival-plan-claude-1/rival-plan-claude/notes.txt",
-      ".agents/skills/rival-personal/SKILL.md"
+      ".claude/skills/rival/SKILL.md"
     ],
     "http_requests": [
       {

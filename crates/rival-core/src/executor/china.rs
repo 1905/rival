@@ -2,6 +2,7 @@
 mod tests;
 
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::{anyhow, bail};
 
@@ -37,6 +38,9 @@ pub fn china_effort(requested: &str) -> anyhow::Result<&'static str> {
     })
 }
 
+/// How long `opencode --version` may take.
+const VERSION_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Checks that opencode v2 or later is installed. Auth is opencode's own
 /// (`opencode auth login` or its config), so no key is checked here.
 pub fn china_preflight(cfg: &Config) -> anyhow::Result<()> {
@@ -44,7 +48,11 @@ pub fn china_preflight(cfg: &Config) -> anyhow::Result<()> {
     // The filtered env of the provider run: a reviewed repo's .env must not
     // reach this child either (LD_PRELOAD, NODE_OPTIONS).
     let environ = safe_env(cfg.environ());
-    let (out, res) = oscmd::run_env(cfg, "opencode", &["--version"], Output::Combined, &environ);
+    // The run timeout starts after the preflight, so bound this call itself.
+    let (ctx, _cancel) = Context::background().with_timeout(VERSION_TIMEOUT);
+    let (out, res) = oscmd::with_context(&ctx, || {
+        oscmd::run_env(cfg, "opencode", &["--version"], Output::Combined, &environ)
+    });
     res.map_err(|e| anyhow!("opencode --version: {e}"))?;
     let version = String::from_utf8_lossy(&out);
     match opencode_major(&version) {

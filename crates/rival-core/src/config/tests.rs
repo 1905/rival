@@ -2172,6 +2172,7 @@ fn china_model_rejects_bad_selectors() {
         "moonshot/",
         "moonshot/a/",
         "moon shot/kimi",
+        "moonshot/kimi-k3.1-pro#max",
     ] {
         let (home, config) = loaded(&format!("china:\n  model: {raw:?}\n"));
         let err = config.user_config_error().expect("error").to_string();
@@ -2205,4 +2206,6 @@ fn china_label_is_the_model_name() {
         engine_label(CHINA_LABEL, CHINA_DEFAULT_MODEL),
         "kimi-k3.1-pro"
     );
+    // A known id under china keeps the china label.
+    assert_eq!(engine_label(CHINA_LABEL, "x-ai/grok-4.6"), "grok-4.6");
 }

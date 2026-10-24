@@ -32,7 +32,7 @@
       "stdin": "",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ✓ rival — installed (v<V>)\n  🗑 deprecated skill removed\n  🗑 deprecated skill removed\n\nDone: 1 installed, 0 updated, 0 up to date, 2 removed\n",
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  ✓ rival — installed (v<V>)\n  ✓ china — installed (v<V>)\n  🗑 deprecated skill removed\n  🗑 deprecated skill removed\n\nDone: 2 installed, 0 updated, 0 up to date, 2 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -46,7 +46,7 @@
       "stdin": "y\n",
       "expect": {
         "exit_code": 0,
-        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  · rival — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 1 up to date, 0 removed\n",
+        "stdout": "Installing claude skills to <HOME>/.claude/skills\n\n  · rival — already up to date (v<V>)\n  · china — already up to date (v<V>)\n\nDone: 0 installed, 0 updated, 2 up to date, 0 removed\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -54,8 +54,9 @@
   ],
   "expect": {
     "home_files": [
-      ".claude/skills/rival/SKILL.md",
-      ".claude/skills/rival-personal/SKILL.md"
+      ".claude/skills/china/SKILL.md",
+      ".claude/skills/rival-personal/SKILL.md",
+      ".claude/skills/rival/SKILL.md"
     ],
     "files": [
       {
