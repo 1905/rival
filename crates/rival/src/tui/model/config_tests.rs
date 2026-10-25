@@ -487,7 +487,8 @@ fn the_window_loads_the_opencode_models() {
     m.set_config_seed(config_seed(&h, None, Some(TEST_KEY)));
     let out = cmds(&mut m, key("c"));
     assert!(
-        out.iter().any(|c| matches!(c, Cmd::Job(Job::ChinaModels(_)))),
+        out.iter()
+            .any(|c| matches!(c, Cmd::Job(Job::ChinaModels(_)))),
         "{out:?}"
     );
     m.update(Msg::ChinaModels(Ok(vec![
