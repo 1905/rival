@@ -15,8 +15,8 @@
 │    in Claude Code      ‹ sol ›   Sol 6.1 · Codex CLI                         │|
 │    in Codex            ‹ claude ›   Opus 5.5 · Claude Code                   │|
 │                                                                              │|
-│    Codex speed         ‹ fast ›   about 2x speed, uses more quota            │|
-│    Sol speed           ‹ fast ›   about 2x speed, uses more quota            │|
+│  /CHINA RUNS                                                                 │|
+│    provider            ‹ Moonshot ›   opencode moonshot · 1 model            │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK  not run · c checks the draft                     ● online · 6 models │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
@@ -40,8 +40,8 @@ d..DDDDDDDDDDD.................................................................d
 d....ddddddddddddddddddddddTTTdddddddddddddddddddddddd.........................d|
 d....ddddddddddddddddddddddTTTTTTddddddddddddddddddddddddddd...................d|
 d..............................................................................d|
-d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd............d|
-d....ddddddddddddddddddddddTTTTdddddddddddddddddddddddddddddddddddd............d|
+d..DDDDDDDDDDD.................................................................d|
+d....ddddddddddddddddddddddTTTTTTTTdddddddddddddddddddddddddddddddd............d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

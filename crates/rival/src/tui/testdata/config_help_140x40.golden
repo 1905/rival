@@ -13,7 +13,7 @@
 │                    │    sol    Sol 6.1    │ enter     edit a field, or toggle                │                                           │|
 │                    │    claude Opus 5.5   │ space     toggle                                 │                                           │|
 │                    │    fable  Fable 5.1  │ ←→ h l    pick a value (prefix, effort, model…)  │                                           │|
-│                    │                      │ e         type a prefix the proxy does not list  │                                           │|
+│                    │                      │ e         type a prefix or model not listed      │                                           │|
 │                    │                      │ d         import ANTHROPIC_BASE_URL into URL     │                                           │|
 │                    │                      │ c         check the default models on the draft  │                                           │|
 │                    │                      │ a         check every model                      │                                           │|
@@ -54,7 +54,7 @@ d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttt.....
 d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttt................a...........................................d|
 d....................d....tttttttdddddddddddaaaaaaaaaaaatttttt.................................a...........................................d|
 d....................d....tttttttdddddddddddaaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
-d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
+d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttt......a...........................................d|
 d....................d......................aaaaaaaaaaaatttttttttttttttttttttttttttttttttt.....a...........................................d|
 d....................d......................aaaaaaaaaaaattttttttttttttttttttttttttttttttttttt..a...........................................d|
 d....................d......................aaaaaaaaaaaattttttttttttttttt......................a...........................................d|

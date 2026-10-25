@@ -1380,7 +1380,7 @@ fn help_overlay(area: Rect, buf: &mut Buffer, s: &Styles) {
         ("enter", "edit a field, or toggle"),
         ("space", "toggle"),
         ("←→ h l", "pick a value (prefix, effort, model…)"),
-        ("e", "type a prefix or a model not in the list"),
+        ("e", "type a prefix or model not listed"),
         ("d", "import ANTHROPIC_BASE_URL into URL"),
         ("c", "check the default models on the draft"),
         ("a", "check every model"),
