@@ -18,6 +18,10 @@ fn tier_off_env() -> Env {
 }
 
 fn argv(effort: &str, workdir: &str) -> Vec<String> {
+    argv_sandbox(effort, workdir, "read-only")
+}
+
+fn argv_sandbox(effort: &str, workdir: &str, sandbox: &str) -> Vec<String> {
     let effort_arg = format!("model_reasoning_effort={effort}");
     strings(&[
         "exec",
@@ -28,7 +32,7 @@ fn argv(effort: &str, workdir: &str) -> Vec<String> {
         "-c",
         &effort_arg,
         "--sandbox",
-        "read-only",
+        sandbox,
         "--ephemeral",
         "--skip-git-repo-check",
         "--color",
@@ -41,7 +45,7 @@ fn argv(effort: &str, workdir: &str) -> Vec<String> {
 #[test]
 fn codex_run_args_uses_explicit_model_and_effort() {
     for effort in ["high", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo", Speed::Normal);
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/repo", Speed::Normal, true);
         assert_eq!(args, argv(effort, "/repo"));
         let joined = args.join(" ");
         assert!(joined.contains(&format!("-m {}", config::CODEX_MODEL)));
@@ -50,15 +54,24 @@ fn codex_run_args_uses_explicit_model_and_effort() {
     }
     // An empty workdir stays an empty argument after -C.
     assert_eq!(
-        codex_run_args(config::CODEX_MODEL, "", "", Speed::Normal),
+        codex_run_args(config::CODEX_MODEL, "", "", Speed::Normal, true),
         argv("", "")
     );
+}
+
+/// A raw prompt gets a writable sandbox, a review keeps read-only.
+#[test]
+fn codex_sandbox_follows_the_run_kind() {
+    let raw = codex_run_args(config::CODEX_MODEL, "xhigh", "/repo", Speed::Normal, false);
+    assert_eq!(raw, argv_sandbox("xhigh", "/repo", "workspace-write"));
+    let review = codex_run_args(config::CODEX_MODEL, "xhigh", "/repo", Speed::Normal, true);
+    assert_eq!(review, argv_sandbox("xhigh", "/repo", "read-only"));
 }
 
 #[test]
 fn codex_passes_ultra_and_xhigh_through_unaliased() {
     for effort in ["xhigh", "ultra"] {
-        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp", Speed::Normal);
+        let args = codex_run_args(config::CODEX_MODEL, effort, "/tmp", Speed::Normal, true);
         assert!(
             args.contains(&format!("model_reasoning_effort={effort}")),
             "{args:?}"
@@ -81,6 +94,7 @@ fn run_codex_model_rejects_unsupported_sol_and_empty() {
             "high",
             "/repo",
             model,
+            true,
             None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
@@ -113,6 +127,7 @@ fn run_codex_model_builds_the_exact_request() {
         "xhigh",
         &work,
         config::CODEX_MODEL,
+        true,
         None,
         recorder(&mut seen, Ok(want)),
     )
@@ -153,6 +168,7 @@ fn run_codex_model_wraps_errors_with_the_public_label() {
         "high",
         "/repo",
         config::CODEX_MODEL,
+        true,
         None,
         recorder(
             &mut seen,
@@ -228,6 +244,7 @@ fn run_codex_model_runs_the_fake_with_argv_and_prompt() {
                 "ultra",
                 &work,
                 config::CODEX_MODEL,
+                true,
                 None,
                 Some(&mut out),
             )
@@ -256,6 +273,7 @@ fn run_codex_model_forwards_the_log_file() {
         "low",
         &work,
         config::CODEX_MODEL,
+        true,
         Some("/home/s/sessions/x.log.repair.log"),
         recorder(&mut seen, Ok(RunResult::default())),
     )
@@ -320,6 +338,7 @@ fn run_recorded(env: &Env) -> anyhow::Result<(Spawned, Session)> {
         "xhigh",
         &work,
         config::CODEX_MODEL,
+        true,
         None,
         recorder(&mut seen, Ok(RunResult::default())),
     )?;
@@ -334,6 +353,7 @@ fn codex_proxy_args_pin_the_provider_values() {
         "high",
         "/repo",
         Speed::Normal,
+        true,
         "http://127.0.0.1:8999",
     )
     .unwrap();
@@ -373,7 +393,8 @@ fn codex_proxy_args_refuse_a_toml_unsafe_url() {
         "http://h:1/a\u{1}b",
     ] {
         let err =
-            codex_proxy_run_args("gpt-6-astra", "high", "/repo", Speed::Normal, url).unwrap_err();
+            codex_proxy_run_args("gpt-6-astra", "high", "/repo", Speed::Normal, true, url)
+                .unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(
@@ -607,6 +628,7 @@ fn sol_runs_direct_and_through_the_proxy() {
             "ultra",
             &work,
             config::SOL_MODEL,
+            true,
             None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
@@ -658,6 +680,7 @@ fn speed_reaches_argv_direct_and_through_the_proxy() {
             "xhigh",
             &work,
             model,
+            true,
             None,
             recorder(&mut seen, Ok(RunResult::default())),
         )
@@ -820,6 +843,7 @@ fn run_sets_service_tier_omitted_from_its_log() {
             "low",
             &work,
             config::SOL_MODEL,
+            true,
             Some(log.to_str().unwrap()),
             |_, req| {
                 std::fs::write(&log, tier_log(req.prompt, between, "ok")).unwrap();

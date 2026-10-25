@@ -256,7 +256,7 @@ fn codex_plan_uses_codex_runtime_and_structured_output() {
     let args = std::fs::read_to_string(&args_file).unwrap();
     // No config file: the speed is fast by default.
     let mut want =
-        codex_run_args(CODEX_MODEL, "xhigh", &repo, crate::config::Speed::Fast).join("\n");
+        codex_run_args(CODEX_MODEL, "xhigh", &repo, crate::config::Speed::Fast, true).join("\n");
     want.push('\n');
     assert_eq!(args, want);
     for part in [

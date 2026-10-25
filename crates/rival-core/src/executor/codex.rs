@@ -129,6 +129,10 @@ fn log_head(path: &str, prompt: &str) -> std::io::Result<String> {
 /// also the model sent to the runtime. It runs Codex and Sol 6.1. When
 /// [`Config::speed`] of `model` has a tier, the call asks for it and the
 /// session records it.
+///
+/// The caller passes `read_only` rather than this function deriving it from
+/// the session mode, as [`super::run_claude`] does: reviews and the language
+/// pass must not touch the workdir, a raw prompt may edit it.
 #[allow(clippy::too_many_arguments)]
 pub fn run_codex_model(
     ctx: &Context,
@@ -138,6 +142,7 @@ pub fn run_codex_model(
     effort: &str,
     workdir: &str,
     model: &str,
+    read_only: bool,
     log: Option<&str>,
     mirror: Mirror<'_>,
 ) -> anyhow::Result<RunResult> {
@@ -148,6 +153,7 @@ pub fn run_codex_model(
         effort,
         workdir,
         model,
+        read_only,
         log,
         |sess, req| run_subprocess(ctx, cfg.paths(), sess, req, mirror),
     )
@@ -162,6 +168,7 @@ pub(crate) fn run_codex_model_with(
     effort: &str,
     workdir: &str,
     model: &str,
+    read_only: bool,
     log: Option<&str>,
     spawn: impl FnOnce(&mut Session, &Request<'_>) -> anyhow::Result<RunResult>,
 ) -> anyhow::Result<RunResult> {
@@ -176,13 +183,17 @@ pub(crate) fn run_codex_model_with(
         let (args, child_env) = match cfg.proxy_route(ProxyProvider::Codex)? {
             Some(route) => {
                 let wire = proxy::wire_id(&route.prefix, model);
-                let args = codex_proxy_run_args(&wire, effort, workdir, speed, &route.url)?;
+                let args =
+                    codex_proxy_run_args(&wire, effort, workdir, speed, read_only, &route.url)?;
                 sess.route = ROUTE_PROXY.to_string();
                 sess.wire_model = wire;
                 sess.account = ROUTE_PROXY.to_string();
                 (args, proxy_env(&route))
             }
-            None => (codex_run_args(model, effort, workdir, speed), Vec::new()),
+            None => (
+                codex_run_args(model, effort, workdir, speed, read_only),
+                Vec::new(),
+            ),
         };
 
         let full_prompt = format!(
@@ -233,12 +244,15 @@ pub(crate) fn run_codex_model_with(
 /// The `codex exec` argv. A `speed` with a tier adds `-c
 /// service_tier="<tier>"` and `-c features.<tier>_mode=true` right after
 /// `-m <model>`, so a local config that turned the feature off cannot drop
-/// the tier unseen. Normal adds nothing.
+/// the tier unseen. Normal adds nothing. `read_only` selects the sandbox:
+/// reviews and the language pass get `read-only`, a raw prompt gets
+/// `workspace-write`, so the agent can edit files in the workdir.
 pub(crate) fn codex_run_args(
     model: &str,
     effort: &str,
     workdir: &str,
     speed: Speed,
+    read_only: bool,
 ) -> Vec<String> {
     // The codex runtime takes ultra as its own reasoning level (distinct from
     // xhigh), so preserve the requested value instead of normalizing it.
@@ -251,7 +265,7 @@ pub(crate) fn codex_run_args(
         "-c",
         &format!("model_reasoning_effort={effort}"),
         "--sandbox",
-        "read-only",
+        if read_only { "read-only" } else { "workspace-write" },
         "--ephemeral",
         "--skip-git-repo-check",
         "--color",
@@ -283,9 +297,10 @@ pub(crate) fn codex_proxy_run_args(
     effort: &str,
     workdir: &str,
     speed: Speed,
+    read_only: bool,
     url: &str,
 ) -> anyhow::Result<Vec<String>> {
-    let mut args = codex_run_args(wire, effort, workdir, speed);
+    let mut args = codex_run_args(wire, effort, workdir, speed, read_only);
     args.splice(5..5, proxy_provider_args(url)?);
     Ok(args)
 }

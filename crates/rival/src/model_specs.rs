@@ -218,7 +218,7 @@ fn codex_runtime_spec(
         preflight: Box::new(move |cfg| executor::codex_preflight_for(cfg, model)),
         run: Box::new(move |c| {
             executor::run_codex_model(
-                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.log, c.out,
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.review, c.log, c.out,
             )
         }),
     }
