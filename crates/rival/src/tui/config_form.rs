@@ -730,10 +730,7 @@ impl ConfigForm {
             },
             _ => {}
         }
-        let Some(edit) = self.edit.as_ref() else {
-            return None;
-        };
-        let field = edit.field;
+        let field = self.edit.as_ref()?.field;
         self.edit = None;
         self.validate();
         (field == Field::Url).then_some(Effect::Probe { debounce: false })

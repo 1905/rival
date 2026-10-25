@@ -745,7 +745,7 @@ fn a_typed_china_model_resolves_against_the_list() {
     let (_h, mut f) = form(Some("china:\n  model: openrouter/aion-labs/aion-2.0\n"));
     f.china_models_done(Ok(china_list()));
     focus(&mut f, Field::ChinaModel);
-    let mut set = |f: &mut ConfigForm, text: &str| {
+    let set = |f: &mut ConfigForm, text: &str| {
         keys(f, &["e", "ctrl+u"]);
         typed(f, text);
         keys(f, &["enter"]);
