@@ -799,13 +799,16 @@ fn china_lines(form: &ConfigForm, w: usize, s: &Styles, out: &mut Vec<BodyLine>)
         .iter()
         .find(|(p, _)| *p == provider)
         .map_or(provider.as_str(), |(_, d)| d);
-    let count = form.china_models(&provider).len();
+    let models = form.china_models(&provider);
     let mut value = picker(display, form.field() == Some(Field::ChinaProvider), s);
     value.push(Span::styled(
         match &form.china {
             ChinaList::Loading => format!("   opencode {provider} · loading models…"),
-            ChinaList::Ready(_) if count == 1 => format!("   opencode {provider} · 1 model"),
-            ChinaList::Ready(_) => format!("   opencode {provider} · {count} models"),
+            ChinaList::Ready(_) => format!(
+                "   opencode {provider} · {} model{}",
+                models.len(),
+                if models.len() == 1 { "" } else { "s" }
+            ),
             ChinaList::Failed(_) => format!("   opencode {provider}"),
         },
         s.dim,
@@ -820,9 +823,8 @@ fn china_lines(form: &ConfigForm, w: usize, s: &Styles, out: &mut Vec<BodyLine>)
         s,
     );
     let selector = form.china_selector();
-    let model = selector.split_once('/').map_or("", |(_, m)| m);
+    let model = rival_core::proxy::id_model(&selector);
     let mut value = picker(model, form.field() == Some(Field::ChinaModel), s);
-    let models = form.china_models(&provider);
     if let Some(i) = models.iter().position(|m| *m == selector) {
         value.push(Span::styled(
             format!("   {}/{} on {display}", i + 1, models.len()),
@@ -1311,7 +1313,7 @@ fn footer_line(form: &ConfigForm, w: usize, s: &Styles) -> Line<'static> {
         match field {
             Some(f) if f.is_toggle() => add("space", "toggle", 7),
             Some(Field::Model(_)) => add("←→", "effort", 7),
-            Some(Field::ClaudePrefix | Field::CodexPrefix | Field::ChinaModel) => {
+            Some(f) if f.is_typeable_picker() => {
                 add("←→", "choose", 7);
                 add("e", "type", 3);
             }

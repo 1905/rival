@@ -983,6 +983,16 @@ pub struct ChinaConfig {
     pub model: String,
 }
 
+impl ChinaConfig {
+    /// `china.model`, trimmed, else [`CHINA_DEFAULT_MODEL`].
+    pub fn model_or_default(&self) -> &str {
+        match self.model.trim() {
+            "" => CHINA_DEFAULT_MODEL,
+            m => m,
+        }
+    }
+}
+
 /// The `skill:` block: the model each host's `/rival` skill runs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SkillConfig {
@@ -1754,9 +1764,7 @@ impl Config {
     pub fn china_model(&self) -> &str {
         self.user
             .as_ref()
-            .map(|u| u.china.model.as_str())
-            .filter(|m| !m.is_empty())
-            .unwrap_or(CHINA_DEFAULT_MODEL)
+            .map_or(CHINA_DEFAULT_MODEL, |u| u.china.model_or_default())
     }
 
     /// Whether `china.model` is set in the user config.

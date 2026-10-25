@@ -228,8 +228,6 @@ pub const FAKE_PROXY_IDS: [&str; 6] = [
     "gpt-6.1-sol",
 ];
 
-/// The fake `/v1/models`: [`FAKE_PROXY_IDS`] for any URL whose key is
-/// `test-key-a91f`, a 401 for any other key. It never opens a socket.
 /// The opencode models every test window sees.
 pub const FAKE_OPENCODE_MODELS: [&str; 4] = [
     "moonshot/kimi-k3.1-pro",
@@ -242,6 +240,8 @@ pub fn fake_opencode_models(_: &rival_core::config::Config) -> Result<Vec<String
     Ok(FAKE_OPENCODE_MODELS.iter().map(|s| s.to_string()).collect())
 }
 
+/// The fake `/v1/models`: [`FAKE_PROXY_IDS`] for any URL whose key is
+/// `test-key-a91f`, a 401 for any other key. It never opens a socket.
 pub fn fake_models(
     route: &rival_core::config::Route,
 ) -> Result<Vec<String>, rival_core::proxy::ModelsError> {

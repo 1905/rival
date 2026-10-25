@@ -161,6 +161,14 @@ impl Field {
         )
     }
 
+    /// A picker that `e` also opens as a text edit.
+    pub fn is_typeable_picker(self) -> bool {
+        matches!(
+            self,
+            Field::ClaudePrefix | Field::CodexPrefix | Field::ChinaModel
+        )
+    }
+
     /// Whether `enter` opens a text edit.
     pub fn is_text(self) -> bool {
         matches!(
@@ -291,14 +299,10 @@ const CHINA_LABS: [&str; 14] = [
 /// Whether `selector` is a Chinese lab's model: every model of the
 /// moonshot provider, else a [`CHINA_LABS`] vendor.
 fn chinese_lab(selector: &str) -> bool {
-    let Some((provider, model)) = selector.split_once('/') else {
+    let Some((provider, model)) = config::parse_china_model(selector) else {
         return false;
     };
-    let vendor = model
-        .split('/')
-        .next()
-        .unwrap_or("")
-        .trim_start_matches('~');
+    let vendor = proxy::id_prefix(model).trim_start_matches('~');
     provider == "moonshot" || CHINA_LABS.contains(&vendor)
 }
 
@@ -542,10 +546,7 @@ impl ConfigForm {
             "left" | "h" => return self.step(-1),
             "right" | "l" => return self.step(1),
             "e" => {
-                if matches!(
-                    self.field(),
-                    Some(Field::ClaudePrefix | Field::CodexPrefix | Field::ChinaModel)
-                ) {
+                if self.field().is_some_and(Field::is_typeable_picker) {
                     self.open_edit();
                 }
             }
@@ -715,10 +716,9 @@ impl ConfigForm {
                 Ok((selector, listed)) => {
                     self.draft.china.model = selector.clone();
                     if !listed {
-                        self.notice = Some(Notice {
-                            text: format!("opencode does not list {selector}; it may not run"),
-                            kind: NoticeKind::Warn,
-                        });
+                        self.warn(&format!(
+                            "opencode does not list {selector}; it may not run"
+                        ));
                     }
                 }
                 Err(why) => {
@@ -775,13 +775,22 @@ impl ConfigForm {
                 let n = Speed::ALL.len() as isize;
                 *slot = Speed::ALL[(at + delta).rem_euclid(n) as usize];
                 if *slot == Speed::Ultrafast {
-                    self.notice = Some(Notice {
-                        text: config::ULTRAFAST_PLAN_WARNING.to_string(),
-                        kind: NoticeKind::Warn,
-                    });
+                    self.warn(config::ULTRAFAST_PLAN_WARNING);
                 }
             }
             Field::ChinaProvider => {
+                match &self.china {
+                    ChinaList::Ready(_) => {}
+                    ChinaList::Loading => {
+                        self.info("opencode models are loading…");
+                        return None;
+                    }
+                    ChinaList::Failed(e) => {
+                        let e = format!("opencode models: {e}");
+                        self.error_notice(&e);
+                        return None;
+                    }
+                }
                 let mut names: Vec<String> = config::CHINA_PROVIDERS
                     .iter()
                     .map(|(p, _)| p.to_string())
@@ -791,17 +800,7 @@ impl ConfigForm {
                     names.push(current.clone());
                 }
                 let next = cycle(&names, &current, delta);
-                let models = match &self.china {
-                    ChinaList::Ready(_) => self.china_models(&next),
-                    ChinaList::Loading => {
-                        self.info("opencode models are loading…");
-                        return None;
-                    }
-                    ChinaList::Failed(e) => {
-                        self.error_notice(&format!("opencode models: {e}"));
-                        return None;
-                    }
-                };
+                let models = self.china_models(&next);
                 // The same model on the new provider when it has one
                 // (moonshot/kimi-k3.1-pro → openrouter/moonshotai/kimi-k3.1-pro).
                 let label = config::china_label(&self.china_selector()).to_string();
@@ -810,12 +809,7 @@ impl ConfigForm {
                     .find(|m| config::china_label(m) == label)
                     .or(models.first())
                 else {
-                    self.notice = Some(Notice {
-                        text: format!(
-                            "opencode lists no {next} models: run opencode auth login, or enable them in its config"
-                        ),
-                        kind: NoticeKind::Warn,
-                    });
+                    self.warn(&format!("opencode lists no {next} models: run opencode auth login, or enable them in its config"));
                     return None;
                 };
                 self.draft.china.model = pick.clone();
@@ -905,6 +899,13 @@ impl ConfigForm {
         self.notice = Some(Notice {
             text: text.to_string(),
             kind: NoticeKind::Info,
+        });
+    }
+
+    fn warn(&mut self, text: &str) {
+        self.notice = Some(Notice {
+            text: text.to_string(),
+            kind: NoticeKind::Warn,
         });
     }
 
@@ -1017,9 +1018,7 @@ impl ConfigForm {
 
     /// The opencode provider of the draft's `china.model`.
     pub fn china_provider(&self) -> &str {
-        china_selector(&self.draft)
-            .split_once('/')
-            .map_or("", |(p, _)| p)
+        proxy::id_prefix(china_selector(&self.draft))
     }
 
     /// The listed models of `provider`, as full selectors: Chinese labs
@@ -1030,7 +1029,7 @@ impl ConfigForm {
         };
         let mut models: Vec<String> = all
             .iter()
-            .filter(|s| s.split_once('/').is_some_and(|(p, _)| p == provider))
+            .filter(|s| proxy::id_prefix(s) == provider)
             .cloned()
             .collect();
         models.sort_by_key(|m| !chinese_lab(m));
@@ -1068,7 +1067,7 @@ impl ConfigForm {
         let models = self.china_models(provider);
         let needle = text.to_lowercase();
         // The name the picker shows (after the provider), then its last part.
-        let name = |m: &String| m.split_once('/').map_or("", |(_, n)| n).to_lowercase();
+        let name = |m: &String| proxy::id_model(m).to_lowercase();
         let label = |m: &String| config::china_label(m).to_lowercase();
         for key in [&name as &dyn Fn(&String) -> String, &label] {
             let found: Vec<&String> = models.iter().filter(|m| key(m) == needle).collect();
@@ -1080,9 +1079,7 @@ impl ConfigForm {
         // a listed name contains it (glm-5.3 inside glm-5.3-flash).
         let known = |p: &str| {
             config::CHINA_PROVIDERS.iter().any(|(k, _)| *k == p)
-                || all
-                    .iter()
-                    .any(|m| m.split_once('/').is_some_and(|(k, _)| k == p))
+                || all.iter().any(|m| proxy::id_prefix(m) == p)
         };
         if let Some((p, _)) = config::parse_china_model(text)
             && known(p)
@@ -1451,10 +1448,7 @@ fn edits_of(patch: &Json) -> Result<Vec<Edit>, String> {
 
 /// The `china.model` of `u`, else the default.
 fn china_selector(u: &UserConfig) -> &str {
-    match u.china.model.trim() {
-        "" => config::CHINA_DEFAULT_MODEL,
-        m => m,
-    }
+    u.china.model_or_default()
 }
 
 /// The configured reviewer, `k3` when unset.

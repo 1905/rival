@@ -22,6 +22,11 @@ use crate::session::Session;
 /// would stay allowed.
 pub(crate) const CHINA_READ_ONLY_PERMISSION: &str = r#"{"*":"deny","read":"allow","grep":"allow","glob":"allow","list":"allow","external_directory":"deny"}"#;
 
+/// Keeps the project's own opencode config out of every china call: a
+/// reviewed repo must not re-enable tools, and the model list must match
+/// what a run can use.
+pub(crate) const DISABLE_PROJECT_CONFIG: &str = "OPENCODE_DISABLE_PROJECT_CONFIG=1";
+
 /// The opencode agent every china run uses. The user's own agents (such as
 /// the default `build`) can carry permissions that override the top-level
 /// `permission` block, so the run gets an agent of its own with the profile.
@@ -48,9 +53,7 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 fn opencode_query(cfg: &Config, args: &[&str]) -> anyhow::Result<String> {
     require_opencode(cfg)?;
     let mut environ = safe_env(cfg.environ());
-    // As in the run: the project's opencode config does not apply, so the
-    // model list matches what a run can use.
-    environ.push("OPENCODE_DISABLE_PROJECT_CONFIG=1".into());
+    environ.push(DISABLE_PROJECT_CONFIG.into());
     let (ctx, _cancel) = Context::background().with_timeout(QUERY_TIMEOUT);
     let (out, res) = oscmd::with_context(&ctx, || {
         oscmd::run_env(cfg, "opencode", args, Output::Combined, &environ)
@@ -149,7 +152,7 @@ pub(crate) fn run_china_with(
             "OPENCODE_CONFIG_CONTENT={}",
             china_config_content(provider, model, effort, raw)
         ),
-        "OPENCODE_DISABLE_PROJECT_CONFIG=1".to_string(),
+        DISABLE_PROJECT_CONFIG.to_string(),
     ];
     let full_prompt = format!(
         "{}\n\n{}\n{prompt}",
