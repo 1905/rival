@@ -717,3 +717,22 @@ fn blank_plan_summary_is_never_a_clean_plan() {
         assert!(crate::review::parse_plan_log(raw).is_err(), "{raw}");
     }
 }
+
+/// A china (opencode) log: the answer is what follows the last agent
+/// header. A stray brace in an earlier tool line (here a grep pattern) used
+/// to hide the answer from the JSON scan, and an object in a tool line
+/// before the header is never the answer.
+#[test]
+fn china_log_answer_follows_the_last_agent_header() {
+    let raw = concat!(
+        "\u{1b}[0m\n> rival-china · kimi-k3.1-pro\n",
+        "\u{1b}[0m✱ \u{1b}[0mGrep \"RunCall \\{|review:\" in crates/rival/src · 81 matches\n",
+        "\u{1b}[0m✱ \u{1b}[0mGrep \"{\\\"summary\\\": \\\"old\\\", \\\"findings\\\": []}\" in . · 0 matches\n",
+        "> rival-china · kimi-k3.1-pro\n",
+        "{\n  \"summary\": \"One bug.\",\n  \"findings\": [{\"file\": \"a.rs\", \"line\": 3, \"severity\": \"high\", \"category\": \"bug\", \"title\": \"t\", \"body\": \"b\", \"suggestion\": \"s\", \"confidence\": 9}]\n}\n",
+    );
+    assert!(final_answer(raw).starts_with("{\n  \"summary\": \"One bug.\""));
+    let p = log_payload(raw, PayloadKind::Any).unwrap();
+    assert_eq!((p.summary.as_str(), p.rating), ("One bug.", None));
+    assert_eq!(p.findings.len(), 1);
+}

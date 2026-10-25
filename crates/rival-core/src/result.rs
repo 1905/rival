@@ -108,6 +108,11 @@ pub fn severity_groups(findings: Vec<Finding>) -> Vec<SeverityGroup> {
 
 /// The part of a provider log that holds the model's final answer.
 ///
+/// - A china (opencode) log: the lines after the last agent header
+///   (`> rival-china · <model>`). opencode starts every step with it and
+///   prints tool calls, never tool output, so the last step is the answer.
+///   A tool line before it can hold a stray brace (`Grep "RunCall \{"`)
+///   that would hide every later JSON object from the scan.
 /// - No line that is exactly "codex": the whole text.
 /// - Else the lines after the last such line. Codex streams the answer there,
 ///   then prints it again, clean, and puts a "tokens used" + count footer and
@@ -117,6 +122,10 @@ pub fn severity_groups(findings: Vec<Finding>) -> Vec<SeverityGroup> {
 ///   is the answer; else all of it is.
 pub fn final_answer(raw: &str) -> String {
     let lines: Vec<&str> = raw.split('\n').collect();
+    let china_header = format!("> {} · ", crate::executor::china::CHINA_AGENT);
+    if let Some(header) = lines.iter().rposition(|l| l.starts_with(&china_header)) {
+        return lines[header + 1..].join("\n");
+    }
     let Some(header) = lines.iter().rposition(|l| *l == "codex") else {
         return raw.to_string();
     };
