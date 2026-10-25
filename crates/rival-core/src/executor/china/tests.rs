@@ -178,7 +178,7 @@ fn china_models_runs_opencode_models() {
     let env = Env::new();
     env.fake(
         "opencode",
-        "#!/bin/sh\n[ \"$1 $2\" = 'models --standalone' ] || exit 3\nprintf 'openrouter/qwen/qwen4\\nmoonshot/kimi-k3.1-pro\\n'\n",
+        "#!/bin/sh\n[ \"$1 $2\" = 'models --standalone' ] || exit 3\n[ \"$OPENCODE_DISABLE_PROJECT_CONFIG\" = 1 ] || exit 4\nprintf 'openrouter/qwen/qwen4\\nmoonshot/kimi-k3.1-pro\\n'\n",
     );
     assert_eq!(
         china_models(&env.config()).unwrap(),

@@ -758,6 +758,17 @@ fn a_typed_china_model_resolves_against_the_list() {
     );
     set(&mut f, "kimi");
     assert_eq!(f.china_selector(), "openrouter/moonshotai/kimi-k3.1-pro");
+    set(&mut f, "z-ai/glm-5.3-flash");
+    assert_eq!(
+        f.china_selector(),
+        "openrouter/z-ai/glm-5.3-flash",
+        "the name as the picker shows it"
+    );
+    // A full selector opencode does not list stays as typed, even though a
+    // listed name contains it.
+    set(&mut f, "openrouter/z-ai/glm-5");
+    assert_eq!(f.china_selector(), "openrouter/z-ai/glm-5");
+    assert!(f.china_unlisted());
     set(&mut f, "glm");
     assert!(
         f.edit

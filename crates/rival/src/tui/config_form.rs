@@ -1050,36 +1050,53 @@ impl ConfigForm {
         };
     }
 
-    /// The `china.model` for a typed text, and whether opencode lists it. A
-    /// full `provider/model` is taken as typed. Other text picks the one
-    /// model of the current provider that contains it (any case).
+    /// The `china.model` for a typed text, and whether opencode lists it.
+    /// In order: a listed selector; the exact model name as the picker
+    /// shows it (`z-ai/glm-5.3`) or its last part (`glm-5.3`); a full
+    /// `provider/model` of a known provider, as typed; the one model of the
+    /// current provider that contains the text (any case).
     fn resolve_china_model(&self, text: &str) -> Result<(String, bool), String> {
         let text = text.trim();
-        let listed =
-            |s: &str| matches!(&self.china, ChinaList::Ready(all) if all.iter().any(|m| m == s));
-        if listed(text) {
+        let all: &[String] = match &self.china {
+            ChinaList::Ready(all) => all,
+            _ => &[],
+        };
+        if all.iter().any(|m| m == text) {
             return Ok((text.to_string(), true));
         }
         let provider = self.china_provider();
+        let models = self.china_models(provider);
         let needle = text.to_lowercase();
-        let hits: Vec<String> = self
-            .china_models(provider)
-            .into_iter()
+        // The name the picker shows (after the provider), then its last part.
+        let name = |m: &String| m.split_once('/').map_or("", |(_, n)| n).to_lowercase();
+        let label = |m: &String| config::china_label(m).to_lowercase();
+        for key in [&name as &dyn Fn(&String) -> String, &label] {
+            let found: Vec<&String> = models.iter().filter(|m| key(m) == needle).collect();
+            if let [one] = found.as_slice() {
+                return Ok(((*one).clone(), true));
+            }
+        }
+        // A full selector of a known provider is meant as typed, even when
+        // a listed name contains it (glm-5.3 inside glm-5.3-flash).
+        let known = |p: &str| {
+            config::CHINA_PROVIDERS.iter().any(|(k, _)| *k == p)
+                || all
+                    .iter()
+                    .any(|m| m.split_once('/').is_some_and(|(k, _)| k == p))
+        };
+        if let Some((p, _)) = config::parse_china_model(text)
+            && known(p)
+        {
+            return Ok((text.to_string(), false));
+        }
+        let hits: Vec<&String> = models
+            .iter()
             .filter(|m| m.to_lowercase().contains(&needle))
             .collect();
-        // A full model name wins over the longer names that contain it
-        // (glm-5.3 over glm-5.3-flash).
-        let exact: Vec<&String> = hits
-            .iter()
-            .filter(|m| config::china_label(m).to_lowercase() == needle)
-            .collect();
-        if let [one] = exact.as_slice() {
-            return Ok(((*one).clone(), true));
-        }
         match hits.as_slice() {
-            [one] if !needle.is_empty() => return Ok((one.clone(), true)),
+            [one] if !needle.is_empty() => return Ok(((*one).clone(), true)),
             [_, _, ..] if !needle.is_empty() => {
-                let shown: Vec<&str> = hits.iter().take(3).map(String::as_str).collect();
+                let shown: Vec<&str> = hits.iter().take(3).map(|m| m.as_str()).collect();
                 return Err(format!(
                     "{} {provider} models match: {}{}",
                     hits.len(),

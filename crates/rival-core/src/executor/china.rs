@@ -47,7 +47,10 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 /// preflight, so the call has its own bound.
 fn opencode_query(cfg: &Config, args: &[&str]) -> anyhow::Result<String> {
     require_opencode(cfg)?;
-    let environ = safe_env(cfg.environ());
+    let mut environ = safe_env(cfg.environ());
+    // As in the run: the project's opencode config does not apply, so the
+    // model list matches what a run can use.
+    environ.push("OPENCODE_DISABLE_PROJECT_CONFIG=1".into());
     let (ctx, _cancel) = Context::background().with_timeout(QUERY_TIMEOUT);
     let (out, res) = oscmd::with_context(&ctx, || {
         oscmd::run_env(cfg, "opencode", args, Output::Combined, &environ)
