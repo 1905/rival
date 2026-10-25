@@ -971,6 +971,11 @@ pub fn display_model<'a>(cli: &str, model: &'a str) -> &'a str {
     }
 }
 
+/// The opencode providers the config window offers for `china.model`, with
+/// their display names. Any other provider still works when typed.
+pub const CHINA_PROVIDERS: [(&str, &str); 2] =
+    [("moonshot", "Moonshot"), ("openrouter", "OpenRouter")];
+
 /// The `china:` block.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChinaConfig {

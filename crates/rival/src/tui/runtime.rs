@@ -480,6 +480,8 @@ struct Pending {
     prompts: Option<Job>,
     /// The config window's newest proxy probe.
     probe: Option<Job>,
+    /// The config window's opencode model list.
+    china: Option<Job>,
     /// The config window's check. The window runs one at a time.
     check: Option<Job>,
     actions: VecDeque<Job>,
@@ -495,6 +497,7 @@ impl Pending {
             &self.result,
             &self.prompts,
             &self.probe,
+            &self.china,
             &self.check,
         ]
         .iter()
@@ -515,6 +518,7 @@ impl Pending {
             Job::Result(_) => self.result = Some(job),
             Job::Prompts(_) => self.prompts = Some(job),
             Job::Probe(_) => self.probe = Some(job),
+            Job::ChinaModels(_) => self.china = Some(job),
             Job::Check(_) => self.check = Some(job),
             Job::Stop(_) | Job::OpenLog(_) | Job::Save(_) => {
                 if self.actions.contains(&job) {
@@ -545,6 +549,7 @@ impl Pending {
             .or_else(|| self.preview.take())
             .or_else(|| self.prompts.take())
             .or_else(|| self.probe.take())
+            .or_else(|| self.china.take())
             .or_else(|| self.check.take())
     }
 }

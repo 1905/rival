@@ -122,7 +122,6 @@ fn run_china_request_per_mode() {
                     china_config_content("moonshot", "kimi-k3.1-pro", "high", raw)
                 ),
                 "OPENCODE_DISABLE_PROJECT_CONFIG=1".to_string(),
-                format!("OPENCODE_DB=rival-{}.db", sess.id),
             ],
             "{mode}"
         );
@@ -162,4 +161,27 @@ fn china_preflight_filters_the_env() {
         "#!/bin/sh\nif [ -n \"$NODE_OPTIONS\" ]; then echo leaked; exit 1; fi\necho 'opencode v2.1.3'\n",
     );
     china_preflight(&env.config()).unwrap();
+}
+
+#[test]
+fn parse_opencode_models_keeps_selectors_sorted() {
+    let text = "WARN something\nopenrouter/z-ai/glm-5.3\nmoonshot/kimi-k3.1-pro\n\nopenrouter/z-ai/glm-5.3\nnot a model\n";
+    assert_eq!(
+        parse_opencode_models(text),
+        strings(&["moonshot/kimi-k3.1-pro", "openrouter/z-ai/glm-5.3"])
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn china_models_runs_opencode_models() {
+    let env = Env::new();
+    env.fake(
+        "opencode",
+        "#!/bin/sh\n[ \"$1 $2\" = 'models --standalone' ] || exit 3\nprintf 'openrouter/qwen/qwen4\\nmoonshot/kimi-k3.1-pro\\n'\n",
+    );
+    assert_eq!(
+        china_models(&env.config()).unwrap(),
+        strings(&["moonshot/kimi-k3.1-pro", "openrouter/qwen/qwen4"])
+    );
 }

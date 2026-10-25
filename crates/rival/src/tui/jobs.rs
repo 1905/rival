@@ -23,7 +23,8 @@ use rival_core::paths::Paths;
 use rival_core::session::Session;
 
 use super::config_check::{
-    self, CheckFn, CheckRequest, ModelsFn, ProbeRequest, SaveRequest, run_probe, run_save,
+    self, CheckFn, CheckRequest, ChinaModelsRequest, ModelsFn, OpencodeModelsFn, ProbeRequest,
+    SaveRequest, run_probe, run_save,
 };
 use super::kill::{ProcessOps, StopRequest, stop_sessions};
 use super::logview::{LogRequest, ReadTail, create_group_log_view, create_log_view, load_log};
@@ -66,6 +67,8 @@ pub enum Job {
     /// The config window's `/v1/models` call (the online dot, the prefix
     /// pickers).
     Probe(Box<ProbeRequest>),
+    /// The config window's `opencode models` call (the China pickers).
+    ChinaModels(Box<ChinaModelsRequest>),
     /// The config window's model check; each row is its own message.
     Check(Box<CheckRequest>),
     /// The config window's save.
@@ -342,6 +345,8 @@ pub struct JobEnv {
     pub temp_dir: PathBuf,
     /// The proxy's model list; tests fake it.
     pub models: ModelsFn,
+    /// The models opencode can run; tests fake it.
+    pub opencode_models: OpencodeModelsFn,
     /// The model check; tests fake it.
     pub check: CheckFn,
 }
@@ -355,6 +360,7 @@ impl JobEnv {
             launch: launch_viewer,
             temp_dir: std::env::temp_dir(),
             models: rival_core::proxy::models,
+            opencode_models: config_check::opencode_models,
             check: crate::check::run_check,
         }
     }
@@ -370,6 +376,9 @@ impl JobEnv {
     pub fn run_with(&self, job: Job, emit: &(dyn Fn(Msg) + Sync)) -> JobOutput {
         match job {
             Job::Probe(req) => JobOutput::Msg(Msg::ProxyModels(run_probe(*req, self.models))),
+            Job::ChinaModels(req) => {
+                JobOutput::Msg(Msg::ChinaModels((self.opencode_models)(&req.cfg)))
+            }
             Job::Check(req) => JobOutput::Msg(config_check::run_check(*req, self.check, emit)),
             Job::Save(req) => JobOutput::Msg(Msg::ConfigSaved(Box::new(run_save(req)))),
             Job::Log(req) => JobOutput::Msg(Msg::Log(load_log(req, self.read_tail))),

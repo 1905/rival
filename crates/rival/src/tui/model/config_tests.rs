@@ -477,3 +477,27 @@ fn a_late_answer_never_reaches_the_next_window() {
     assert!(f.check.slots.is_empty(), "{:?}", f.check.slots);
     assert!(!matches!(f.probe.state, ProbeState::Offline(_)));
 }
+
+/// Opening the window asks opencode for its models; the answer fills the
+/// China pickers.
+#[test]
+fn the_window_loads_the_opencode_models() {
+    let h = harness();
+    let mut m = list_model(Vec::new(), 110, 48);
+    m.set_config_seed(config_seed(&h, None, Some(TEST_KEY)));
+    let out = cmds(&mut m, key("c"));
+    assert!(
+        out.iter().any(|c| matches!(c, Cmd::Job(Job::ChinaModels(_)))),
+        "{out:?}"
+    );
+    m.update(Msg::ChinaModels(Ok(vec![
+        "moonshot/kimi-k3.1-pro".to_string(),
+        "openrouter/z-ai/glm-5.3".to_string(),
+    ])));
+    let form = m.config.as_ref().unwrap();
+    assert_eq!(form.china_models("openrouter"), ["openrouter/z-ai/glm-5.3"]);
+    drive(&mut m, &h.env, [key("2")]);
+    let text = frame_text(&m);
+    assert!(text.contains("/CHINA RUNS"), "{text}");
+    assert!(text.contains("opencode moonshot · 1 model"), "{text}");
+}

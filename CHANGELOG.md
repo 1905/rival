@@ -8,6 +8,7 @@ Latest binary release: [v6.0.0](https://github.com/1905/rival/releases/tag/v6.0.
 
 ### Added
 - **`/china` skill** for Claude Code and Codex. "review with china" (or `/china review [scope]`, `/china <prompt>`) runs `china.model` through opencode v2 and returns its review. The default is Kimi K3.1 Pro on opencode's `moonshot` provider (`moonshot/kimi-k3.1-pro`). Change it with `rival config set china.model <provider/model>`; `rival config show` lists it.
+- The config window's Models section has `/CHINA RUNS` pickers: `provider` (Moonshot or OpenRouter) and `model`, listed from `opencode models` with Chinese labs first. `e` types a model name or any `provider/model`.
 - `rival command china`, which the skill launches. It runs `opencode run --standalone -m <china.model>` with opencode's own provider auth: Rival sends no key. The permission profile and the model's effort go in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_PROJECT_CONFIG=1` keeps the reviewed repository's opencode config out. `-re` maps `low` → low, `medium`/`high` → high, `xhigh`/`ultra` → max; the default is max. The preflight needs opencode v2 or later.
 
 ### Known issues

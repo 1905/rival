@@ -669,3 +669,108 @@ fn the_speed_pickers_write_their_own_keys() {
     keys(&mut f, &["left"]);
     assert_eq!(f.patch(), json!({"speed.sol": "fast"}));
 }
+
+fn china_list() -> Vec<String> {
+    [
+        "moonshot/kimi-k3.1-pro",
+        "openrouter/aion-labs/aion-2.0",
+        "openrouter/moonshotai/kimi-k3.1-pro",
+        "openrouter/z-ai/glm-5.3",
+        "openrouter/z-ai/glm-5.3-flash",
+    ]
+    .map(String::from)
+    .to_vec()
+}
+
+/// The provider picker waits for opencode's list, then moves the model to
+/// the same name on the new provider, and back.
+#[test]
+fn the_china_provider_picker_keeps_the_model_name() {
+    let (_h, mut f) = form(None);
+    focus(&mut f, Field::ChinaProvider);
+    keys(&mut f, &["right"]);
+    assert_eq!(f.china_selector(), config::CHINA_DEFAULT_MODEL);
+    assert_eq!(
+        f.notice.as_ref().unwrap().text,
+        "opencode models are loading…"
+    );
+
+    f.china_models_done(Ok(china_list()));
+    keys(&mut f, &["right"]);
+    assert_eq!(f.china_selector(), "openrouter/moonshotai/kimi-k3.1-pro");
+    assert_eq!(
+        f.patch(),
+        json!({"china.model": "openrouter/moonshotai/kimi-k3.1-pro"})
+    );
+    keys(&mut f, &["left"]);
+    assert_eq!(f.china_selector(), "moonshot/kimi-k3.1-pro");
+    assert_eq!(
+        f.patch(),
+        json!({}),
+        "the default chosen again is no change"
+    );
+}
+
+/// Chinese labs come first; a provider without a listed model refuses.
+#[test]
+fn the_china_model_picker_lists_chinese_labs_first() {
+    let (_h, mut f) = form(None);
+    f.china_models_done(Ok(china_list()));
+    assert_eq!(
+        f.china_models("openrouter"),
+        [
+            "openrouter/moonshotai/kimi-k3.1-pro",
+            "openrouter/z-ai/glm-5.3",
+            "openrouter/z-ai/glm-5.3-flash",
+            "openrouter/aion-labs/aion-2.0",
+        ]
+    );
+    f.china_models_done(Ok(vec!["moonshot/kimi-k3.1-pro".to_string()]));
+    focus(&mut f, Field::ChinaProvider);
+    keys(&mut f, &["right"]);
+    assert_eq!(f.china_selector(), "moonshot/kimi-k3.1-pro");
+    assert!(
+        f.notice
+            .as_ref()
+            .unwrap()
+            .text
+            .starts_with("opencode lists no openrouter models")
+    );
+}
+
+/// `e` takes a full name, a unique part, or a full selector opencode does
+/// not list (with a warning); several matches are an error.
+#[test]
+fn a_typed_china_model_resolves_against_the_list() {
+    let (_h, mut f) = form(Some("china:\n  model: openrouter/aion-labs/aion-2.0\n"));
+    f.china_models_done(Ok(china_list()));
+    focus(&mut f, Field::ChinaModel);
+    let mut set = |f: &mut ConfigForm, text: &str| {
+        keys(f, &["e", "ctrl+u"]);
+        typed(f, text);
+        keys(f, &["enter"]);
+    };
+    set(&mut f, "glm-5.3");
+    assert_eq!(
+        f.china_selector(),
+        "openrouter/z-ai/glm-5.3",
+        "the exact name wins"
+    );
+    set(&mut f, "kimi");
+    assert_eq!(f.china_selector(), "openrouter/moonshotai/kimi-k3.1-pro");
+    set(&mut f, "glm");
+    assert!(
+        f.edit
+            .as_ref()
+            .unwrap()
+            .error
+            .as_ref()
+            .unwrap()
+            .starts_with("2 openrouter models match")
+    );
+    keys(&mut f, &["esc"]);
+    set(&mut f, "hinoki/hinoki-offensive");
+    assert_eq!(f.china_selector(), "hinoki/hinoki-offensive");
+    assert_eq!(f.notice.as_ref().unwrap().kind, NoticeKind::Warn);
+    assert!(f.china_unlisted());
+}

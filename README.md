@@ -64,7 +64,9 @@ provider by default. Ask "review with china", or use the same input as
 | `/china 'explain the auth flow'` | Run any prompt. |
 
 The model is `china.model`, an opencode `provider/model` (default
-`moonshot/kimi-k3.1-pro`). To change it, run
+`moonshot/kimi-k3.1-pro`). To change it, open the config window
+(`rival config`, Models: `/CHINA RUNS`) and pick the provider (Moonshot or
+OpenRouter) and a model from opencode's list, or run
 `rival config set china.model <provider/model>`. The provider must be set up
 in opencode with `opencode auth login` or a `{file:…}` key; Rival sends no
 key and strips `MOONSHOT_*` variables from the child.

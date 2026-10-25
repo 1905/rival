@@ -230,6 +230,18 @@ pub const FAKE_PROXY_IDS: [&str; 6] = [
 
 /// The fake `/v1/models`: [`FAKE_PROXY_IDS`] for any URL whose key is
 /// `test-key-a91f`, a 401 for any other key. It never opens a socket.
+/// The opencode models every test window sees.
+pub const FAKE_OPENCODE_MODELS: [&str; 4] = [
+    "moonshot/kimi-k3.1-pro",
+    "openrouter/moonshotai/kimi-k3.1-pro",
+    "openrouter/qwen/qwen4-coder",
+    "openrouter/z-ai/glm-5.3",
+];
+
+pub fn fake_opencode_models(_: &rival_core::config::Config) -> Result<Vec<String>, String> {
+    Ok(FAKE_OPENCODE_MODELS.iter().map(|s| s.to_string()).collect())
+}
+
 pub fn fake_models(
     route: &rival_core::config::Route,
 ) -> Result<Vec<String>, rival_core::proxy::ModelsError> {
@@ -393,6 +405,7 @@ pub fn harness() -> Harness {
         launch: fake_launch,
         temp_dir: tmp,
         models: fake_models,
+        opencode_models: fake_opencode_models,
         check: fake_check,
     };
     Harness { home, env }
@@ -482,6 +495,7 @@ pub fn press(name: &str) -> KeyEvent {
         "tab" => (KeyCode::Tab, none),
         "shift+tab" => (KeyCode::BackTab, KeyModifiers::SHIFT),
         "ctrl+c" => (KeyCode::Char('c'), KeyModifiers::CONTROL),
+        "ctrl+u" => (KeyCode::Char('u'), KeyModifiers::CONTROL),
         "backspace" => (KeyCode::Backspace, none),
         "space" => (KeyCode::Char(' '), none),
         "up" => (KeyCode::Up, none),

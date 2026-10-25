@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail};
 
 use super::Mirror;
 use super::kimi::KIMI_DROP_ENV;
-use super::opencode::{OPENCODE_FULL_AUTO_PERMISSION, opencode_db_env, require_opencode};
+use super::opencode::{OPENCODE_FULL_AUTO_PERMISSION, require_opencode};
 use super::oscmd::{self, Output};
 use super::subprocess::{Request, RunResult, run_subprocess, safe_env};
 use crate::cancel::Context;
@@ -38,23 +38,50 @@ pub fn china_effort(requested: &str) -> anyhow::Result<&'static str> {
     })
 }
 
-/// How long `opencode --version` may take.
-const VERSION_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long a one-shot opencode query (`--version`, `models`) may take.
+const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Runs `opencode <args>` once and returns its output. The child gets the
+/// filtered env of the provider run: a reviewed repo's .env must not reach
+/// it (LD_PRELOAD, NODE_OPTIONS). The run timeout starts only after the
+/// preflight, so the call has its own bound.
+fn opencode_query(cfg: &Config, args: &[&str]) -> anyhow::Result<String> {
+    require_opencode(cfg)?;
+    let environ = safe_env(cfg.environ());
+    let (ctx, _cancel) = Context::background().with_timeout(QUERY_TIMEOUT);
+    let (out, res) = oscmd::with_context(&ctx, || {
+        oscmd::run_env(cfg, "opencode", args, Output::Combined, &environ)
+    });
+    res.map_err(|e| anyhow!("opencode {}: {e}", args.join(" ")))?;
+    Ok(String::from_utf8_lossy(&out).into_owned())
+}
+
+/// Every model opencode can run, as `provider/model` selectors, from
+/// `opencode models --standalone`. It lists the providers opencode has auth
+/// or config for, without the models the user's config disables.
+pub fn china_models(cfg: &Config) -> anyhow::Result<Vec<String>> {
+    Ok(parse_opencode_models(&opencode_query(
+        cfg,
+        &["models", "--standalone"],
+    )?))
+}
+
+/// The selectors in `opencode models` output: one per line, sorted and
+/// without repeats. Other lines (warnings) have no valid selector.
+pub(crate) fn parse_opencode_models(text: &str) -> Vec<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| config::parse_china_model(l).is_some())
+        .map(String::from)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
 
 /// Checks that opencode v2 or later is installed. Auth is opencode's own
 /// (`opencode auth login` or its config), so no key is checked here.
 pub fn china_preflight(cfg: &Config) -> anyhow::Result<()> {
-    require_opencode(cfg)?;
-    // The filtered env of the provider run: a reviewed repo's .env must not
-    // reach this child either (LD_PRELOAD, NODE_OPTIONS).
-    let environ = safe_env(cfg.environ());
-    // The run timeout starts after the preflight, so bound this call itself.
-    let (ctx, _cancel) = Context::background().with_timeout(VERSION_TIMEOUT);
-    let (out, res) = oscmd::with_context(&ctx, || {
-        oscmd::run_env(cfg, "opencode", &["--version"], Output::Combined, &environ)
-    });
-    res.map_err(|e| anyhow!("opencode --version: {e}"))?;
-    let version = String::from_utf8_lossy(&out);
+    let version = opencode_query(cfg, &["--version"])?;
     match opencode_major(&version) {
         Some(major) if major >= 2 => Ok(()),
         _ => bail!(
@@ -110,14 +137,16 @@ pub(crate) fn run_china_with(
     let args = china_run_args(&selector);
     // opencode v2 has no `OPENCODE_PERMISSION` and no `--pure`: the profile
     // goes into the config, and `OPENCODE_DISABLE_PROJECT_CONFIG` stops a
-    // reviewed repo's own opencode config from re-enabling tools.
+    // reviewed repo's own opencode config from re-enabling tools. No
+    // `OPENCODE_DB`: v2 keeps `opencode auth login` credentials in its own
+    // DB, so a private per-run DB has none (OpenRouter then fails with "No
+    // cookie auth credentials found") and leaves an ~8 MB file per run.
     let env = [
         format!(
             "OPENCODE_CONFIG_CONTENT={}",
             china_config_content(provider, model, effort, raw)
         ),
         "OPENCODE_DISABLE_PROJECT_CONFIG=1".to_string(),
-        opencode_db_env(&sess.id),
     ];
     let full_prompt = format!(
         "{}\n\n{}\n{prompt}",

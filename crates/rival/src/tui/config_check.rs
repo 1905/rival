@@ -216,6 +216,28 @@ pub type ModelsFn = fn(&Route) -> Result<Vec<String>, ModelsError>;
 /// The model check. Production is `check::run_check`; tests fake it.
 pub type CheckFn = fn(&Context, &Config, &[Target], &(dyn Fn(&CheckRow) + Sync)) -> Report;
 
+/// The models opencode can run (`china_models`). Production asks opencode;
+/// tests fake it.
+pub type OpencodeModelsFn = fn(&Config) -> Result<Vec<String>, String>;
+
+/// The production [`OpencodeModelsFn`].
+pub fn opencode_models(cfg: &Config) -> Result<Vec<String>, String> {
+    rival_core::executor::china_models(cfg).map_err(|e| format!("{e:#}"))
+}
+
+/// The opencode model list for the China pickers.
+#[derive(Debug, Clone)]
+pub struct ChinaModelsRequest {
+    pub cfg: Config,
+}
+
+/// One list is enough: the pool keeps only the newest request.
+impl PartialEq for ChinaModelsRequest {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 /// The proxy's model list for the draft URL and key.
 #[derive(Debug, Clone)]
 pub struct ProbeRequest {

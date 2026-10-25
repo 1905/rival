@@ -53,3 +53,12 @@
 - Risk: a provider that does not know `max` (for example OpenAI) rejects the effort. Accepted: the default target is Moonshot; documented.
 - Risk: a 5xx from the provider makes opencode retry with no end. The rival run timeout (30 min) bounds it.
 - `ModelSpec.model` is `&'static str`; the configured model is leaked once per process. One small string per CLI run: fine.
+
+## Amendment 2026-10-25: provider and model pickers in the TUI
+
+- Models section, `/CHINA RUNS`: `provider` picker (moonshot, openrouter, plus a configured other provider) and `model` picker.
+- The list comes from `opencode models --standalone` (v2 takes no provider argument; about 2.5 s). The window asks once when it opens. It respects the user's opencode config, which can disable models.
+- Model order: Chinese labs first (assumption: "china" means Chinese-lab models), then the rest, each by name. OpenRouter lists 363 models here.
+- A provider change keeps the model name if the new provider lists it, else takes the first model. No listed model: the change is refused with a notice.
+- `e` on the model: exact name wins, then a unique substring, then any full `provider/model` (saved with a warning when unlisted).
+- Found while testing: opencode v2 keeps `opencode auth login` credentials in its DB. The per-run `OPENCODE_DB` hid them (OpenRouter: "No cookie auth credentials found") and left ~8 MB per run. China runs now use opencode's own DB; two concurrent runs passed.

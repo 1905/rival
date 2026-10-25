@@ -14,11 +14,12 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Widget};
 
-use rival_core::config::{ProxyProvider, SPEED_MODELS, SkillHost, Speed};
+use rival_core::config::{self, ProxyProvider, SPEED_MODELS, SkillHost, Speed};
 
 use super::config_check::KeyStatus;
 use super::config_form::{
-    CheckSlot, ConfigForm, Field, MODELS, ModelInfo, NoticeKind, ProbeState, REVIEWERS, Section,
+    CheckSlot, ChinaList, ConfigForm, Field, MODELS, ModelInfo, NoticeKind, ProbeState, REVIEWERS,
+    Section,
 };
 use super::styles::{SELECTION_BG, Styles, gradient_word, rgb};
 use super::text::{fit_line, pad_line, truncate, width, wrap_cells};
@@ -278,7 +279,7 @@ fn section_lines(form: &ConfigForm, w: usize, wide: bool, v: &ViewCtx) -> Vec<Bo
     if wide {
         let (title, about) = match form.section {
             Section::Proxy => ("PROXY", "Claude and Codex through CLIProxyAPI"),
-            Section::Models => ("MODELS", "efforts, the /rival models and speed"),
+            Section::Models => ("MODELS", "efforts, the /rival and /china models, speed"),
             Section::Review => ("REVIEW", "the security review and the skills"),
             Section::Check => ("CHECK", "one short live call to each model"),
         };
@@ -734,6 +735,8 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
     out.push(BodyLine::plain(Line::default()));
     skill_lines(form, w, s, out);
     out.push(BodyLine::plain(Line::default()));
+    china_lines(form, w, s, out);
+    out.push(BodyLine::plain(Line::default()));
     for (i, (label, _)) in SPEED_MODELS.iter().enumerate() {
         let f = Field::Speed(i);
         let speed = form.draft.speed.get(label);
@@ -783,6 +786,66 @@ fn skill_lines(form: &ConfigForm, w: usize, s: &Styles, out: &mut Vec<BodyLine>)
         };
         field(out, form, f, value, help, w, s);
     }
+}
+
+/// The `/china` pickers: the opencode provider and its model.
+fn china_lines(form: &ConfigForm, w: usize, s: &Styles, out: &mut Vec<BodyLine>) {
+    out.push(BodyLine::plain(Line::from(Span::styled(
+        "/CHINA RUNS",
+        s.section,
+    ))));
+    let provider = form.china_provider().to_string();
+    let display = config::CHINA_PROVIDERS
+        .iter()
+        .find(|(p, _)| *p == provider)
+        .map_or(provider.as_str(), |(_, d)| d);
+    let count = form.china_models(&provider).len();
+    let mut value = picker(display, form.field() == Some(Field::ChinaProvider), s);
+    value.push(Span::styled(
+        match &form.china {
+            ChinaList::Loading => format!("   opencode {provider} · loading models…"),
+            ChinaList::Ready(_) if count == 1 => format!("   opencode {provider} · 1 model"),
+            ChinaList::Ready(_) => format!("   opencode {provider} · {count} models"),
+            ChinaList::Failed(_) => format!("   opencode {provider}"),
+        },
+        s.dim,
+    ));
+    field(
+        out,
+        form,
+        Field::ChinaProvider,
+        value,
+        "the opencode provider /china runs on: moonshot or openrouter",
+        w,
+        s,
+    );
+    let selector = form.china_selector();
+    let model = selector.split_once('/').map_or("", |(_, m)| m);
+    let mut value = picker(model, form.field() == Some(Field::ChinaModel), s);
+    let models = form.china_models(&provider);
+    if let Some(i) = models.iter().position(|m| *m == selector) {
+        value.push(Span::styled(
+            format!("   {}/{} on {display}", i + 1, models.len()),
+            s.dim,
+        ));
+    }
+    let warning = match &form.china {
+        ChinaList::Failed(e) => Some(format!("opencode models failed: {e}")),
+        _ if form.china_unlisted() => Some(format!(
+            "opencode does not list {selector}: enable it in opencode, or pick another"
+        )),
+        _ => None,
+    };
+    field_with(
+        out,
+        form,
+        Field::ChinaModel,
+        value,
+        "a model from opencode's list; e types a part of its name",
+        warning.as_deref(),
+        w,
+        s,
+    );
 }
 
 /// The effort column, 13 cells: a picker on the focused row.
@@ -1248,7 +1311,7 @@ fn footer_line(form: &ConfigForm, w: usize, s: &Styles) -> Line<'static> {
         match field {
             Some(f) if f.is_toggle() => add("space", "toggle", 7),
             Some(Field::Model(_)) => add("←→", "effort", 7),
-            Some(Field::ClaudePrefix | Field::CodexPrefix) => {
+            Some(Field::ClaudePrefix | Field::CodexPrefix | Field::ChinaModel) => {
                 add("←→", "choose", 7);
                 add("e", "type", 3);
             }
@@ -1317,7 +1380,7 @@ fn help_overlay(area: Rect, buf: &mut Buffer, s: &Styles) {
         ("enter", "edit a field, or toggle"),
         ("space", "toggle"),
         ("←→ h l", "pick a value (prefix, effort, model…)"),
-        ("e", "type a prefix the proxy does not list"),
+        ("e", "type a prefix or a model not in the list"),
         ("d", "import ANTHROPIC_BASE_URL into URL"),
         ("c", "check the default models on the draft"),
         ("a", "check every model"),

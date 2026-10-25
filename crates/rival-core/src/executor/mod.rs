@@ -21,7 +21,7 @@ pub mod subprocess;
 #[cfg(test)]
 pub(crate) mod testutil;
 
-pub use china::{china_effort, china_preflight, run_china};
+pub use china::{china_effort, china_models, china_preflight, run_china};
 pub use claude::{
     claude_auth_hint, claude_preflight, claude_preflight_model, is_claude_model, run_claude,
 };

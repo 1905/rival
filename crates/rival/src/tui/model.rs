@@ -24,7 +24,7 @@ use rival_core::sessionview::{self, Bucket, LoadProgress, SessionEvent};
 
 use crate::check::{CheckRow, Report};
 
-use super::config_check::{ConfigSeed, ProbeResult, SaveResult};
+use super::config_check::{ChinaModelsRequest, ConfigSeed, ProbeResult, SaveResult};
 use super::config_form::{ConfigForm, Effect, PROBE_DEBOUNCE};
 use super::config_view::{self, ViewCtx};
 use super::detail_view::{DetailPane, DetailTab, KillConfirm};
@@ -145,6 +145,8 @@ pub enum Msg {
     ConfigProbe(u64),
     /// A [`Job::Probe`] finished.
     ProxyModels(ProbeResult),
+    /// A [`Job::ChinaModels`] finished: the selectors, or the error line.
+    ChinaModels(Result<Vec<String>, String>),
     /// One model of check `run` finished.
     CheckRow {
         run: u64,
@@ -562,6 +564,12 @@ impl Model {
                 }
                 Vec::new()
             }
+            Msg::ChinaModels(res) => {
+                if let Some(form) = self.config.as_mut() {
+                    form.china_models_done(res);
+                }
+                Vec::new()
+            }
             Msg::CheckRow { run, row } => {
                 if let Some(form) = self.config.as_mut() {
                     form.check_row(run, *row);
@@ -593,10 +601,16 @@ impl Model {
         let Some(seed) = self.config_seed.clone() else {
             return;
         };
+        let cfg = seed.cfg.clone();
         self.config = Some(ConfigForm::new(seed));
         self.mode = Mode::Config;
         self.show_all_help = false;
         self.config_effect(Some(Effect::Probe { debounce: false }));
+        // About 2.5 s; the China pickers say "loading" until it lands.
+        self.jobs
+            .push(Cmd::Job(Job::ChinaModels(Box::new(ChinaModelsRequest {
+                cfg,
+            }))));
     }
 
     /// Leaves the window: back to the list, or out of `rival config`. A
