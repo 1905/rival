@@ -156,7 +156,7 @@ pub fn with_context<T>(ctx: &Context, f: impl FnOnce() -> T) -> T {
     f()
 }
 
-fn current_context() -> Option<Context> {
+pub(crate) fn current_context() -> Option<Context> {
     CONTEXT.with(|c| c.borrow().clone())
 }
 

@@ -479,13 +479,11 @@ fn china_model_is_a_settable_string() {
 /// `security.reviewer` that picked it.
 #[test]
 fn removed_k3_keys_are_not_settable() {
-    let (_dir, path) = temp();
     for key in ["efforts.kimi-k3", "security.reviewer"] {
-        let err = set(&path, key, "max").unwrap_err().to_string();
+        let err = parse_setting(key, "max").unwrap_err().to_string();
         assert!(
             err.starts_with(&format!("unknown config key {key:?}")),
             "{err}"
         );
     }
-    assert!(!path.exists());
 }

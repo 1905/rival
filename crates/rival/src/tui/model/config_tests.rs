@@ -225,7 +225,7 @@ fn quitting_cancels_a_running_check() {
     else {
         panic!("{out:?}");
     };
-    assert_eq!(req.targets.len(), 7, "a checks every model");
+    assert_eq!(req.targets.len(), 6, "a checks every model");
     assert!(!req.ctx.is_done());
     m.update(key("ctrl+c"));
     assert!(req.ctx.is_done());

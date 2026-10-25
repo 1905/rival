@@ -80,12 +80,14 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 /// Runs `opencode <args>` once and returns its output. The child gets the
 /// filtered env of the provider run: a reviewed repo's .env must not reach
 /// it (LD_PRELOAD, NODE_OPTIONS). The run timeout starts only after the
-/// preflight, so the call has its own bound.
+/// preflight, so the call has its own bound, under the caller's context
+/// (a cancelled model check ends it).
 fn opencode_query(cfg: &Config, args: &[&str]) -> anyhow::Result<String> {
     require_opencode(cfg)?;
     let mut environ = safe_env(cfg.environ());
     environ.push(DISABLE_PROJECT_CONFIG.into());
-    let (ctx, _cancel) = Context::background().with_timeout(QUERY_TIMEOUT);
+    let parent = oscmd::current_context().unwrap_or_else(Context::background);
+    let (ctx, _cancel) = parent.with_timeout(QUERY_TIMEOUT);
     let (out, res) = oscmd::with_context(&ctx, || {
         oscmd::run_env(cfg, "opencode", args, Output::Combined, &environ)
     });

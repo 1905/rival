@@ -114,7 +114,7 @@ fn command_subtree_matches_cli_surface() {
     assert_eq!(
         names(command),
         [
-            "china", "claude", "codex", "fable", "grok", "k3", "plan", "security", "skill", "sol"
+            "china", "claude", "codex", "fable", "grok", "plan", "security", "skill", "sol"
         ]
     );
     let detach = command
@@ -126,7 +126,7 @@ fn command_subtree_matches_cli_surface() {
         detach.get_help().unwrap().to_string(),
         "run detached in a new process session; prints 'rival: detached pid=N' and exits"
     );
-    for model in ["claude", "codex", "fable", "grok", "k3", "sol"] {
+    for model in ["china", "claude", "codex", "fable", "grok", "sol"] {
         assert_eq!(
             flags(node(&r, &["command", model])),
             [f("workdir", "."), f("no-queue", "false")],
@@ -170,7 +170,7 @@ fn other_commands_match_cli_surface() {
     );
     assert_eq!(names(node(&r, &["queue"])), ["clear"]);
     assert_eq!(flags(node(&r, &["queue", "clear"])), [f("force", "false")]);
-    assert_eq!(names(node(&r, &["run"])), ["claude", "fable", "grok", "k3"]);
+    assert_eq!(names(node(&r, &["run"])), ["claude", "fable", "grok"]);
     let run_flags = [
         f("effort", ""),
         f("workdir", "."),
@@ -181,7 +181,6 @@ fn other_commands_match_cli_surface() {
     assert_eq!(flags(node(&r, &["run", "claude"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "fable"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "grok"])), run_flags);
-    assert_eq!(flags(node(&r, &["run", "k3"])), run_flags[1..]);
     assert_eq!(
         flags(node(&r, &["sessions"])),
         [f("active", "false"), f("recent", "0")]
@@ -275,9 +274,10 @@ fn model_commands_are_public_and_registered() {
         "reasoning effort override (low, medium, high, xhigh)"
     );
     let text = render_help(&mut root(), &["rival", "run"]);
-    for name in ["claude", "grok", "k3"] {
+    for name in ["claude", "fable", "grok"] {
         assert!(text.contains(name), "{text}");
     }
+    assert!(!text.contains("k3"), "{text}");
 }
 
 #[test]
@@ -509,13 +509,9 @@ fn review_flag_changed_even_when_empty() {
     assert!(inv.changed("review"));
     assert_eq!(inv.string("review"), "");
     assert!(!parse_ok(&["run", "claude"]).changed("review"));
-    let inv = parse_ok(&["run", "k3", "--review=src/"]);
+    let inv = parse_ok(&["run", "grok", "--review=src/"]);
     assert_eq!(inv.string("review"), "src/");
-    assert_eq!(inv.string("effort"), "", "k3 has no --effort");
-    assert_eq!(
-        parse_err(&["run", "k3", "--effort", "high"]),
-        "unknown flag: --effort"
-    );
+    assert_eq!(inv.string("effort"), "");
 }
 
 #[test]
@@ -766,7 +762,7 @@ fn opus_is_an_alias_of_claude() {
 #[test]
 fn ultrafast_is_not_a_flag() {
     for name in [
-        "codex", "sol", "claude", "opus", "fable", "grok", "k3", "plan", "security", "skill",
+        "codex", "sol", "claude", "opus", "fable", "grok", "china", "plan", "security", "skill",
     ] {
         assert_eq!(
             parse_err(&["command", name, "--ultrafast"]),

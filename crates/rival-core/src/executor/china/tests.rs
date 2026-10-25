@@ -185,3 +185,22 @@ fn china_models_runs_opencode_models() {
         strings(&["moonshot/kimi-k3.1-pro", "openrouter/qwen/qwen4"])
     );
 }
+
+/// A cancelled caller context (a model check the user cancelled) ends the
+/// version query at once, not after its own 30 s bound.
+#[cfg(unix)]
+#[test]
+fn china_preflight_honours_the_caller_context() {
+    let env = Env::new();
+    env.fake("opencode", "#!/bin/sh\nsleep 20\n");
+    let (ctx, cancel) = Context::background().with_cancel();
+    cancel.cancel();
+    let started = std::time::Instant::now();
+    let err = oscmd::with_context(&ctx, || china_preflight(&env.config())).unwrap_err();
+    assert!(err.to_string().contains("context canceled"), "{err}");
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+}

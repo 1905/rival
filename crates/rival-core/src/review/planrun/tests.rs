@@ -547,7 +547,7 @@ fn format_plan_result_multi_blocks_and_skipped() {
             "(could not parse structured output — raw output below)\n\n",
             "Claude runtime raw dump\n",
             "\n",
-            "Skipped: kimi-k3 — n/a\n",
+            "Skipped: kimi-k3.1-pro — n/a\n",
         )
     );
     // Plan output must use model names, not adapter names.

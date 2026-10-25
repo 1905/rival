@@ -206,7 +206,7 @@ fn preflight_failure_names_the_config_key() {
     assert_eq!(
         out.result,
         Err(CmdError::plain(
-            "codex runtime is not installed\nset another model: rival config set skill.claude <model> (codex, sol, claude, fable, k3, grok)"
+            "codex runtime is not installed\nset another model: rival config set skill.claude <model> (codex, sol, claude, fable, grok)"
         ))
     );
     assert!(fix.sessions().is_empty());

@@ -75,10 +75,7 @@ fn show_lists_each_value_with_its_source() {
     assert_eq!(line(&out, "efforts.fable"), "efforts.fable low file");
     assert_eq!(line(&out, "efforts.codex"), "efforts.codex xhigh default");
     assert_eq!(line(&out, "efforts.sol"), "efforts.sol xhigh default");
-    assert_eq!(
-        line(&out, "security.reviewer"),
-        "security.reviewer k3 default"
-    );
+    assert!(!out.contains("security."), "{out}");
     assert_eq!(
         line(&out, "auto_fix_critical_high"),
         "auto_fix_critical_high false default"
@@ -94,11 +91,11 @@ fn show_lists_each_value_with_its_source() {
 /// file (`opus` normalized), in text and JSON.
 #[test]
 fn show_lists_the_skill_models() {
-    let fix = Fixture::with_config_yaml("skill:\n  claude: Opus\n  codex: k3\n");
+    let fix = Fixture::with_config_yaml("skill:\n  claude: Opus\n  codex: grok\n");
     let (code, out, err) = run(&fix, "", &["config", "show"]);
     assert_eq!((code, err.as_str()), (0, ""), "{out}");
     assert_eq!(line(&out, "skill.claude"), "skill.claude claude file");
-    assert_eq!(line(&out, "skill.codex"), "skill.codex k3 file");
+    assert_eq!(line(&out, "skill.codex"), "skill.codex grok file");
     let (code, out, _) = run(&fix, "", &["config", "show", "--json"]);
     assert_eq!(code, 0);
     let v: serde_json::Value = serde_json::from_str(out.trim()).unwrap();
@@ -108,7 +105,7 @@ fn show_lists_the_skill_models() {
     );
     assert_eq!(
         v["values"]["skill.codex"],
-        serde_json::json!({"value": "k3", "source": "file"})
+        serde_json::json!({"value": "grok", "source": "file"})
     );
     let fix = Fixture::new();
     let (_, out, _) = run(&fix, "", &["config", "show", "--json"]);
@@ -558,7 +555,7 @@ fn check_json_prints_one_line_per_model_then_the_summary() {
 fn check_text_and_exit_1_on_a_failed_model() {
     let bin = fake_codex_bin("Sure, ok");
     let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
-    let (code, out, err) = run(&fix, "", &["config", "check", "-m", "codex,opus,k3"]);
+    let (code, out, err) = run(&fix, "", &["config", "check", "-m", "codex,opus,china"]);
     assert_eq!(
         (code, err.as_str()),
         (1, "config check: 2 of 3 models failed\n"),
@@ -568,17 +565,17 @@ fn check_text_and_exit_1_on_a_failed_model() {
     assert_eq!(lines[0], "proxy  off");
     assert_eq!(lines[1], "");
     assert!(
-        lines[2].starts_with("  ✓ codex   direct  gpt-6-astra         ")
+        lines[2].starts_with("  ✓ codex   direct  gpt-6-astra             ")
             && lines[2].ends_with("s  Sure, ok  (not ok)  [fast]"),
         "{out}"
     );
     assert_eq!(
         lines[3],
-        "  ✗ claude  direct  claude-opus-5-5     —     not installed"
+        "  ✗ claude  direct  claude-opus-5-5         —     not installed"
     );
     assert_eq!(
         lines[4],
-        "  ✗ k3      direct  moonshotai/kimi-k3  —     not installed"
+        "  ✗ china   direct  moonshot/kimi-k3.1-pro  —     not installed"
     );
     assert_eq!(&lines[5..], ["", "1 of 3 ok"]);
 }

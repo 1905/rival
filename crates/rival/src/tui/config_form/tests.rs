@@ -320,13 +320,13 @@ fn space_on_a_model_row_changes_nothing() {
     assert_eq!(f.draft.plan.models, ["opus", "codex"]);
 }
 
-/// The two `/rival` pickers follow the model rows: each cycles the six
+/// The two `/rival` pickers follow the model rows: each cycles the five
 /// models from the host's default and writes its own `skill.<host>` key.
 #[test]
 fn the_skill_pickers_write_their_own_keys() {
     let (_h, mut f) = form(None);
     keys(&mut f, &["tab"]);
-    keys(&mut f, &["down"; 6]);
+    keys(&mut f, &["down"; 5]);
     assert_eq!(f.field(), Some(Field::Skill(SkillHost::Claude)));
     assert_eq!(f.skill_model(SkillHost::Claude).unwrap().name, "sol");
     assert_eq!(f.skill_model(SkillHost::Codex).unwrap().name, "claude");

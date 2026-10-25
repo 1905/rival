@@ -707,8 +707,8 @@ fn at_most_three_live_calls_at_once() {
     let mut fake = Fake::new();
     fake.delay = Duration::from_millis(150);
     let report = check(&fix, &["all"], &fake);
-    assert_eq!(report.rows.len(), 7);
-    assert_eq!(fake.called().len(), 7);
+    assert_eq!(report.rows.len(), 6);
+    assert_eq!(fake.called().len(), 6);
     assert_eq!(fake.max_active.load(Ordering::SeqCst), MAX_LIVE);
 }
 
