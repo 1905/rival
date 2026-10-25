@@ -38,23 +38,6 @@ pub fn parse_grok_args(raw: &str) -> Result<ParseResult> {
     parse_args_with_effort(raw, "", config::is_valid_effort, &VALID_EFFORTS)
 }
 
-/// Parses raw arguments for the kimi command. The -re flag is accepted for
-/// grammar consistency, but the executor always runs Kimi K3 at max
-/// reasoning — the model supports no other level.
-pub fn parse_kimi_args(raw: &str) -> Result<ParseResult> {
-    // K3 runs at max regardless (OpencodeVariant pins it), but rejecting the
-    // level the docs advertise would be a trap, so accept the shared ladder
-    // plus max and discard the value later.
-    let mut names = VALID_EFFORTS.to_vec();
-    names.push("max");
-    parse_args_with_effort(
-        raw,
-        "",
-        |e| config::is_valid_effort(e) || e == "max",
-        &names,
-    )
-}
-
 /// Parses raw arguments for the codex command (gpt-6-astra). Identical
 /// grammar to Claude: an omitted effort stays empty so the command can apply
 /// Codex's configured default.

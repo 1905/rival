@@ -40,7 +40,7 @@ pub fn validate_security_result(out: Option<&ReviewerOutput>, raw: &str) -> anyh
     Ok(())
 }
 
-/// Phrases from the security prompt. Security runs on opencode, whose log
+/// Phrases from the security prompt. Security runs on china (opencode), whose log
 /// never contains the prompt, so a marker in a clean security result means
 /// the model echoed its instructions. A false "unusable" is the safe
 /// failure for a security gate, so this stays strict.

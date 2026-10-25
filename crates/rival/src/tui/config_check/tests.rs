@@ -136,7 +136,7 @@ fn a_probe_needs_a_url_and_a_key() {
 fn a_check_job_emits_each_row_then_the_report() {
     let h = harness();
     let seed = config_seed(&h, Some(PROXY_YAML), Some(TEST_KEY));
-    let targets = crate::check::targets(&seed.cfg, &[]).unwrap();
+    let targets = crate::check::targets(&[]).unwrap();
     let (ctx, _cancel) = Context::background().with_cancel();
     let seen = std::sync::Mutex::new(Vec::new());
     let done = run_check(

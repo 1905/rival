@@ -66,7 +66,7 @@ fn tab_and_arrows_move_between_sections_and_fields() {
     assert_eq!(f.section, Section::Check);
     assert_eq!(f.field(), None);
     keys(&mut f, &["3"]);
-    assert_eq!(f.field(), Some(Field::Reviewer));
+    assert_eq!(f.field(), Some(Field::AutoFix));
 }
 
 #[test]
@@ -299,16 +299,12 @@ fn effort_pickers_step_through_each_ladder() {
     assert_eq!(f.patch(), json!({"efforts.codex": "low"}));
     keys(&mut f, &["left", "left"]);
     assert_eq!(f.patch(), json!({}), "the default again is no change");
-    // K3 is pinned to max.
+    // Grok steps low, medium, high.
     keys(&mut f, &["down", "down", "down", "down", "right"]);
     assert_eq!(f.field(), Some(Field::Model(4)));
-    assert_eq!(f.effort(&MODELS[4]), "max");
-    assert_eq!(f.notice.as_ref().unwrap().text, "Kimi K3 runs at max only");
-    // Grok steps low, medium, high.
-    keys(&mut f, &["down", "right"]);
-    assert_eq!(f.effort(&MODELS[5]), "low");
+    assert_eq!(f.effort(&MODELS[4]), "low");
     keys(&mut f, &["left", "left"]);
-    assert_eq!(f.effort(&MODELS[5]), "medium");
+    assert_eq!(f.effort(&MODELS[4]), "medium");
     assert_eq!(f.patch(), json!({"efforts.grok": "medium"}));
 }
 
@@ -375,17 +371,10 @@ fn the_skill_pickers_write_their_own_keys() {
 }
 
 #[test]
-fn the_reviewer_picker_and_the_auto_fix_toggle() {
+fn the_auto_fix_toggle() {
     let (_h, mut f) = form(None);
-    keys(&mut f, &["3"]);
-    assert_eq!(f.reviewer(), "k3");
-    keys(&mut f, &["right"]);
-    assert_eq!(f.reviewer(), "grok");
-    keys(&mut f, &["down", "space"]);
-    assert_eq!(
-        f.patch(),
-        json!({"security.reviewer": "grok", "auto_fix_critical_high": true})
-    );
+    keys(&mut f, &["3", "space"]);
+    assert_eq!(f.patch(), json!({"auto_fix_critical_high": true}));
 }
 
 #[test]
@@ -543,7 +532,7 @@ fn a_check_runs_on_the_draft_and_drops_stale_rows() {
     assert_eq!(keys(&mut f, &["c"]), [Some(Effect::Check { all: false })]);
     let req = f.start_check(false).unwrap();
     let names: Vec<&str> = req.targets.iter().map(|t| t.name).collect();
-    assert_eq!(names, ["codex", "sol", "claude", "fable", "k3"]);
+    assert_eq!(names, ["codex", "sol", "claude", "fable", "china"]);
     assert!(f.check.running);
     let slot =
         |f: &ConfigForm, n: &str| f.check.slots.iter().find(|s| s.name == n).cloned().unwrap();

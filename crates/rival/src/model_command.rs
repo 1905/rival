@@ -63,9 +63,7 @@ pub fn run_model_command(
         .resolve_effort(cfg, &parsed.effort)
         .map_err(CmdError::plain)?;
     let workdir = resolve_workdir_or_exit(cfg, workdir, env.stdout)?;
-    // Preflight in the caller's workdir: that is where credentials live, even
-    // when an MR review later runs in a temporary checkout.
-    (spec.preflight)(cfg, &workdir).map_err(|e| CmdError::plain(format!("{e:#}")))?;
+    (spec.preflight)(cfg).map_err(|e| CmdError::plain(format!("{e:#}")))?;
 
     // Cancel the MR resolve, the queue wait and the child on SIGINT/SIGTERM
     // so the cleanup below runs. Locals drop in reverse order: run timeout,
@@ -138,7 +136,6 @@ pub fn run_model_command(
         prompt: &prompt,
         effort: &effort,
         workdir: &run_workdir,
-        cred_workdir: &workdir,
         review: parsed.is_review,
         log: None,
         out: None,
@@ -167,8 +164,7 @@ pub fn run_model_command(
     } else if parsed.is_review && log.is_ok() {
         // A zero exit is not a review: quota errors and empty output also
         // exit 0.
-        let log_text =
-            repair_review_language(&ctx, cfg, spec, &mut sess, log_text, &run_workdir, &workdir);
+        let log_text = repair_review_language(&ctx, cfg, spec, &mut sess, log_text, &run_workdir);
         let log_file = sess.log_file.clone();
         match finish_review(cfg, spec, &mut sess, &log_text, &scope, &log_file) {
             Err(reason) => {
@@ -306,9 +302,7 @@ pub(crate) fn repair_review_language(
     sess: &mut Session,
     raw: String,
     workdir: &str,
-    cred_workdir: &str,
 ) -> String {
-    // K3 resolves to max, its only level.
     let effort = spec
         .resolve_effort(cfg, "low")
         .unwrap_or_else(|_| "low".to_string());
@@ -326,7 +320,6 @@ pub(crate) fn repair_review_language(
                 prompt,
                 effort: &effort,
                 workdir,
-                cred_workdir,
                 review: true,
                 log: Some(log),
                 out: None,

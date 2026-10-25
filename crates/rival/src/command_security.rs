@@ -1,12 +1,9 @@
-//! `rival command security`: security review with the configured model.
-
-use std::path::Path;
+//! `rival command security`: security review with the china model
+//! (`china.model`).
 
 use rival_core::cancel::Context;
-use rival_core::config::{
-    Config, PromptKind, SecurityModel, public_runtime_log, security_reviewer_names,
-};
-use rival_core::executor::{self, OpencodeRunOpts, RunResult};
+use rival_core::config::{self, Config, PromptKind, public_runtime_log};
+use rival_core::executor::{self, RunResult};
 use rival_core::logging;
 use rival_core::result::PayloadKind;
 use rival_core::review::{self, GroupSlot};
@@ -28,29 +25,26 @@ pub const SECURITY_USAGE: &str = "Usage:
   /rival security src/api/ — review a specific scope
   rival command security --which — show which model will run and why
 
-The model comes from security.reviewer in ~/.rival/config.yaml: k3 (default)
-or grok. Run --which to see the resolved model and whether its API key is
-present. The run fails rather than falling back, because a security review
-that silently skips is worse than one that refuses to start.";
+The model is china.model in ~/.rival/config.yaml, the /china model (default
+moonshot/kimi-k3.1-pro), at max effort. Run --which to see the model and
+whether opencode can run it. The run fails rather than falling back, because
+a security review that silently skips is worse than one that refuses to
+start.";
 
-type PreflightFn<'a> = dyn Fn(&Config, &SecurityModel, &str) -> anyhow::Result<()> + 'a;
+/// The effort of a security review: the top of the china menu.
+const SECURITY_EFFORT: &str = "max";
+/// The effort of the language pass after it.
+const REPAIR_EFFORT: &str = "low";
 
-/// Runs the entry on the session: `(ctx, cfg, sess, prompt, variant,
-/// workdir, entry, log)`. `log` is the file that gets the output; `None` is
-/// the session log.
-type RunFn<'a> = dyn Fn(
-        &Context,
-        &Config,
-        &mut Session,
-        &str,
-        &str,
-        &str,
-        &SecurityModel,
-        Option<&str>,
-    ) -> anyhow::Result<RunResult>
+type PreflightFn<'a> = dyn Fn(&Config) -> anyhow::Result<()> + 'a;
+
+/// Runs the china model on the session: `(ctx, cfg, sess, prompt, effort,
+/// workdir, log)`. `log` is the file that gets the output; `None` is the
+/// session log.
+type RunFn<'a> = dyn Fn(&Context, &Config, &mut Session, &str, &str, &str, Option<&str>) -> anyhow::Result<RunResult>
     + 'a;
 
-/// The opencode preflight and run entry points; tests inject fakes.
+/// The china preflight and run entry points; tests inject fakes.
 pub struct SecurityExecutor<'a> {
     pub preflight: Box<PreflightFn<'a>>,
     pub run: Box<RunFn<'a>>,
@@ -59,22 +53,9 @@ pub struct SecurityExecutor<'a> {
 impl SecurityExecutor<'static> {
     pub fn production() -> Self {
         SecurityExecutor {
-            preflight: Box::new(|cfg, entry, workdir| {
-                executor::opencode_preflight_entry(cfg, entry, workdir)
-            }),
-            run: Box::new(|ctx, cfg, sess, prompt, variant, workdir, entry, log| {
-                executor::run_opencode_entry(
-                    ctx,
-                    cfg,
-                    sess,
-                    prompt,
-                    variant,
-                    workdir,
-                    entry,
-                    &OpencodeRunOpts::default(),
-                    log,
-                    None,
-                )
+            preflight: Box::new(executor::china_preflight),
+            run: Box::new(|ctx, cfg, sess, prompt, effort, workdir, log| {
+                executor::run_china(ctx, cfg, sess, prompt, effort, workdir, log, None)
             }),
         }
     }
@@ -98,7 +79,7 @@ impl SecurityOptions {
     }
 }
 
-/// [`run_command_security`] with the real opencode adapter.
+/// [`run_command_security`] with the real china adapter.
 pub fn command_security_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdError> {
     run_command_security(
         env,
@@ -131,35 +112,30 @@ pub(crate) fn security_scope_and_prompt(
 fn print_security_resolution(
     env: &mut CmdEnv<'_>,
     ex: &SecurityExecutor<'_>,
-    entry: &SecurityModel,
-    workdir: &str,
 ) -> Result<(), CmdError> {
     let cfg = env.cfg;
     let out = &mut *env.stdout;
-    let configured = match cfg.configured_security_reviewer() {
-        "" => "unset (default)",
-        name => name,
+    let model = cfg.china_model();
+    let source = if cfg.china_model_configured() {
+        "file"
+    } else {
+        "default"
     };
     let _ = writeln!(
         out,
-        "Security reviewer: {} ({} via {})",
-        entry.name, entry.model, entry.provider
+        "Security reviewer: china ({})",
+        config::display_model(config::CHINA_LABEL, model)
     );
-    let _ = writeln!(out, "Config: security.reviewer = {configured}");
-    let _ = writeln!(out, "OpenCode selector: {}", entry.selector);
-    let _ = writeln!(out, "Reasoning variant: {}", entry.variant);
+    let _ = writeln!(out, "Config: china.model = {model} ({source})");
+    let _ = writeln!(out, "Reasoning effort: {SECURITY_EFFORT}");
+    let _ = writeln!(
+        out,
+        "Auth: opencode's own (opencode auth login or its config)"
+    );
 
-    let key_set = !cfg
-        .security_api_key_from(entry, Path::new(workdir))
-        .is_empty();
-    let status = if key_set { "set" } else { "MISSING" };
-    let _ = writeln!(out, "{}: {status}", entry.key_env);
-
-    // A present key does not make the model usable when the binary is
-    // absent, so report the two conditions separately. The error travels
-    // only through the returned error: the root prints it, and printing it
-    // here as well would show the same line twice.
-    if let Err(e) = (ex.preflight)(cfg, entry, workdir) {
+    // The error travels only through the returned error: the root prints
+    // it, and printing it here as well would show the same line twice.
+    if let Err(e) = (ex.preflight)(cfg) {
         let _ = write!(out, "\nNot usable.\n");
         return Err(CmdError::exit(1, format!("{e:#}")));
     }
@@ -177,19 +153,11 @@ pub fn run_command_security(
     let paths = cfg.paths();
     let workdir = resolve_workdir_or_exit(cfg, &opts.workdir, env.stdout)?;
 
-    let entry = match cfg.resolve_security_model() {
-        Ok(entry) => entry,
-        Err(e) => {
-            // Printed here, and the root prints it again.
-            let msg = e.to_string();
-            let _ = writeln!(env.stderr, "{msg}");
-            return Err(CmdError::exit(1, msg));
-        }
-    };
-
     if opts.which {
-        return print_security_resolution(env, ex, &entry, &workdir);
+        return print_security_resolution(env, ex);
     }
+    let model = cfg.china_model().to_string();
+    let label = config::engine_label(config::CHINA_LABEL, &model);
 
     // A terminal stdin means the command was run by hand with no piped
     // scope. Show usage rather than silently reviewing the whole project.
@@ -210,12 +178,11 @@ pub fn run_command_security(
     }
 
     reject_unresolved_mr(&raw_scope).map_err(CmdError::plain)?;
-    if let Err(e) = (ex.preflight)(cfg, &entry, &workdir) {
+    if let Err(e) = (ex.preflight)(cfg) {
         let err = format!("{e:#}");
         let _ = writeln!(
             env.stdout,
-            "{err}\n\nsecurity.reviewer selects the model; accepted values: {}",
-            security_reviewer_names().join(", ")
+            "{err}\n\nSecurity reviews run on china.model ({model}); change it with: rival config set china.model <provider/model>"
         );
         return Err(CmdError::exit(1, err));
     }
@@ -225,10 +192,10 @@ pub fn run_command_security(
     let mut sess = OwnedSession::new_queued(
         paths,
         NewSession {
-            cli: "opencode",
+            cli: config::CHINA_LABEL,
             mode: MODE_SECURITY,
-            model: entry.model,
-            effort: entry.variant,
+            model: &model,
+            effort: SECURITY_EFFORT,
             workdir: &workdir,
             prompt: &prompt,
             review_scope: &scope,
@@ -241,7 +208,7 @@ pub fn run_command_security(
     // session, and it then reports a healthy run as a crash.
     logging::info()
         .str("session", sess.id.as_str())
-        .str("model", entry.label)
+        .str("model", &label)
         .msg("starting security reviewer");
 
     // Locals drop in reverse order: run timeout, slot,
@@ -270,15 +237,14 @@ pub fn run_command_security(
         cfg,
         &mut sess,
         &prompt,
-        entry.variant,
+        SECURITY_EFFORT,
         &workdir,
-        &entry,
         None,
     ) {
         Ok(result) => result,
         Err(e) => {
             let err = format!("{e:#}");
-            let reason = review::run_timeout_reason(&run_ctx, cfg, entry.label, &err);
+            let reason = review::run_timeout_reason(&run_ctx, cfg, &label, &err);
             fail_session(paths, &mut sess, 1, &reason);
             return Err(CmdError::plain(err));
         }
@@ -294,19 +260,18 @@ pub fn run_command_security(
     let raw = String::from_utf8_lossy(&log_data);
 
     if result.exit_code != 0 {
-        let exit_msg = format!("{} exited with code {}", entry.label, result.exit_code);
-        let reason = review::run_timeout_reason(&run_ctx, cfg, entry.label, &exit_msg);
+        let exit_msg = format!("{label} exited with code {}", result.exit_code);
+        let reason = review::run_timeout_reason(&run_ctx, cfg, &label, &exit_msg);
         fail_session(paths, &mut sess, result.exit_code, &reason);
         let _ = env
             .stdout
-            .write_all(public_runtime_log("opencode", entry.model, &raw).as_bytes());
+            .write_all(public_runtime_log(config::CHINA_LABEL, &model, &raw).as_bytes());
         return Err(CmdError::exit(result.exit_code as i32, exit_msg));
     }
 
-    let raw =
-        repair_security_language(&ctx, cfg, ex, &mut sess, &entry, &workdir, raw.into_owned());
+    let raw = repair_security_language(&ctx, cfg, ex, &mut sess, &workdir, raw.into_owned());
     let log_file = sess.log_file.clone();
-    let (out, valid) = format_security_output(&raw, entry.model, &scope, &log_file);
+    let (out, valid) = format_security_output(&raw, &model, &scope, &log_file);
     env.stdout
         .write_all(out.as_bytes())
         .map_err(|e| write_stdout_error(&e))?;
@@ -356,18 +321,15 @@ pub fn run_command_security(
 
 /// The language pass on a finished security review: the same model repairs
 /// the wording, read-only, with its own log and its own run timeout from
-/// `parent`. K3 keeps max, its only level; another model runs at low. It
-/// returns the session log text after the pass.
+/// `parent`, at low effort. It returns the session log text after the pass.
 fn repair_security_language(
     parent: &Context,
     cfg: &Config,
     ex: &SecurityExecutor<'_>,
     sess: &mut Session,
-    entry: &SecurityModel,
     workdir: &str,
     raw: String,
 ) -> String {
-    let variant = if entry.variant == "max" { "max" } else { "low" };
     review::repair_language(
         parent,
         cfg,
@@ -375,7 +337,7 @@ fn repair_security_language(
         raw,
         PayloadKind::Any,
         |ctx, sess, prompt, log| {
-            let result = (ex.run)(ctx, cfg, sess, prompt, variant, workdir, entry, Some(log))?;
+            let result = (ex.run)(ctx, cfg, sess, prompt, REPAIR_EFFORT, workdir, Some(log))?;
             Ok(result.exit_code)
         },
     )
@@ -401,7 +363,7 @@ pub(crate) fn format_security_output(
     review::format_security_result(
         parsed.as_ref().ok(),
         raw,
-        "opencode",
+        config::CHINA_LABEL,
         model,
         scope,
         log_path,

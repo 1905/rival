@@ -110,11 +110,17 @@ fn sort_group_members_uses_creation_order_and_puts_judge_last() {
 fn sort_group_members_uses_curated_fallback_for_legacy_sessions() {
     let mut sessions = vec![
         member("claude", "claude", config::CLAUDE_MODEL, "plan", None),
-        member("k3", "opencode", config::KIMI_MODEL, "megareview", None),
+        member(
+            "china",
+            config::CHINA_LABEL,
+            config::CHINA_DEFAULT_MODEL,
+            "megareview",
+            None,
+        ),
         member("sol", "codex", config::GPT56_SOL_MODEL, "plan", None),
     ];
     sort_group_members(&mut sessions);
-    assert_eq!(ids(&sessions), ["sol", "k3", "claude"]);
+    assert_eq!(ids(&sessions), ["sol", "claude", "china"]);
 }
 
 #[test]
@@ -130,9 +136,9 @@ fn sort_group_members_preserves_explicit_reviewer_order() {
             Some(later),
         ),
         member(
-            "k3",
-            "opencode",
-            config::KIMI_MODEL,
+            "china",
+            config::CHINA_LABEL,
+            config::CHINA_DEFAULT_MODEL,
             "megareview",
             Some(created),
         ),
@@ -140,7 +146,7 @@ fn sort_group_members_preserves_explicit_reviewer_order() {
     sort_group_members(&mut sessions);
     assert_eq!(
         ids(&sessions),
-        ["k3", "sol"],
+        ["china", "sol"],
         "explicit reviewer order was not preserved"
     );
 }
@@ -149,7 +155,6 @@ fn sort_group_members_preserves_explicit_reviewer_order() {
 fn group_model_rank_orders_grok_after_the_existing_named_models() {
     let cases = [
         ("sol", "codex", config::GPT56_SOL_MODEL, 0),
-        ("kimi-k3", "opencode", config::KIMI_MODEL, 1),
         ("claude", "claude", config::CLAUDE_MODEL, 2),
         ("grok", config::GROK_LABEL, config::GROK_MODEL, 3),
         ("unknown", "mystery", "some-retired-model", 100),

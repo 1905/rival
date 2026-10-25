@@ -116,10 +116,9 @@ fn add_preflight_hint(spec: &mut ModelSpec, host: SkillHost) {
         host.key(),
         SKILL_MODEL_NAMES.join(", ")
     );
-    let preflight = std::mem::replace(&mut spec.preflight, Box::new(|_, _| Ok(())));
-    spec.preflight = Box::new(move |cfg, workdir| {
-        preflight(cfg, workdir).map_err(|e| anyhow::anyhow!("{e:#}\n{hint}"))
-    });
+    let preflight = std::mem::replace(&mut spec.preflight, Box::new(|_| Ok(())));
+    spec.preflight =
+        Box::new(move |cfg| preflight(cfg).map_err(|e| anyhow::anyhow!("{e:#}\n{hint}")));
 }
 
 /// Runs `body` with `stdin` in place of the env's stdin.

@@ -6,7 +6,6 @@
 │    sol     Codex CLI    proxy     xhigh                                      │|
 │  ▸ claude  Claude Code  proxy   ‹ medium ›                                   │|
 │    fable   Claude Code  proxy     medium                                     │|
-│    k3      OpenCode     direct    max fixed                                  │|
 │    grok    grok CLI     direct    high         not installed                 │|
 │                                                                              │|
 │    Opus 5.5 sends emcd2_/claude-opus-5-5                                     │|
@@ -17,6 +16,7 @@
 │                                                                              │|
 │  /CHINA RUNS                                                                 │|
 │    provider            ‹ Moonshot ›   opencode moonshot · 1 model            │|
+│    model               ‹ kimi-k3.1-pro ›   1/1 on Moonshot                   │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK  not run · c checks the draft                     ● online · 6 models │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
@@ -31,7 +31,6 @@ d....tttttttttttttttttttttaaaaaaaattttttttttttt................................d
 d....tttttttttttttttttttttaaaaaaaattttttttttttt................................d|
 d.????????????????????????????????????????????????????????????????????????????.d|
 d....tttttttttttttttttttttaaaaaaaattttttttttttt................................d|
-d....tttttttttttttttttttttddddddddddddddddddddd................................d|
 d....dddddddddddddddddddddddddddddtttttttttttttddddddddddddddd.................d|
 d..............................................................................d|
 d..tttttttttttddddddTTTTTTTTTTTTTTTTTTTTTT.....................................d|
@@ -42,6 +41,7 @@ d....ddddddddddddddddddddddTTTTTTddddddddddddddddddddddddddd...................d
 d..............................................................................d|
 d..DDDDDDDDDDD.................................................................d|
 d....ddddddddddddddddddddddTTTTTTTTdddddddddddddddddddddddddddddddd............d|
+d....ddddddddddddddddddddddTTTTTTTTTTTTTdddddddddddddddddddd...................d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

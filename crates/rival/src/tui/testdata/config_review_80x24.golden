@@ -1,9 +1,9 @@
 ╭─ rival · config ────────────────────────────────────── ~/.rival/config.yaml ─╮|
 │ 1 Proxy  2 Models  3 Review  4 Check                                         │|
 │                                                                              │|
-│  ▸ Security reviewer   ‹ k3 › ←→   Kimi K3 through OpenCode                  │|
-│                        the model behind rival command security               │|
-│    Auto-fix crit/high  ○ off   skills fix confirmed critical/high            │|
+│  ▸ Auto-fix crit/high  ○ off   skills fix confirmed critical/high            │|
+│                        medium and low findings are never fixed without askin │|
+│    security reviews use moonshot/kimi-k3.1-pro · the /china model            │|
 │                                                                              │|
 │  ROLE PROMPTS   read-only                                                    │|
 │    reviewer    29 chars  Review like a staff engineer.                       │|
@@ -20,15 +20,15 @@
 ├──────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK  not run · c checks the draft                     ● online · 6 models │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
-│ tab section  ↑↓ field  ←→ choose  c check  a all  s save  ? help  esc back   │|
+│ tab section  ↑↓ field  space toggle  c check  s save  ? help  esc back       │|
 ╰──────────────────────────────────────────────────────────────────────────────╯|
 -- styles --
 dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d.dddddddddddddddddddAAAAAAAAddddddddd.........................................d|
 d..............................................................................d|
 d.????????????????????????????????????????????????????????????????????????????.d|
-d........................ddddddddddddddddddddddddddddddddddddddd...............d|
-d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd............d|
+d........................ddddddddddddddddddddddddddddddddddddddddddddddddddddd.d|
+d..dddddddddddddddddddddddttttttttttttttttttttttddddddddddddddddddd............d|
 d..............................................................................d|
 d..DDDDDDDDDDDDdddddddddddd....................................................d|
 d..ttttttttttttttddddddddddddddddddddddddddddddddddddddd.......................d|
@@ -45,5 +45,5 @@ d..............................................................................d
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
 d..DDDDD..ddddddddddaddddddddddddddddd.....................aaaaaaaaddddddddddd.d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
-d.aaa.ddddddd..aa.ddddd..aa.dddddd..a.ddddd..a.ddd..a.dddd..a.dddd..aaa.dddd...d|
+d.aaa.ddddddd..aa.ddddd..aaaaa.dddddd..a.ddddd..a.dddd..a.dddd..aaa.dddd.......d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

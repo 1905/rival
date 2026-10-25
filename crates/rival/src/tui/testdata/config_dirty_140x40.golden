@@ -34,7 +34,7 @@
 │                                                    proxy (-codex-device-login)                                                           │|
 │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                                                                                    │|
 │  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s  Sure! ok.  (not ok)                                                                   │|
-│  ✗ k3      direct  moonshotai/kimi-k3        4.0s  limit 429 monthly spend limit reached                                                 │|
+│  ✗ china   direct  moonshot/kimi-k3.1-pro    4.0s  limit 429 monthly spend limit reached                                                 │|
 ├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
 │ tab section  ↑↓ field  ←→ choose  e type  x cancel check  s save  u undo  ? help  esc back                                               │|
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|

@@ -18,8 +18,7 @@ use rival_core::config::{self, ProxyProvider, SPEED_MODELS, SkillHost, Speed};
 
 use super::config_check::KeyStatus;
 use super::config_form::{
-    CheckSlot, ChinaList, ConfigForm, Field, MODELS, ModelInfo, NoticeKind, ProbeState, REVIEWERS,
-    Section,
+    CheckSlot, ChinaList, ConfigForm, Field, MODELS, ModelInfo, NoticeKind, ProbeState, Section,
 };
 use super::styles::{SELECTION_BG, Styles, gradient_word, rgb};
 use super::text::{fit_line, pad_line, truncate, width, wrap_cells};
@@ -280,7 +279,7 @@ fn section_lines(form: &ConfigForm, w: usize, wide: bool, v: &ViewCtx) -> Vec<Bo
         let (title, about) = match form.section {
             Section::Proxy => ("PROXY", "Claude and Codex through CLIProxyAPI"),
             Section::Models => ("MODELS", "efforts, the /rival and /china models, speed"),
-            Section::Review => ("REVIEW", "the security review and the skills"),
+            Section::Review => ("REVIEW", "auto-fix and the role prompts"),
             Section::Check => ("CHECK", "one short live call to each model"),
         };
         out.push(BodyLine::plain(fit_line(
@@ -719,17 +718,11 @@ fn model_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>
     if let Some(Field::Model(i)) = form.field()
         && let Some(m) = MODELS.get(i)
     {
-        let mut spans = vec![
+        let spans = vec![
             Span::styled(format!("  {} ", m.display), s.text),
             Span::styled("sends ", s.dim),
             Span::styled(form.wire(m), s.value),
         ];
-        if m.ladder.len() < 2 {
-            spans.push(Span::styled(
-                format!(" · runs at {} only", m.ladder[0]),
-                s.dim,
-            ));
-        }
         out.push(BodyLine::plain(fit_line(Line::from(spans), w)));
     }
     out.push(BodyLine::plain(Line::default()));
@@ -860,35 +853,14 @@ fn effort_cell(form: &ConfigForm, m: &ModelInfo, focused: bool, s: &Styles) -> V
         spans.push(Span::raw(" ".repeat(13usize.saturating_sub(used))));
         return spans;
     }
-    let text = if m.ladder.len() < 2 {
-        format!("  {effort} fixed")
-    } else {
-        format!("  {effort}")
-    };
     vec![Span::styled(
-        format!("{text:<13}"),
-        if m.ladder.len() < 2 { s.dim } else { s.text },
+        format!("{:<13}", format!("  {effort}")),
+        s.text,
     )]
 }
 
 fn review_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine>) {
     let s = v.styles;
-    let reviewer = form.reviewer().to_string();
-    let about = REVIEWERS
-        .iter()
-        .find(|(n, _)| *n == reviewer)
-        .map_or("", |(_, a)| a);
-    let mut value = picker(&reviewer, form.field() == Some(Field::Reviewer), s);
-    value.push(Span::styled(format!("   {about}"), s.dim));
-    field(
-        out,
-        form,
-        Field::Reviewer,
-        value,
-        "the model behind rival command security",
-        w,
-        s,
-    );
     field(
         out,
         form,
@@ -901,6 +873,14 @@ fn review_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<BodyLine
         w,
         s,
     );
+    out.push(BodyLine::plain(fit_line(
+        Line::from(vec![
+            Span::styled("  security reviews use ", s.dim),
+            Span::styled(form.china_selector(), s.text),
+            Span::styled(" · the /china model", s.dim),
+        ]),
+        w,
+    )));
     out.push(BodyLine::plain(Line::default()));
     out.push(BodyLine::plain(Line::from(vec![
         Span::styled("ROLE PROMPTS", s.section),
@@ -967,17 +947,14 @@ fn check_section_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<B
     out.push(BodyLine::plain(fit_line(
         Line::from(vec![
             Span::styled("  c", s.accent),
-            Span::styled(
-                " codex, sol, claude, fable and the security reviewer",
-                s.dim,
-            ),
+            Span::styled(" codex, sol, claude, fable and china", s.dim),
         ]),
         w,
     )));
     out.push(BodyLine::plain(fit_line(
         Line::from(vec![
             Span::styled("  a", s.accent),
-            Span::styled(" every model, K3 and Grok too", s.dim),
+            Span::styled(" every model, Grok too", s.dim),
         ]),
         w,
     )));

@@ -12,13 +12,13 @@
 │                    │                                                    set proxy.codex.model_prefix                                     │|
 │                    │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                                                               │|
 │                    │  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s  Sure! ok.  (not ok)                                              │|
-│                    │  ✗ k3      direct  moonshotai/kimi-k3        4.0s  limit 429 monthly spend limit reached                            │|
+│                    │  ✗ china   direct  moonshot/kimi-k3.1-pro    4.0s  limit 429 monthly spend limit reached                            │|
 │                    │                                                    the account is at its limit; try again after the reset           │|
 │                    │                                                                                                                     │|
 │                    │  running · 4 of 5 done                                                                                              │|
 │                    │                                                                                                                     │|
-│                    │    c codex, sol, claude, fable and the security reviewer                                                            │|
-│                    │    a every model, K3 and Grok too                                                                                   │|
+│                    │    c codex, sol, claude, fable and china                                                                            │|
+│                    │    a every model, Grok too                                                                                          │|
 │                    │    x cancels the running check                                                                                      │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
@@ -58,8 +58,8 @@ d....................d....................................................dddddd
 d....................d.....................................................................................................................d|
 d....................d..rrrrrrrrrrrrrrrrrrrrr..............................................................................................d|
 d....................d.....................................................................................................................d|
-d....................d..aaadddddddddddddddddddddddddddddddddddddddddddddddddddd............................................................d|
-d....................d..aaaddddddddddddddddddddddddddddd...................................................................................d|
+d....................d..aaadddddddddddddddddddddddddddddddddddd............................................................................d|
+d....................d..aaadddddddddddddddddddddd..........................................................................................d|
 d....................d..aaadddddddddddddddddddddddddd......................................................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|

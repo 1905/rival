@@ -17,7 +17,7 @@ use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{
-    ModelSpec, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, sol_spec,
+    ModelSpec, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, sol_spec,
 };
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
@@ -586,7 +586,6 @@ fn dispatch(
         CommandId::CommandFable => model_command(env, inv, fable_spec()),
         CommandId::CommandSol => model_command(env, inv, sol_spec()),
         CommandId::CommandGrok => model_command(env, inv, grok_spec()),
-        CommandId::CommandK3 => model_command(env, inv, k3_spec()),
         CommandId::CommandChina => {
             let spec = china_spec(env.cfg);
             model_command(env, inv, spec)
@@ -613,7 +612,6 @@ fn dispatch(
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunFable => model_run(env, inv, fable_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
-        CommandId::RunK3 => model_run(env, inv, k3_spec),
         CommandId::Wait => {
             let opts = wait::WaitOptions {
                 log: inv.string("log").into(),
@@ -657,7 +655,6 @@ fn model_run(
         RunOptions {
             workdir: inv.string("workdir"),
             no_queue: inv.bool("no-queue"),
-            // K3 has no --effort flag: it reads as "".
             effort: inv.string("effort"),
             review_scope: inv.string("review"),
             is_review: inv.changed("review"),

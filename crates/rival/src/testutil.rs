@@ -214,7 +214,6 @@ pub struct FakeRun {
     pub prompt: String,
     pub effort: String,
     pub workdir: String,
-    pub cred_workdir: String,
     pub review: bool,
     pub had_mirror: bool,
     /// Whether `workdir` was still on disk during the run, so a test can
@@ -247,7 +246,7 @@ pub fn fake_run(log: &str) -> SharedRun {
 pub fn fake_spec(f: &SharedRun) -> ModelSpec {
     let mut spec = codex_spec();
     let pre = Rc::clone(f);
-    spec.preflight = Box::new(move |_, _| {
+    spec.preflight = Box::new(move |_| {
         pre.borrow_mut().preflight_calls += 1;
         Ok(())
     });
@@ -275,7 +274,6 @@ pub fn fake_spec(f: &SharedRun) -> ModelSpec {
         f.prompt = c.prompt.to_string();
         f.effort = c.effort.to_string();
         f.workdir = c.workdir.to_string();
-        f.cred_workdir = c.cred_workdir.to_string();
         f.review = c.review;
         f.workdir_existed = Path::new(c.workdir).exists();
         f.status_during_run = c.sess.status.clone();

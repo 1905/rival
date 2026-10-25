@@ -66,9 +66,7 @@ pub fn run_model_run(
         return Err(CmdError::plain("provide --prompt-stdin or --review"));
     }
     let workdir = resolve_workdir(cfg, &opts.workdir).map_err(CmdError::plain)?;
-    // Preflight in the caller's workdir: that is where credentials live, even
-    // when an MR review later runs in a temporary checkout.
-    (spec.preflight)(cfg, &workdir).map_err(|e| CmdError::plain(format!("{e:#}")))?;
+    (spec.preflight)(cfg).map_err(|e| CmdError::plain(format!("{e:#}")))?;
 
     let (ctx, _signals) = env.signal_context()?;
 
@@ -149,7 +147,6 @@ pub fn run_model_run(
         prompt: &prompt,
         effort: &effort,
         workdir: &run_workdir,
-        cred_workdir: &workdir,
         review: opts.is_review,
         log: None,
         out: Some(&mut *stdout),
@@ -191,7 +188,7 @@ pub fn run_model_run(
             return Err(CmdError::plain(format!("read log file: {e}")));
         }
     };
-    let log = repair_review_language(&ctx, cfg, spec, &mut sess, log, &run_workdir, &workdir);
+    let log = repair_review_language(&ctx, cfg, spec, &mut sess, log, &run_workdir);
     // A zero exit is not a review: quota errors and empty output also exit 0.
     let log_file = sess.log_file.clone();
     let out = match finish_review(cfg, spec, &mut sess, &log, &scope, &log_file) {

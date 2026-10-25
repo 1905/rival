@@ -2,7 +2,7 @@
 //! security command's final-answer test.
 
 use super::*;
-use crate::config::{K3_LABEL, KIMI_MODEL, PromptKind};
+use crate::config::{CHINA_DEFAULT_MODEL, CHINA_LABEL, PromptKind};
 use crate::review::testutil::temp_config;
 use crate::review::{ReviewerFinding, build_reviewer_prompt, parse_reviewer_log};
 
@@ -59,8 +59,8 @@ fn format_security_result_falls_back_on_unusable_output() {
     let (got, result) = format_security_result(
         None,
         "provider exploded",
-        "opencode",
-        KIMI_MODEL,
+        CHINA_LABEL,
+        CHINA_DEFAULT_MODEL,
         "src/",
         "/tmp/s.log",
     );
@@ -82,7 +82,7 @@ fn format_security_console_orders_by_severity() {
     (med.line, med.confidence) = (2, 7);
     let mut crit = finding("a.go", "sql injection", "critical");
     (crit.line, crit.confidence) = (1, 9);
-    let got = format_security_console(&out("two issues", vec![med, crit]), K3_LABEL, "src/");
+    let got = format_security_console(&out("two issues", vec![med, crit]), "kimi-k3.1-pro", "src/");
     let crit_at = got.find("sql injection").unwrap();
     let med_at = got.find("open redirect").unwrap();
     assert!(crit_at < med_at, "critical rendered after medium:\n{got}");
@@ -91,10 +91,10 @@ fn format_security_console_orders_by_severity() {
 
 #[test]
 fn format_security_console_clean_review() {
-    let got = format_security_console(&out("nothing found", vec![]), K3_LABEL, "src/");
+    let got = format_security_console(&out("nothing found", vec![]), "kimi-k3.1-pro", "src/");
     assert_eq!(
         got,
-        "\n═══ RIVAL SECURITY REVIEW ═══\n\nModel: kimi-k3\nScope: src/\n\nSummary: nothing found\n\nNo vulnerabilities found.\n"
+        "\n═══ RIVAL SECURITY REVIEW ═══\n\nModel: kimi-k3.1-pro\nScope: src/\n\nSummary: nothing found\n\nNo vulnerabilities found.\n"
     );
 }
 
@@ -160,8 +160,8 @@ fn security_parses_final_answer_not_tool_output() {
     let (text, result) = format_security_result(
         parsed.as_ref(),
         raw,
-        "opencode",
-        KIMI_MODEL,
+        CHINA_LABEL,
+        CHINA_DEFAULT_MODEL,
         "src/",
         "/tmp/x.log",
     );

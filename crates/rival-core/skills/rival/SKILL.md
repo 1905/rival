@@ -14,8 +14,8 @@ watched in the background, so this skill does not block your session.
 **Which model runs is a config choice, not a part of this skill.**
 `skill.claude` in `~/.rival/config.yaml` selects it (`rival config`, Models).
 The output names the model that ran; never guess or hardcode it.
-`security [scope]` runs the security review instead; `security.reviewer`
-selects its model.
+`security [scope]` runs the security review instead, on the `/china` model
+(`china.model`).
 
 ## Instructions
 

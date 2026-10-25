@@ -280,7 +280,7 @@ fn mixed_rows(m: &mut Model) {
             limit: true,
             error: "429 monthly spend limit reached".into(),
             hint: "the account is at its limit; try again after the reset".into(),
-            ..row("k3", "direct", "moonshotai/kimi-k3")
+            ..row("china", "direct", "moonshot/kimi-k3.1-pro")
         },
     ];
     for r in rows {

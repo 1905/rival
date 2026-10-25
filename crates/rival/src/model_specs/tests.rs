@@ -3,7 +3,7 @@
 
 use super::*;
 
-use rival_core::config::{CLAUDE_LABEL, CODEX_LABEL, GROK_LABEL, K3_LABEL, UserConfig};
+use rival_core::config::{CLAUDE_LABEL, CODEX_LABEL, GROK_LABEL, UserConfig};
 
 use crate::model_run::{RunOptions, run_model_run};
 use crate::testutil::{FakeStdin, Fixture, fake_run, fake_spec, no_mr, with_env};
@@ -12,7 +12,7 @@ fn cfg() -> Config {
     Fixture::new().cfg
 }
 
-/// The command word and the display label differ for K3, so one field
+/// The command word and the display label differ for china, so one field
 /// cannot serve both. Error text and logs use the label; the tree uses the
 /// command name.
 #[test]
@@ -20,7 +20,7 @@ fn spec_labels_and_command_names() {
     let cases = [
         (codex_spec(), "codex", CODEX_LABEL, "codex"),
         (claude_spec(), "claude", CLAUDE_LABEL, "claude"),
-        (k3_spec(), "k3", K3_LABEL, "opencode"),
+        (china_spec(&cfg()), "china", "kimi-k3.1-pro", "china"),
         (grok_spec(), "grok", GROK_LABEL, GROK_LABEL),
     ];
     for (spec, command_name, label, cli) in cases {
@@ -30,20 +30,8 @@ fn spec_labels_and_command_names() {
     }
     assert_eq!(codex_spec().model, config::CODEX_MODEL);
     assert_eq!(claude_spec().model, config::CLAUDE_MODEL);
-    assert_eq!(k3_spec().model, config::KIMI_MODEL);
+    assert_eq!(china_spec(&cfg()).model, config::CHINA_DEFAULT_MODEL);
     assert_eq!(grok_spec().model, config::GROK_MODEL);
-}
-
-#[test]
-fn k3_effort_is_pinned_to_max() {
-    let cfg = cfg();
-    for requested in ["", "low", "high", "xhigh", "ultra", "bogus"] {
-        assert_eq!(
-            k3_spec().resolve_effort(&cfg, requested).unwrap(),
-            "max",
-            "{requested:?}"
-        );
-    }
 }
 
 #[test]
@@ -108,7 +96,7 @@ fn defaults_configured_efforts_and_invalid_efforts() {
 #[test]
 fn only_claude_reports_an_auth_hint() {
     let cfg = cfg();
-    for spec in [codex_spec(), k3_spec(), grok_spec()] {
+    for spec in [codex_spec(), china_spec(&cfg), grok_spec()] {
         assert_eq!(
             spec.auth_hint(&cfg, "/nonexistent.log"),
             "",
@@ -266,16 +254,12 @@ fn usage_texts_are_pinned() {
         CODEX_USAGE
             .ends_with("Omitted uses efforts.codex from ~/.rival/config.yaml (built-in: xhigh).")
     );
-    assert!(K3_USAGE.starts_with("Usage:\n  echo 'explain the auth flow' | rival command k3\n"));
-    assert!(K3_USAGE.ends_with(
-        "raw prompts run full auto and can edit files and run commands in the workdir."
-    ));
     assert!(GROK_USAGE.ends_with(
         "Review mode runs read-only sandboxed; raw prompts can edit files in the workdir."
     ));
     assert_eq!(codex_spec().usage, CODEX_USAGE);
     assert_eq!(claude_spec().usage, CLAUDE_USAGE);
-    assert_eq!(k3_spec().usage, K3_USAGE);
+    assert_eq!(china_spec(&cfg()).usage, CHINA_USAGE);
     assert_eq!(grok_spec().usage, GROK_USAGE);
 }
 

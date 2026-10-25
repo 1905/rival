@@ -50,21 +50,6 @@
     {
       "run": [
         "command",
-        "k3",
-        "--help"
-      ],
-      "expect": {
-        "exit_code": 0,
-        "stdout": {
-          "$regex": "(?s)(?=.*\\ARun Kimi K3 prompts from stdin)(?=.*Usage:\\s+rival\\s+command\\s+k3(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for k3)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
-        },
-        "stderr_lines": [],
-        "log_events": []
-      }
-    },
-    {
-      "run": [
-        "command",
         "plan",
         "--help"
       ],
@@ -146,21 +131,6 @@
         "exit_code": 0,
         "stdout": {
           "$regex": "(?s)(?=.*\\ARun Grok)(?=.*Usage:\\s+rival\\s+run\\s+grok(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for grok)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?reasoning effort override: low, medium, high \\(ultra clamps to high\\))(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-prompt\\-stdin(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?read prompt from stdin)(?=.*(?<![\\w-])\\-\\-review(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?review scope \\(enables review mode\\))(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory).*"
-        },
-        "stderr_lines": [],
-        "log_events": []
-      }
-    },
-    {
-      "run": [
-        "run",
-        "k3",
-        "--help"
-      ],
-      "expect": {
-        "exit_code": 0,
-        "stdout": {
-          "$regex": "(?s)(?=.*\\ARun Kimi K3 \\(via opencode\\))(?=.*Usage:\\s+rival\\s+run\\s+k3(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for k3)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-prompt\\-stdin(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?read prompt from stdin)(?=.*(?<![\\w-])\\-\\-review(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?review scope \\(enables review mode\\))(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory).*"
         },
         "stderr_lines": [],
         "log_events": []

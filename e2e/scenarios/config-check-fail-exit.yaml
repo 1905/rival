@@ -1,10 +1,11 @@
 {
   "name": "config-check-fail-exit",
-  "description": "`rival config check` with no proxy and the default models: codex, sol, claude, fable and the security reviewer (k3). Codex and Sol pass through the real codex adapter (preflight `codex login status`, then a read-only exec at low effort in ~/.rival/check). Claude and Fable fail as not installed (no claude, no docker) and never run; K3 fails its preflight (no MOONSHOT_API_KEY) and opencode never runs. The text table is in model order and the command exits 1. No session is saved and no queue slot is taken: home has only the two check logs (one `check/<name>-<pid>-<id>.log` per run).",
+  "description": "`rival config check` with no proxy and the default models: codex, sol, claude, fable and china. Codex and Sol pass through the real codex adapter (preflight `codex login status`, then a read-only exec at low effort in ~/.rival/check). Claude and Fable fail as not installed (no claude, no docker) and never run; China fails as not installed (no opencode) and never runs. The text table is in model order and the command exits 1. No session is saved and no queue slot is taken: home has only the two check logs (one `check/<name>-<pid>-<id>.log` per run).",
   "fakes": {
     "absent": [
       "claude",
-      "docker"
+      "docker",
+      "opencode"
     ],
     "scripts": {
       "codex": {
@@ -93,7 +94,7 @@
       ],
       "expect": {
         "exit_code": 1,
-        "stdout": "proxy  off\n\n  ✓ codex   direct  gpt-6-astra         <DURATION>  ok  [fast]\n  ✓ sol     direct  gpt-6.1-sol         <DURATION>  ok  [fast]\n  ✗ claude  direct  claude-opus-5-5     —     not installed\n  ✗ fable   direct  claude-fable-5-1    —     not installed\n  ✗ k3      direct  moonshotai/kimi-k3  —     MOONSHOT_API_KEY is not set — add it to the project .env or export it\n\n2 of 5 ok\n",
+        "stdout": "proxy  off\n\n  ✓ codex   direct  gpt-6-astra             <DURATION>  ok  [fast]\n  ✓ sol     direct  gpt-6.1-sol             <DURATION>  ok  [fast]\n  ✗ claude  direct  claude-opus-5-5         —     not installed\n  ✗ fable   direct  claude-fable-5-1        —     not installed\n  ✗ china   direct  moonshot/kimi-k3.1-pro  —     not installed\n\n2 of 5 ok\n",
         "stderr_lines": [
           "config check: 3 of 5 models failed"
         ]

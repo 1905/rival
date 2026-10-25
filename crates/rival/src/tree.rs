@@ -30,7 +30,6 @@ pub enum CommandId {
     CommandCodex,
     CommandFable,
     CommandGrok,
-    CommandK3,
     CommandChina,
     CommandPlan,
     CommandSecurity,
@@ -51,7 +50,6 @@ pub enum CommandId {
     RunClaude,
     RunFable,
     RunGrok,
-    RunK3,
     Sessions,
     Tui,
     Update,
@@ -75,7 +73,6 @@ impl CommandId {
             ["rival", "command", "codex"] => CommandCodex,
             ["rival", "command", "fable"] => CommandFable,
             ["rival", "command", "grok"] => CommandGrok,
-            ["rival", "command", "k3"] => CommandK3,
             ["rival", "command", "china"] => CommandChina,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
@@ -96,7 +93,6 @@ impl CommandId {
             ["rival", "run", "claude"] => RunClaude,
             ["rival", "run", "fable"] => RunFable,
             ["rival", "run", "grok"] => RunGrok,
-            ["rival", "run", "k3"] => RunK3,
             ["rival", "sessions"] => Sessions,
             ["rival", "tui"] => Tui,
             ["rival", "update"] => Update,
@@ -246,21 +242,15 @@ fn model_command(name: &'static str, about: &'static str) -> Command {
     with_args(command(name, about)).args([workdir(), no_queue()])
 }
 
-fn run_command(
-    name: &'static str,
-    about: &'static str,
-    effort_help: Option<&'static str>,
-) -> Command {
-    let mut cmd = with_args(command(name, about));
-    if let Some(help) = effort_help {
-        cmd = cmd.arg(effort(help));
-    }
-    cmd.args([
-        workdir(),
-        bool_flag("prompt-stdin", "read prompt from stdin"),
-        string_flag("review", "", "review scope (enables review mode)"),
-        no_queue(),
-    ])
+fn run_command(name: &'static str, about: &'static str, effort_help: &'static str) -> Command {
+    with_args(command(name, about))
+        .arg(effort(effort_help))
+        .args([
+            workdir(),
+            bool_flag("prompt-stdin", "read prompt from stdin"),
+            string_flag("review", "", "review scope (enables review mode)"),
+            no_queue(),
+        ])
 }
 
 fn shell(name: &'static str) -> Command {
@@ -300,7 +290,6 @@ pub fn build(defaults: &Defaults) -> Command {
         model_command("codex", "Skill-facing Codex executor"),
         model_command("fable", "Skill-facing Fable executor"),
         model_command("grok", "Skill-facing Grok executor"),
-        model_command("k3", "Run Kimi K3 prompts from stdin"),
         with_args(command("plan", "Review a plan/spec with Codex, Sol, Claude and/or Fable")).args([
             workdir(),
             no_queue(),
@@ -348,7 +337,7 @@ pub fn build(defaults: &Defaults) -> Command {
             .arg(bool_flag("json", "print one JSON object")),
         with_args(command("check", "Send one short prompt to each model and show which answer"))
             .args([
-                model_flag("", "models to check: codex, sol, claude (or opus), fable, k3, grok, grok-4.6-openrouter, or all (comma-separated; default: codex, sol, claude, fable and the security reviewer)"),
+                model_flag("", "models to check: codex, sol, claude (or opus), fable, china, grok, or all (comma-separated; default: codex, sol, claude, fable and china)"),
                 bool_flag("json", "print one JSON line per model as it finishes, then a summary line"),
                 bool_flag("config-stdin", "check a draft config.yaml read from stdin instead of the saved file"),
             ]),
@@ -373,20 +362,19 @@ pub fn build(defaults: &Defaults) -> Command {
                     run_command(
                         "claude",
                         "Run Claude",
-                        Some("reasoning effort override (low, medium, high, xhigh)"),
+                        "reasoning effort override (low, medium, high, xhigh)",
                     )
                     .visible_alias(OPUS_ALIAS),
                     run_command(
                         "fable",
                         "Run Fable",
-                        Some("reasoning effort override (low, medium, high, xhigh)"),
+                        "reasoning effort override (low, medium, high, xhigh)",
                     ),
                     run_command(
                         "grok",
                         "Run Grok",
-                        Some("reasoning effort override: low, medium, high (ultra clamps to high)"),
+                        "reasoning effort override: low, medium, high (ultra clamps to high)",
                     ),
-                    run_command("k3", "Run Kimi K3 (via opencode)", None),
                 ]),
             with_args(command("sessions", "List sessions")).args([
                 bool_flag("active", "show only running sessions"),

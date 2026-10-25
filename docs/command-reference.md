@@ -201,9 +201,8 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 |---|---|
 | Codex (`gpt-6-astra`), Sol (`gpt-6.1-sol`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. Through the [proxy](#proxy), no `codex login` is needed. |
 | Claude (`claude-opus-5-5`), Fable (`claude-fable-5-1`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](claude-docker-setup.md)). |
-| Kimi K3 (`moonshotai/kimi-k3`) | [OpenCode](https://opencode.ai/docs) plus `MOONSHOT_API_KEY`, exported or in a gitignored project `.env`. |
 | Grok (`grok-4.6`) | [Grok CLI](https://docs.x.ai/) with `grok login`. `XAI_API_KEY` is not supported. |
-| Grok via OpenRouter (`x-ai/grok-4.6`) | OpenCode plus `OPENROUTER_API_KEY`. Used only by the security review. |
+| China (`china.model`, default `moonshot/kimi-k3.1-pro`); also the security review | [OpenCode](https://opencode.ai/docs) v2 with the provider set up in opencode (`opencode auth login` or its config). Rival sends no key. |
 
 ### Updating
 
@@ -230,7 +229,7 @@ only when you intend to overwrite your installed skill contents.
 |---|---|
 | `/rival [-re low\|medium\|high\|xhigh\|ultra] review [scope]` | A code review with the model of `skill.<host>`. |
 | `/rival [-re level] <prompt>` | Any prompt with the model of `skill.<host>`. |
-| `/rival security [scope]` | The security review with the model of `security.reviewer` (default `k3`). |
+| `/rival security [scope]` | The security review with the `/china` model (`china.model`). |
 | `/rival` | Prints the usage. |
 
 | Host | Config key | Default model | Launches |
@@ -239,8 +238,8 @@ only when you intend to overwrite your installed skill contents.
 | Codex | `skill.codex` | `claude` (Opus 5.5) | `rival command skill --host codex` |
 
 - By default each host gets a review from the other vendor.
-- Pick a model in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. The values are `codex`, `sol`, `claude` (or `opus`), `fable`, `k3` and `grok`.
-- An omitted `-re` uses `efforts.<model>` of the resolved model. K3 runs at max only; grok clamps levels above high.
+- Pick a model in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. The values are `codex`, `sol`, `claude` (or `opus`), `fable` and `grok`.
+- An omitted `-re` uses `efforts.<model>` of the resolved model. Grok clamps levels above high.
 - The review header names the model that ran (`Model: sol (gpt-6.1-sol)`).
 - If the runtime of the configured model is missing, the preflight error is followed by `set another model: rival config set skill.<host> <model> (…)`.
 - 6.0 removes the per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok` and `/rival-security`. `rival command codex|sol|claude|fable|k3|grok|security|plan` stay for the CLI.
@@ -287,27 +286,27 @@ Top-level commands (`rival --help`):
 `rival command` subcommands. Each reads its input from stdin.
 
 - If stdin is a terminal or `/dev/null`, every subcommand prints its usage and starts no model.
-- Empty piped input prints usage for `skill`, `codex`, `claude`, `grok`, `k3` and `plan`. For `security`, empty piped input reviews the changed files.
+- Empty piped input prints usage for `skill`, `codex`, `claude`, `grok`, `china` and `plan`. For `security`, empty piped input reviews the changed files.
 
 | Subcommand | Flags (defaults) |
 |---|---|
-| `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `k3` | `--workdir` (`.`), `--no-queue` |
+| `codex`, `sol`, `claude` (alias `opus`), `fable`, `grok`, `china` | `--workdir` (`.`), `--no-queue` |
 | `plan` | `--workdir` (`.`), `--no-queue`, `-m/--model` (`plan.models`, else `codex`; accepts `codex`, `sol`, `claude`/`opus`, `fable`, comma-separated), `--effort` |
 | `security` | `--workdir` (`.`), `--no-queue`, `--which` |
-| `skill` | `--host` (required: `claude` or `codex`), `--workdir` (`.`), `--no-queue`. Input that starts with `security` runs `security` with the rest as the scope; any other input runs `codex`, `sol`, `claude`, `fable`, `k3` or `grok` as `skill.<host>` selects. |
+| `skill` | `--host` (required: `claude` or `codex`), `--workdir` (`.`), `--no-queue`. Input that starts with `security` runs `security` with the rest as the scope; any other input runs `codex`, `sol`, `claude`, `fable` or `grok` as `skill.<host>` selects. |
 
 - `--detach` is a flag on `rival command` and applies to every subcommand.
 - The Codex service tier is a config key, not a flag: see `speed` under Configuration.
 - `plan --help` shows `--effort` with default `high`. That value is not used unless you pass the flag. Without it, Codex runs at xhigh and Claude at medium.
 - `plan` input: one path, optionally `-re <level> <path>`. Use `-- <path>` for a path that starts with `-`.
 
-`rival run` subcommands: `claude` (alias `opus`), `fable`, `grok`, `k3`. There is no `rival run codex` or `rival run sol`; use `rival command codex` or `rival command sol`.
+`rival run` subcommands: `claude` (alias `opus`), `fable`, `grok`. There is no `rival run codex` or `rival run sol`; use `rival command codex` or `rival command sol`.
 
 | Flag | Meaning |
 |---|---|
 | `--prompt-stdin` | Read the prompt from stdin. |
 | `--review <scope>` | Review mode. `--review` wins when both are given. |
-| `--effort` | `claude`: low, medium, high, xhigh. `grok`: low, medium, high; higher values clamp to high. `k3` has no effort flag. |
+| `--effort` | `claude`: low, medium, high, xhigh. `grok`: low, medium, high; higher values clamp to high. |
 | `--workdir` (`.`), `--no-queue` | As above. |
 
 Examples:
@@ -368,19 +367,18 @@ cat out.txt                       # the review
 | `sol` | `gpt-6.1-sol` | Codex CLI | `xhigh` |
 | `claude` (alias `opus`) | `claude-opus-5-5` | Claude Code CLI (native, else Docker) | `medium` |
 | `fable` | `claude-fable-5-1` | Claude Code CLI (native, else Docker) | `medium` |
-| `kimi-k3` | `moonshotai/kimi-k3` | OpenCode, Moonshot provider | `max` (only level) |
 | `grok` | `grok-4.6` | Grok CLI | `high` |
-| `grok-4.6-openrouter` | `x-ai/grok-4.6` | OpenCode, OpenRouter | `xhigh` (security only) |
+| the model name of `china.model` (`kimi-k3.1-pro`) | `china.model` (`moonshot/kimi-k3.1-pro`) | OpenCode v2 | `max` |
 
 - The effort ladder is `low`, `medium`, `high`, `xhigh`, `ultra`. `xhigh` and `ultra` are different levels.
 - Precedence: explicit `-re`/`--effort`, then `efforts.<label>` in `~/.rival/config.yaml`, then the built-in value.
-- Kimi K3 always runs at `max`. Any `-re` value is accepted and ignored.
+- China maps the ladder onto Moonshot's levels: `low` → low, `medium`/`high` → high, `xhigh`/`ultra` → max. There is no `efforts` key for it.
 - Grok accepts `low`, `medium`, `high`. Higher values clamp to `high`, and the session records the clamped value.
 - Claude maps `low` and `medium` to the same CLI levels, and `high`, `xhigh` and `ultra` to the Claude CLI level `max`.
 
 ### Code review: JSON contract and console output
 
-Every single-model code review (`codex`, `claude`, `grok`, `k3` in review mode) asks the model for exactly one JSON object:
+Every single-model code review (`codex`, `claude`, `grok`, `china` in review mode) asks the model for exactly one JSON object:
 
 ```json
 {
@@ -475,19 +473,14 @@ Log: ~/.rival/sessions/<session-id>.log
 
 `/rival security [scope]` runs `rival command security`. It hunts exploitable vulnerabilities in twelve classes: injection, authorization (including IDOR), authentication, crypto, path traversal, SSRF, deserialization, secret exposure, input validation, CSRF, open redirect, and resource exhaustion. It does not report style or ordinary logic bugs.
 
-The model comes from `security.reviewer` in `~/.rival/config.yaml`:
+The model is the `/china` model: `china.model` in `~/.rival/config.yaml` (default `moonshot/kimi-k3.1-pro`), through the same opencode v2 runner (see [`/china`](#china)). The review runs read-only at `max`; the language pass runs at `low`.
 
-| Value | Model | Provider | Key | Reasoning |
-|---|---|---|---|---|
-| `k3` (default) | `moonshotai/kimi-k3` | OpenCode, Moonshot | `MOONSHOT_API_KEY` | `max` |
-| `grok` | `x-ai/grok-4.6` | OpenCode, OpenRouter | `OPENROUTER_API_KEY` | `xhigh` |
-
-- `rival command security --which` prints the resolved model, the config value, the key status and `Ready.` or `Not usable.`. It exits `1` when not usable.
-- The key is read from the environment first, then from the nearest `.env` walking up from the workdir.
-- If the key is missing, the run fails. It never falls back to another model.
+- `rival command security --which` prints the model, `china.model` with its source (`default` or `file`), the effort, the auth note and `Ready.` or `Not usable.`. It exits `1` when not usable.
+- Auth is opencode's own. Rival reads no key.
+- If opencode v2 is missing, the run fails. It never falls back to another model.
 - It uses the code-review JSON contract. The console title is `═══ RIVAL SECURITY REVIEW ═══`; an empty list prints `No vulnerabilities found.`.
 - Every finding must have a file, a title and a known severity. Otherwise Rival prints `RIVAL SECURITY REVIEW — UNUSABLE OUTPUT` and exits `1`.
-- An invalid `security.reviewer` value fails every command at startup.
+- 6.0 and earlier picked the model with `security.reviewer` (`k3` or `grok`). That key is removed; an old value is ignored.
 
 ### GitLab MR review
 
@@ -499,7 +492,7 @@ echo 'review https://gitlab.example.com/group/project/-/merge_requests/123' | ri
 rival run claude --review https://gitlab.example.com/group/project/-/merge_requests/123 --workdir .
 ```
 
-- Supported by `rival command codex|claude|grok|k3` in review mode and by `rival run <x> --review`.
+- Supported by `rival command codex|claude|grok|china` in review mode and by `rival run <x> --review`.
 - Rejected before any reviewer starts by raw prompts and `security`.
 - The scope must be one HTTPS URL of the form `.../<namespace>/<project>/-/merge_requests/<N>`, optionally ending in `/diffs` or `/commits`.
 - The workdir must be a git repository with a remote for the same host and project.
@@ -518,17 +511,13 @@ efforts:              # per-model default effort
   claude: medium      # low | medium | high | xhigh | ultra
   fable: medium       # low | medium | high | xhigh | ultra
   grok: high          # low | medium | high | xhigh | ultra (clamped to high)
-  kimi-k3: max        # max only
-
-security:
-  reviewer: k3        # k3 (default) | grok
 
 skill:                # the model the /rival skill runs, per host
-  claude: sol         # in Claude Code: codex | sol | claude (or opus) | fable | k3 | grok
+  claude: sol         # in Claude Code: codex | sol | claude (or opus) | fable | grok
   codex: claude       # in Codex: the same values
 
 china:                # the model the /china skill runs
-  model: moonshot/kimi-k3.1-pro   # an opencode provider/model
+  model: moonshot/kimi-k3.1-pro   # an opencode provider/model; also runs the security review
 
 claude:
   subscription: team  # free text shown in the TUI Account field, e.g. team or personal
@@ -558,7 +547,8 @@ roles:                # optional prompt overrides
 ```
 
 - The values shown for `efforts`, `skill` and `speed` are the built-in defaults.
-- An unknown `efforts` key, an invalid effort, an invalid `security.reviewer`, an invalid `skill.claude` / `skill.codex`, an invalid `china.model`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
+- An unknown `efforts` key, an invalid effort, an invalid `skill.claude` / `skill.codex`, an invalid `china.model`, or an invalid `speed.codex` / `speed.sol` stops every command before it creates a session.
+- The removed keys `security.reviewer` and `efforts.kimi-k3` are ignored when the file has them; `rival config set` rejects them.
 - `rival config set` and the config windows rewrite this file. Unknown keys stay. Comments do not: the first rewrite of a hand-written file keeps a copy in `config.yaml.bak`.
 - `auto_fix_critical_high` is off by default. Skills always verify every finding. When it is on, they fix CONFIRMED critical and high findings without asking, then build and test. Medium and low findings are only verified, presented and proposed. `rival wait --log` prints the setting as its last line: `auto-fix: off` or `auto-fix: critical+high`.
 - `speed.codex` and `speed.sol` pick the Codex service tier of each Codex-runtime model: `normal`, `fast` (the default) or `ultrafast`. Change them in the config window (`rival config`, Models: `Codex speed`, `Sol speed`; `←`/`→` cycles normal → fast → ultrafast) or with `rival config set speed.sol normal`. The speed applies to every call of that model: `/rival` reviews and prompts, `rival command codex` and `rival command sol`, their language-repair pass, `rival command plan` and `rival config check`.
@@ -587,7 +577,7 @@ Environment variables:
 
 ### Proxy
 
-Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one HTTP gateway such as CLIProxyAPI. Each provider has its own switch and model prefix. K3 and Grok always run direct.
+Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one HTTP gateway such as CLIProxyAPI. Each provider has its own switch and model prefix. China and Grok always run direct.
 
 | Item | Claude route | Codex route |
 |---|---|---|
@@ -612,7 +602,7 @@ Rival can send Claude runs (Opus, Fable) and Codex runs (Codex, Sol) through one
 | `rival config set KEY VALUE` | Sets one key, e.g. `proxy.claude.model_prefix emcd_`. `set --json` reads a patch from stdin. |
 | `rival config key set` / `key clear` | Reads the key from stdin (hidden on a terminal) and writes it with mode 0600 / removes it. |
 | `rival config models [--json]` | The proxy's models, grouped by prefix. |
-| `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and the security reviewer. Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
+| `rival config check [-m LIST\|all] [--json] [--config-stdin]` | Sends `Reply with exactly: ok` to each model through its real adapter (low effort, read-only, 90 s). Default: codex, sol, claude, fable and china (`china.model`, which also runs the security review). Exit `1` if one fails. `--json` prints one line per model, then a summary. `--config-stdin` checks an unsaved draft. Check runs are not saved as sessions; logs go to `~/.rival/check/`. |
 
 The config window (`rival config`) has Proxy, Models, Review and Check sections, a "Requests go to" list with the exact model name each run sends, and a check panel. Models has the model table (MODEL, RUNTIME, ROUTE, EFFORT; `←`/`→` picks the effort), the `/RIVAL RUNS` pickers `in Claude Code` (`skill.claude`) and `in Codex` (`skill.codex`), which cycle the six models with `←`/`→`, the `/CHINA RUNS` pickers `provider` and `model` (`china.model`, from opencode's model list; `e` types a model), and the two speed pickers (`Codex speed`, `Sol speed`). The window does not set `plan.models`; use `rival config set plan.models` or `rival command plan -m`. Keys: `Tab` section, `↑`/`↓` field, `Space` toggle, `←`/`→` choose, `e` type a value, `c` check the draft, `a` check all models, `x` cancel the check, `s` save, `u` undo, `?` help, `Esc` back (asks to save unsaved changes).
 
@@ -687,6 +677,8 @@ Claude runs through the Claude Code CLI and bills your subscription login by def
 | Removed | Replacement |
 |---|---|
 | Per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok`, `/rival-security` (6.0) | `/rival` with `skill.claude` / `skill.codex`; `/rival security`. `rival install` removes the old skills. |
+| Kimi K3: `rival command k3`, `rival run k3`, `skill.<host>: k3`, `efforts.kimi-k3` | `rival command china` with `china.model` (default `moonshot/kimi-k3.1-pro`) |
+| `security.reviewer` (`k3`, `grok`) and the OpenRouter Grok security model | The security review runs on `china.model`. |
 | The PLAN column and plan toggles of the config window (6.0) | `rival config set plan.models <models>` |
 | Megareview: `rival review`, `rival command megareview`, and the consilium judge | `rival command codex review` (skill: `/rival review`) |
 | `/rival-review` skill | `/rival review`. `rival install` removes the old skill. |

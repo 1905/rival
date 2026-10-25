@@ -9,8 +9,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::config::{
-    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, FABLE_MODEL, GPT56_SOL_MODEL, KIMI_MODEL, SOL_LABEL,
-    SOL_MODEL,
+    CLAUDE_LABEL, CLAUDE_MODEL, CODEX_MODEL, FABLE_MODEL, GPT56_SOL_MODEL, SOL_LABEL, SOL_MODEL,
 };
 use crate::review::parse_reviewer_log;
 use crate::review::plan::PlanOutput;
@@ -527,7 +526,11 @@ fn format_plan_result_multi_blocks_and_skipped() {
                 raw: "Claude raw dump".into(),
             },
         ],
-        skipped: vec![skipped("opencode", KIMI_MODEL, "n/a")],
+        skipped: vec![skipped(
+            config::CHINA_LABEL,
+            config::CHINA_DEFAULT_MODEL,
+            "n/a",
+        )],
     };
     let out = format_plan_result_for(&res, "/tmp/plan.md");
     assert_eq!(
@@ -902,22 +905,6 @@ fn run_doc_review_quota_final_answer_fails_despite_tool_plan_json() {
     assert_eq!(sess.status, "failed");
     assert_eq!(sess.exit_code, Some(1));
     assert_eq!(sess.error_msg, "codex hit provider quota/rate limit (429)");
-}
-
-#[test]
-fn opencode_variant_per_curated_model() {
-    for (model, effort, want) in [
-        (KIMI_MODEL, "low", "max"),
-        (KIMI_MODEL, "xhigh", "max"),
-        (KIMI_MODEL, "ultra", "max"),
-        ("unsupported-model", "high", ""),
-    ] {
-        assert_eq!(
-            config::opencode_variant(model, effort),
-            want,
-            "{model} {effort}"
-        );
-    }
 }
 
 /// Rust-only: no models requested is an error before any session exists.

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeDelta, TimeZone};
 use ratatui::text::Line;
 
-use rival_core::config::{CLAUDE_MODEL, GPT56_SOL_MODEL, GROK_MODEL, KIMI_MODEL};
+use rival_core::config::{CLAUDE_MODEL, GPT56_SOL_MODEL, GROK_MODEL};
 use rival_core::session::{self, Session};
 
 use super::*;
@@ -162,7 +162,8 @@ fn singleton_claude_plan_remains_logical_plan_group() {
 fn row_labels_for_every_cli() {
     for s in [
         sess("", "codex", GPT56_SOL_MODEL, "review"),
-        sess("", "opencode", KIMI_MODEL, "review"),
+        // A session of the removed K3 keeps its stored id.
+        sess("", "opencode", "moonshotai/kimi-k3", "review"),
         sess("", "claude", CLAUDE_MODEL, "review"),
         sess("", "grok", GROK_MODEL, "review"),
     ] {

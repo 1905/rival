@@ -11,8 +11,12 @@ Latest binary release: [v6.0.0](https://github.com/1905/rival/releases/tag/v6.0.
 - The config window's Models section has `/CHINA RUNS` pickers: `provider` (Moonshot or OpenRouter) and `model`, listed from `opencode models` with Chinese labs first. `e` types a model name or any `provider/model`.
 - `rival command china`, which the skill launches. It runs `opencode run --standalone -m <china.model>` with opencode's own provider auth: Rival sends no key. The permission profile and the model's effort go in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_PROJECT_CONFIG=1` keeps the reviewed repository's opencode config out. `-re` maps `low` → low, `medium`/`high` → high, `xhigh`/`ultra` → max; the default is max. The preflight needs opencode v2 or later.
 
-### Known issues
-- `rival command k3` and the security review still pass the opencode v1 flags `--pure`, `--variant` and `--dir`, which opencode v2 rejects.
+### Changed
+- **Breaking: the security review runs on `china.model`** (`/rival security`, `rival command security`), at max effort with a low-effort language pass, through the same opencode v2 runner as `/china`. `rival command security --which` shows the model, where it comes from (`default` or `file`) and whether opencode v2 is installed. `rival config check` checks `china` in place of the security reviewer; `-m` takes `china`.
+- `config window`: the Review section shows the security model in place of the `Security reviewer` picker.
+
+### Removed
+- **Kimi K3 and the security reviewer choice.** `rival command k3`, `rival run k3`, `skill.<host>: k3`, `efforts.kimi-k3`, `security.reviewer` (`k3`, `grok`) and the OpenRouter Grok security model are gone, with their opencode v1 runner (`--pure`, `--variant`, `--dir`, `OPENCODE_PERMISSION`, a per-run `OPENCODE_DB`), which opencode v2 rejects. Rival no longer reads `MOONSHOT_API_KEY`, `KIMI_API` or `OPENROUTER_API_KEY`: opencode's own auth applies. An old `security:` block or `efforts.kimi-k3` in `config.yaml` is ignored, not an error; `rival config set` no longer accepts them. Sessions of the removed models show as `retired-model`.
 
 ## [v6.0.0] — 2026-10-12
 

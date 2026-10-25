@@ -54,7 +54,6 @@ fn run_mr_review_runs_in_snapshot() {
         let f = f.borrow();
         assert_eq!(f.workdir, s(&mr.snapshot_dir));
         assert!(f.workdir_existed);
-        assert_eq!(f.cred_workdir, s(caller.path()));
         assert!(
             f.prompt.contains("PINNED-SNAPSHOT-SCOPE"),
             "{:.300}",

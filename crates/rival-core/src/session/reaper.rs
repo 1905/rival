@@ -88,9 +88,9 @@ mod tests {
         let mut s = Session::new_queued(
             paths,
             NewSession {
-                cli: "opencode",
+                cli: config::CHINA_LABEL,
                 mode: "raw",
-                model: config::KIMI_MODEL,
+                model: config::CHINA_DEFAULT_MODEL,
                 effort: "max",
                 workdir: &work.path().to_string_lossy(),
                 prompt: "prompt",

@@ -56,7 +56,7 @@
     {
       "run": [
         "command",
-        "k3",
+        "china",
         "--workdir",
         "missing"
       ],
@@ -126,24 +126,6 @@
       "run": [
         "run",
         "grok",
-        "--prompt-stdin",
-        "--workdir",
-        "missing"
-      ],
-      "stdin": "hi",
-      "expect": {
-        "exit_code": 1,
-        "stdout": "",
-        "stderr_lines": [
-          "workdir not found: <ROOT>/work/missing"
-        ],
-        "log_events": []
-      }
-    },
-    {
-      "run": [
-        "run",
-        "k3",
         "--prompt-stdin",
         "--workdir",
         "missing"

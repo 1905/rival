@@ -1,6 +1,6 @@
 {
   "name": "sessions-list",
-  "description": "`rival sessions` lists sessions newest first. A live `run claude --prompt-stdin --no-queue` holds a running session (its owner is alive, so the pre-run reap keeps it). Rows show the 8-char id, engine label (codex, kimi-k3, claude), status and duration, with 'running...' for an empty running duration. --recent N keeps the first N only when 0 < N < number of sessions; --active keeps only running sessions. After the live run completes, --active finds nothing. The live id prefix is normalised to <ID8>.",
+  "description": "`rival sessions` lists sessions newest first. A live `run claude --prompt-stdin --no-queue` holds a running session (its owner is alive, so the pre-run reap keeps it). Rows show the 8-char id, engine label (codex, retired-model for the removed K3, claude), status and duration, with 'running...' for an empty running duration. --recent N keeps the first N only when 0 < N < number of sessions; --active keeps only running sessions. After the live run completes, --active finds nothing. The live id prefix is normalised to <ID8>.",
   "timeout": 120,
   "fixtures": [
     {
@@ -78,7 +78,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  retired-model         failed      max     3s\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -104,7 +104,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  retired-model         failed      max     3s\n",
         "stderr_lines": [],
         "log_events": []
       }
@@ -117,7 +117,7 @@
       ],
       "expect": {
         "exit_code": 0,
-        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  kimi-k3               failed      max     3s\n",
+        "stdout": "<ID8>  claude                running     medium  running...\nsess-new  codex                 completed   xhigh   1m2s\nsess-old  retired-model         failed      max     3s\n",
         "stderr_lines": [],
         "log_events": []
       }

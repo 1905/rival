@@ -25,9 +25,9 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use rival_core::cancel::{Context, ContextError};
-use rival_core::config::{self, Config, ProxyProvider, Route, SecurityModel, Speed};
+use rival_core::config::{self, Config, ProxyProvider, Route, Speed};
 use rival_core::duration;
-use rival_core::executor::{self, OpencodeRunOpts};
+use rival_core::executor;
 use rival_core::leakguard;
 use rival_core::logging;
 use rival_core::proxy::{self, ModelsError};
@@ -36,13 +36,13 @@ use rival_core::session::Session;
 use serde_json::{Value as Json, json};
 
 use crate::model_specs::{
-    ModelSpec, RunCall, claude_spec, codex_spec, fable_spec, grok_spec, k3_spec, session_mode,
+    ModelSpec, RunCall, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, session_mode,
     sol_spec,
 };
 
 /// What each model is asked.
 pub const CHECK_PROMPT: &str = "Reply with exactly: ok";
-/// The effort of the live call; K3 resolves it to max, grok clamps it.
+/// The effort of the live call; grok clamps it.
 pub const CHECK_EFFORT: &str = "low";
 /// The budget of one live call.
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(90);
@@ -59,23 +59,28 @@ pub const REPLY_CHARS: usize = 40;
 /// The row error of a model whose runtime binary is missing.
 pub const NOT_INSTALLED: &str = "not installed";
 
-/// The `-m` name of the security reviewer Grok (OpenCode on OpenRouter).
-/// `grok` is the grok CLI.
-pub const SECURITY_GROK_NAME: &str = config::GROK_OPENROUTER_LABEL;
-
 /// One model the check covers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Target {
-    /// The `-m` name and the row name: codex, sol, claude, fable, k3, grok
-    /// or grok-4.6-openrouter.
+    /// The `-m` name and the row name: codex, sol, claude, fable, china or
+    /// grok.
     pub name: &'static str,
-    /// The session `cli`: codex, claude, opencode or grok.
+    /// The session `cli`: codex, claude, china or grok.
     pub runtime: &'static str,
-    /// The concrete model id.
+    /// The concrete model id; "" for china, whose model is `china.model`.
     pub model: &'static str,
 }
 
 impl Target {
+    /// The concrete model id: `china.model` for china.
+    pub fn model_id<'a>(&self, cfg: &'a Config) -> &'a str {
+        if self.runtime == config::CHINA_LABEL {
+            cfg.china_model()
+        } else {
+            self.model
+        }
+    }
+
     /// The proxy provider of the runtime; `None` for runtimes that never go
     /// through the proxy.
     pub fn provider(&self) -> Option<ProxyProvider> {
@@ -92,7 +97,7 @@ impl Target {
         match self.runtime {
             "claude" => &["claude", "docker"],
             "codex" => &["codex"],
-            "opencode" => &["opencode"],
+            config::CHINA_LABEL => &["opencode"],
             _ => &["grok"],
         }
     }
@@ -110,25 +115,19 @@ pub const CODEX: Target = target(config::CODEX_LABEL, "codex", config::CODEX_MOD
 pub const SOL: Target = target(config::SOL_LABEL, "codex", config::SOL_MODEL);
 pub const CLAUDE: Target = target(config::CLAUDE_LABEL, "claude", config::CLAUDE_MODEL);
 pub const FABLE: Target = target(config::FABLE_LABEL, "claude", config::FABLE_MODEL);
-pub const K3: Target = target(config::K3_COMMAND_NAME, "opencode", config::KIMI_MODEL);
+pub const CHINA: Target = target(config::CHINA_LABEL, config::CHINA_LABEL, "");
 pub const GROK: Target = target(config::GROK_LABEL, config::GROK_LABEL, config::GROK_MODEL);
-pub const SECURITY_GROK: Target = target(
-    SECURITY_GROK_NAME,
-    "opencode",
-    config::GROK_OPENROUTER_MODEL,
-);
 
 /// Every model, in row order.
-pub const ALL: [Target; 7] = [CODEX, SOL, CLAUDE, FABLE, K3, GROK, SECURITY_GROK];
+pub const ALL: [Target; 6] = [CODEX, SOL, CLAUDE, FABLE, CHINA, GROK];
 
 /// The accepted `-m` words, for the error text.
-pub const NAMES_HELP: &str =
-    "codex, sol, claude (or opus), fable, k3, grok, grok-4.6-openrouter, all";
+pub const NAMES_HELP: &str = "codex, sol, claude (or opus), fable, china, grok, all";
 
-/// The models to check. No names: codex, sol, claude, fable and the
-/// configured security reviewer. `all`: every model. `opus` is `claude`;
+/// The models to check. No names: codex, sol, claude, fable and china, the
+/// security reviewer. `all`: every model. `opus` is `claude`;
 /// a model named twice is checked once. Rows follow [`ALL`] order.
-pub fn targets(cfg: &Config, names: &[String]) -> Result<Vec<Target>, String> {
+pub fn targets(names: &[String]) -> Result<Vec<Target>, String> {
     let names: Vec<String> = names
         .iter()
         .map(|n| n.trim().to_lowercase())
@@ -136,8 +135,7 @@ pub fn targets(cfg: &Config, names: &[String]) -> Result<Vec<Target>, String> {
         .collect();
     let mut chosen: HashSet<&'static str> = HashSet::new();
     if names.is_empty() {
-        chosen.extend([CODEX.name, SOL.name, CLAUDE.name, FABLE.name]);
-        chosen.insert(security_target(cfg).name);
+        chosen.extend([CODEX.name, SOL.name, CLAUDE.name, FABLE.name, CHINA.name]);
     }
     for name in &names {
         if name == "all" {
@@ -163,20 +161,11 @@ pub fn targets(cfg: &Config, names: &[String]) -> Result<Vec<Target>, String> {
         .collect())
 }
 
-/// The configured security reviewer: K3, or Grok on OpenRouter. An invalid
-/// value is caught when the config loads; K3 is the fallback.
-fn security_target(cfg: &Config) -> Target {
-    match cfg.resolve_security_model() {
-        Ok(m) if m.name == config::SECURITY_REVIEWER_GROK => SECURITY_GROK,
-        _ => K3,
-    }
-}
-
 /// One checked model.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CheckRow {
     pub name: String,
-    /// The session `cli`: codex, claude, opencode or grok.
+    /// The session `cli`: codex, claude, china or grok.
     pub runtime: String,
     /// `proxy` or `direct`.
     pub route: String,
@@ -593,10 +582,11 @@ struct Engine<'a> {
 /// An enabled route that fails (no URL or key) still shows as `proxy`.
 fn base_row(cfg: &Config, t: &Target) -> CheckRow {
     let route = t.provider().map(|p| cfg.proxy_route(p));
+    let model = t.model_id(cfg);
     let (route_name, wire_model) = match &route {
-        Some(Ok(Some(r))) => ("proxy", proxy::wire_id(&r.prefix, t.model)),
-        Some(Err(_)) => ("proxy", t.model.to_string()),
-        _ => ("direct", t.model.to_string()),
+        Some(Ok(Some(r))) => ("proxy", proxy::wire_id(&r.prefix, model)),
+        Some(Err(_)) => ("proxy", model.to_string()),
+        _ => ("direct", model.to_string()),
     };
     CheckRow {
         name: t.name.to_string(),
@@ -848,53 +838,15 @@ pub struct SpecRunner;
 
 /// The spec of a target. Specs are not `Sync`, so each thread builds its
 /// own.
-pub fn spec_for(t: &Target) -> ModelSpec {
+pub fn spec_for(cfg: &Config, t: &Target) -> ModelSpec {
     match t.name {
         "codex" => codex_spec(),
         "sol" => sol_spec(),
         "claude" => claude_spec(),
         "fable" => fable_spec(),
-        "k3" => k3_spec(),
-        "grok" => grok_spec(),
-        _ => security_grok_spec(),
+        config::CHINA_LABEL => china_spec(cfg),
+        _ => grok_spec(),
     }
-}
-
-/// The security reviewer Grok (OpenCode on OpenRouter) as a spec, so the
-/// check calls it through [`ModelSpec::run`] like the others.
-fn security_grok_spec() -> ModelSpec {
-    let mut spec = k3_spec();
-    spec.command_name = SECURITY_GROK_NAME;
-    spec.model = config::GROK_OPENROUTER_MODEL;
-    spec.preflight = Box::new(|cfg, workdir| {
-        executor::opencode_preflight_entry(cfg, &security_grok_entry(), workdir)
-    });
-    spec.run = Box::new(|c| {
-        executor::run_opencode_entry(
-            c.ctx,
-            c.cfg,
-            c.sess,
-            c.prompt,
-            c.effort,
-            c.workdir,
-            &security_grok_entry(),
-            &OpencodeRunOpts::default(),
-            c.log,
-            c.out,
-        )
-    });
-    spec
-}
-
-fn security_grok_entry() -> SecurityModel {
-    config::open_code_entry_for(config::GROK_OPENROUTER_MODEL)
-        .expect("the security registry has the OpenRouter Grok")
-}
-
-/// Where a `.env` credential is looked up: the caller's directory.
-fn cred_workdir(cfg: &Config) -> String {
-    cfg.cwd()
-        .map_or_else(|| ".".to_string(), |p| p.to_string_lossy().into_owned())
 }
 
 impl Runner for SpecRunner {
@@ -909,7 +861,7 @@ impl Runner for SpecRunner {
     }
 
     fn preflight(&self, ctx: &Context, cfg: &Config, t: &Target) -> Result<(), String> {
-        executor::oscmd::with_context(ctx, || (spec_for(t).preflight)(cfg, &cred_workdir(cfg)))
+        executor::oscmd::with_context(ctx, || (spec_for(cfg, t).preflight)(cfg))
             .map_err(|e| format!("{e:#}"))
     }
 
@@ -921,12 +873,8 @@ impl Runner for SpecRunner {
         log: &Path,
         workdir: &str,
     ) -> Result<CallOutcome, String> {
-        let spec = spec_for(t);
-        let effort = if t.name == SECURITY_GROK_NAME {
-            security_grok_entry().variant.to_string()
-        } else {
-            spec.resolve_effort(cfg, CHECK_EFFORT)?
-        };
+        let spec = spec_for(cfg, t);
+        let effort = spec.resolve_effort(cfg, CHECK_EFFORT)?;
         let log = log.to_string_lossy().into_owned();
         let mut sess = check_session(&spec, &effort, workdir, &log);
         if spec.cli == "claude" {
@@ -939,7 +887,6 @@ impl Runner for SpecRunner {
             prompt: CHECK_PROMPT,
             effort: &effort,
             workdir,
-            cred_workdir: &cred_workdir(cfg),
             review: true,
             log: Some(&log),
             out: None,
@@ -952,7 +899,7 @@ impl Runner for SpecRunner {
     }
 
     fn hint(&self, cfg: &Config, t: &Target, log: &Path) -> String {
-        spec_for(t).auth_hint(cfg, &log.to_string_lossy())
+        spec_for(cfg, t).auth_hint(cfg, &log.to_string_lossy())
     }
 }
 

@@ -143,7 +143,6 @@ fn command_mr_review_runs_in_snapshot() {
     let f = f.borrow();
     assert_eq!(f.workdir, s(&mr.snapshot_dir), "run workdir");
     assert!(f.workdir_existed, "the snapshot was gone during the run");
-    assert_eq!(f.cred_workdir, s(caller.path()), "credential workdir");
     assert!(
         f.prompt.contains("Review scope: PINNED-SNAPSHOT-SCOPE"),
         "prompt does not carry the snapshot scope:\n{:.300}",
@@ -180,7 +179,6 @@ fn command_plain_scope_skips_mr_resolver() {
     let f = f.borrow();
     assert_eq!(mr.calls.get(), 0);
     assert_eq!(f.workdir, s(caller.path()));
-    assert_eq!(f.cred_workdir, s(caller.path()));
 }
 
 /// A raw prompt cannot pin an MR checkout, so an MR URL in one is rejected
@@ -327,7 +325,7 @@ fn workdir_then_preflight_order() {
 
     // A failing preflight is a plain error and creates no session.
     let mut spec = fake_spec(&f);
-    spec.preflight = Box::new(|_, _| anyhow::bail!("codex runtime is not installed"));
+    spec.preflight = Box::new(|_| anyhow::bail!("codex runtime is not installed"));
     let wd = tmp();
     let mut stdin = FakeStdin::new("hi");
     let out = with_env(&fix, &mut stdin, &*no_mr(), |env| {
@@ -338,27 +336,6 @@ fn workdir_then_preflight_order() {
         Err(CmdError::plain("codex runtime is not installed"))
     );
     assert!(fix.sessions().is_empty());
-}
-
-#[test]
-fn preflight_gets_the_caller_workdir_for_an_mr_review() {
-    let fix = Fixture::new();
-    let mr = fake_mr();
-    let caller = tmp();
-    let f = fake_run(&json_answer_log());
-    let mut spec = fake_spec(&f);
-    let seen = std::rc::Rc::new(std::cell::RefCell::new(String::new()));
-    let seen2 = std::rc::Rc::clone(&seen);
-    spec.preflight = Box::new(move |_, wd| {
-        *seen2.borrow_mut() = wd.to_string();
-        Ok(())
-    });
-    let mut stdin = FakeStdin::new(&format!("review {TEST_MR_URL}"));
-    let out = with_env(&fix, &mut stdin, &*mr.resolver, |env| {
-        run_model_command(env, &spec, s(caller.path()), true)
-    });
-    out.result.unwrap();
-    assert_eq!(*seen.borrow(), s(caller.path()));
 }
 
 #[test]

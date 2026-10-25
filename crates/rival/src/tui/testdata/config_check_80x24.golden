@@ -14,7 +14,7 @@
 │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                        │|
 │  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s                            │|
 │      Sure! ok.  (not ok)                                                     │|
-│  ✗ k3      direct  moonshotai/kimi-k3        4.0s                            │|
+│  ✗ china   direct  moonshot/kimi-k3.1-pro    4.0s                            │|
 │      limit 429 monthly spend limit reached                                   │|
 │      the account is at its limit; try again after the reset                  │|
 ├──────────────────────────────────────────────────────────────────────────────┤|

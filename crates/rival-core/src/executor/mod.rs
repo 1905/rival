@@ -12,8 +12,6 @@ pub mod claude;
 pub mod claude_docker;
 pub mod codex;
 pub mod grok;
-pub mod kimi;
-pub mod opencode;
 pub mod oscmd;
 pub mod process;
 pub mod quota;
@@ -30,11 +28,6 @@ pub use codex::{
     codex_auth_hint, codex_preflight_for, is_codex_model, run_codex_model, tier_notice,
 };
 pub use grok::{grok_effort, grok_preflight, run_grok, run_grok_model};
-pub use kimi::{kimi_preflight, run_kimi};
-pub use opencode::{
-    OpencodeRunOpts, opencode_preflight_entry, opencode_preflight_model, run_opencode,
-    run_opencode_entry, run_opencode_with,
-};
 pub use process::{LookPathError, look_path};
 pub use quota::is_quota_exhausted;
 pub use subprocess::{PIPE_DRAIN_GRACE, Request, RunResult, run_subprocess, safe_env};

@@ -1,0 +1,51 @@
+{
+  "name": "security-old-opencode",
+  "description": "`rival command security` with scope `src/` on stdin, the leftover `security: reviewer: k3` of the removed K3 in config.yaml, and opencode v1 on PATH. The old key is ignored. The china preflight runs `opencode --version` once and fails on v1. Stdout shows the error plus the china.model hint; stderr shows the bare error; exit code 1. No session is created.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "--version"
+            ],
+            "times": 1,
+            "stdout": "1.4.0\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "fixtures": [
+    {
+      "write": "home/.rival/config.yaml",
+      "text": "security:\n  reviewer: k3\nefforts:\n  kimi-k3: max\n"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 1,
+        "stdout": "china needs opencode v2 or later, found \"1.4.0\". Update: opencode upgrade\n\nSecurity reviews run on china.model (moonshot/kimi-k3.1-pro); change it with: rival config set china.model <provider/model>\n",
+        "stderr_lines": [
+          "china needs opencode v2 or later, found \"1.4.0\". Update: opencode upgrade"
+        ],
+        "log_events": []
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/config.yaml"
+    ],
+    "calls": {
+      "opencode": 1
+    }
+  }
+}

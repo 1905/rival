@@ -20,8 +20,8 @@ struct Seen {
 /// prompt, then fails, so the test needs no valid security output.
 fn security_fake(seen: &RefCell<Seen>) -> SecurityExecutor<'_> {
     SecurityExecutor {
-        preflight: Box::new(|_, _, _| Ok(())),
-        run: Box::new(move |_, _, _, prompt, _, _, _, _| {
+        preflight: Box::new(|_| Ok(())),
+        run: Box::new(move |_, _, _, prompt, _, _, _| {
             seen.borrow_mut().security_prompt = Some(prompt.to_string());
             anyhow::bail!("fake security run")
         }),
@@ -186,7 +186,7 @@ fn preflight_failure_names_the_config_key() {
     let security = security_fake(&seen);
     let spec = |_: &str| {
         let mut spec = fake_spec(&f);
-        spec.preflight = Box::new(|_, _| anyhow::bail!("codex runtime is not installed"));
+        spec.preflight = Box::new(|_| anyhow::bail!("codex runtime is not installed"));
         Some(spec)
     };
     let workdir = tempfile::tempdir().unwrap();

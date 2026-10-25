@@ -16,9 +16,8 @@ use serde_json::{Map, Value as Json, json};
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
-    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, ProxyProvider,
-    SECURITY_REVIEWER_GROK, SECURITY_REVIEWER_K3, SOL_LABEL, SPEED_MODELS, SkillHost, Speed,
-    UserConfig, VALID_EFFORTS,
+    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, ProxyProvider, SOL_LABEL,
+    SPEED_MODELS, SkillHost, Speed, UserConfig, VALID_EFFORTS,
 };
 use rival_core::proxy;
 
@@ -87,7 +86,7 @@ impl Section {
                 .chain([Field::ChinaProvider, Field::ChinaModel])
                 .chain((0..SPEED_MODELS.len()).map(Field::Speed))
                 .collect(),
-            Section::Review => vec![Field::Reviewer, Field::AutoFix],
+            Section::Review => vec![Field::AutoFix],
             Section::Check => Vec::new(),
         }
     }
@@ -106,7 +105,6 @@ pub enum Field {
     Model(usize),
     /// The `skill.<host>` picker: the model `/rival` runs in that host.
     Skill(SkillHost),
-    Reviewer,
     AutoFix,
     /// A row of [`SPEED_MODELS`]: its `speed.<label>` picker.
     Speed(usize),
@@ -130,7 +128,6 @@ impl Field {
             Field::Skill(SkillHost::Codex) => "in Codex",
             Field::ChinaProvider => "provider",
             Field::ChinaModel => "model",
-            Field::Reviewer => "Security reviewer",
             Field::AutoFix => "Auto-fix crit/high",
             Field::Speed(i) => match SPEED_MODELS.get(i).map(|(label, _)| *label) {
                 Some(CODEX_LABEL) => "Codex speed",
@@ -152,7 +149,6 @@ impl Field {
             self,
             Field::ClaudePrefix
                 | Field::CodexPrefix
-                | Field::Reviewer
                 | Field::Model(_)
                 | Field::Skill(_)
                 | Field::Speed(_)
@@ -204,11 +200,10 @@ pub struct ModelInfo {
 }
 
 const GROK_LADDER: [&str; 3] = ["low", "medium", "high"];
-const K3_LADDER: [&str; 1] = ["max"];
 
 /// The window's models, in row order. The names are the
 /// [`config::SKILL_MODEL_NAMES`], so the skill pickers cycle through them.
-pub const MODELS: [ModelInfo; 6] = [
+pub const MODELS: [ModelInfo; 5] = [
     ModelInfo {
         name: CODEX_LABEL,
         effort_label: CODEX_LABEL,
@@ -250,16 +245,6 @@ pub const MODELS: [ModelInfo; 6] = [
         binaries: &["claude", "docker"],
     },
     ModelInfo {
-        name: config::K3_COMMAND_NAME,
-        effort_label: K3_LABEL,
-        display: "Kimi K3",
-        runtime: "OpenCode",
-        provider: None,
-        model: config::KIMI_MODEL,
-        ladder: &K3_LADDER,
-        binaries: &["opencode"],
-    },
-    ModelInfo {
         name: GROK_LABEL,
         effort_label: GROK_LABEL,
         display: "Grok 4.6",
@@ -269,12 +254,6 @@ pub const MODELS: [ModelInfo; 6] = [
         ladder: &GROK_LADDER,
         binaries: &["grok"],
     },
-];
-
-/// The security reviewers the picker offers, with what runs them.
-pub const REVIEWERS: [(&str, &str); 2] = [
-    (SECURITY_REVIEWER_K3, "Kimi K3 through OpenCode"),
-    (SECURITY_REVIEWER_GROK, "Grok 4.6 on OpenRouter"),
 ];
 
 /// Model vendors of Chinese labs, as OpenRouter names them. Their models
@@ -764,10 +743,6 @@ impl ConfigForm {
                     _ => self.draft.proxy.codex.model_prefix = next,
                 }
             }
-            Field::Reviewer => {
-                let names: Vec<String> = REVIEWERS.iter().map(|(n, _)| n.to_string()).collect();
-                self.draft.security.reviewer = cycle(&names, self.reviewer(), delta);
-            }
             Field::Speed(i) => {
                 let (label, _) = SPEED_MODELS.get(i)?;
                 let slot = self.draft.speed.get_mut(label)?;
@@ -829,10 +804,6 @@ impl ConfigForm {
             }
             Field::Model(i) => {
                 let m = MODELS.get(i)?;
-                if m.ladder.len() < 2 {
-                    self.info(&format!("{} runs at {} only", m.display, m.ladder[0]));
-                    return None;
-                }
                 let ladder: Vec<String> = m.ladder.iter().map(|s| s.to_string()).collect();
                 let next = cycle(&ladder, &self.effort(m), delta);
                 self.draft.efforts.insert(m.effort_label.to_string(), next);
@@ -1004,11 +975,6 @@ impl ConfigForm {
             .get(m.effort_label)
             .cloned()
             .unwrap_or_else(|| config::builtin_effort(m.effort_label).to_string())
-    }
-
-    /// The draft's security reviewer.
-    pub fn reviewer(&self) -> &str {
-        effective_reviewer(&self.draft)
     }
 
     /// The draft's `china.model`, or the default.
@@ -1263,7 +1229,7 @@ impl ConfigForm {
         } else {
             Vec::new()
         };
-        let targets = check::targets(&cfg, &names)?;
+        let targets = check::targets(&names)?;
         let (ctx, cancel) = Context::background().with_cancel();
         self.seed.serial += 1;
         self.check.run = self.seed.serial;
@@ -1282,8 +1248,10 @@ impl ConfigForm {
                     route: if proxied { "proxy" } else { "direct" }.to_string(),
                     wire: match (info, provider) {
                         (Some(m), _) => self.wire(m),
-                        (None, Some(p)) if proxied => proxy::wire_id(self.prefix(p), t.model),
-                        _ => t.model.to_string(),
+                        (None, Some(p)) if proxied => {
+                            proxy::wire_id(self.prefix(p), t.model_id(&cfg))
+                        }
+                        _ => t.model_id(&cfg).to_string(),
                     },
                     row: None,
                 }
@@ -1379,8 +1347,8 @@ impl ConfigForm {
     }
 }
 
-/// The difference of `d` from `s` as a patch with dotted keys. Efforts,
-/// the skill models and the reviewer compare by their effective values, so
+/// The difference of `d` from `s` as a patch with dotted keys. Efforts and
+/// the skill models compare by their effective values, so
 /// a default chosen again is no change.
 fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
     let mut p = Map::new();
@@ -1425,9 +1393,6 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
     if china_selector(s) != china_selector(d) {
         p.insert("china.model".into(), json!(china_selector(d)));
     }
-    if effective_reviewer(s) != effective_reviewer(d) {
-        p.insert("security.reviewer".into(), json!(effective_reviewer(d)));
-    }
     if s.auto_fix_critical_high != d.auto_fix_critical_high {
         p.insert(
             "auto_fix_critical_high".into(),
@@ -1449,14 +1414,6 @@ fn edits_of(patch: &Json) -> Result<Vec<Edit>, String> {
 /// The `china.model` of `u`, else the default.
 fn china_selector(u: &UserConfig) -> &str {
     u.china.model_or_default()
-}
-
-/// The configured reviewer, `k3` when unset.
-fn effective_reviewer(u: &UserConfig) -> &str {
-    match u.security.reviewer.trim() {
-        "" => SECURITY_REVIEWER_K3,
-        r => r,
-    }
 }
 
 /// The `/rival` model of `host` in `u`: `skill.<host>` (`opus` is

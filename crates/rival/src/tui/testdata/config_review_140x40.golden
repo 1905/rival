@@ -1,9 +1,9 @@
 ╭─ rival · config ───┬────────────────────────────────────────────────────────────────────────────────────────────── ~/.rival/config.yaml ─╮|
-│                    │  REVIEW   the security review and the skills                                                                        │|
+│                    │  REVIEW   auto-fix and the role prompts                                                                             │|
 │   Proxy            │                                                                                                                     │|
-│   Models           │  ▸ Security reviewer   ‹ k3 › ←→   Kimi K3 through OpenCode                                                         │|
-│ ▸ Review           │                        the model behind rival command security                                                      │|
-│   Check            │    Auto-fix crit/high  ○ off   skills fix confirmed critical/high                                                   │|
+│   Models           │  ▸ Auto-fix crit/high  ○ off   skills fix confirmed critical/high                                                   │|
+│ ▸ Review           │                        medium and low findings are never fixed without asking                                       │|
+│   Check            │    security reviews use moonshot/kimi-k3.1-pro · the /china model                                                   │|
 │                    │                                                                                                                     │|
 │                    │  ROLE PROMPTS   read-only                                                                                           │|
 │                    │    reviewer    29 chars  Review like a staff engineer.                                                              │|
@@ -36,15 +36,15 @@
 │  CHECK   ● online · 6 models                                                                                                             │|
 │  not run yet · c checks the default models on the draft, a every model                                                                   │|
 ├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
-│ tab section  ↑↓ field  ←→ choose  c check  a all  s save  ? help  esc back                                                               │|
+│ tab section  ↑↓ field  space toggle  c check  a all  s save  ? help  esc back                                                            │|
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯|
 -- styles --
 dddgggggdddTTTTTTddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
-d....................d..ggggggddddddddddddddddddddddddddddddddddddd........................................................................d|
+d....................d..ggggggdddddddddddddddddddddddddddddddd.............................................................................d|
 d.ddttttt............d.....................................................................................................................d|
 d.ddtttttt...........d.???????????????????????????????????????????????????????????????????????????????????????????????????????????????????.d|
-dSSSSSSSSSSSSSSSSSSS.d........................ddddddddddddddddddddddddddddddddddddddd......................................................d|
-d.ddttttt............d....dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd...................................................d|
+dSSSSSSSSSSSSSSSSSSS.d........................dddddddddddddddddddddddddddddddddddddddddddddddddddddd.......................................d|
+d.ddttttt............d..dddddddddddddddddddddddttttttttttttttttttttttddddddddddddddddddd...................................................d|
 d....................d.....................................................................................................................d|
 d....................d..DDDDDDDDDDDDdddddddddddd...........................................................................................d|
 d....................d..ttttttttttttttddddddddddddddddddddddddddddddddddddddd..............................................................d|
@@ -77,5 +77,5 @@ dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 d..DDDDD...aaaaaaaaddddddddddd.............................................................................................................d|
 d..ddddddddddddddadddddddddddddddddddddddddddddddddddddddddadddddddddddd...................................................................d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|
-d.aaa.ddddddd..aa.ddddd..aa.dddddd..a.ddddd..a.ddd..a.dddd..a.dddd..aaa.dddd...............................................................d|
+d.aaa.ddddddd..aa.ddddd..aaaaa.dddddd..a.ddddd..a.ddd..a.dddd..a.dddd..aaa.dddd............................................................d|
 dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|

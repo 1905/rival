@@ -463,7 +463,7 @@ fn prepare_target(
     git(ctx, cfg, &dir, &args_of(&["cat-file", "-e", &commit]))
         .map_err(|e| format!("MR base commit is unavailable: {e}"))?;
 
-    // K3 cannot run shell commands. Give every reviewer the actual patch,
+    // Read-only reviewers cannot run shell commands. Give every reviewer the actual patch,
     // including changes from all MR commits, without requiring git access.
     let patch_path = paths::clean(&Path::new(&dir).join(".git").join("rival-mr.diff"));
     let output_arg = format!("--output={}", patch_path.display());

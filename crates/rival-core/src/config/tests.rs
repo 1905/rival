@@ -1,4 +1,4 @@
-//! Config, codex, kimi and security tests, plus golden pins of the prompt
+//! Config and codex tests, plus golden pins of the prompt
 //! texts. Every test builds its own
 //! [`Config`] from an explicit env map; nothing reads or mutates the process
 //! environment or the real `~/.rival`.
@@ -28,15 +28,6 @@ fn efforts(pairs: &[(&str, &str)]) -> UserConfig {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect(),
-        ..UserConfig::default()
-    }
-}
-
-fn reviewer(name: &str) -> UserConfig {
-    UserConfig {
-        security: SecurityConfig {
-            reviewer: name.to_string(),
-        },
         ..UserConfig::default()
     }
 }
@@ -300,18 +291,20 @@ fn engine_label_table() {
         ("claude", "retired-model-id", "retired-model"),
         ("claude", CLAUDE_MODEL, CLAUDE_LABEL),
         ("claude", "", "retired-model"),
-        ("opencode", KIMI_MODEL, K3_LABEL),
+        // The removed K3 and OpenRouter Grok ran on opencode.
+        ("opencode", "moonshotai/kimi-k3", "retired-model"),
+        ("opencode", "x-ai/grok-4.6", "retired-model"),
         ("opencode", "provider/retired-model-id", "retired-model"),
         ("opencode", "", "retired-model"),
         ("grok", GROK_MODEL, GROK_LABEL),
         ("grok", "", GROK_LABEL),
         // The remaining branches.
-        ("opencode", GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         ("fable", "", "retired-model"),
         ("astra", "", "astra"),
         ("custom", "", "custom"),
         ("custom", "custom/model", "retired-model"),
-        ("custom", GROK_OPENROUTER_LABEL, GROK_OPENROUTER_LABEL),
+        ("custom", "grok-4.6-openrouter", "retired-model"),
+        (CHINA_LABEL, CHINA_DEFAULT_MODEL, "kimi-k3.1-pro"),
         // Sol 6.1 and Fable 5.1 are current again; old ids keep their labels.
         ("codex", SOL_MODEL, SOL_LABEL),
         ("codex", "gpt-6.1-sol", "sol"),
@@ -340,16 +333,14 @@ fn model_label_only_exposes_supported_models() {
         (SOL_LABEL, SOL_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
         (CLAUDE_LABEL, CLAUDE_LABEL),
-        (KIMI_MODEL, K3_LABEL),
-        (K3_LABEL, K3_LABEL),
+        ("moonshotai/kimi-k3", "retired-model"),
+        ("kimi-k3", "retired-model"),
         (GROK_MODEL, GROK_LABEL),
         (GROK_LABEL, GROK_LABEL),
         ("custom/model", "retired-model"),
         ("", "retired-model"),
         (CODEX_MODEL, CODEX_LABEL),
         (CODEX_LABEL, CODEX_LABEL),
-        (GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
-        (GROK_OPENROUTER_LABEL, GROK_OPENROUTER_LABEL),
         (SOL_MODEL, SOL_LABEL),
         (FABLE_MODEL, FABLE_LABEL),
         (FABLE_LABEL, FABLE_LABEL),
@@ -422,14 +413,13 @@ fn public_runtime_log_hides_retired_runtime_identities() {
 }
 
 #[test]
-fn public_runtime_log_labels_k3_review_header() {
-    let raw = format!("=== REVIEW FROM opencode ({KIMI_MODEL}) [role: bug_hunter] ===\n");
-    let got = public_runtime_log("opencode", KIMI_MODEL, &raw);
-    let want = format!("=== REVIEW FROM {K3_LABEL} [role: bug_hunter] ===");
-    assert!(
-        got.contains(&want) && !got.contains("opencode") && !got.contains(KIMI_MODEL),
-        "public K3 header = {got:?}, want {want:?}"
+fn public_runtime_log_labels_the_china_model() {
+    let got = public_runtime_log(
+        CHINA_LABEL,
+        CHINA_DEFAULT_MODEL,
+        "Model unavailable: moonshot/kimi-k3.1-pro\n",
     );
+    assert_eq!(got, "Model unavailable: kimi-k3.1-pro\n");
 }
 
 #[test]
@@ -473,11 +463,11 @@ fn public_runtime_error_rewrites_every_runtime_phrase() {
     // Other adapters only get their model ids scrubbed.
     assert_eq!(
         public_runtime_error(
-            "opencode",
-            KIMI_MODEL,
-            "opencode failed on moonshotai/kimi-k3"
+            CHINA_LABEL,
+            CHINA_DEFAULT_MODEL,
+            "opencode failed on moonshot/kimi-k3.1-pro"
         ),
-        "opencode failed on kimi-k3"
+        "opencode failed on kimi-k3.1-pro"
     );
 }
 
@@ -498,11 +488,7 @@ fn replace_ordered_follows_replacer_priority() {
 #[test]
 fn resolve_effort_precedence_and_model_defaults() {
     let config = cfg(&[]);
-    for (model, want) in [
-        (CODEX_MODEL, "xhigh"),
-        (KIMI_MODEL, "max"),
-        (CLAUDE_MODEL, "medium"),
-    ] {
+    for (model, want) in [(CODEX_MODEL, "xhigh"), (CLAUDE_MODEL, "medium")] {
         assert_eq!(
             config.resolve_effort(model, "", "").unwrap(),
             want,
@@ -512,7 +498,6 @@ fn resolve_effort_precedence_and_model_defaults() {
 
     let config = cfg(&[]).with_user_config(Some(efforts(&[
         (GROK_LABEL, "low"),
-        ("kimi-k3", "max"),
         (CLAUDE_LABEL, "high"),
     ])));
     assert_eq!(
@@ -522,10 +507,6 @@ fn resolve_effort_precedence_and_model_defaults() {
     assert_eq!(
         config.resolve_effort(GROK_MODEL, "medium", "low").unwrap(),
         "medium"
-    );
-    assert_eq!(
-        config.resolve_effort(KIMI_MODEL, "low", "low").unwrap(),
-        "max"
     );
 
     let config = cfg(&[]).with_user_config(Some(UserConfig::default()));
@@ -623,7 +604,7 @@ fn grok_is_enumerated_in_effort_model_errors() {
     assert_eq!(
         err.to_string(),
         format!(
-            r#"invalid effort model "mystery" in {}; use one of: codex, sol, kimi-k3, claude, fable, grok"#,
+            r#"invalid effort model "mystery" in {}; use one of: codex, sol, claude, fable, grok"#,
             path.display()
         )
     );
@@ -656,18 +637,19 @@ fn load_user_config_validates_effort_map() {
     let cases = [
         (
             "valid",
-            "efforts:\n  sol: low\n  codex: ultra\n  kimi-k3: max\n  claude: medium\n  fable: high\n",
+            "efforts:\n  sol: low\n  codex: ultra\n  claude: medium\n  fable: high\n",
+            None,
+        ),
+        // The removed K3's key and security block are ignored, any value.
+        (
+            "retired k3 keys",
+            "efforts:\n  sol: low\n  codex: ultra\n  kimi-k3: whatever\n  fable: high\nsecurity:\n  reviewer: k3\n",
             None,
         ),
         (
             "unknown model",
             "efforts:\n  mystery: high\n",
             Some("invalid effort model"),
-        ),
-        (
-            "invalid k3 level",
-            "efforts:\n  kimi-k3: high\n",
-            Some("use one of: max"),
         ),
         ("invalid yaml", "efforts: [", Some("parse ")),
     ];
@@ -706,24 +688,6 @@ fn load_user_config_reports_error_messages() {
             path.display()
         )
     );
-    let (home, config) = loaded("efforts:\n  kimi-k3: high\n");
-    let path = config_path(home.path());
-    assert_eq!(
-        config.user_config_error().unwrap().to_string(),
-        format!(
-            r#"invalid effort "high" for kimi-k3 in {}; use one of: max"#,
-            path.display()
-        )
-    );
-    let (home, config) = loaded("security:\n  reviewer: ' GPT5 '\n");
-    let path = config_path(home.path());
-    assert_eq!(
-        config.user_config_error().unwrap().to_string(),
-        format!(
-            r#"invalid security.reviewer "GPT5" in {}; use one of: k3, grok"#,
-            path.display()
-        )
-    );
     let (home, config) = loaded("efforts: [");
     let path = config_path(home.path());
     let message = config.user_config_error().unwrap().to_string();
@@ -736,23 +700,17 @@ fn load_user_config_reports_error_messages() {
 #[test]
 fn load_user_config_normalizes_values() {
     let (_home, config) = loaded(
-        "claude:\n  subscription: team\nsecurity:\n  reviewer: ' Grok '\nefforts:\n  codex: ' XHigh '\n  grok: LOW\nroles:\n  bug_hunter: hunt\n  empty:\n",
+        "claude:\n  subscription: team\nefforts:\n  codex: ' XHigh '\n  grok: LOW\nroles:\n  bug_hunter: hunt\n  empty:\n",
     );
     assert_eq!(config.user_config_error(), None);
     let user = config.user_config().unwrap();
-    assert_eq!(user.security.reviewer, "grok");
     assert_eq!(user.efforts["codex"], "xhigh");
     assert_eq!(user.efforts["grok"], "low");
     assert_eq!(config.claude_subscription(), "team");
-    assert_eq!(config.configured_security_reviewer(), "grok");
     assert_eq!(config.role_prompt_override("bug_hunter"), Some("hunt"));
     // A null map value decodes into a string as "".
     assert_eq!(config.role_prompt_override("empty"), Some(""));
     assert_eq!(config.role_prompt_override("missing"), None);
-    assert_eq!(
-        config.resolve_security_model().unwrap().name,
-        SECURITY_REVIEWER_GROK
-    );
 }
 
 #[test]
@@ -1001,7 +959,7 @@ fn public_review_header_cases() {
         ),
         (
             "=== REVIEW FROM opencode (kimi-k3) [role: x] ===",
-            "=== REVIEW FROM kimi-k3 [role: x] ===",
+            "=== REVIEW FROM retired-model [role: x] ===",
         ),
         (
             "=== REVIEW FROM (gpt-5.6-sol) [role: x] ===",
@@ -1028,143 +986,6 @@ fn public_review_header_cases() {
     for (line, want) in cases {
         assert_eq!(public_review_header(line), want, "{line:?}");
     }
-}
-
-// ---- kimi tests ----
-
-#[test]
-fn kimi_api_key_from_prefers_env() {
-    let home = tempfile::tempdir().unwrap();
-    fs::write(home.path().join(".env"), "MOONSHOT_API_KEY=file-key\n").unwrap();
-    let config = home_config(
-        home.path(),
-        &[("MOONSHOT_API_KEY", "env-key"), ("KIMI_API", "legacy-key")],
-    );
-    assert_eq!(
-        config.kimi_api_key_from(home.path()),
-        "env-key",
-        "env must win over workdir .env"
-    );
-}
-
-#[test]
-fn kimi_api_key_from_falls_back_to_workdir_env_file() {
-    // HOME bounds the walk so
-    // no real directory above the temp tree is read.
-    let home = tempfile::tempdir().unwrap();
-    let dir = home.path().join("project");
-    let empty = home.path().join("other");
-    fs::create_dir_all(&dir).unwrap();
-    fs::create_dir_all(&empty).unwrap();
-    fs::write(dir.join(".env"), "MOONSHOT_API_KEY=file-key\n").unwrap();
-    let config = home_config(home.path(), &[("MOONSHOT_API_KEY", ""), ("KIMI_API", "")]);
-    assert_eq!(config.kimi_api_key_from(&dir), "file-key");
-    assert_eq!(config.kimi_api_key_from(&empty), "", "no .env");
-}
-
-#[test]
-fn kimi_api_key_from_supports_legacy_env_alias() {
-    let home = tempfile::tempdir().unwrap();
-    let config = home_config(
-        home.path(),
-        &[("MOONSHOT_API_KEY", ""), ("KIMI_API", "legacy-key")],
-    );
-    assert_eq!(config.kimi_api_key_from(home.path()), "legacy-key");
-}
-
-#[test]
-fn opencode_variant_kimi_k3_pins_max() {
-    for effort in ["low", "medium", "high", "xhigh", "ultra", "max", ""] {
-        assert_eq!(opencode_variant(KIMI_MODEL, effort), "max", "{effort:?}");
-    }
-    assert_eq!(opencode_variant(GROK_OPENROUTER_MODEL, "high"), "");
-}
-
-#[test]
-fn kimi_api_key_from_walks_up_to_parent_env_file() {
-    let home = tempfile::tempdir().unwrap();
-    let root = home.path().join("root");
-    let sub = root.join("rival").join("internal");
-    fs::create_dir_all(&sub).unwrap();
-    fs::write(root.join(".env"), "MOONSHOT_API_KEY=parent-key\n").unwrap();
-    let config = home_config(home.path(), &[]);
-    assert_eq!(config.kimi_api_key_from(&sub), "parent-key");
-}
-
-/// A HOME with a trailing separator still bounds the walk: the walked
-/// directory is compared with the cleaned HOME, not the raw value.
-#[test]
-fn dotenv_walk_stops_at_home_with_a_trailing_separator() {
-    let top = tempfile::tempdir().unwrap();
-    let home = top.path().join("home");
-    let project = home.join("p");
-    fs::create_dir_all(&project).unwrap();
-    fs::write(top.path().join(".env"), "MOONSHOT_API_KEY=above-home\n").unwrap();
-    let plain = home.to_str().unwrap().to_string();
-    let slashed = format!("{plain}{}", std::path::MAIN_SEPARATOR);
-    for raw in [plain, slashed] {
-        let config = home_config(Path::new(&raw), &[]);
-        assert_eq!(config.kimi_api_key_from(&project), "", "HOME={raw:?}");
-        assert_eq!(config.kimi_api_key_from(&home), "", "HOME={raw:?}");
-    }
-}
-
-#[test]
-fn dotenv_walk_respects_home_and_root_bounds() {
-    let top = tempfile::tempdir().unwrap();
-    let home = top.path().join("home");
-    let project = home.join("p");
-    fs::create_dir_all(&project).unwrap();
-    // Above HOME: never read.
-    fs::write(top.path().join(".env"), "MOONSHOT_API_KEY=above-home\n").unwrap();
-    let config = home_config(&home, &[]);
-    assert_eq!(config.kimi_api_key_from(&project), "");
-    // HOME itself is read before the walk stops.
-    fs::write(home.join(".env"), "KIMI_API=at-home\n").unwrap();
-    assert_eq!(config.kimi_api_key_from(&project), "at-home");
-
-    // At most 8 directories: workdir plus 7 parents.
-    let deep_root = tempfile::tempdir().unwrap();
-    let mut deep = deep_root.path().to_path_buf();
-    for i in 0..8 {
-        deep.push(format!("d{i}"));
-    }
-    fs::create_dir_all(&deep).unwrap();
-    fs::write(deep_root.path().join(".env"), "MOONSHOT_API_KEY=root-key\n").unwrap();
-    let config = home_config(deep_root.path(), &[]);
-    assert_eq!(
-        config.kimi_api_key_from(&deep),
-        "",
-        "the 9th directory is out of reach"
-    );
-    assert_eq!(
-        config.kimi_api_key_from(deep.parent().unwrap()),
-        "root-key",
-        "8th is read"
-    );
-
-    // A relative workdir resolves against the snapshotted cwd; a bad .env is
-    // skipped, and blank values do not count.
-    fs::write(project.join(".env"), "MOONSHOT_API_KEY='unterminated\n").unwrap();
-    fs::write(
-        home.join(".env"),
-        "MOONSHOT_API_KEY=  \nKIMI_API=' spaced '\n",
-    )
-    .unwrap();
-    let mut env = env_map(&[]);
-    env.insert(
-        paths::HOME_VAR.to_string(),
-        home.to_str().unwrap().to_string(),
-    );
-    let config = Config::new(Paths::from_home(&home), env, Some(home.clone()));
-    assert_eq!(config.kimi_api_key_from(Path::new("p")), "spaced");
-    assert_eq!(config.kimi_api_key_from(Path::new("")), "");
-    let no_cwd = home_config(&home, &[]);
-    assert_eq!(
-        no_cwd.kimi_api_key_from(Path::new("p")),
-        "",
-        "Abs fails without a cwd"
-    );
 }
 
 #[test]
@@ -1251,148 +1072,21 @@ fn fresh_home_without_rival_dir_has_no_config_error() {
     assert!(load_user_config(&home.path().join("dir.yaml")).is_err());
 }
 
-// ---- security tests ----
-
-#[test]
-fn resolve_security_model_defaults_to_k3() {
-    let entry = cfg(&[]).resolve_security_model().unwrap();
-    assert_eq!(entry.name, SECURITY_REVIEWER_K3);
-    assert_eq!(entry.model, KIMI_MODEL);
-    assert_eq!(entry.variant, "max", "its provider exposes no other level");
-    assert_eq!(
-        entry,
-        SecurityModel {
-            name: "k3",
-            model: "moonshotai/kimi-k3",
-            selector: "moonshotai/kimi-k3",
-            provider: "moonshotai",
-            base_url: "",
-            key_env: "MOONSHOT_API_KEY",
-            label: "kimi-k3",
-            variant: "max",
-        }
-    );
-}
-
-#[test]
-fn resolve_security_model_grok() {
-    let entry = cfg(&[])
-        .with_user_config(Some(reviewer(SECURITY_REVIEWER_GROK)))
-        .resolve_security_model()
-        .unwrap();
-    assert_eq!(entry.model, GROK_OPENROUTER_MODEL);
-    // OpenCode splits the -m value at the first slash to pick the provider,
-    // so the selector must name openrouter.
-    assert_eq!(entry.selector, GROK_OPENROUTER_SELECTOR);
-    assert_eq!(entry.key_env, "OPENROUTER_API_KEY");
-    assert_eq!(entry.variant, "xhigh");
-    assert_eq!(entry.provider, "openrouter");
-    assert_eq!(entry.base_url, "https://openrouter.ai/api/v1");
-    assert_eq!(entry.label, GROK_OPENROUTER_LABEL);
-}
-
-#[test]
-fn resolve_security_model_rejects_unknown() {
-    let err = cfg(&[])
-        .with_user_config(Some(reviewer("gpt5")))
-        .resolve_security_model()
-        .expect_err("expected an unknown reviewer to error");
-    for want in security_reviewer_names() {
-        assert!(
-            err.to_string().contains(want),
-            "{err} does not name {want:?}"
-        );
-    }
-    assert_eq!(
-        err.to_string(),
-        r#"invalid security.reviewer "gpt5", must be one of: k3, grok"#
-    );
-    // Trimmed and lowered.
-    let entry = cfg(&[])
-        .with_user_config(Some(reviewer("  GROK ")))
-        .resolve_security_model()
-        .unwrap();
-    assert_eq!(entry.name, SECURITY_REVIEWER_GROK);
-}
-
-#[test]
-fn grok_labels_do_not_collide() {
-    assert_ne!(GROK_OPENROUTER_LABEL, GROK_LABEL);
-    assert_ne!(GROK_OPENROUTER_LABEL, GROK_MODEL);
-}
-
-#[test]
-fn open_code_entry_for_ignores_config() {
-    // A free function cannot consult
-    // the security config at all.
-    let entry = open_code_entry_for(KIMI_MODEL).expect("K3 model not found in the registry");
-    assert_eq!(entry.key_env, "MOONSHOT_API_KEY");
-    assert_eq!(open_code_entry_for("no-such-model"), None);
-    assert_eq!(
-        open_code_entry_for(GROK_OPENROUTER_MODEL).unwrap().name,
-        SECURITY_REVIEWER_GROK
-    );
-}
-
-#[test]
-fn both_groks_normalize_to_their_own_label() {
-    let xai_log = format!("runtime banner from {GROK_MODEL} finished");
-    let got = public_runtime_log(GROK_LABEL, GROK_MODEL, &xai_log);
-    assert!(got.contains(GROK_LABEL), "xAI log did not normalize: {got}");
-    let or_log = format!("runtime banner from {GROK_OPENROUTER_MODEL} finished");
-    let got = public_runtime_log("opencode", GROK_OPENROUTER_MODEL, &or_log);
-    assert!(
-        got.contains(GROK_OPENROUTER_LABEL),
-        "OpenRouter log did not normalize: {got}"
-    );
-    assert_eq!(got, "runtime banner from grok-4.6-openrouter finished");
-    assert_ne!(model_label(GROK_MODEL), model_label(GROK_OPENROUTER_MODEL));
-}
-
-#[test]
-fn k3_key_still_reads_the_legacy_env_alias() {
-    let home = tempfile::tempdir().unwrap();
-    fs::write(home.path().join(".env"), "KIMI_API=from-dotenv\n").unwrap();
-    let config = home_config(home.path(), &[("MOONSHOT_API_KEY", ""), ("KIMI_API", "")]);
-    let entry = open_code_entry_for(KIMI_MODEL).expect("K3 missing from the registry");
-    assert_eq!(
-        config.security_api_key_from(&entry, home.path()),
-        "from-dotenv"
-    );
-}
-
-#[test]
-fn security_api_key_from_reads_the_entry_key() {
-    let home = tempfile::tempdir().unwrap();
-    fs::write(
-        home.path().join(".env"),
-        "OPENROUTER_API_KEY=or-file\nKIMI_API=not-for-grok\n",
-    )
-    .unwrap();
-    let grok = open_code_entry_for(GROK_OPENROUTER_MODEL).unwrap();
-    let config = home_config(home.path(), &[("OPENROUTER_API_KEY", " or-env ")]);
-    assert_eq!(config.security_api_key_from(&grok, home.path()), "or-env");
-    let config = home_config(home.path(), &[]);
-    assert_eq!(config.security_api_key_from(&grok, home.path()), "or-file");
-    assert_eq!(config.security_api_key_from(&grok, Path::new("")), "");
-}
-
 #[test]
 fn runtime_log_normalization_is_idempotent() {
     let cases = [
-        (
-            "openrouter id becomes its label",
-            "opencode",
-            GROK_OPENROUTER_MODEL,
-            GROK_OPENROUTER_LABEL,
-        ),
         (
             "xai id becomes its label",
             GROK_LABEL,
             GROK_MODEL,
             GROK_LABEL,
         ),
-        ("k3 id becomes its label", "opencode", KIMI_MODEL, K3_LABEL),
+        (
+            "china selector becomes its label",
+            CHINA_LABEL,
+            CHINA_DEFAULT_MODEL,
+            "kimi-k3.1-pro",
+        ),
     ];
     for (name, cli, model, want) in cases {
         let raw = format!("banner from {model} done");
@@ -1427,20 +1121,15 @@ fn claude_id_normalizes_to_its_label() {
 
 #[test]
 fn replace_concrete_model_ids_protects_labels() {
-    // An already-normalized OpenRouter label survives a second pass even
-    // though it contains the xAI id.
-    let text = format!("{GROK_OPENROUTER_LABEL} and {GROK_MODEL}");
+    // An already-normalized label survives next to its id.
+    let text = format!("{GROK_LABEL} and {GROK_MODEL}");
     assert_eq!(
         replace_concrete_model_ids(GROK_LABEL, GROK_MODEL, &text),
-        "grok-4.6-openrouter and grok"
+        "grok and grok"
     );
     assert_eq!(
-        replace_concrete_model_ids(
-            "",
-            "",
-            "gpt-6-astra claude-opus-5-5 moonshotai/kimi-k3 x-ai/grok-4.6 gpt-5.6-sol"
-        ),
-        "codex claude kimi-k3 grok-4.6-openrouter sol"
+        replace_concrete_model_ids("", "", "gpt-6-astra claude-opus-5-5 grok-4.6 gpt-5.6-sol"),
+        "codex claude grok sol"
     );
 }
 
@@ -1514,9 +1203,6 @@ fn string_constants_golden() {
         CLAUDE_MODEL,
         SOL_LABEL,
         CLAUDE_LABEL,
-        K3_LABEL,
-        K3_COMMAND_NAME,
-        KIMI_MODEL,
         GROK_MODEL,
         GROK_LABEL,
         CLAUDE_DOCKER_IMAGE,
@@ -1525,12 +1211,6 @@ fn string_constants_golden() {
         DEFAULT_PLAN_EFFORT,
         SESSION_DIR,
         QUEUE_DIR,
-        SECURITY_REVIEWER_K3,
-        SECURITY_REVIEWER_GROK,
-        GROK_OPENROUTER_MODEL,
-        GROK_OPENROUTER_SELECTOR,
-        GROK_OPENROUTER_LABEL,
-        OPENROUTER_BASE_URL,
         CLAUDE_AUTH_SUBSCRIPTION,
         CLAUDE_AUTH_API,
     ];
@@ -1541,9 +1221,6 @@ fn string_constants_golden() {
         "claude-opus-5-5",
         "sol",
         "claude",
-        "kimi-k3",
-        "k3",
-        "moonshotai/kimi-k3",
         "grok-4.6",
         "grok",
         "rival-claude",
@@ -1552,12 +1229,6 @@ fn string_constants_golden() {
         "high",
         ".rival/sessions",
         ".rival/queue",
-        "k3",
-        "grok",
-        "x-ai/grok-4.6",
-        "openrouter/x-ai/grok-4.6",
-        "grok-4.6-openrouter",
-        "https://openrouter.ai/api/v1",
         "subscription",
         "api",
     ];
@@ -2098,7 +1769,6 @@ fn skill_models_take_every_command_model_and_the_opus_alias() {
         (" claude ", "claude"),
         ("Opus", "claude"),
         ("fable", "fable"),
-        ("k3", "k3"),
         ("grok", "grok"),
     ] {
         let (_home, config) = loaded(&format!("skill:\n  claude: {raw:?}\n  codex: {raw:?}\n"));
@@ -2126,7 +1796,7 @@ fn skill_model_rejects_unknown_names() {
         assert_eq!(
             err,
             format!(
-                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, k3, grok"#,
+                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, grok"#,
                 config_path(home.path()).display()
             )
         );

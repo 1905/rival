@@ -1,6 +1,6 @@
 {
   "name": "skill-command",
-  "description": "`rival command skill --host claude|codex` with no config file. Claude Code's /rival runs Sol 6.1 (the skill.claude default), with the fast tier pairs because speed.sol is fast by default. Codex's /rival runs Opus 5.5 (the skill.codex default). Empty input prints the /rival usage, which names no model, and starts nothing. 'security src/' goes to the security review: with no MOONSHOT_API_KEY its preflight fails before any session. An unknown --host is a usage error before stdin is read.",
+  "description": "`rival command skill --host claude|codex` with no config file. Claude Code's /rival runs Sol 6.1 (the skill.claude default), with the fast tier pairs because speed.sol is fast by default. Codex's /rival runs Opus 5.5 (the skill.codex default). Empty input prints the /rival usage, which names no model, and starts nothing. 'security src/' goes to the security review: with no opencode on PATH its china preflight fails before any session. An unknown --host is a usage error before stdin is read.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -70,21 +70,11 @@
             "exit": 0
           }
         ]
-      },
-      "opencode": {
-        "responses": [
-          {
-            "argv_prefix": [],
-            "stderr": "fake must not run\n",
-            "exit": 97
-          }
-        ]
       }
-    }
-  },
-  "env": {
-    "MOONSHOT_API_KEY": null,
-    "KIMI_API": null
+    },
+    "absent": [
+      "opencode"
+    ]
   },
   "steps": [
     {
@@ -173,9 +163,9 @@
       "stdin": "security src/",
       "expect": {
         "exit_code": 1,
-        "stdout": "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it\n\nsecurity.reviewer selects the model; accepted values: k3, grok\n",
+        "stdout": "opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash\n\nSecurity reviews run on china.model (moonshot/kimi-k3.1-pro); change it with: rival config set china.model <provider/model>\n",
         "stderr_lines": [
-          "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
+          "opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash"
         ],
         "log_events": []
       }
@@ -230,8 +220,7 @@
     ],
     "calls": {
       "codex": 2,
-      "claude": 1,
-      "opencode": 0
+      "claude": 1
     }
   }
 }

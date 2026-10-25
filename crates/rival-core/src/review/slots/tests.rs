@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use super::*;
-use crate::config::{GPT56_SOL_MODEL, GROK_LABEL, GROK_MODEL, KIMI_MODEL};
+use crate::config::{CHINA_DEFAULT_MODEL, CHINA_LABEL, GPT56_SOL_MODEL, GROK_LABEL, GROK_MODEL};
 use crate::review::testutil::{config_in, temp_config};
 use crate::session::NewSession;
 
@@ -76,8 +76,8 @@ fn format_skipped_distinguishes_models() {
     assert_eq!(format_skipped(&[]), "none");
     let got = format_skipped(&[
         SkippedCLI {
-            cli: "opencode".into(),
-            model: KIMI_MODEL.into(),
+            cli: CHINA_LABEL.into(),
+            model: CHINA_DEFAULT_MODEL.into(),
             reason: "failed".into(),
         },
         SkippedCLI {
@@ -86,7 +86,7 @@ fn format_skipped_distinguishes_models() {
             reason: "unavailable".into(),
         },
     ]);
-    assert_eq!(got, "kimi-k3: failed; grok: unavailable");
+    assert_eq!(got, "kimi-k3.1-pro: failed; grok: unavailable");
 }
 
 /// `RIVAL_NO_QUEUE` skips the queue; nothing is written to the

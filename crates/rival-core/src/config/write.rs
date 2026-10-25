@@ -28,7 +28,7 @@ pub const HEADER: &str = "# written by rival config; comments are not kept";
 
 /// The key paths `rival config set` accepts. `efforts.<model>` takes any
 /// effort label; the validation checks the label.
-pub const SETTABLE_KEYS: [&str; 15] = [
+pub const SETTABLE_KEYS: [&str; 14] = [
     "proxy.url",
     "proxy.key_file",
     "proxy.claude.enabled",
@@ -37,7 +37,6 @@ pub const SETTABLE_KEYS: [&str; 15] = [
     "proxy.codex.model_prefix",
     "plan.models",
     "efforts.<model>",
-    "security.reviewer",
     "auto_fix_critical_high",
     "speed.<model>",
     "skill.claude",
@@ -97,7 +96,6 @@ fn key_kind(key: &str) -> Result<Kind, ConfigError> {
         | "proxy.key_file"
         | "proxy.claude.model_prefix"
         | "proxy.codex.model_prefix"
-        | "security.reviewer"
         | "skill.claude"
         | "skill.codex"
         | "china.model"
@@ -112,8 +110,15 @@ fn key_kind(key: &str) -> Result<Kind, ConfigError> {
         {
             Kind::Str
         }
+        // The removed K3's effort is read and ignored, never written.
         _ => match key.strip_prefix("efforts.") {
-            Some(label) if !label.is_empty() && !label.contains('.') => Kind::Str,
+            Some(label)
+                if !label.is_empty()
+                    && !label.contains('.')
+                    && label != super::RETIRED_K3_EFFORT =>
+            {
+                Kind::Str
+            }
             _ => {
                 return Err(ConfigError::new(format!(
                     "unknown config key {:?}; use one of: {}",

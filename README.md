@@ -33,8 +33,8 @@ By default, each host gets a review from the other vendor: `/rival` in Claude
 Code runs Sol 6.1, and `/rival` in Codex runs Opus 5.5. To pick the models,
 open the config window (`rival config`, Models), or run
 `rival config set skill.claude <model>` and `rival config set skill.codex <model>`.
-The models are `codex`, `sol`, `claude`, `fable`, `k3` and `grok`. The security
-review uses the model in `security.reviewer`.
+The models are `codex`, `sol`, `claude`, `fable` and `grok`. The security
+review uses the `/china` model (`china.model`, below).
 
 Codex (GPT-6 Astra) and Sol 6.1 run at the Codex fast tier by default:
 about 2x speed, using more of the plan's quota. To change it, set
@@ -74,6 +74,11 @@ key and strips `MOONSHOT_*` variables from the child.
 `xhigh`/`ultra` → max. The default is max. Reviews run read-only, and the
 reviewed repository's own opencode config is ignored. Raw prompts can edit
 files in the workdir. The command behind the skill is `rival command china`.
+
+The same model runs the security review (`/rival security`,
+`rival command security`) at max effort. Kimi K3 (`rival command k3`,
+`rival run k3`, `efforts.kimi-k3`) and the `security.reviewer` key are
+removed. An old config that still has them loads, and Rival ignores them.
 
 ## View the results
 

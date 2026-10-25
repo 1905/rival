@@ -1,14 +1,15 @@
 //! `rival command security`, plus the `command_security_action` branches with
-//! a fake opencode adapter. No provider runs; `--which` looks up a
-//! never-executed `opencode` stub on a private PATH.
+//! a fake china adapter. No provider runs; `--which` runs an `opencode` stub
+//! on a private PATH that only answers `--version`.
 
 use super::*;
 
 use std::cell::RefCell;
 use std::io;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
-use rival_core::config::{K3_LABEL, KIMI_MODEL, WHOLE_PROJECT};
+use rival_core::config::{CHINA_DEFAULT_MODEL, CHINA_LABEL, WHOLE_PROJECT};
 
 use crate::testutil::{
     CLOSED_HANDLE, FakeStdin, Fixture, NO_SUCH_FILE, TEST_MR_URL, closed_handle_error, execute,
@@ -130,8 +131,12 @@ fn tool_output_then_prose() -> String {
 
 #[test]
 fn security_parses_final_answer_not_tool_output() {
-    let (out, err) =
-        format_security_output(&tool_output_then_prose(), KIMI_MODEL, "src/", "/tmp/x.log");
+    let (out, err) = format_security_output(
+        &tool_output_then_prose(),
+        CHINA_DEFAULT_MODEL,
+        "src/",
+        "/tmp/x.log",
+    );
     assert!(
         err.is_err(),
         "tool output accepted as the security review:\n{out}"
@@ -161,7 +166,6 @@ struct Fake {
     prompt: String,
     variant: String,
     workdir: String,
-    entry_name: String,
     status_during_run: String,
     /// What the repair call writes to its log; `None` writes nothing.
     repair_reply: Option<String>,
@@ -173,7 +177,7 @@ struct Fake {
 
 fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
     SecurityExecutor {
-        preflight: Box::new(move |_, _, _| {
+        preflight: Box::new(move |_| {
             let mut f = f.borrow_mut();
             f.preflight_calls += 1;
             match &f.preflight_error {
@@ -181,59 +185,56 @@ fn fake_executor(f: &RefCell<Fake>) -> SecurityExecutor<'_> {
                 None => Ok(()),
             }
         }),
-        run: Box::new(
-            move |ctx, cfg, sess, prompt, variant, workdir, entry, log| {
-                let mut f = f.borrow_mut();
-                if let Some(log) = log {
-                    f.repair_calls += 1;
-                    f.repair_prompt = prompt.to_string();
-                    f.repair_variant = variant.to_string();
-                    f.status_during_repair = sess.status.clone();
-                    if let Some(reply) = &f.repair_reply {
-                        std::fs::write(log, reply)?;
-                    }
-                    return Ok(RunResult {
-                        exit_code: 0,
-                        output_bytes: 0,
-                        output_lines: 0,
-                    });
+        run: Box::new(move |ctx, cfg, sess, prompt, variant, workdir, log| {
+            let mut f = f.borrow_mut();
+            if let Some(log) = log {
+                f.repair_calls += 1;
+                f.repair_prompt = prompt.to_string();
+                f.repair_variant = variant.to_string();
+                f.status_during_repair = sess.status.clone();
+                if let Some(reply) = &f.repair_reply {
+                    std::fs::write(log, reply)?;
                 }
-                f.run_calls += 1;
-                f.prompt = prompt.to_string();
-                f.variant = variant.to_string();
-                f.workdir = workdir.to_string();
-                f.entry_name = entry.name.to_string();
-                f.status_during_run = sess.status.clone();
-                if f.wait_for_cancel {
-                    let deadline = Instant::now() + Duration::from_secs(10);
-                    while ctx.err().is_none() && Instant::now() < deadline {
-                        std::thread::sleep(Duration::from_millis(5));
-                    }
+                return Ok(RunResult {
+                    exit_code: 0,
+                    output_bytes: 0,
+                    output_lines: 0,
+                });
+            }
+            f.run_calls += 1;
+            f.prompt = prompt.to_string();
+            f.variant = variant.to_string();
+            f.workdir = workdir.to_string();
+            f.status_during_run = sess.status.clone();
+            if f.wait_for_cancel {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                while ctx.err().is_none() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(5));
                 }
-                if let Some(e) = &f.run_error {
-                    anyhow::bail!("{e}");
-                }
-                if let Some(log) = &f.log {
-                    std::fs::write(&sess.log_file, log)?;
-                }
-                // Only the Unix-only save-failure test sets it.
-                #[cfg(unix)]
-                if f.lock_sessions {
-                    use std::os::unix::fs::PermissionsExt;
-                    std::fs::set_permissions(
-                        cfg.paths().sessions_dir(),
-                        std::fs::Permissions::from_mode(0o500),
-                    )?;
-                }
-                #[cfg(not(unix))]
-                let _ = (f.lock_sessions, cfg);
-                Ok(RunResult {
-                    exit_code: f.exit_code,
-                    output_bytes: f.log.as_ref().map_or(0, |l| l.len() as i64),
-                    output_lines: 1,
-                })
-            },
-        ),
+            }
+            if let Some(e) = &f.run_error {
+                anyhow::bail!("{e}");
+            }
+            if let Some(log) = &f.log {
+                std::fs::write(&sess.log_file, log)?;
+            }
+            // Only the Unix-only save-failure test sets it.
+            #[cfg(unix)]
+            if f.lock_sessions {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(
+                    cfg.paths().sessions_dir(),
+                    std::fs::Permissions::from_mode(0o500),
+                )?;
+            }
+            #[cfg(not(unix))]
+            let _ = (f.lock_sessions, cfg);
+            Ok(RunResult {
+                exit_code: f.exit_code,
+                output_bytes: f.log.as_ref().map_or(0, |l| l.len() as i64),
+                output_lines: 1,
+            })
+        }),
     }
 }
 
@@ -289,16 +290,17 @@ fn successful_review_prints_it_and_completes_the_session() {
     let sessions = fix.sessions();
     assert_eq!(sessions.len(), 1);
     let sess = &sessions[0];
-    let (want, valid) = format_security_output(GOOD_LOG, KIMI_MODEL, "src/api/", &sess.log_file);
+    let (want, valid) =
+        format_security_output(GOOD_LOG, CHINA_DEFAULT_MODEL, "src/api/", &sess.log_file);
     assert!(valid.is_ok());
     assert_eq!(r.stdout, want);
     assert!(r.stdout.contains("RIVAL SECURITY REVIEW"), "{}", r.stdout);
 
     assert_eq!(sess.status, "completed");
     assert_eq!(sess.exit_code, Some(0));
-    assert_eq!(sess.cli, "opencode");
+    assert_eq!(sess.cli, CHINA_LABEL);
     assert_eq!(sess.mode, "security");
-    assert_eq!(sess.model, KIMI_MODEL);
+    assert_eq!(sess.model, CHINA_DEFAULT_MODEL);
     assert_eq!(sess.effort, "max");
     assert_eq!(sess.review_scope, "src/api/");
     assert_eq!(sess.work_dir, w);
@@ -310,25 +312,27 @@ fn successful_review_prints_it_and_completes_the_session() {
     assert_eq!(f.run_calls, 1);
     assert_eq!(f.variant, "max");
     assert_eq!(f.workdir, w);
-    assert_eq!(f.entry_name, "k3");
     assert_eq!(f.status_during_run, "running");
     let (prompt, _) = security_scope_and_prompt(&fix.cfg, "src/api/", &w);
     assert_eq!(f.prompt, prompt);
 }
 
 #[test]
-fn configured_grok_runs_the_grok_entry() {
-    let fix = Fixture::with_config_yaml("security:\n  reviewer: GROK\n");
+fn the_configured_china_model_runs_the_review() {
+    // A leftover security.reviewer from the removed K3 is ignored.
+    let fix = Fixture::with_config_yaml(
+        "security:\n  reviewer: grok\nchina:\n  model: openrouter/z-ai/glm-5.3\n",
+    );
     let dir = tempfile::tempdir().unwrap();
     let f = good_fake();
     let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
     assert_eq!(r.result, Ok(()));
-    let f = f.borrow();
-    assert_eq!(f.entry_name, "grok");
-    assert_eq!(f.variant, "xhigh");
+    assert_eq!(f.borrow().variant, "max");
     let sess = &fix.sessions()[0];
-    assert_eq!(sess.effort, "xhigh");
-    assert_eq!(sess.model, "x-ai/grok-4.6");
+    assert_eq!(sess.cli, CHINA_LABEL);
+    assert_eq!(sess.effort, "max");
+    assert_eq!(sess.model, "openrouter/z-ai/glm-5.3");
+    assert!(r.stdout.contains("Model: glm-5.3"), "{}", r.stdout);
 }
 
 #[test]
@@ -395,29 +399,23 @@ fn read_errors_and_mr_scopes_fail_plainly_before_preflight() {
     assert!(fix.sessions().is_empty());
 }
 
+/// The china preflight error for opencode v1.
+const OLD_OPENCODE: &str =
+    "china needs opencode v2 or later, found \"1.4.0\". Update: opencode upgrade";
+/// The hint a failed preflight prints after its error.
+const CHINA_HINT: &str = "\n\nSecurity reviews run on china.model (moonshot/kimi-k3.1-pro); change it with: rival config set china.model <provider/model>\n";
+
 #[test]
 fn preflight_failure_prints_a_hint_and_starts_nothing() {
     let fix = Fixture::new();
     let dir = tempfile::tempdir().unwrap();
     let f = RefCell::new(Fake {
-        preflight_error: Some(
-            "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
-                .into(),
-        ),
+        preflight_error: Some(OLD_OPENCODE.into()),
         ..Fake::default()
     });
     let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
-    assert_eq!(
-        r.result,
-        Err(CmdError::exit(
-            1,
-            "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
-        ))
-    );
-    assert_eq!(
-        r.stdout,
-        "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it\n\nsecurity.reviewer selects the model; accepted values: k3, grok\n"
-    );
+    assert_eq!(r.result, Err(CmdError::exit(1, OLD_OPENCODE)));
+    assert_eq!(r.stdout, format!("{OLD_OPENCODE}{CHINA_HINT}"));
     assert_eq!(f.borrow().run_calls, 0);
     assert!(fix.sessions().is_empty());
 }
@@ -455,7 +453,7 @@ fn run_timeout_is_recorded_as_the_reason() {
     assert_eq!(r.result, Err(CmdError::plain("signal: killed")));
     assert_eq!(
         fix.sessions()[0].error_msg,
-        format!("{K3_LABEL} run timeout after 50ms (RIVAL_RUN_TIMEOUT) — model did not finish")
+        "kimi-k3.1-pro run timeout after 50ms (RIVAL_RUN_TIMEOUT) — model did not finish"
     );
 }
 
@@ -472,13 +470,16 @@ fn nonzero_exit_prints_the_log_and_keeps_the_code() {
     let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
     assert_eq!(
         r.result,
-        Err(CmdError::exit(3, "kimi-k3 exited with code 3"))
+        Err(CmdError::exit(3, "kimi-k3.1-pro exited with code 3"))
     );
-    assert_eq!(r.stdout, public_runtime_log("opencode", KIMI_MODEL, log));
+    assert_eq!(
+        r.stdout,
+        public_runtime_log(CHINA_LABEL, CHINA_DEFAULT_MODEL, log)
+    );
     let sess = &fix.sessions()[0];
     assert_eq!(sess.status, "failed");
     assert_eq!(sess.exit_code, Some(3));
-    assert_eq!(sess.error_msg, "kimi-k3 exited with code 3");
+    assert_eq!(sess.error_msg, "kimi-k3.1-pro exited with code 3");
 }
 
 #[test]
@@ -496,7 +497,8 @@ fn unusable_output_prints_it_and_fails() {
         let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
         let sessions = fix.sessions();
         let sess = sessions.iter().find(|s| s.status != "completed").unwrap();
-        let (want, valid) = format_security_output(&log, KIMI_MODEL, "src/", &sess.log_file);
+        let (want, valid) =
+            format_security_output(&log, CHINA_DEFAULT_MODEL, "src/", &sess.log_file);
         let reason = format!("{:#}", valid.unwrap_err());
         assert_eq!(r.stdout, want);
         assert!(want.contains("UNUSABLE OUTPUT"), "{want}");
@@ -619,13 +621,18 @@ fn stdout_write_error_leaves_the_session_interrupted() {
 
 // ---- --which ----
 
-/// A PATH dir holding a never-executed `opencode` stub.
+/// A PATH dir holding an `opencode` stub that prints `version` for
+/// `--version` and fails anything else.
 #[cfg(unix)]
-fn opencode_stub() -> tempfile::TempDir {
+fn opencode_stub(version: &str) -> tempfile::TempDir {
     use std::os::unix::fs::PermissionsExt;
     let bin = tempfile::tempdir().unwrap();
     let stub = bin.path().join("opencode");
-    std::fs::write(&stub, "#!/bin/sh\nexit 97\n").unwrap();
+    std::fs::write(
+        &stub,
+        format!("#!/bin/sh\n[ \"$1\" = --version ] || exit 97\necho '{version}'\n"),
+    )
+    .unwrap();
     std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
     bin
 }
@@ -657,24 +664,17 @@ fn run_which(fix: &Fixture, workdir: &str) -> Run {
 #[cfg(unix)]
 #[test]
 fn which_reports_a_ready_default_model() {
-    let bin = opencode_stub();
-    let fix = Fixture::with(
-        &[
-            ("PATH", bin.path().to_str().unwrap()),
-            ("MOONSHOT_API_KEY", "sk-test"),
-        ],
-        None,
-    );
+    let bin = opencode_stub("opencode v2.1.4");
+    let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
     let dir = tempfile::tempdir().unwrap();
     let r = run_which(&fix, &s(dir.path()));
     assert_eq!(r.result, Ok(()));
     assert_eq!(
         r.stdout,
-        "Security reviewer: k3 (moonshotai/kimi-k3 via moonshotai)\n\
-         Config: security.reviewer = unset (default)\n\
-         OpenCode selector: moonshotai/kimi-k3\n\
-         Reasoning variant: max\n\
-         MOONSHOT_API_KEY: set\n\
+        "Security reviewer: china (kimi-k3.1-pro)\n\
+         Config: china.model = moonshot/kimi-k3.1-pro (default)\n\
+         Reasoning effort: max\n\
+         Auth: opencode's own (opencode auth login or its config)\n\
          \n\
          Ready.\n"
     );
@@ -684,51 +684,36 @@ fn which_reports_a_ready_default_model() {
 
 #[cfg(unix)]
 #[test]
-fn which_shows_the_validated_configured_value() {
-    // Config loading lowercases a valid security.reviewer, so "GROK" shows
-    // as "grok".
-    let bin = opencode_stub();
+fn which_shows_the_configured_model() {
+    let bin = opencode_stub("2.1.4");
     let fix = Fixture::with_config_and_env(
-        "security:\n  reviewer: GROK\n",
-        &[
-            ("PATH", bin.path().to_str().unwrap()),
-            ("OPENROUTER_API_KEY", "sk-or"),
-        ],
+        "china:\n  model: openrouter/z-ai/glm-5.3\n",
+        &[("PATH", bin.path().to_str().unwrap())],
     );
     let dir = tempfile::tempdir().unwrap();
     let r = run_which(&fix, &s(dir.path()));
     assert_eq!(r.result, Ok(()));
-    assert_eq!(
-        r.stdout,
-        "Security reviewer: grok (x-ai/grok-4.6 via openrouter)\n\
-         Config: security.reviewer = grok\n\
-         OpenCode selector: openrouter/x-ai/grok-4.6\n\
-         Reasoning variant: xhigh\n\
-         OPENROUTER_API_KEY: set\n\
-         \n\
-         Ready.\n"
+    assert!(
+        r.stdout.starts_with(
+            "Security reviewer: china (glm-5.3)\n\
+             Config: china.model = openrouter/z-ai/glm-5.3 (file)\n"
+        ),
+        "{}",
+        r.stdout
     );
 }
 
 #[cfg(unix)]
 #[test]
-fn which_reports_a_missing_key_only_through_the_error() {
-    let bin = opencode_stub();
+fn which_reports_an_old_opencode_only_through_the_error() {
+    let bin = opencode_stub("1.4.0");
     let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
     let dir = tempfile::tempdir().unwrap();
     let r = run_which(&fix, &s(dir.path()));
-    assert_eq!(
-        r.result,
-        Err(CmdError::exit(
-            1,
-            format!(
-                "model {K3_LABEL} requires MOONSHOT_API_KEY — add it to the project .env or export it"
-            )
-        ))
-    );
+    assert_eq!(r.result, Err(CmdError::exit(1, OLD_OPENCODE)));
     assert!(
         r.stdout
-            .ends_with("Reasoning variant: max\nMOONSHOT_API_KEY: MISSING\n\nNot usable.\n"),
+            .ends_with("Reasoning effort: max\nAuth: opencode's own (opencode auth login or its config)\n\nNot usable.\n"),
         "{}",
         r.stdout
     );
@@ -736,15 +721,9 @@ fn which_reports_a_missing_key_only_through_the_error() {
 }
 
 #[test]
-fn which_reports_a_missing_binary_even_with_a_key() {
+fn which_reports_a_missing_binary() {
     let empty = tempfile::tempdir().unwrap();
-    let fix = Fixture::with_config_and_env(
-        "security:\n  reviewer: grok\n",
-        &[
-            ("PATH", empty.path().to_str().unwrap()),
-            ("OPENROUTER_API_KEY", "sk-or"),
-        ],
-    );
+    let fix = Fixture::with(&[("PATH", empty.path().to_str().unwrap())], None);
     let dir = tempfile::tempdir().unwrap();
     let r = run_which(&fix, &s(dir.path()));
     assert_eq!(
@@ -754,16 +733,7 @@ fn which_reports_a_missing_binary_even_with_a_key() {
             "opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash"
         ))
     );
-    assert_eq!(
-        r.stdout,
-        "Security reviewer: grok (x-ai/grok-4.6 via openrouter)\n\
-         Config: security.reviewer = grok\n\
-         OpenCode selector: openrouter/x-ai/grok-4.6\n\
-         Reasoning variant: xhigh\n\
-         OPENROUTER_API_KEY: set\n\
-         \n\
-         Not usable.\n"
-    );
+    assert!(r.stdout.ends_with("\nNot usable.\n"), "{}", r.stdout);
 }
 
 // ---- Through the root ----
@@ -797,7 +767,13 @@ fn root_which_prints_its_error_once() {
 #[test]
 fn root_preflight_failure_prints_hint_on_stdout_and_error_on_stderr() {
     let empty = tempfile::tempdir().unwrap();
-    let fix = Fixture::with(&[("PATH", empty.path().to_str().unwrap())], None);
+    // A leftover security.reviewer from the removed K3 no longer fails the
+    // config check.
+    let fix = Fixture::with_config_and_env(
+        "security:\n  reviewer: gpt\n",
+        &[("PATH", empty.path().to_str().unwrap())],
+    );
+    assert_eq!(fix.cfg.user_config_error(), None);
     let dir = tempfile::tempdir().unwrap();
     let (code, stdout, stderr) = execute(
         &fix,
@@ -806,33 +782,9 @@ fn root_preflight_failure_prints_hint_on_stdout_and_error_on_stderr() {
     );
     let err = "opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash";
     assert_eq!(code, 1);
-    assert_eq!(
-        stdout,
-        format!("{err}\n\nsecurity.reviewer selects the model; accepted values: k3, grok\n")
-    );
+    assert_eq!(stdout, format!("{err}{CHINA_HINT}"));
     assert_eq!(stderr, format!("{err}\n"));
     assert!(fix.sessions().is_empty());
-}
-
-#[test]
-fn root_invalid_reviewer_is_caught_by_the_pre_run_first() {
-    // The root's config check runs before the action, so the action's own
-    // stderr line never prints through the root.
-    let fix = Fixture::with_config_yaml("security:\n  reviewer: gpt\n");
-    let pre_run = fix.cfg.user_config_error().unwrap().to_string();
-    assert!(
-        pre_run.contains("invalid security.reviewer \"gpt\""),
-        "{pre_run}"
-    );
-    let dir = tempfile::tempdir().unwrap();
-    let (code, stdout, stderr) = execute(
-        &fix,
-        &mut FakeStdin::new("src/"),
-        &["command", "security", "--workdir", &s(dir.path())],
-    );
-    assert_eq!(code, 1);
-    assert_eq!(stdout, "");
-    assert_eq!(stderr, format!("{pre_run}\n"));
 }
 
 // ---- the language pass ----
@@ -859,8 +811,8 @@ fn a_flagged_security_review_is_repaired_by_the_same_model() {
     let f = f.borrow();
     assert_eq!(f.run_calls, 1);
     assert_eq!(f.repair_calls, 1);
-    // K3 has one level only.
-    assert_eq!(f.repair_variant, "max");
+    assert_eq!(f.variant, "max");
+    assert_eq!(f.repair_variant, "low");
     assert_eq!(f.status_during_repair, "running");
     assert!(f.repair_prompt.contains(FLAGGED_REVIEW));
     let sess = &fix.sessions()[0];
@@ -868,19 +820,6 @@ fn a_flagged_security_review_is_repaired_by_the_same_model() {
     let log = std::fs::read_to_string(&sess.log_file).unwrap();
     assert!(log.ends_with(&format!("\n{REPAIRED_REVIEW}\n")), "{log}");
     assert!(!log.contains("## Task: Edit the wording"), "{log}");
-}
-
-#[test]
-fn grok_repairs_at_low_effort() {
-    use crate::testutil::REPAIRED_REVIEW;
-    let fix = Fixture::with_config_yaml("security:\n  reviewer: grok\n");
-    let dir = tempfile::tempdir().unwrap();
-    let f = flagged_fake(Some(REPAIRED_REVIEW));
-    let r = run_security(&fix, &mut FakeStdin::new("src/"), opts(&s(dir.path())), &f);
-    assert_eq!(r.result, Ok(()));
-    let f = f.borrow();
-    assert_eq!(f.variant, "xhigh");
-    assert_eq!(f.repair_variant, "low");
 }
 
 #[test]

@@ -8,9 +8,9 @@ use std::io::BufRead;
 
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
-    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, K3_LABEL, PROXY_KEY_ENV,
-    PROXY_KEY_MISSING, PROXY_URL_ENV, ProxyKeySource, ProxyRoute, Route, SECURITY_REVIEWER_K3,
-    SOL_LABEL, SkillHost, Speed,
+    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, PROXY_KEY_ENV,
+    PROXY_KEY_MISSING, PROXY_URL_ENV, ProxyKeySource, ProxyRoute, Route, SOL_LABEL, SkillHost,
+    Speed,
 };
 use rival_core::proxy;
 use serde_json::{Value as Json, json};
@@ -23,12 +23,11 @@ use crate::tree::Invocation;
 mod tests;
 
 /// The effort labels `show` lists, in this order.
-const EFFORT_LABELS: [&str; 6] = [
+const EFFORT_LABELS: [&str; 5] = [
     CODEX_LABEL,
     SOL_LABEL,
     CLAUDE_LABEL,
     FABLE_LABEL,
-    K3_LABEL,
     GROK_LABEL,
 ];
 
@@ -166,12 +165,6 @@ fn rows(cfg: &Config) -> Result<Vec<Row>, CmdError> {
             None => Row::new(&key, json!(config::builtin_effort(label)), "default"),
         });
     }
-    let reviewer = cfg.configured_security_reviewer();
-    rows.push(if reviewer.is_empty() {
-        Row::new("security.reviewer", json!(SECURITY_REVIEWER_K3), "default")
-    } else {
-        Row::new("security.reviewer", json!(reviewer), "file")
-    });
     for host in SkillHost::ALL {
         let source = if cfg.skill_model_configured(host) {
             "file"
@@ -427,7 +420,7 @@ pub fn check_action(env: &mut CmdEnv<'_>, inv: &Invocation) -> Result<(), CmdErr
     } else {
         env.cfg
     };
-    let targets = check::targets(cfg, &inv.strings("model")).map_err(CmdError::plain)?;
+    let targets = check::targets(&inv.strings("model")).map_err(CmdError::plain)?;
     let (ctx, _signals) = env.signal_context()?;
     let as_json = inv.bool("json");
     let out = std::sync::Mutex::new(&mut *env.stdout);

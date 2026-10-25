@@ -1,8 +1,8 @@
 //! What differs per model between the `command` and `run` surfaces, plus
 //! the usage texts.
 //!
-//! The executor signatures are not uniform: grok takes a review flag, K3
-//! takes no effort, and the others take effort but no flag. Each adapter
+//! The executor signatures are not uniform: grok takes a review flag, and
+//! the others take effort but no flag. Each adapter
 //! below absorbs that difference so both workflows can call one shape.
 
 use std::path::Path;
@@ -72,18 +72,6 @@ Reasoning effort (-re): low, medium, high (levels above high clamp to high).
 Omitted uses efforts.grok from ~/.rival/config.yaml (built-in: high).
 Review mode runs read-only sandboxed; raw prompts can edit files in the workdir.";
 
-pub const K3_USAGE: &str = "Usage:
-  echo 'explain the auth flow' | rival command k3
-  echo 'review' | rival command k3
-  echo 'review src/api/' | rival command k3
-  rival command k3 < prompt.txt
-
-Note: k3 runs Kimi K3 (moonshotai/kimi-k3 via opencode), a thinking-only model
-pinned to max reasoning — the -re flag accepts low|medium|high|xhigh|ultra|max
-and ignores the value. Needs MOONSHOT_API_KEY in the project .env (or exported).
-Review mode runs read-only sandboxed (same profile as the other reviewers);
-raw prompts run full auto and can edit files and run commands in the workdir.";
-
 pub const CHINA_USAGE: &str = "Usage:
   /china 'explain the auth flow' — run any prompt with the China model
   /china -re high 'find bugs in src/main.rs' — run with a lower reasoning effort
@@ -116,7 +104,7 @@ in ~/.rival/config.yaml. Pick it in rival config (Models), or run:
   rival config set skill.claude <model>
 Reasoning effort (-re): low, medium, high, xhigh, ultra.
 Omitted uses efforts.<model> from ~/.rival/config.yaml.
-The security review model comes from security.reviewer.";
+Security reviews run on china.model, the /china model.";
 
 /// One provider run, as the workflows hand it to [`ModelSpec::run`].
 pub struct RunCall<'a, 'm> {
@@ -127,10 +115,6 @@ pub struct RunCall<'a, 'm> {
     pub effort: &'a str,
     /// Where the provider runs.
     pub workdir: &'a str,
-    /// The caller's project, where a `.env` credential is looked up. It
-    /// differs from `workdir` only for a GitLab MR review in a temporary
-    /// checkout.
-    pub cred_workdir: &'a str,
     /// Whether the run is a review, so grok can apply its sandbox.
     pub review: bool,
     /// The file that gets the provider output; `None` is the session log.
@@ -139,17 +123,16 @@ pub struct RunCall<'a, 'm> {
     pub out: Mirror<'m>,
 }
 
-pub type PreflightFn = Box<dyn Fn(&Config, &str) -> anyhow::Result<()>>;
+pub type PreflightFn = Box<dyn Fn(&Config) -> anyhow::Result<()>>;
 pub type RunFn = Box<dyn Fn(RunCall<'_, '_>) -> anyhow::Result<RunResult>>;
 
 /// One model's command and run surfaces. It carries only
 /// what genuinely differs per model. Anything a single model needs stays an
 /// explicit branch in the workflows, keyed on `command_name`.
 pub struct ModelSpec {
-    /// The command word: codex, sol, claude, fable, k3, or grok. For K3 this
-    /// is NOT the display label, which is kimi-k3.
+    /// The command word: codex, sol, claude, fable, china, or grok.
     pub command_name: &'static str,
-    /// The adapter recorded on the session: codex, claude, opencode, or the
+    /// The adapter recorded on the session: codex, claude, or the china or
     /// grok label.
     pub cli: &'static str,
     /// The concrete model id. The display and error label is always
@@ -157,7 +140,7 @@ pub struct ModelSpec {
     pub model: &'static str,
     pub usage: &'static str,
     pub parse: fn(&str) -> anyhow::Result<ParseResult>,
-    /// Verifies the runtime is usable. Only K3 needs the workdir.
+    /// Verifies the runtime is usable.
     pub preflight: PreflightFn,
     /// Invokes the provider.
     pub run: RunFn,
@@ -169,12 +152,9 @@ impl ModelSpec {
         config::engine_label(self.cli, self.model)
     }
 
-    /// K3 is pinned to the only level its provider
-    /// supports; grok clamps the shared ladder onto its own shorter menu.
+    /// china maps the ladder onto its provider's menu; grok clamps it onto
+    /// its own shorter menu.
     pub fn resolve_effort(&self, cfg: &Config, requested: &str) -> Result<String, String> {
-        if self.command_name == config::K3_COMMAND_NAME {
-            return Ok("max".to_string());
-        }
         if self.command_name == config::CHINA_LABEL {
             return executor::china_effort(requested)
                 .map(str::to_string)
@@ -235,7 +215,7 @@ fn codex_runtime_spec(
         model,
         usage,
         parse: parser::parse_codex_args,
-        preflight: Box::new(move |cfg, _| executor::codex_preflight_for(cfg, model)),
+        preflight: Box::new(move |cfg| executor::codex_preflight_for(cfg, model)),
         run: Box::new(move |c| {
             executor::run_codex_model(
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.log, c.out,
@@ -264,35 +244,10 @@ fn claude_runtime_spec(
         model,
         usage,
         parse: parser::parse_claude_args,
-        preflight: Box::new(move |cfg, _| executor::claude_preflight_model(cfg, model)),
+        preflight: Box::new(move |cfg| executor::claude_preflight_model(cfg, model)),
         run: Box::new(move |c| {
             executor::run_claude(
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, model, c.review, c.log, c.out,
-            )
-        }),
-    }
-}
-
-pub fn k3_spec() -> ModelSpec {
-    ModelSpec {
-        command_name: config::K3_COMMAND_NAME,
-        cli: "opencode",
-        model: config::KIMI_MODEL,
-        usage: K3_USAGE,
-        parse: parser::parse_kimi_args,
-        preflight: Box::new(executor::kimi_preflight),
-        // K3 takes no effort: its provider exposes only max reasoning. It is
-        // the only adapter whose credential lives in the project .env.
-        run: Box::new(|c| {
-            executor::run_kimi(
-                c.ctx,
-                c.cfg,
-                c.sess,
-                c.prompt,
-                c.workdir,
-                c.cred_workdir,
-                c.log,
-                c.out,
             )
         }),
     }
@@ -308,7 +263,7 @@ pub fn china_spec(cfg: &Config) -> ModelSpec {
         model: Box::leak(cfg.china_model().to_string().into_boxed_str()),
         usage: CHINA_USAGE,
         parse: parser::parse_codex_args,
-        preflight: Box::new(|cfg, _| executor::china_preflight(cfg)),
+        preflight: Box::new(executor::china_preflight),
         run: Box::new(|c| {
             executor::run_china(
                 c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.log, c.out,
@@ -324,7 +279,7 @@ pub fn grok_spec() -> ModelSpec {
         model: config::GROK_MODEL,
         usage: GROK_USAGE,
         parse: parser::parse_grok_args,
-        preflight: Box::new(|cfg, _| executor::grok_preflight(cfg)),
+        preflight: Box::new(executor::grok_preflight),
         // Grok sandboxes reviews and only reviews.
         run: Box::new(|c| {
             executor::run_grok(
@@ -342,7 +297,6 @@ pub fn spec_for_name(name: &str) -> Option<ModelSpec> {
         config::SOL_LABEL => sol_spec(),
         config::CLAUDE_LABEL => claude_spec(),
         config::FABLE_LABEL => fable_spec(),
-        config::K3_COMMAND_NAME => k3_spec(),
         config::GROK_LABEL => grok_spec(),
         _ => return None,
     };

@@ -36,8 +36,7 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
-| `command k3` | executor-k3-success | executor-k3-failure, executor-k3-quota, executor-k3-missing-runtime, executor-k3-missing-key |
-| `command k3 --no-queue`, `--workdir` | command-k3-no-queue-workdir | workdir-missing |
+| `command china` | executor-china-success | workdir-missing; preflight, effort map, selector: unit tests `executor::china`, `model_specs` |
 | `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
 | `command plan -m opus,fable,sol` (two blocks on the Claude runtime, one on codex, all through the proxy; repair pass per block) | plan-three-models | unit tests `command_plan::tests::parse_plan_models`, `review::planrun::tests::two_models_on_one_runtime_run_as_two_blocks` |
@@ -45,8 +44,8 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command plan --effort` | plan-dual-models | plan-effort-conflict |
 | `command plan --no-queue`, `--workdir` | plan-no-queue-workdir | workdir-missing |
 | `command skill --host claude\|codex` (the `/rival` skill: `skill.claude` default sol, `skill.codex` default claude, empty input prints the `/rival` usage, `security [scope]` goes to the security review, bad `--host`) | skill-command | skill-command (security preflight, bad host); configured models, `-re`, preflight hint: unit tests `skill_command::tests` |
-| `command security` | security-k3-structured | security-k3-nonzero-exit, security-missing-key |
-| `command security --which` | security-which-ready | security-which-missing-key |
+| `command security` (runs `china.model`) | security-china-structured | security-china-nonzero-exit, security-old-opencode |
+| `command security --which` | security-which-ready | unit tests `command_security` (old opencode, missing binary) |
 | `command security --no-queue`, `--workdir` | security-no-queue-workdir | workdir-missing |
 | review wording edit (code, security, plan; none for a clean review) | review-language-code, review-language-security, review-language-plan, review-language-clean | unit tests: `lang::repair`, `model_command`, `command_security`, `review::planrun` |
 | every `command *` leaf `--help` | help-every-command (help) | — |
@@ -65,8 +64,6 @@ Concurrent reviewers bind each session file by its `cli` field (plan-dual-models
 | `run fable`, `run opus` (alias of `run claude`) | unit tests `tree::tests::opus_is_an_alias_of_claude`, `model_specs::tests::fable_and_sol_specs_follow_their_runtimes` | — |
 | `run grok --prompt-stdin`, `--effort`, `--no-queue`, `--workdir` | run-grok-flags | workdir-missing |
 | `run grok --review` (ultra clamps to high, read-only sandbox) | run-grok-flags | — |
-| `run k3 --prompt-stdin`, `--no-queue`, `--workdir` | run-k3-flags | workdir-missing |
-| `run k3 --review` | run-k3-flags | run-k3-flags (`--effort` is not a k3 flag) |
 | every `run *` leaf `--help` | help-every-command (help) | — |
 
 ## install
@@ -149,7 +146,7 @@ The same fake proxy as for Claude. The fake `codex` pins the argv: `-m <model>` 
 
 | Command / flag | ✓ | ✗ |
 |---|---|---|
-| `config check` (default models: codex, sol, claude, fable, security reviewer), text table in model order, `N of M ok`, exit 1 | config-check-fail-exit (codex, sol) | config-check-fail-exit (claude/fable not installed, K3 preflight) |
+| `config check` (default models: codex, sol, claude, fable, china), text table in model order, `N of M ok`, exit 1 | config-check-fail-exit (codex, sol) | config-check-fail-exit (claude, fable and china not installed) |
 | `config check -m LIST --json` through the proxy: no info log lines on stderr, one `/v1/models` call, one JSON line per row, summary line with the proxy state, `opus` = `claude`, unexpected reply passes flagged, 429 row with `limit` and the hint | config-check-json | config-check-json (fable 429) |
 | `config check --config-stdin` (an unsaved draft; config.yaml untouched) | config-check-draft | invalid draft, invalid saved file bypassed: unit tests `config_cmd::tests::check_config_stdin_*` |
 | engine: proxy down, key rejected or missing, model not listed, timeout, at most 3 live calls, logs under `check/`, no session saved | unit tests `check::tests`, `executor::subprocess::tests::ephemeral_session_is_never_saved`, `session::tests::ephemeral_session_save_writes_nothing` | same |

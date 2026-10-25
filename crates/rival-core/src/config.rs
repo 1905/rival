@@ -44,12 +44,6 @@ pub const OPUS_ALIAS: &str = "opus";
 /// The Fable label: `command fable`, `run fable`, plan `-m fable` and the
 /// `efforts.fable` key (Claude ladder).
 pub const FABLE_LABEL: &str = "fable";
-pub const K3_LABEL: &str = "kimi-k3";
-/// The CLI command word for K3. It differs from [`K3_LABEL`], which is the
-/// public display and error name.
-pub const K3_COMMAND_NAME: &str = "k3";
-/// Kimi K3 via OpenCode's built-in Moonshot AI provider.
-pub const KIMI_MODEL: &str = "moonshotai/kimi-k3";
 pub const GROK_MODEL: &str = "grok-4.6";
 /// The `/china` model: `rival command china`, the session adapter and the
 /// `china:` config block.
@@ -91,15 +85,6 @@ pub fn claude_effort_level(effort: &str) -> Option<&'static str> {
     }
 }
 
-/// K3's only provider-supported reasoning variant. Unknown models have no
-/// supported variant because K3 is Rival's sole OpenCode-backed model.
-pub fn opencode_variant(model: &str, _effort: &str) -> &'static str {
-    if model != KIMI_MODEL {
-        return "";
-    }
-    "max"
-}
-
 /// The stable public name for a concrete model id. Runtime model ids stay
 /// internal so dashboards, console output, and API summaries use Rival's
 /// short model names consistently.
@@ -110,11 +95,7 @@ pub fn model_label(model: &str) -> &'static str {
         CODEX_MODEL | CODEX_LABEL => CODEX_LABEL,
         CLAUDE_MODEL | CLAUDE_LABEL => CLAUDE_LABEL,
         FABLE_MODEL | FABLE_LABEL => FABLE_LABEL,
-        KIMI_MODEL | K3_LABEL => K3_LABEL,
         GROK_MODEL | GROK_LABEL => GROK_LABEL,
-        // Distinct from GROK_LABEL: this is Grok on OpenCode via OpenRouter,
-        // a different runtime with a different credential.
-        GROK_OPENROUTER_MODEL | GROK_OPENROUTER_LABEL => GROK_OPENROUTER_LABEL,
         _ => "retired-model",
     }
 }
@@ -137,11 +118,7 @@ pub fn engine_label(cli: &str, model: &str) -> String {
         // Checked before the adapter fallback, which labels other Claude-
         // runtime ids "retired-model".
         FABLE_MODEL => return FABLE_LABEL.to_string(),
-        KIMI_MODEL => return K3_LABEL.to_string(),
         GROK_MODEL => return GROK_LABEL.to_string(),
-        // Checked before the adapter fallback below: both this and K3 run on
-        // opencode, so falling through would label Grok as K3.
-        GROK_OPENROUTER_MODEL => return GROK_OPENROUTER_LABEL.to_string(),
         _ => {}
     }
 
@@ -311,11 +288,11 @@ pub fn public_runtime_log(cli: &str, model: &str, raw: &str) -> String {
 }
 
 fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
-    // Model ids overlap textually: "grok-4.6" is a substring of the label
-    // "grok-4.6-openrouter". Replacing ids directly lets one substitution
+    // Model ids overlap textually: one id can be a substring of another id
+    // or label. Replacing ids directly lets one substitution
     // corrupt another's output, so each id becomes a placeholder first and
     // only expands to its label once every id is consumed.
-    let mut pairs: Vec<(String, String)> = Vec::with_capacity(9);
+    let mut pairs: Vec<(String, String)> = Vec::with_capacity(7);
     if !model.is_empty() {
         // The run's own model wins, and is matched before the shared list so
         // a longer id is never shadowed by a shorter one it contains.
@@ -327,8 +304,6 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
         (CODEX_MODEL, CODEX_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
         (FABLE_MODEL, FABLE_LABEL),
-        (KIMI_MODEL, K3_LABEL),
-        (GROK_OPENROUTER_MODEL, GROK_OPENROUTER_LABEL),
         (GROK_MODEL, GROK_LABEL),
     ] {
         pairs.push((id.to_string(), label.to_string()));
@@ -341,12 +316,9 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     let mut labels: Vec<(String, String)> = Vec::new();
 
     // Protect public labels before touching ids. Text can already contain a
-    // label — a re-normalized log, or a model naming itself — and
-    // "grok-4.6-openrouter" contains the id "grok-4.6", so an unprotected
-    // label would be rewritten into "grok-openrouter".
+    // label — a re-normalized log, or a model naming itself — and a label
+    // that contains an id would otherwise be rewritten.
     let mut protected = [
-        GROK_OPENROUTER_LABEL,
-        K3_LABEL,
         SOL_LABEL,
         CLAUDE_LABEL,
         FABLE_LABEL,
@@ -429,18 +401,11 @@ fn public_review_header(line: &str) -> String {
                 "retired-model".to_string()
             };
         }
-        "opencode" => {
-            reviewer = if lower_identity.contains(K3_LABEL) {
-                K3_LABEL.to_string()
-            } else {
-                "retired-model".to_string()
-            };
-        }
+        "opencode" => reviewer = "retired-model".to_string(),
         GPT56_SOL_MODEL => reviewer = SOL_LABEL.to_string(), // read-compat
         SOL_MODEL => reviewer = SOL_LABEL.to_string(),
         CLAUDE_MODEL => reviewer = CLAUDE_LABEL.to_string(),
         FABLE_MODEL => reviewer = FABLE_LABEL.to_string(),
-        KIMI_MODEL => reviewer = K3_LABEL.to_string(),
         GROK_LABEL | GROK_MODEL => reviewer = GROK_LABEL.to_string(),
         _ => {}
     }
@@ -573,88 +538,6 @@ pub enum PromptKind {
     Security,
 }
 
-/// One model that can run the security review. Both entries run through the
-/// OpenCode adapter, so the differences between them are data rather than
-/// code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SecurityModel {
-    /// The config value: "k3" or "grok".
-    pub name: &'static str,
-    /// The upstream model id.
-    pub model: &'static str,
-    /// What `opencode -m` receives. OpenCode splits it at the first slash to
-    /// choose the provider, so for OpenRouter-hosted models this differs from
-    /// `model`.
-    pub selector: &'static str,
-    /// Names the block in the generated OpenCode config.
-    pub provider: &'static str,
-    /// The provider endpoint. Empty means OpenCode's own default, which is
-    /// what the built-in Moonshot provider uses.
-    pub base_url: &'static str,
-    /// The environment variable holding the API key.
-    pub key_env: &'static str,
-    /// The public name shown in output. It must not collide with any other
-    /// model's label or concrete id.
-    pub label: &'static str,
-    /// The reasoning level passed to the provider.
-    pub variant: &'static str,
-}
-
-/// Accepted values of the `security.reviewer` config key.
-pub const SECURITY_REVIEWER_K3: &str = "k3";
-pub const SECURITY_REVIEWER_GROK: &str = "grok";
-
-/// Grok 4.6 served through OpenRouter. A different runtime from
-/// [`GROK_MODEL`], which reaches xAI through the grok CLI.
-pub const GROK_OPENROUTER_MODEL: &str = "x-ai/grok-4.6";
-pub const GROK_OPENROUTER_SELECTOR: &str = "openrouter/x-ai/grok-4.6";
-/// Deliberately differs from [`GROK_LABEL`]. The two Groks are separate
-/// models on separate runtimes with separate credentials, and a shared label
-/// would make their sessions and logs indistinguishable.
-pub const GROK_OPENROUTER_LABEL: &str = "grok-4.6-openrouter";
-const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
-
-/// The registry. Adding an entry here is all a new security model needs: the
-/// adapter reads provider, key, selector, and variant from it.
-const SECURITY_MODELS: [SecurityModel; 2] = [
-    SecurityModel {
-        name: SECURITY_REVIEWER_K3,
-        model: KIMI_MODEL,
-        selector: KIMI_MODEL,
-        provider: "moonshotai",
-        base_url: "",
-        key_env: "MOONSHOT_API_KEY",
-        label: K3_LABEL,
-        variant: "max",
-    },
-    SecurityModel {
-        name: SECURITY_REVIEWER_GROK,
-        model: GROK_OPENROUTER_MODEL,
-        selector: GROK_OPENROUTER_SELECTOR,
-        provider: "openrouter",
-        base_url: OPENROUTER_BASE_URL,
-        key_env: "OPENROUTER_API_KEY",
-        label: GROK_OPENROUTER_LABEL,
-        variant: "xhigh",
-    },
-];
-
-fn security_model_named(name: &str) -> Option<SecurityModel> {
-    SECURITY_MODELS.iter().find(|m| m.name == name).copied()
-}
-
-/// The accepted `security.reviewer` values, for error messages.
-pub fn security_reviewer_names() -> [&'static str; 2] {
-    [SECURITY_REVIEWER_K3, SECURITY_REVIEWER_GROK]
-}
-
-/// Looks up a registry entry by concrete model id, without consulting the
-/// security config: with security.reviewer set to grok, a run that names K3
-/// must still run K3.
-pub fn open_code_entry_for(model: &str) -> Option<SecurityModel> {
-    SECURITY_MODELS.iter().find(|m| m.model == model).copied()
-}
-
 /// Checks if the given effort level is in the allowlist.
 pub fn is_valid_effort(effort: &str) -> bool {
     VALID_EFFORTS.contains(&effort)
@@ -667,12 +550,11 @@ pub const CLAUDE_AUTH_SUBSCRIPTION: &str = "subscription";
 pub const CLAUDE_AUTH_API: &str = "api";
 
 /// Models whose effort is a property of the model rather than of the surface
-/// invoking it. K3's provider exposes exactly one level; Codex defaults to
+/// invoking it. Codex defaults to
 /// xhigh for correctness and plan reviews; Claude runs at medium. Sol
 /// follows Codex and Fable follows Claude.
 fn pinned_model_effort(label: &str) -> Option<&'static str> {
     match label {
-        "kimi-k3" => Some("max"),
         CODEX_LABEL | SOL_LABEL => Some("xhigh"),
         // Claude runs Opus 5.5 at medium on every surface; Fable too.
         CLAUDE_LABEL | FABLE_LABEL => Some("medium"),
@@ -685,7 +567,6 @@ fn builtin_model_effort(label: &str) -> &'static str {
         // Codex is the deep-reasoning model and is pinned to xhigh; Sol
         // follows Codex.
         CODEX_LABEL | SOL_LABEL => "xhigh",
-        "kimi-k3" => "max",
         CLAUDE_LABEL | FABLE_LABEL => "medium",
         // grok-4.6's menu is low/medium/high, and high is its own default.
         GROK_LABEL => "high",
@@ -699,18 +580,14 @@ pub fn builtin_effort(label: &str) -> &'static str {
     builtin_model_effort(label)
 }
 
+/// The `efforts:` key of the removed Kimi K3 model.
+const RETIRED_K3_EFFORT: &str = "kimi-k3";
+
 fn known_effort_model(label: &str) -> bool {
     matches!(
         label,
-        CODEX_LABEL | SOL_LABEL | "kimi-k3" | CLAUDE_LABEL | FABLE_LABEL | GROK_LABEL
+        CODEX_LABEL | SOL_LABEL | CLAUDE_LABEL | FABLE_LABEL | GROK_LABEL
     )
-}
-
-fn valid_configured_model_effort(label: &str, effort: &str) -> bool {
-    if label == "kimi-k3" {
-        return effort == "max";
-    }
-    is_valid_effort(effort)
 }
 
 /// A config error carrying its exact message text.
@@ -736,12 +613,6 @@ impl std::error::Error for ConfigError {}
 pub struct ClaudeConfig {
     /// "team" or "personal".
     pub subscription: String,
-}
-
-/// Selects which model runs the security review.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SecurityConfig {
-    pub reviewer: String,
 }
 
 /// The proxy switch for one provider (`proxy.claude`, `proxy.codex`).
@@ -913,12 +784,11 @@ impl SkillHost {
 
 /// The models a `skill.<host>` key accepts, as `rival command <model>`
 /// names. [`skill_model_name`] also takes `opus` for `claude`.
-pub const SKILL_MODEL_NAMES: [&str; 6] = [
+pub const SKILL_MODEL_NAMES: [&str; 5] = [
     CODEX_LABEL,
     SOL_LABEL,
     CLAUDE_LABEL,
     FABLE_LABEL,
-    K3_COMMAND_NAME,
     GROK_LABEL,
 ];
 
@@ -1188,7 +1058,6 @@ fn expand_home(path: &str, home: &str) -> PathBuf {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UserConfig {
     pub claude: ClaudeConfig,
-    pub security: SecurityConfig,
     pub proxy: ProxyConfig,
     pub plan: PlanConfig,
     pub efforts: BTreeMap<String, String>,
@@ -1218,12 +1087,6 @@ impl<'de> Deserialize<'de> for GoString {
 struct RawClaude {
     #[serde(default)]
     subscription: GoString,
-}
-
-#[derive(Default, Deserialize)]
-struct RawSecurity {
-    #[serde(default)]
-    reviewer: GoString,
 }
 
 /// Marks a key that is present, whatever its value (null too).
@@ -1307,14 +1170,12 @@ struct RawSpeed {
     sol: GoString,
 }
 
-/// Unknown keys (for example the removed megareview's `review:` roster) are
-/// ignored, like yaml.v3.
+/// Unknown keys (for example the removed megareview's `review:` roster and
+/// the removed K3's `security:` block) are ignored, like yaml.v3.
 #[derive(Default, Deserialize)]
 struct RawUserConfig {
     #[serde(default)]
     claude: Option<RawClaude>,
-    #[serde(default)]
-    security: Option<RawSecurity>,
     #[serde(default)]
     efforts: Option<BTreeMap<String, GoString>>,
     #[serde(default)]
@@ -1363,9 +1224,6 @@ impl From<RawUserConfig> for UserConfig {
                     .into_iter()
                     .map(|m| m.0)
                     .collect(),
-            },
-            security: SecurityConfig {
-                reviewer: raw.security.unwrap_or_default().reviewer.0,
             },
             efforts: strings(raw.efforts),
             roles: strings(raw.roles),
@@ -1428,40 +1286,24 @@ pub fn parse_user_config(text: &str, path: &Path) -> Result<UserConfig, ConfigEr
     let raw_ultrafast = raw.ultrafast.take().unwrap_or_default();
     let mut cfg = UserConfig::from(raw);
 
+    // The removed K3's effort key is ignored, like its `security:` block,
+    // so an old config still loads. The next write drops it.
+    cfg.efforts.remove(RETIRED_K3_EFFORT);
     for (label, raw) in cfg.efforts.iter_mut() {
         let effort = raw.trim().to_lowercase();
         if !known_effort_model(label) {
             return Err(ConfigError::new(format!(
-                "invalid effort model {:?} in {shown}; use one of: codex, sol, kimi-k3, claude, fable, grok",
+                "invalid effort model {:?} in {shown}; use one of: codex, sol, claude, fable, grok",
                 label
             )));
         }
-        if !valid_configured_model_effort(label, &effort) {
-            let allowed = if label == "kimi-k3" {
-                "max"
-            } else {
-                "low, medium, high, xhigh, ultra"
-            };
+        if !is_valid_effort(&effort) {
             return Err(ConfigError::new(format!(
-                "invalid effort {:?} for {label} in {shown}; use one of: {allowed}",
+                "invalid effort {:?} for {label} in {shown}; use one of: low, medium, high, xhigh, ultra",
                 raw
             )));
         }
         *raw = effort;
-    }
-    // Validate the security reviewer here, not only where it is resolved, so
-    // a typo fails every command instead of waiting for a security run.
-    let configured = cfg.security.reviewer.trim().to_string();
-    if !configured.is_empty() {
-        let name = configured.to_lowercase();
-        if security_model_named(&name).is_none() {
-            return Err(ConfigError::new(format!(
-                "invalid security.reviewer {:?} in {shown}; use one of: {}",
-                configured,
-                security_reviewer_names().join(", ")
-            )));
-        }
-        cfg.security.reviewer = name;
     }
     for host in SkillHost::ALL {
         let value = cfg.skill.get_mut(host);
@@ -1907,36 +1749,9 @@ impl Config {
         }))
     }
 
-    /// The raw `security.reviewer` value, or "" when unset.
-    pub fn configured_security_reviewer(&self) -> &str {
-        self.user
-            .as_ref()
-            .map_or("", |u| u.security.reviewer.trim())
-    }
-
-    /// The model that runs the security review. An empty config value means
-    /// K3.
-    pub fn resolve_security_model(&self) -> Result<SecurityModel, ConfigError> {
-        let mut name = SECURITY_REVIEWER_K3.to_string();
-        let configured = self.configured_security_reviewer();
-        if !configured.is_empty() {
-            name = configured.to_lowercase();
-        }
-        security_model_named(&name).ok_or_else(|| {
-            ConfigError::new(format!(
-                "invalid security.reviewer {:?}, must be one of: {}",
-                name,
-                security_reviewer_names().join(", ")
-            ))
-        })
-    }
-
     /// The configured default for a concrete model id or public model label.
     /// Invalid user configuration is reported by [`Config::user_config_error`]
     /// before command side effects begin.
-    ///
-    /// Kimi K3 is thinking-only and supports exactly max. Other current models
-    /// accept Rival's low/medium/high/xhigh/ultra ladder.
     pub fn default_effort_for_model(&self, model: &str) -> String {
         let label = model_label(model);
         let builtin = builtin_model_effort(label);
@@ -1948,8 +1763,7 @@ impl Config {
 
     /// The documented precedence for one concrete model: explicit invocation
     /// override, then `~/.rival/config.yaml`, then the supplied
-    /// surface-specific fallback. Kimi K3 remains pinned to max because that
-    /// provider exposes no other reasoning level.
+    /// surface-specific fallback.
     pub fn resolve_effort(
         &self,
         model: &str,
@@ -1959,9 +1773,6 @@ impl Config {
         let label = model_label(model);
         let override_effort = override_effort.trim().to_lowercase();
         if !override_effort.is_empty() {
-            if label == "kimi-k3" {
-                return Ok("max".to_string());
-            }
             if !is_valid_effort(&override_effort) {
                 return Err(ConfigError::new(format!(
                     "invalid effort {:?} for {label}",
@@ -1984,9 +1795,6 @@ impl Config {
         if fallback.is_empty() {
             fallback = builtin_model_effort(label).to_string();
         }
-        if label == "kimi-k3" {
-            return Ok("max".to_string());
-        }
         if !is_valid_effort(&fallback) {
             return Err(ConfigError::new(format!(
                 "invalid fallback effort {:?} for {label}",
@@ -1994,74 +1802,6 @@ impl Config {
             )));
         }
         Ok(fallback)
-    }
-
-    /// The Moonshot AI API key for K3 runs. `MOONSHOT_API_KEY` is the
-    /// canonical OpenCode variable; `KIMI_API` remains a backward-compatible
-    /// alias. The process environment is checked first, then each project
-    /// `.env` walking up from `workdir`. The key is injected per run into
-    /// OpenCode's built-in moonshotai provider through
-    /// `OPENCODE_CONFIG_CONTENT` and is never written to on-disk OpenCode
-    /// config.
-    pub fn kimi_api_key_from(&self, workdir: &Path) -> String {
-        const NAMES: [&str; 2] = ["MOONSHOT_API_KEY", "KIMI_API"];
-        for name in NAMES {
-            let key = self.getenv(name).trim();
-            if !key.is_empty() {
-                return key.to_string();
-            }
-        }
-        self.dotenv_key_from(workdir, &NAMES)
-    }
-
-    /// An entry's API key. Precedence matches [`Config::kimi_api_key_from`]:
-    /// the process environment first, then the nearest `.env` found walking
-    /// up from `workdir`.
-    pub fn security_api_key_from(&self, entry: &SecurityModel, workdir: &Path) -> String {
-        if entry.name == SECURITY_REVIEWER_K3 {
-            // Delegate rather than reimplement: the K3 lookup checks the
-            // legacy KIMI_API alias in every .env it walks, not only in the
-            // process environment, and an existing installation may rely on
-            // that.
-            return self.kimi_api_key_from(workdir);
-        }
-        let key = self.getenv(entry.key_env).trim();
-        if !key.is_empty() {
-            return key.to_string();
-        }
-        self.dotenv_key_from(workdir, &[entry.key_env])
-    }
-
-    /// The `.env` walk shared by both key lookups: at most 8 directories,
-    /// stopping after the home directory or the filesystem root. Files that
-    /// fail to read or parse are skipped.
-    fn dotenv_key_from(&self, workdir: &Path, names: &[&str]) -> String {
-        if workdir.as_os_str().is_empty() {
-            return String::new();
-        }
-        let Some(mut dir) = paths::abs(self.cwd.as_deref(), workdir) else {
-            return String::new();
-        };
-        // The walked directory is clean, so HOME must be too: a raw
-        // `HOME=/home/x/` never equals `/home/x` and the walk would go above.
-        let home = paths::clean(Path::new(self.getenv(paths::HOME_VAR)));
-        for _ in 0..8 {
-            if let Ok(vars) = paths::read_dotenv(&dir.join(".env")) {
-                for name in names {
-                    if let Some(key) = vars.get(*name).map(|v| v.trim())
-                        && !key.is_empty()
-                    {
-                        return key.to_string();
-                    }
-                }
-            }
-            let parent = dir.parent().map_or_else(|| dir.clone(), Path::to_path_buf);
-            if dir == home || parent == dir {
-                break;
-            }
-            dir = parent;
-        }
-        String::new()
     }
 
     /// The auth mode for native claude runs. Default is subscription: the

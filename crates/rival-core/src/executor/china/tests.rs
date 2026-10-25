@@ -86,7 +86,7 @@ fn run_china_request_per_mode() {
 
     for (mode, raw, extra_drop) in [
         ("review", false, &[][..]),
-        ("raw", true, &KIMI_DROP_ENV[..]),
+        ("raw", true, &RAW_DROP_ENV[..]),
         ("security", false, &[][..]),
     ] {
         let mut sess = env.session(config::CHINA_LABEL, mode, selector, &work);

@@ -127,7 +127,7 @@ fn an_invalid_value_leaves_the_old_file() {
             "codex,gpt",
             "invalid plan.models entry \"gpt\"",
         ),
-        ("security.reviewer", "nobody", "invalid security.reviewer"),
+        ("skill.claude", "k3", "invalid skill.claude \"k3\""),
     ] {
         let err = set(&path, key, value).unwrap_err().to_string();
         assert!(err.contains(want), "{key}: {err}");
@@ -473,4 +473,19 @@ fn china_model_is_a_settable_string() {
     let err = set(&path, "china.model", "kimi").unwrap_err().to_string();
     assert!(err.contains("invalid china.model \"kimi\""), "{err}");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+}
+
+/// The removed K3 keys are unknown to the writer: its effort and the
+/// `security.reviewer` that picked it.
+#[test]
+fn removed_k3_keys_are_not_settable() {
+    let (_dir, path) = temp();
+    for key in ["efforts.kimi-k3", "security.reviewer"] {
+        let err = set(&path, key, "max").unwrap_err().to_string();
+        assert!(
+            err.starts_with(&format!("unknown config key {key:?}")),
+            "{err}"
+        );
+    }
+    assert!(!path.exists());
 }

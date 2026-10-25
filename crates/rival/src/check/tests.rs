@@ -189,7 +189,7 @@ fn check(fix: &Fixture, names: &[&str], fake: &Fake) -> Report {
 
 fn check_timeout(fix: &Fixture, names: &[&str], fake: &Fake, timeout: Duration) -> Report {
     let names: Vec<String> = names.iter().map(|s| s.to_string()).collect();
-    let targets = targets(&fix.cfg, &names).unwrap();
+    let targets = targets(&names).unwrap();
     run_check_with(
         &Context::background(),
         &fix.cfg,
@@ -210,49 +210,51 @@ fn row<'a>(report: &'a Report, name: &str) -> &'a CheckRow {
 
 // ---- targets ----
 
-fn names(fix: &Fixture, list: &[&str]) -> Result<Vec<&'static str>, String> {
+fn names(list: &[&str]) -> Result<Vec<&'static str>, String> {
     let list: Vec<String> = list.iter().map(|s| s.to_string()).collect();
-    targets(&fix.cfg, &list).map(|ts| ts.iter().map(|t| t.name).collect())
+    targets(&list).map(|ts| ts.iter().map(|t| t.name).collect())
 }
 
 #[test]
 fn targets_default_all_list_and_dedupe() {
-    let fix = Fixture::new();
     assert_eq!(
-        names(&fix, &[]).unwrap(),
-        ["codex", "sol", "claude", "fable", "k3"]
+        names(&[]).unwrap(),
+        ["codex", "sol", "claude", "fable", "china"]
     );
     assert_eq!(
-        names(&fix, &["all"]).unwrap(),
-        [
-            "codex",
-            "sol",
-            "claude",
-            "fable",
-            "k3",
-            "grok",
-            "grok-4.6-openrouter"
-        ]
+        names(&["all"]).unwrap(),
+        ["codex", "sol", "claude", "fable", "china", "grok"]
     );
     // opus is claude; rows keep the model order, whatever the list order.
     assert_eq!(
-        names(&fix, &["fable", "opus", " Claude ", "codex"]).unwrap(),
+        names(&["fable", "opus", " Claude ", "codex"]).unwrap(),
         ["codex", "claude", "fable"]
     );
-    assert_eq!(names(&fix, &["grok", "k3"]).unwrap(), ["k3", "grok"]);
-    let err = names(&fix, &["gpt"]).unwrap_err();
-    assert_eq!(
-        err,
-        format!("unknown model \"gpt\" for config check; use one of: {NAMES_HELP}")
-    );
+    assert_eq!(names(&["grok", "china"]).unwrap(), ["china", "grok"]);
+    // The removed models are unknown.
+    for gone in ["gpt", "k3", "grok-4.6-openrouter"] {
+        let err = names(&[gone]).unwrap_err();
+        assert_eq!(
+            err,
+            format!("unknown model {gone:?} for config check; use one of: {NAMES_HELP}")
+        );
+    }
 }
 
+/// The china row checks `china.model`, whatever it is set to.
 #[test]
-fn targets_default_adds_the_configured_security_reviewer() {
-    let fix = Fixture::with_config_yaml("security:\n  reviewer: grok\n");
+fn the_china_row_checks_the_configured_model() {
+    let fix = Fixture::with_config_yaml("china:\n  model: openrouter/z-ai/glm-5.3\n");
+    let fake = Fake::new();
+    let report = check(&fix, &["china"], &fake);
+    let china = row(&report, "china");
     assert_eq!(
-        names(&fix, &[]).unwrap(),
-        ["codex", "sol", "claude", "fable", "grok-4.6-openrouter"]
+        (
+            china.runtime.as_str(),
+            china.route.as_str(),
+            china.wire_model.as_str()
+        ),
+        ("china", "direct", "openrouter/z-ai/glm-5.3")
     );
 }
 
@@ -267,7 +269,7 @@ fn all_pass_direct() {
     assert_eq!(report.proxy, ProxyLine::Off);
     assert_eq!(
         fake.called(),
-        ["claude", "codex", "fable", "k3", "sol"],
+        ["china", "claude", "codex", "fable", "sol"],
         "one live call each"
     );
     let codex = row(&report, "codex");
@@ -279,8 +281,8 @@ fn all_pass_direct() {
         ),
         ("codex", "direct", "gpt-6-astra")
     );
-    assert_eq!(row(&report, "k3").wire_model, "moonshotai/kimi-k3");
-    assert_eq!(row(&report, "k3").runtime, "opencode");
+    assert_eq!(row(&report, "china").wire_model, "moonshot/kimi-k3.1-pro");
+    assert_eq!(row(&report, "china").runtime, "china");
     for r in &report.rows {
         assert_eq!(
             (r.ok, r.reply.as_str(), r.error.as_str(), r.unexpected),
@@ -377,13 +379,13 @@ fn preflight_error_fails_with_its_first_line_and_no_call() {
     let fix = Fixture::new();
     let mut fake = Fake::new();
     fake.preflight.insert(
-        "k3",
-        "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it\nsecond",
+        "china",
+        "china needs opencode v2 or later, found \"1.4.0\". Update: opencode upgrade\nsecond",
     );
-    let report = check(&fix, &["k3"], &fake);
+    let report = check(&fix, &["china"], &fake);
     assert_eq!(
-        row(&report, "k3").error,
-        "model kimi-k3 requires MOONSHOT_API_KEY — add it to the project .env or export it"
+        row(&report, "china").error,
+        "china needs opencode v2 or later, found \"1.4.0\". Update: opencode upgrade"
     );
     assert!(fake.called().is_empty());
 }
@@ -394,11 +396,11 @@ fn proxy_down_fails_the_proxied_rows_only() {
     let mut fake = Fake::new();
     let down = "proxy unreachable at http://127.0.0.1:9: connection refused";
     fake.models = Err(ModelsError::Unreachable(down.to_string()));
-    let report = check(&fix, &["codex", "claude", "k3"], &fake);
+    let report = check(&fix, &["codex", "claude", "china"], &fake);
     assert_eq!(row(&report, "codex").error, down);
     assert_eq!(row(&report, "claude").error, down);
-    assert!(row(&report, "k3").ok, "K3 does not use the proxy");
-    assert_eq!(fake.called(), ["k3"]);
+    assert!(row(&report, "china").ok, "china does not use the proxy");
+    assert_eq!(fake.called(), ["china"]);
     // The failed list is asked once for the header and every row.
     assert_eq!(fake.models_calls.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -538,7 +540,7 @@ fn cancel_ends_a_hung_preflight() {
     let fix = Fixture::new();
     let mut fake = Fake::new();
     fake.preflight_hang.push("codex");
-    let targets = targets(&fix.cfg, &["codex".to_string()]).unwrap();
+    let targets = targets(&["codex".to_string()]).unwrap();
     let (ctx, cancel) = Context::background().with_cancel();
     let started = Instant::now();
     let report = std::thread::scope(|s| {
@@ -668,7 +670,7 @@ fn old_check_logs_are_pruned() {
     let old = |name: &str, i: usize| dir.join(format!("{name}-{pid}-{:032x}.log", i));
     let mut aged = Vec::new();
     for i in 0..8 {
-        for name in ["codex", "grok", "grok-4.6-openrouter"] {
+        for name in ["codex", "grok", "china"] {
             let path = old(name, i);
             fs::write(&path, "old\n").unwrap();
             let when = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000 + i as u64);
@@ -692,7 +694,7 @@ fn old_check_logs_are_pruned() {
     }
     let new = &fake.calls.lock().unwrap()[0].1;
     assert!(codex.contains(new));
-    for name in ["grok", "grok-4.6-openrouter"] {
+    for name in ["grok", "china"] {
         assert_eq!(run_logs(&dir, name).len(), 8, "{name}");
     }
     assert!(dir.join("codex.log").exists());
@@ -717,7 +719,7 @@ fn rows_reach_the_callback_as_they_finish() {
     fake.missing = vec!["sol"];
     fake.delay = Duration::from_millis(100);
     let seen: Mutex<Vec<String>> = Mutex::new(Vec::new());
-    let targets = targets(&fix.cfg, &["codex".to_string(), "sol".to_string()]).unwrap();
+    let targets = targets(&["codex".to_string(), "sol".to_string()]).unwrap();
     let report = run_check_with(
         &Context::background(),
         &fix.cfg,
@@ -761,10 +763,10 @@ fn text_output_matches_the_spec_layout() {
                 ..CheckRow::default()
             },
             CheckRow {
-                name: "k3".into(),
-                runtime: "opencode".into(),
+                name: "china".into(),
+                runtime: "china".into(),
                 route: "direct".into(),
-                wire_model: "moonshotai/kimi-k3".into(),
+                wire_model: "moonshot/kimi-k3.1-pro".into(),
                 ok: true,
                 ms: 4000,
                 reply: "Sure".into(),
@@ -778,9 +780,9 @@ fn text_output_matches_the_spec_layout() {
         report.text(),
         "proxy  http://127.0.0.1:8317  ✓ 200  38 models  key …a91f
 
-  ✓ claude  proxy   emcd_/claude-opus-5-5  2.1s  ok
-  ✗ sol     proxy   gpt-6.1-sol            —     proxy does not serve gpt-6.1-sol
-  ✓ k3      direct  moonshotai/kimi-k3     4.0s  Sure  (not ok)
+  ✓ claude  proxy   emcd_/claude-opus-5-5   2.1s  ok
+  ✗ sol     proxy   gpt-6.1-sol             —     proxy does not serve gpt-6.1-sol
+  ✓ china   direct  moonshot/kimi-k3.1-pro  4.0s  Sure  (not ok)
 
 2 of 3 ok
 "
@@ -832,7 +834,7 @@ fn real_preflight_is_killed_on_cancel() {
     .unwrap();
     fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     let fix = Fixture::with(&[("PATH", bin.path().to_str().unwrap())], None);
-    let targets = targets(&fix.cfg, &["codex".to_string()]).unwrap();
+    let targets = targets(&["codex".to_string()]).unwrap();
     let (ctx, cancel) = Context::background().with_cancel();
     let started = Instant::now();
     let report = std::thread::scope(|s| {
@@ -872,7 +874,7 @@ fn real_adapter_path_saves_no_session() {
     // The directory exists, so a save would succeed.
     let sessions = fix.cfg.paths().sessions_dir();
     fs::create_dir_all(&sessions).unwrap();
-    let targets = targets(&fix.cfg, &["codex".to_string(), "claude".to_string()]).unwrap();
+    let targets = targets(&["codex".to_string(), "claude".to_string()]).unwrap();
     let report = run_check(&Context::background(), &fix.cfg, &targets, &|_| {});
     let codex = row(&report, "codex");
     assert!(codex.ok, "{report:?}");

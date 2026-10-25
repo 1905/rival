@@ -1,0 +1,101 @@
+{
+  "name": "security-china-nonzero-exit",
+  "description": "`rival command security` with scope `src/` on stdin, where the china run (opencode) exits 3. The session fails with 'kimi-k3.1-pro exited with code 3'. Stdout carries the run log (plain text 'provider crashed' unchanged), stderr carries the failure message, and the exit code is 3.",
+  "fakes": {
+    "scripts": {
+      "opencode": {
+        "responses": [
+          {
+            "argv": [
+              "--version"
+            ],
+            "times": 1,
+            "stdout": "opencode v2.1.4\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "run",
+              "--standalone",
+              "--agent",
+              "rival-china",
+              "-m",
+              "moonshot/kimi-k3.1-pro"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\nReview scope: src/\n\n## Role: Security Reviewer\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work",
+              "env": {
+                "OPENCODE_CONFIG_CONTENT": "{\"$schema\":\"https://opencode.ai/config.json\",\"agent\":{\"rival-china\":{\"mode\":\"primary\",\"permission\":{\"*\":\"deny\",\"external_directory\":\"deny\",\"glob\":\"allow\",\"grep\":\"allow\",\"list\":\"allow\",\"read\":\"allow\"}}},\"permission\":{\"*\":\"deny\",\"external_directory\":\"deny\",\"glob\":\"allow\",\"grep\":\"allow\",\"list\":\"allow\",\"read\":\"allow\"},\"provider\":{\"moonshot\":{\"models\":{\"kimi-k3.1-pro\":{\"options\":{\"reasoningEffort\":\"max\"}}}}}}",
+                "OPENCODE_DISABLE_PROJECT_CONFIG": "1",
+                "OPENCODE_DB": null,
+                "OPENCODE_PERMISSION": null
+              }
+            },
+            "stdout": "provider crashed\n",
+            "exit": 3
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "security"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 3,
+        "stdout": "provider crashed\n",
+        "stderr_lines": [
+          "kimi-k3.1-pro exited with code 3"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting security reviewer",
+            "fields": {
+              "session": "<UUID1>",
+              "model": "kimi-k3.1-pro"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "failed",
+          "exit_code": 3,
+          "cli": "china",
+          "model": "moonshot/kimi-k3.1-pro",
+          "effort": "max",
+          "mode": "security",
+          "review_scope": "src/",
+          "work_dir": "<ROOT>/work",
+          "error": "kimi-k3.1-pro exited with code 3"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.log",
+        "text": "provider crashed\n"
+      }
+    ],
+    "calls": {
+      "opencode": 2
+    }
+  }
+}

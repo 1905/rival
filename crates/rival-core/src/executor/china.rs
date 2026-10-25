@@ -7,8 +7,6 @@ use std::time::Duration;
 use anyhow::{anyhow, bail};
 
 use super::Mirror;
-use super::kimi::KIMI_DROP_ENV;
-use super::opencode::{OPENCODE_FULL_AUTO_PERMISSION, require_opencode};
 use super::oscmd::{self, Output};
 use super::subprocess::{Request, RunResult, run_subprocess, safe_env};
 use crate::cancel::Context;
@@ -21,6 +19,31 @@ use crate::session::Session;
 /// with network access, plus `skill`, `question`, `worktree_create`), which
 /// would stay allowed.
 pub(crate) const CHINA_READ_ONLY_PERMISSION: &str = r#"{"*":"deny","read":"allow","grep":"allow","glob":"allow","list":"allow","external_directory":"deny"}"#;
+
+/// The raw-mode profile: every tool is allowed except out-of-workdir native
+/// reads. The user asked for a full-auto agent that edits files and runs
+/// commands in the workdir. Bash is allowed, so the external_directory deny
+/// is defense in depth, not containment.
+pub(crate) const OPENCODE_FULL_AUTO_PERMISSION: &str = r#"{"read":"allow","grep":"allow","glob":"allow","list":"allow","external_directory":"deny","edit":"allow","bash":"allow","task":"allow","webfetch":"allow","websearch":"allow"}"#;
+
+/// Credential vars stripped from the child in raw (full-auto) mode, where
+/// every tool call is allowed: a prompt-injected repo could otherwise read
+/// an inherited secret with `env` and send it out. opencode needs none of
+/// them. The other modes deny bash. This shrinks the blast radius but is
+/// NOT a sandbox: the agent can still run any command as the user.
+pub(crate) const RAW_DROP_ENV: [&str; 9] = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "GOOGLE_",
+    "RIVAL_CLAUDE_TOKEN",
+    // Trailing underscore = prefix drop: catches SESSION_TOKEN, PROFILE,
+    // WEB_IDENTITY_TOKEN_FILE, container credential URIs — the whole family.
+    "AWS_",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "GITLAB_TOKEN",
+];
 
 /// Keeps the project's own opencode config out of every china call: a
 /// reviewed repo must not re-enable tools, and the model list must match
@@ -41,6 +64,14 @@ pub fn china_effort(requested: &str) -> anyhow::Result<&'static str> {
         "" | "xhigh" | "ultra" | "max" => "max",
         other => bail!("invalid effort {other:?}; use one of: low, medium, high, xhigh, ultra"),
     })
+}
+
+/// Fails with the install hint when the opencode CLI is not on `$PATH`.
+fn require_opencode(cfg: &Config) -> anyhow::Result<()> {
+    if oscmd::look_path(cfg, "opencode").is_err() {
+        bail!("opencode CLI not installed. Install: curl -fsSL https://opencode.ai/install | bash");
+    }
+    Ok(())
 }
 
 /// How long a one-shot opencode query (`--version`, `models`) may take.
@@ -106,7 +137,7 @@ pub(crate) fn opencode_major(version: &str) -> Option<u32> {
 }
 
 /// Runs a prompt with the `china.model` through `opencode run --standalone`
-/// (v2). The permission profile follows the session mode, like K3: raw is
+/// (v2). The permission profile follows the session mode: raw is
 /// full auto with known credentials stripped, every other mode is the
 /// read-only reviewer profile.
 #[allow(clippy::too_many_arguments)]
@@ -160,7 +191,7 @@ pub(crate) fn run_china_with(
         cfg.build_workdir_preamble(Path::new(workdir))
     );
     // safe_env already strips every inherited OPENCODE_ variable.
-    let drop: &[&str] = if raw { &KIMI_DROP_ENV } else { &[] };
+    let drop: &[&str] = if raw { &RAW_DROP_ENV } else { &[] };
     let req = Request {
         binary: "opencode",
         args: &args,

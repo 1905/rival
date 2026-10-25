@@ -154,11 +154,10 @@ fn parse_grok_args_empty() {
 #[test]
 fn every_surface_accepts_the_shared_ladder() {
     type Parse = fn(&str) -> Result<ParseResult>;
-    let parsers: [(&str, Parse); 4] = [
+    let parsers: [(&str, Parse); 3] = [
         ("claude", parse_claude_args),
         ("codex", parse_codex_args),
         ("grok", parse_grok_args),
-        ("kimi", parse_kimi_args),
     ];
     for (name, parse) in parsers {
         for effort in VALID_EFFORTS {
@@ -166,40 +165,6 @@ fn every_surface_accepts_the_shared_ladder() {
             assert!(r.is_ok(), "{name} rejected -re {effort}: {r:?}");
         }
     }
-}
-
-// Kimi arguments.
-
-/// Every advertised effort must parse — the value is ignored downstream (K3
-/// runs max only), so rejecting "max"/"ultra" while the docs say "pinned to
-/// max regardless of -re" would be a trap.
-#[test]
-fn parse_kimi_args_accepts_and_ignores_all_effort_names() {
-    for effort in VALID_EFFORTS.iter().chain(&["max"]) {
-        let parsed = parse_kimi_args(&format!("-re {effort} hello")).unwrap();
-        assert_eq!(parsed.effort, *effort);
-        assert_eq!(parsed.prompt, "hello");
-    }
-}
-
-#[test]
-fn parse_kimi_args_rejects_unknown_effort() {
-    assert_eq!(
-        err_text(parse_kimi_args("-re bogus hello")),
-        r#"invalid effort level "bogus", must be one of: low, medium, high, xhigh, ultra, max"#
-    );
-    // max is kimi-only.
-    assert!(parse_codex_args("-re max hello").is_err());
-}
-
-#[test]
-fn parse_kimi_args_leaves_default_for_config_resolution() {
-    let parsed = parse_kimi_args("review src/").unwrap();
-    assert_eq!(parsed.effort, "", "configured-default sentinel");
-    assert!(
-        parsed.is_review && parsed.review_scope == "src/",
-        "{parsed:?}"
-    );
 }
 
 // Source-behavior pins.

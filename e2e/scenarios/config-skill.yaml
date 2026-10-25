@@ -61,7 +61,7 @@
         "exit_code": 1,
         "stdout": "",
         "stderr_lines": [
-          "invalid skill.codex \"gpt5\" in <HOME>/.rival/config.yaml; use one of: codex, sol, claude, fable, k3, grok"
+          "invalid skill.codex \"gpt5\" in <HOME>/.rival/config.yaml; use one of: codex, sol, claude, fable, grok"
         ],
         "log_events": []
       }

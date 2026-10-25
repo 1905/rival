@@ -514,7 +514,7 @@ fn golden_fixture() -> Vec<Arc<Session>> {
             ..run(
                 "g0000002-wait",
                 "opencode",
-                rival_core::config::KIMI_MODEL,
+                "moonshotai/kimi-k3",
                 "review",
                 "high",
                 "queued",

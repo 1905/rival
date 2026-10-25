@@ -62,3 +62,15 @@
 - A provider change keeps the model name if the new provider lists it, else takes the first model. No listed model: the change is refused with a notice.
 - `e` on the model: exact name wins, then a unique substring, then any full `provider/model` (saved with a warning when unlisted).
 - Found while testing: opencode v2 keeps `opencode auth login` credentials in its DB. The per-run `OPENCODE_DB` hid them (OpenRouter: "No cookie auth credentials found") and left ~8 MB per run. China runs now use opencode's own DB; two concurrent runs passed.
+
+## Amendment 2026-10-25: china runs the security review; K3 removed
+
+User request: "remove 'security.reviewer: k3' stuff. china will do this role now. remove legacy stuff".
+
+- `rival command security` (and `/rival security`) runs `china.model` through the china runner, mode `security`, at `max`; the language pass at `low`. Session `cli = "china"`.
+- `--which` prints the china model, `china.model` with its source, the effort, the auth note, and the preflight result (opencode v2).
+- Removed (legacy, opencode v1 path, broken on v2): `rival command k3`, `rival run k3`, `skill.<host>: k3`, `efforts.kimi-k3`, `security.reviewer` (`k3`, `grok`), the OpenRouter Grok security model, `executor/kimi.rs`, `executor/opencode.rs`, the Moonshot/OpenRouter key lookups (`MOONSHOT_API_KEY`, `KIMI_API`, `OPENROUTER_API_KEY`, the `.env` walk).
+- Old configs: a `security:` block and `efforts.kimi-k3` are ignored at load (no error); `rival config set` rejects both keys as unknown. Old K3/Grok-OpenRouter sessions label as `retired-model`.
+- `rival config check`: the `china` row replaces `k3` and `grok-4.6-openrouter`, and is in the default set.
+- TUI: the Kimi K3 effort row and the `Security reviewer` picker are gone; the Review section names the security model.
+- Assumption: the Grok CLI model (`grok`) stays. Only its OpenRouter security variant is removed.
