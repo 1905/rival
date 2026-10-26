@@ -392,9 +392,8 @@ fn codex_proxy_args_refuse_a_toml_unsafe_url() {
         "http://h:1/a\u{7f}b",
         "http://h:1/a\u{1}b",
     ] {
-        let err =
-            codex_proxy_run_args("gpt-6-astra", "high", "/repo", Speed::Normal, true, url)
-                .unwrap_err();
+        let err = codex_proxy_run_args("gpt-6-astra", "high", "/repo", Speed::Normal, true, url)
+            .unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(

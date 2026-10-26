@@ -265,7 +265,11 @@ pub(crate) fn codex_run_args(
         "-c",
         &format!("model_reasoning_effort={effort}"),
         "--sandbox",
-        if read_only { "read-only" } else { "workspace-write" },
+        if read_only {
+            "read-only"
+        } else {
+            "workspace-write"
+        },
         "--ephemeral",
         "--skip-git-repo-check",
         "--color",
