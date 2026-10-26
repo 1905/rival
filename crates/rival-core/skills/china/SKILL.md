@@ -1,6 +1,6 @@
 ---
 name: china
-version: 6.0.0
+version: 7.0.0
 description: Run a code review or a prompt with the China model (china.model in rival config, an opencode provider/model) through the rival binary. Detached and watched in the background. Use when the user invokes /china or asks to review, check or ask "with china".
 argument-hint: "[-re low|medium|high|xhigh|ultra] [review [scope] | prompt]"
 allowed-tools: Bash, Read, Write

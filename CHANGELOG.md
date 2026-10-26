@@ -2,9 +2,11 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest binary release: [v6.0.0](https://github.com/1905/rival/releases/tag/v6.0.0) — 2026-10-12.
+Latest binary release: [v7.0.0](https://github.com/1905/rival/releases/tag/v7.0.0) — 2026-10-26.
 
-## [Unreleased]
+## [v7.0.0] — 2026-10-26
+
+Breaking: the security review runs on `china.model`; Kimi K3 and `security.reviewer` are removed.
 
 ### Added
 - **`/china` skill** for Claude Code and Codex. "review with china" (or `/china review [scope]`, `/china <prompt>`) runs `china.model` through opencode v2 and returns its review. The default is Kimi K3.1 Pro on opencode's `moonshot` provider (`moonshot/kimi-k3.1-pro`). Change it with `rival config set china.model <provider/model>`; `rival config show` lists it.

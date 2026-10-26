@@ -1,6 +1,6 @@
 ---
 name: rival
-version: 6.0.0
+version: 7.0.0
 description: Run a prompt, a code review or a security review through the rival binary, with the model set for Claude Code in rival config. Detached and watched in the background. Use only when the user explicitly invokes /rival.
 argument-hint: "[-re low|medium|high|xhigh|ultra] [review [scope] | security [scope] | prompt]"
 allowed-tools: Bash, Read, Write
