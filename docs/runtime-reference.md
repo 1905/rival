@@ -139,7 +139,7 @@ Codex:
 codex exec -C <workdir> -m <wire id>
   -c model_provider="rival_proxy"
   -c model_providers.rival_proxy={ name = "rival proxy", base_url = "<url>/v1", env_key = "RIVAL_PROXY_KEY", wire_api = "responses" }
-  -c model_reasoning_effort=<effort> --sandbox read-only --ephemeral --skip-git-repo-check --color never -
+  -c model_reasoning_effort=<effort> --sandbox <read-only|workspace-write> --ephemeral --skip-git-repo-check --color never -
 env:  RIVAL_PROXY_KEY=<key>
 ```
 

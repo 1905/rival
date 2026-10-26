@@ -13,6 +13,7 @@ Latest binary release: [v6.0.0](https://github.com/1905/rival/releases/tag/v6.0.
 
 ### Changed
 - **Breaking: the security review runs on `china.model`** (`/rival security`, `rival command security`), at max effort with a low-effort language pass, through the same opencode v2 runner as `/china`. `rival command security --which` shows the model, where it comes from (`default` or `file`) and whether opencode v2 is installed. `rival config check` checks `china` in place of the security reviewer; `-m` takes `china`.
+- **Raw Codex and Sol prompts can edit the workdir.** `rival command codex|sol` with a raw prompt passes `--sandbox workspace-write`; reviews, the language pass and `rival config check` keep `--sandbox read-only`.
 - `config window`: the Review section shows the security model in place of the `Security reviewer` picker.
 
 ### Removed

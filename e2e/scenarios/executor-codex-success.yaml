@@ -28,7 +28,7 @@
               "-c",
               "model_reasoning_effort=xhigh",
               "--sandbox",
-              "read-only",
+              "workspace-write",
               "--ephemeral",
               "--skip-git-repo-check",
               "--color",

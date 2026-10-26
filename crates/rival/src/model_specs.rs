@@ -115,7 +115,7 @@ pub struct RunCall<'a, 'm> {
     pub effort: &'a str,
     /// Where the provider runs.
     pub workdir: &'a str,
-    /// Whether the run is a review, so grok can apply its sandbox.
+    /// Whether the run is a review, so codex, sol and grok apply a read-only sandbox.
     pub review: bool,
     /// The file that gets the provider output; `None` is the session log.
     pub log: Option<&'a str>,
