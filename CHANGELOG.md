@@ -4,6 +4,12 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 
 Latest binary release: [v7.0.0](https://github.com/1905/rival/releases/tag/v7.0.0) — 2026-10-26.
 
+## Sunset — 2026-11-19
+
+- End active maintenance. Recommend T3 Code delegate subagents for reviews and jobs.
+- Add a short migration guide at the top of the README. Preserve the previous documentation for reference.
+- Documentation-only change. No new binary release or runtime validation.
+
 ## [v7.0.0] — 2026-10-26
 
 Breaking: the security review runs on `china.model`; Kimi K3 and `security.reviewer` are removed.

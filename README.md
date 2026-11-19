@@ -1,5 +1,24 @@
 # Rival
 
+> **Sunset — 2026-11-19.** Rival is no longer maintained. Use [T3 Code](https://github.com/pingdotgg/t3code) and its delegate subagents for new reviews and jobs. T3 provides model selection, child tasks, and result delivery directly.
+
+## Use T3 delegates
+
+1. Open your project in T3 Code and configure the providers you want to use.
+2. Ask the agent:
+
+   > Delegate subagent: review this branch against `origin/master` with my selected review model. Read-only. Return findings with severity, file and line, evidence, and a proposed fix. Start no further subagents.
+
+3. The agent checks `orchestrator_capabilities`, selects an available model, and starts `delegate_task` with a complete task brief.
+4. Wait for the completion result. Verify the findings before applying fixes. Use a fresh delegate for each independent review round.
+
+For implementation jobs, name the files the delegate may edit and the checks it should run. Children do not inherit the parent conversation.
+See the [T3 delegation documentation](https://github.com/pingdotgg/t3code/blob/main/docs/orchestration-v2/orchestrator-mcp-server.md).
+
+The documentation below describes the retired software and remains for reference.
+
+---
+
 <img src="assets/tui.png" width="100%" alt="Rival terminal UI showing sessions and review output">
 
 Rival sends your code to another AI model for an independent review. It runs in the background while you keep working.
