@@ -30,8 +30,8 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command codex --no-queue`, `--workdir` | command-codex-no-queue-workdir | workdir-missing |
 | `command claude` | executor-claude-success, executor-claude-docker-success | executor-claude-failure, executor-claude-quota, executor-claude-missing-runtime, executor-claude-docker-failure, executor-claude-docker-quota |
 | `command claude --no-queue`, `--workdir` | command-claude-no-queue-workdir | workdir-missing |
-| `command fable` (Fable 5.1 on the Claude runtime: `--model claude-fable-5-1`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
-| `command sol` (Sol 6.1 on the codex runtime: `-m gpt-6.1-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
+| `command fable` (Fable 5.2 on the Claude runtime: `--model claude-fable-5-2`, label `fable`, repair pass) | fable-review | unit tests `executor::claude::tests`, `model_specs::tests` |
+| `command sol` (Sol 6.2 on the codex runtime: `-m gpt-6.2-sol`, label `sol`, repair pass) | sol-review | unit tests `executor::codex::tests`, `model_specs::tests` |
 | `speed.sol` / `speed.codex` (fast by default: every codex/sol fake argv carries the fast tier pairs; tier pairs after `-m`, `service_tier` on the session, the not-applied notice with the plan line for ultrafast; normal runs without the tier) | speed-command (ultrafast omitted, normal, fast after `config set`), skill-command, config-skill (`fast default`) | unit tests `config::tests::speed_*`, `config::tests::old_ultrafast_switches_read_as_a_speed`, `executor::codex::tests` (fast/priority warnings), `review::planrun::tests::omitted_ultrafast_tiers_become_notices`, `check::tests::speed_rows_show_the_tier_and_an_omitted_tier`, `tree::tests::ultrafast_is_not_a_flag` |
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |

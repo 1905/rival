@@ -10,10 +10,10 @@
 │    Codex prefix        ‹ none ›   route off                                  │|
 │                                                                              │|
 │  REQUESTS GO TO                                                              │|
-│    codex  Codex      direct  → gpt-6-astra                                   │|
-│    sol    Sol 6.1    direct  → gpt-6.1-sol                                   │|
+│    codex  Codex      direct  → gpt-6.2-astra                                 │|
+│    sol    Sol 6.2    direct  → gpt-6.2-sol                                   │|
 │    claude Opus 5.5   proxy   → emcd_/claude-opus-5-5                         │|
-│    fable  Fable 5.1  proxy   → emcd_/claude-fable-5-1                        │|
+│    fable  Fable 5.2  proxy   → emcd_/claude-fable-5-2                        │|
 │                                                                              │|
 │                                                                              │|
 │                                                                              │|
@@ -35,7 +35,7 @@ d........................ddddddddddddddddddddddddddddddddddddddddddddddddd.....d
 d....ddddddddddddddddddddddTTTTdddddddddddddd..................................d|
 d..............................................................................d|
 d..DDDDDDDDDDDDDD..............................................................d|
-d....tttttttdddddddddddddddddddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddddddddddddTTTTTTTTTTTTT.................................d|
 d....tttttttdddddddddddddddddddddTTTTTTTTTTT...................................d|
 d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT.........................d|
 d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT........................d|

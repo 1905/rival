@@ -12,10 +12,10 @@
 │    Codex prefix        ‹ none ›                                              │|
 │                                                                              │|
 │  REQUESTS GO TO                                                              │|
-│    codex  Codex      proxy   → gpt-6-astra                                   │|
-│    sol    Sol 6.1    proxy   → gpt-6.1-sol                                   │|
+│    codex  Codex      proxy   → gpt-6.2-astra                                 │|
+│    sol    Sol 6.2    proxy   → gpt-6.2-sol                                   │|
 │    claude Opus 5.5   proxy   → team9/claude-opus-5-5                         │|
-│    fable  Fable 5.1  proxy   → team9/claude-fable-5-1                        │|
+│    fable  Fable 5.2  proxy   → team9/claude-fable-5-2                        │|
 │                                                                              │|
 ├──────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK  not run · c checks the draft                     ● online · 6 models │|
@@ -37,7 +37,7 @@ d........................ggggggggggggggggggggggg...............................d
 d....ddddddddddddddddddddddTTTTdd..............................................d|
 d..............................................................................d|
 d..DDDDDDDDDDDDDD..............................................................d|
-d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
+d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTT.................................d|
 d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTT...................................d|
 d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT.........................d|
 d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT........................d|

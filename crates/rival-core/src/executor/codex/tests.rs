@@ -84,7 +84,13 @@ fn codex_passes_ultra_and_xhigh_through_unaliased() {
 fn run_codex_model_rejects_unsupported_sol_and_empty() {
     let env = Env::new();
     let cfg = env.config();
-    for model in ["retired-model", config::GPT56_SOL_MODEL, ""] {
+    for model in [
+        "retired-model",
+        config::GPT56_SOL_MODEL,
+        config::SOL_61_MODEL,
+        config::CODEX_60_MODEL,
+        "",
+    ] {
         let mut sess = Session::default();
         let mut seen = None;
         let err = run_codex_model_with(
@@ -172,7 +178,9 @@ fn run_codex_model_wraps_errors_with_the_public_label() {
         None,
         recorder(
             &mut seen,
-            Err(anyhow!("start codex: OpenAI Codex failed for gpt-6-astra")),
+            Err(anyhow!(
+                "start codex: OpenAI Codex failed for gpt-6.2-astra"
+            )),
         ),
     )
     .unwrap_err();
@@ -534,7 +542,7 @@ fn proxy_route_errors_stop_the_run() {
 fn codex_preflight_runs_the_proxy_preflight_not_login_status() {
     use crate::proxy::testserver::serve;
     // Not installed: the binary check comes first, before any request.
-    let (url, seen) = serve(200, r#"{"data":[{"id":"gpt-6-astra"}]}"#);
+    let (url, seen) = serve(200, r#"{"data":[{"id":"gpt-6.2-astra"}]}"#);
     let env = proxy_env_at(&url);
     assert_eq!(
         codex_preflight_for(&env.config(), config::CODEX_MODEL)

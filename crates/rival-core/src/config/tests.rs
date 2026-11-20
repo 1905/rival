@@ -305,13 +305,22 @@ fn engine_label_table() {
         ("custom", "custom/model", "retired-model"),
         ("custom", "grok-4.6-openrouter", "retired-model"),
         (CHINA_LABEL, CHINA_DEFAULT_MODEL, "kimi-k3.1-pro"),
-        // Sol 6.1 and Fable 5.1 are current again; old ids keep their labels.
+        // Sol 6.2, Astra 6.2 and Fable 5.2 are current; old ids keep their
+        // labels (read-compat).
         ("codex", SOL_MODEL, SOL_LABEL),
+        ("codex", "gpt-6.2-sol", "sol"),
         ("codex", "gpt-6.1-sol", "sol"),
         ("codex", "gpt-5.6-sol", "sol"),
         ("codex", CODEX_MODEL, CODEX_LABEL),
+        ("codex", "gpt-6.2-astra", "codex"),
+        ("codex", "gpt-6-astra", "codex"),
         ("claude", FABLE_MODEL, FABLE_LABEL),
+        ("claude", "claude-fable-5-2", "fable"),
         ("claude", "claude-fable-5-1", "fable"),
+        ("fable", "claude-fable-5-1", "fable"),
+        ("", "gpt-6-astra", "codex"),
+        ("", "gpt-6.1-sol", "sol"),
+        ("", "claude-fable-5-1", "fable"),
         ("claude", "claude-fable-5", "retired-model"),
         ("fable", FABLE_MODEL, FABLE_LABEL),
         ("", SOL_MODEL, SOL_LABEL),
@@ -344,6 +353,13 @@ fn model_label_only_exposes_supported_models() {
         (SOL_MODEL, SOL_LABEL),
         (FABLE_MODEL, FABLE_LABEL),
         (FABLE_LABEL, FABLE_LABEL),
+        ("gpt-6.2-astra", CODEX_LABEL),
+        ("gpt-6.2-sol", SOL_LABEL),
+        ("claude-fable-5-2", FABLE_LABEL),
+        // read-compat: the ids before Astra 6.2, Sol 6.2 and Fable 5.2.
+        (CODEX_60_MODEL, CODEX_LABEL),
+        (SOL_61_MODEL, SOL_LABEL),
+        (FABLE_51_MODEL, FABLE_LABEL),
     ];
     for (model, want) in cases {
         assert_eq!(model_label(model), want, "model_label({model:?})");
@@ -965,6 +981,56 @@ fn public_review_header_cases() {
             "=== REVIEW FROM (gpt-5.6-sol) [role: x] ===",
             "=== REVIEW FROM sol [role: x] ===",
         ),
+        // read-compat: reviewers from before Astra 6.2, Sol 6.2, Fable 5.2.
+        (
+            "=== REVIEW FROM (gpt-6.1-sol) [role: x] ===",
+            "=== REVIEW FROM sol [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM (gpt-6-astra) [role: x] ===",
+            "=== REVIEW FROM codex [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM (claude-fable-5-1) [role: x] ===",
+            "=== REVIEW FROM fable [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM codex (gpt-6-astra) [role: x] ===",
+            "=== REVIEW FROM codex [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM codex (gpt-6.1-sol) [role: x] ===",
+            "=== REVIEW FROM sol [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM claude (claude-fable-5-1) [role: x] ===",
+            "=== REVIEW FROM fable [role: x] ===",
+        ),
+        // The current ids.
+        (
+            "=== REVIEW FROM (gpt-6.2-sol) [role: x] ===",
+            "=== REVIEW FROM sol [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM (gpt-6.2-astra) [role: x] ===",
+            "=== REVIEW FROM codex [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM (claude-fable-5-2) [role: x] ===",
+            "=== REVIEW FROM fable [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM codex (gpt-6.2-astra) [role: x] ===",
+            "=== REVIEW FROM codex [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM codex (gpt-6.2-sol) [role: x] ===",
+            "=== REVIEW FROM sol [role: x] ===",
+        ),
+        (
+            "=== REVIEW FROM claude (claude-fable-5-2) [role: x] ===",
+            "=== REVIEW FROM fable [role: x] ===",
+        ),
         (
             "=== REVIEW FROM GROK [role: x] ===",
             "=== REVIEW FROM grok [role: x] ===",
@@ -1131,6 +1197,15 @@ fn replace_concrete_model_ids_protects_labels() {
         replace_concrete_model_ids("", "", "gpt-6-astra claude-opus-5-5 grok-4.6 gpt-5.6-sol"),
         "codex claude grok sol"
     );
+    // The current ids and the read-compat ids they replaced.
+    assert_eq!(
+        replace_concrete_model_ids(
+            "",
+            "",
+            "gpt-6.2-astra gpt-6.2-sol claude-fable-5-2 gpt-6-astra gpt-6.1-sol claude-fable-5-1"
+        ),
+        "codex sol fable codex sol fable"
+    );
 }
 
 // ---- golden pins of the texts and constants ----
@@ -1198,6 +1273,11 @@ fn prompts_sha256_golden() {
 fn string_constants_golden() {
     let got = [
         GPT56_SOL_MODEL,
+        SOL_61_MODEL,
+        CODEX_60_MODEL,
+        FABLE_51_MODEL,
+        SOL_MODEL,
+        FABLE_MODEL,
         CODEX_MODEL,
         CODEX_LABEL,
         CLAUDE_MODEL,
@@ -1216,7 +1296,12 @@ fn string_constants_golden() {
     ];
     let want = [
         "gpt-5.6-sol",
+        "gpt-6.1-sol",
         "gpt-6-astra",
+        "claude-fable-5-1",
+        "gpt-6.2-sol",
+        "claude-fable-5-2",
+        "gpt-6.2-astra",
         "codex",
         "claude-opus-5-5",
         "sol",
@@ -1592,16 +1677,16 @@ fn route_debug_hides_the_key() {
     assert!(shown.contains("emcd_"), "{shown}");
 }
 
-/// Sol 6.1 and Fable 5.1 logs show their own labels; a Codex log's bare
+/// Sol 6.2 and Fable 5.2 logs show their own labels; a Codex log's bare
 /// "Codex" banner names Codex, not Sol.
 #[test]
 fn public_runtime_log_names_sol_and_fable() {
     assert_eq!(
-        public_runtime_log("codex", SOL_MODEL, "Codex v1\nmodel: gpt-6.1-sol\n"),
+        public_runtime_log("codex", SOL_MODEL, "Codex v1\nmodel: gpt-6.2-sol\n"),
         "Sol runtime v1\nmodel: sol\n"
     );
     assert_eq!(
-        public_runtime_log("codex", CODEX_MODEL, "Codex v1\nmodel: gpt-6-astra\n"),
+        public_runtime_log("codex", CODEX_MODEL, "Codex v1\nmodel: gpt-6.2-astra\n"),
         "Codex runtime v1\nmodel: codex\n"
     );
     assert_eq!(
@@ -1612,6 +1697,24 @@ fn public_runtime_log_names_sol_and_fable() {
         public_runtime_log(
             "claude",
             FABLE_MODEL,
+            "Claude Code v2\nmodel: claude-fable-5-2\n"
+        ),
+        "Fable runtime v2\nmodel: fable\n"
+    );
+    // read-compat: logs of sessions run before Astra 6.2, Sol 6.2 and
+    // Fable 5.2 keep their labels.
+    assert_eq!(
+        public_runtime_log("codex", SOL_61_MODEL, "Codex v1\nmodel: gpt-6.1-sol\n"),
+        "Sol runtime v1\nmodel: sol\n"
+    );
+    assert_eq!(
+        public_runtime_log("codex", CODEX_60_MODEL, "Codex v1\nmodel: gpt-6-astra\n"),
+        "Codex runtime v1\nmodel: codex\n"
+    );
+    assert_eq!(
+        public_runtime_log(
+            "claude",
+            FABLE_51_MODEL,
             "Claude Code v2\nmodel: claude-fable-5-1\n"
         ),
         "Fable runtime v2\nmodel: fable\n"

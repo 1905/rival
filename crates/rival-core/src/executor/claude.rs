@@ -43,7 +43,7 @@ pub fn claude_preflight(cfg: &Config) -> anyhow::Result<()> {
     claude_preflight_model(cfg, config::CLAUDE_MODEL)
 }
 
-/// Whether the Claude Code runtime runs `model`: Opus 5.5 or Fable 5.1.
+/// Whether the Claude Code runtime runs `model`: Opus 5.5 or Fable 5.2.
 pub fn is_claude_model(model: &str) -> bool {
     model == config::CLAUDE_MODEL || model == config::FABLE_MODEL
 }
@@ -60,7 +60,7 @@ pub fn claude_preflight_model(cfg: &Config, model: &str) -> anyhow::Result<()> {
 }
 
 /// Executes a prompt through the Claude Code CLI on `model` (Opus 5.5 or
-/// Fable 5.1). `read_only` restricts tools and mounts the workdir
+/// Fable 5.2). `read_only` restricts tools and mounts the workdir
 /// read-only: reviews and task runs.
 #[allow(clippy::too_many_arguments)]
 pub fn run_claude(

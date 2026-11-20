@@ -24,17 +24,26 @@ pub mod write;
 /// read-compat: the Sol model before Sol 6.1. Nothing runs it; the
 /// executor rejects it. Its sessions still show as `sol`.
 pub const GPT56_SOL_MODEL: &str = "gpt-5.6-sol";
+/// read-compat: Sol 6.1, the Sol model before Sol 6.2. Nothing runs it; the
+/// executor rejects it. Its sessions still show as `sol`.
+pub const SOL_61_MODEL: &str = "gpt-6.1-sol";
+/// read-compat: GPT-6 Astra, the Codex model before Astra 6.2. Nothing runs
+/// it; the executor rejects it. Its sessions still show as `codex`.
+pub const CODEX_60_MODEL: &str = "gpt-6-astra";
+/// read-compat: Fable 5.1, the Fable model before Fable 5.2. Nothing runs
+/// it; the executor rejects it. Its sessions still show as `fable`.
+pub const FABLE_51_MODEL: &str = "claude-fable-5-1";
 // CODEX_MODEL and SOL_MODEL share the codex runtime, so engine_label must
 // match both ids before the "codex" adapter fallback, which labels old
 // sessions "sol". The public label equals the adapter name, so identity
 // checks key on the model id, never on the bare word "codex".
-pub const CODEX_MODEL: &str = "gpt-6-astra";
+pub const CODEX_MODEL: &str = "gpt-6.2-astra";
 pub const CODEX_LABEL: &str = "codex";
-/// Sol 6.1 on the codex runtime.
-pub const SOL_MODEL: &str = "gpt-6.1-sol";
+/// Sol 6.2 on the codex runtime.
+pub const SOL_MODEL: &str = "gpt-6.2-sol";
 pub const CLAUDE_MODEL: &str = "claude-opus-5-5";
-/// Fable 5.1 on the Claude Code runtime.
-pub const FABLE_MODEL: &str = "claude-fable-5-1";
+/// Fable 5.2 on the Claude Code runtime.
+pub const FABLE_MODEL: &str = "claude-fable-5-2";
 /// The Sol label: `command sol`, plan `-m sol` and the `efforts.sol` key
 /// (Codex ladder).
 pub const SOL_LABEL: &str = "sol";
@@ -91,10 +100,12 @@ pub fn claude_effort_level(effort: &str) -> Option<&'static str> {
 pub fn model_label(model: &str) -> &'static str {
     match model {
         SOL_MODEL | SOL_LABEL => SOL_LABEL,
-        GPT56_SOL_MODEL => SOL_LABEL, // read-compat
+        GPT56_SOL_MODEL | SOL_61_MODEL => SOL_LABEL, // read-compat
         CODEX_MODEL | CODEX_LABEL => CODEX_LABEL,
+        CODEX_60_MODEL => CODEX_LABEL, // read-compat
         CLAUDE_MODEL | CLAUDE_LABEL => CLAUDE_LABEL,
         FABLE_MODEL | FABLE_LABEL => FABLE_LABEL,
+        FABLE_51_MODEL => FABLE_LABEL, // read-compat
         GROK_MODEL | GROK_LABEL => GROK_LABEL,
         _ => "retired-model",
     }
@@ -110,14 +121,16 @@ pub fn engine_label(cli: &str, model: &str) -> String {
     // Exact current ids win first.
     match model {
         SOL_MODEL => return SOL_LABEL.to_string(),
-        GPT56_SOL_MODEL => return SOL_LABEL.to_string(), // read-compat
+        GPT56_SOL_MODEL | SOL_61_MODEL => return SOL_LABEL.to_string(), // read-compat
         // Checked before the adapter fallback: Codex and Sol both run on
         // codex, so falling through would label Codex as Sol.
         CODEX_MODEL => return CODEX_LABEL.to_string(),
+        CODEX_60_MODEL => return CODEX_LABEL.to_string(), // read-compat
         CLAUDE_MODEL => return CLAUDE_LABEL.to_string(),
         // Checked before the adapter fallback, which labels other Claude-
         // runtime ids "retired-model".
         FABLE_MODEL => return FABLE_LABEL.to_string(),
+        FABLE_51_MODEL => return FABLE_LABEL.to_string(), // read-compat
         GROK_MODEL => return GROK_LABEL.to_string(),
         _ => {}
     }
@@ -292,14 +305,17 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
     // or label. Replacing ids directly lets one substitution
     // corrupt another's output, so each id becomes a placeholder first and
     // only expands to its label once every id is consumed.
-    let mut pairs: Vec<(String, String)> = Vec::with_capacity(7);
+    let mut pairs: Vec<(String, String)> = Vec::with_capacity(10);
     if !model.is_empty() {
         // The run's own model wins, and is matched before the shared list so
         // a longer id is never shadowed by a shorter one it contains.
         pairs.push((model.to_string(), engine_label(cli, model)));
     }
     for (id, label) in [
-        (GPT56_SOL_MODEL, SOL_LABEL), // read-compat
+        (GPT56_SOL_MODEL, SOL_LABEL),  // read-compat
+        (SOL_61_MODEL, SOL_LABEL),     // read-compat
+        (CODEX_60_MODEL, CODEX_LABEL), // read-compat
+        (FABLE_51_MODEL, FABLE_LABEL), // read-compat
         (SOL_MODEL, SOL_LABEL),
         (CODEX_MODEL, CODEX_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
@@ -382,6 +398,7 @@ fn public_review_header(line: &str) -> String {
             // identity or the Codex model id means Codex.
             reviewer = if lower_identity == CODEX_LABEL
                 || lower_identity.contains(CODEX_MODEL)
+                || lower_identity.contains(CODEX_60_MODEL) // read-compat
                 || lower_identity.contains("astra")
             {
                 CODEX_LABEL.to_string()
@@ -395,17 +412,22 @@ fn public_review_header(line: &str) -> String {
             // model.
             reviewer = if lower_identity == CLAUDE_LABEL || lower_identity.contains(CLAUDE_MODEL) {
                 CLAUDE_LABEL.to_string()
-            } else if lower_identity.contains(FABLE_MODEL) {
+            } else if lower_identity.contains(FABLE_MODEL)
+                // read-compat: Fable 5.1 sessions.
+                || lower_identity.contains(FABLE_51_MODEL)
+            {
                 FABLE_LABEL.to_string()
             } else {
                 "retired-model".to_string()
             };
         }
         "opencode" => reviewer = "retired-model".to_string(),
-        GPT56_SOL_MODEL => reviewer = SOL_LABEL.to_string(), // read-compat
+        GPT56_SOL_MODEL | SOL_61_MODEL => reviewer = SOL_LABEL.to_string(), // read-compat
         SOL_MODEL => reviewer = SOL_LABEL.to_string(),
+        CODEX_MODEL | CODEX_60_MODEL => reviewer = CODEX_LABEL.to_string(),
         CLAUDE_MODEL => reviewer = CLAUDE_LABEL.to_string(),
         FABLE_MODEL => reviewer = FABLE_LABEL.to_string(),
+        FABLE_51_MODEL => reviewer = FABLE_LABEL.to_string(), // read-compat
         GROK_LABEL | GROK_MODEL => reviewer = GROK_LABEL.to_string(),
         _ => {}
     }
@@ -709,9 +731,9 @@ pub const ULTRAFAST_PLAN_WARNING: &str = "Ultrafast needs the Pro $500 plan (or 
 /// `speed.<label>` reads as ultrafast.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SpeedConfig {
-    /// `speed.codex`: GPT-6 Astra.
+    /// `speed.codex`: GPT-6.2 Astra.
     pub codex: Speed,
-    /// `speed.sol`: Sol 6.1.
+    /// `speed.sol`: Sol 6.2.
     pub sol: Speed,
 }
 
@@ -773,7 +795,7 @@ impl SkillHost {
     }
 
     /// The model when `skill.<host>` is unset: the other vendor's model,
-    /// Sol 6.1 in Claude Code and Opus 5.5 in Codex.
+    /// Sol 6.2 in Claude Code and Opus 5.5 in Codex.
     pub fn default_model(self) -> &'static str {
         match self {
             SkillHost::Claude => SOL_LABEL,
@@ -1579,7 +1601,7 @@ impl Config {
     }
 
     /// The service tier calls of `model` ask Codex for: `speed.codex` for
-    /// GPT-6 Astra, `speed.sol` for Sol 6.1 (fast when unset, also with no
+    /// GPT-6.2 Astra, `speed.sol` for Sol 6.2 (fast when unset, also with no
     /// config file), normal for any other model.
     pub fn speed(&self, model: &str) -> Speed {
         let speeds = self

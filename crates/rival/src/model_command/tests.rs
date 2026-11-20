@@ -36,7 +36,7 @@ fn command_review_prints_formatted_review() {
     );
     for want in [
         "═══ RIVAL REVIEW ═══",
-        "Model: codex (gpt-6-astra)",
+        "Model: codex (gpt-6.2-astra)",
         "Scope: src/",
         "1. [high] nil deref — a.go:3",
         "\nLog: ",

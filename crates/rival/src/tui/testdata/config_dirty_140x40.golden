@@ -10,10 +10,10 @@
 │                    │    Codex prefix        ‹ none ›   route off                                                                         │|
 │                    │                                                                                                                     │|
 │                    │  REQUESTS GO TO                                                                                                     │|
-│                    │    codex  Codex      direct  → gpt-6-astra                                                                          │|
-│                    │    sol    Sol 6.1    direct  → gpt-6.1-sol                                                                          │|
+│                    │    codex  Codex      direct  → gpt-6.2-astra                                                                        │|
+│                    │    sol    Sol 6.2    direct  → gpt-6.2-sol                                                                          │|
 │                    │    claude Opus 5.5   proxy   → emcd_/claude-opus-5-5                                                                │|
-│                    │    fable  Fable 5.1  proxy   → emcd_/claude-fable-5-1                                                               │|
+│                    │    fable  Fable 5.2  proxy   → emcd_/claude-fable-5-2                                                               │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
@@ -29,11 +29,11 @@
 │                    │                                                                                                                     │|
 ├────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
 │  CHECK   ● online · 6 models                                                                                       running · 4 of 5 done │|
-│  ⠋ codex   direct  gpt-6-astra                  …  checking                                                                              │|
-│  ✗ sol     proxy   gpt-6.1-sol                  —  proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log in Codex on the      │|
+│  ⠋ codex   direct  gpt-6.2-astra                …  checking                                                                              │|
+│  ✗ sol     proxy   gpt-6.2-sol                  —  proxy does not serve gpt-6.2-sol; it serves no gpt-6.2-sol — log in Codex on the      │|
 │                                                    proxy (-codex-device-login)                                                           │|
 │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                                                                                    │|
-│  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s  Sure! ok.  (not ok)                                                                   │|
+│  ✓ fable   proxy   emcd2_/claude-fable-5-2   1.8s  Sure! ok.  (not ok)                                                                   │|
 │  ✗ china   direct  moonshot/kimi-k3.1-pro    4.0s  limit 429 monthly spend limit reached                                                 │|
 ├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤|
 │ tab section  ↑↓ field  ←→ choose  e type  x cancel check  s save  u undo  ? help  esc back                                               │|
@@ -51,7 +51,7 @@ d....................d........................dddddddddddddddddddddddddddddddddd
 d....................d....ddddddddddddddddddddddTTTTdddddddddddddd.........................................................................d|
 d....................d.....................................................................................................................d|
 d....................d..DDDDDDDDDDDDDD.....................................................................................................d|
-d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTT..........................................................................d|
+d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTTTT........................................................................d|
 d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTT..........................................................................d|
 d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT................................................................d|
 d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT...............................................................d|

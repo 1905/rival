@@ -998,7 +998,7 @@ fn proxy_key_never_reaches_the_log_mirror_or_record() {
     );
 }
 
-/// Fable 5.1 runs on the Claude runtime: its id reaches `--model`, and on
+/// Fable 5.2 runs on the Claude runtime: its id reaches `--model`, and on
 /// the proxy route it gets the prefix. The session keeps the bare id.
 #[test]
 fn fable_runs_direct_and_through_the_proxy() {
@@ -1032,10 +1032,12 @@ fn fable_runs_direct_and_through_the_proxy() {
     let env = proxy_env_at("http://127.0.0.1:8999");
     env.fake_on_path("claude");
     let (seen, sess) = run(&env);
-    want[2] = "emcd_/claude-fable-5-1".to_string();
+    want[2] = "emcd_/claude-fable-5-2".to_string();
     assert_eq!(seen.args, want);
     assert_eq!(sess.model, config::FABLE_MODEL);
-    assert_eq!(sess.wire_model, "emcd_/claude-fable-5-1");
+    assert_eq!(sess.wire_model, "emcd_/claude-fable-5-2");
     assert!(is_claude_model(config::FABLE_MODEL));
     assert!(!is_claude_model(config::SOL_MODEL));
+    // read-compat: old Fable sessions still read, but nothing runs Fable 5.1.
+    assert!(!is_claude_model(config::FABLE_51_MODEL));
 }

@@ -4,6 +4,12 @@ All notable changes to **rival** are documented here. Versions follow [semver](h
 
 Latest binary release: [v7.0.0](https://github.com/1905/rival/releases/tag/v7.0.0) — 2026-10-26.
 
+## Unreleased
+
+### Changed
+- **Astra 6.2, Sol 6.2 and Fable 5.2.** `codex` runs `gpt-6.2-astra` (was `gpt-6-astra`), `sol` runs `gpt-6.2-sol` (was `gpt-6.1-sol`) and `fable` runs `claude-fable-5-2` (was `claude-fable-5-1`): `rival command codex|sol|fable`, `rival run fable`, plan review, the `/rival` skill, `speed.codex` / `speed.sol` and `rival config check`. Labels, config keys and efforts do not change. Through the proxy, the proxy must serve the new ids.
+- Sessions, logs and review headers written with `gpt-6-astra`, `gpt-6.1-sol` or `claude-fable-5-1` still show as `codex`, `sol` and `fable` (read-compat), never as `retired-model`. Nothing runs the old ids.
+
 ## Sunset — 2026-11-19
 
 - End active maintenance. Recommend T3 Code delegate subagents for reviews and jobs.

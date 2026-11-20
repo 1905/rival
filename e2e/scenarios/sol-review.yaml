@@ -1,6 +1,6 @@
 {
   "name": "sol-review",
-  "description": "`rival command sol` review, direct (no proxy block). The preflight runs `codex login status`. The fake codex sees `-m gpt-6.1-sol` with the Codex default effort (xhigh) for the review and low for the language repair pass, and no provider -c values. The session records the bare Sol id with cli codex; the output names the reviewer `sol`.",
+  "description": "`rival command sol` review, direct (no proxy block). The preflight runs `codex login status`. The fake codex sees `-m gpt-6.2-sol` with the Codex default effort (xhigh) for the review and low for the language repair pass, and no provider -c values. The session records the bare Sol id with cli codex; the output names the reviewer `sol`.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -20,7 +20,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6.1-sol",
+              "gpt-6.2-sol",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -54,7 +54,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6.1-sol",
+              "gpt-6.2-sol",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -95,7 +95,7 @@
       "stdin": "review src/",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: sol (gpt-6.1-sol)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: sol (gpt-6.2-sol)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -125,7 +125,7 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6.1-sol",
+          "model": "gpt-6.2-sol",
           "review_scope": "src/"
         }
       }

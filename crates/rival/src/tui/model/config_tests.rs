@@ -267,13 +267,13 @@ fn mixed_rows(m: &mut Model) {
             ms: 1830,
             reply: "Sure! ok.".into(),
             unexpected: true,
-            ..row("fable", "proxy", "emcd2_/claude-fable-5-1")
+            ..row("fable", "proxy", "emcd2_/claude-fable-5-2")
         },
         CheckRow {
             called: false,
-            error: "proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log in Codex on the proxy (-codex-device-login)".into(),
+            error: "proxy does not serve gpt-6.2-sol; it serves no gpt-6.2-sol — log in Codex on the proxy (-codex-device-login)".into(),
             hint: "set proxy.codex.model_prefix".into(),
-            ..row("sol", "proxy", "gpt-6.1-sol")
+            ..row("sol", "proxy", "gpt-6.2-sol")
         },
         CheckRow {
             ms: 4020,

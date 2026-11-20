@@ -199,7 +199,7 @@ pub fn codex_spec() -> ModelSpec {
     codex_runtime_spec(config::CODEX_LABEL, config::CODEX_MODEL, CODEX_USAGE)
 }
 
-/// Sol 6.1 on the codex runtime.
+/// Sol 6.2 on the codex runtime.
 pub fn sol_spec() -> ModelSpec {
     codex_runtime_spec(config::SOL_LABEL, config::SOL_MODEL, SOL_USAGE)
 }
@@ -228,7 +228,7 @@ pub fn claude_spec() -> ModelSpec {
     claude_runtime_spec(config::CLAUDE_LABEL, config::CLAUDE_MODEL, CLAUDE_USAGE)
 }
 
-/// Fable 5.1 on the Claude runtime.
+/// Fable 5.2 on the Claude runtime.
 pub fn fable_spec() -> ModelSpec {
     claude_runtime_spec(config::FABLE_LABEL, config::FABLE_MODEL, FABLE_USAGE)
 }

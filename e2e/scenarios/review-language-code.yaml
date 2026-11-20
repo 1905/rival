@@ -20,7 +20,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -51,7 +51,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -89,7 +89,7 @@
       "stdin": "review src/",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: We use the cache.\n\n1. [high] Cache key is wrong — src/a.go:3\n   The code in `load()` reads 3 entries. Make sure that the key is unique.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6.2-astra)\nScope: src/\n\nSummary: We use the cache.\n\n1. [high] Cache key is wrong — src/a.go:3\n   The code in `load()` reads 3 entries. Make sure that the key is unique.\n   Fix: Return an error.\n   (bug, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -119,7 +119,7 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6-astra",
+          "model": "gpt-6.2-astra",
           "effort": "xhigh",
           "mode": "review",
           "work_dir": "<ROOT>/work",

@@ -28,10 +28,10 @@ fn proxy_fixture() -> Fixture {
 fn served() -> Vec<String> {
     [
         "emcd_/claude-opus-5-5",
-        "emcd_/claude-fable-5-1",
+        "emcd_/claude-fable-5-2",
         "emcd2_/claude-opus-5-5",
-        "gpt-6-astra",
-        "gpt-6.1-sol",
+        "gpt-6.2-astra",
+        "gpt-6.2-sol",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -279,7 +279,7 @@ fn all_pass_direct() {
             codex.route.as_str(),
             codex.wire_model.as_str()
         ),
-        ("codex", "direct", "gpt-6-astra")
+        ("codex", "direct", "gpt-6.2-astra")
     );
     assert_eq!(row(&report, "china").wire_model, "moonshot/kimi-k3.1-pro");
     assert_eq!(row(&report, "china").runtime, "china");
@@ -316,9 +316,9 @@ fn all_pass_through_the_proxy_shares_one_model_list() {
     let fable = row(&report, "fable");
     assert_eq!(
         (fable.route.as_str(), fable.wire_model.as_str()),
-        ("proxy", "emcd_/claude-fable-5-1")
+        ("proxy", "emcd_/claude-fable-5-2")
     );
-    assert_eq!(row(&report, "sol").wire_model, "gpt-6.1-sol");
+    assert_eq!(row(&report, "sol").wire_model, "gpt-6.2-sol");
 }
 
 #[test]
@@ -446,19 +446,19 @@ fn model_not_listed() {
     let mut fake = Fake::new();
     fake.models = Ok(vec![
         "emcd_/claude-opus-5-5".to_string(),
-        "emcd2_/claude-fable-5-1".to_string(),
-        "gpt-6-astra".to_string(),
+        "emcd2_/claude-fable-5-2".to_string(),
+        "gpt-6.2-astra".to_string(),
     ]);
     let report = check(&fix, &["claude", "fable", "sol"], &fake);
     assert!(row(&report, "claude").ok);
     assert_eq!(
         row(&report, "fable").error,
-        "proxy does not serve emcd_/claude-fable-5-1; it serves claude-fable-5-1 as: emcd2_/claude-fable-5-1 — set proxy.claude.model_prefix"
+        "proxy does not serve emcd_/claude-fable-5-2; it serves claude-fable-5-2 as: emcd2_/claude-fable-5-2 — set proxy.claude.model_prefix"
     );
     assert!(
         row(&report, "sol")
             .error
-            .starts_with("proxy does not serve gpt-6.1-sol;")
+            .starts_with("proxy does not serve gpt-6.2-sol;")
     );
     assert_eq!(fake.called(), ["claude"]);
 }
@@ -583,7 +583,7 @@ fn unexpected_reply_passes_flagged_and_is_cut_to_40_chars() {
 
 #[test]
 fn reply_drops_the_codex_banner() {
-    let log = "OpenAI Codex v0.161.0\n--------\nmodel: gpt-6-astra\n--------\nuser\nReply with exactly: ok\n\ncodex\nok\ntokens used\n1,234\nok\n";
+    let log = "OpenAI Codex v0.161.0\n--------\nmodel: gpt-6.2-astra\n--------\nuser\nReply with exactly: ok\n\ncodex\nok\ntokens used\n1,234\nok\n";
     assert_eq!(reply_text(log), "ok");
     assert!(is_ok_reply("Ok!"));
     assert!(!is_ok_reply("okay"));
@@ -758,8 +758,8 @@ fn text_output_matches_the_spec_layout() {
                 name: "sol".into(),
                 runtime: "codex".into(),
                 route: "proxy".into(),
-                wire_model: "gpt-6.1-sol".into(),
-                error: "proxy does not serve gpt-6.1-sol".into(),
+                wire_model: "gpt-6.2-sol".into(),
+                error: "proxy does not serve gpt-6.2-sol".into(),
                 ..CheckRow::default()
             },
             CheckRow {
@@ -781,7 +781,7 @@ fn text_output_matches_the_spec_layout() {
         "proxy  http://127.0.0.1:8317  ✓ 200  38 models  key …a91f
 
   ✓ claude  proxy   emcd_/claude-opus-5-5   2.1s  ok
-  ✗ sol     proxy   gpt-6.1-sol             —     proxy does not serve gpt-6.1-sol
+  ✗ sol     proxy   gpt-6.2-sol             —     proxy does not serve gpt-6.2-sol
   ✓ china   direct  moonshot/kimi-k3.1-pro  4.0s  Sure  (not ok)
 
 2 of 3 ok
@@ -790,7 +790,7 @@ fn text_output_matches_the_spec_layout() {
     assert_eq!(ProxyLine::Off.text(), "proxy  off");
     assert_eq!(
         report.rows[1].to_json().to_string(),
-        r#"{"error":"proxy does not serve gpt-6.1-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","speed":"","tier_omitted":false,"unexpected":false,"wire_model":"gpt-6.1-sol"}"#
+        r#"{"error":"proxy does not serve gpt-6.2-sol","hint":"","limit":false,"ms":0,"name":"sol","ok":false,"reply":"","route":"proxy","runtime":"codex","speed":"","tier_omitted":false,"unexpected":false,"wire_model":"gpt-6.2-sol"}"#
     );
 }
 

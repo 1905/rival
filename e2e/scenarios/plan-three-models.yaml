@@ -1,6 +1,6 @@
 {
   "name": "plan-three-models",
-  "description": "`rival command plan -m opus,fable,sol` with both proxy routes on: proxy.claude with prefix emcd_ and proxy.codex with no prefix. `opus` names Claude (Opus 5.5). Opus and Fable run on the fake claude as two blocks with wire ids emcd_/claude-opus-5-5 and emcd_/claude-fable-5-1 (ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY in the env); Sol runs on the fake codex with -m gpt-6.1-sol and the provider -c values, RIVAL_PROXY_KEY in the env and no `codex login status`. Each block's language repair pass runs on its own model at low effort. The preflights share one GET /v1/models. Each session keeps its bare model id and records route proxy and its wire_model.",
+  "description": "`rival command plan -m opus,fable,sol` with both proxy routes on: proxy.claude with prefix emcd_ and proxy.codex with no prefix. `opus` names Claude (Opus 5.5). Opus and Fable run on the fake claude as two blocks with wire ids emcd_/claude-opus-5-5 and emcd_/claude-fable-5-2 (ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY in the env); Sol runs on the fake codex with -m gpt-6.2-sol and the provider -c values, RIVAL_PROXY_KEY in the env and no `codex login status`. Each block's language repair pass runs on its own model at low effort. The preflights share one GET /v1/models. Each session keeps its bare model id and records route proxy and its wire_model.",
   "fakes": {
     "scripts": {
       "claude": {
@@ -101,7 +101,7 @@
             "argv": [
               "-p",
               "--model",
-              "emcd_/claude-fable-5-1",
+              "emcd_/claude-fable-5-2",
               "--effort",
               "medium",
               "--output-format",
@@ -147,7 +147,7 @@
             "argv": [
               "-p",
               "--model",
-              "emcd_/claude-fable-5-1",
+              "emcd_/claude-fable-5-2",
               "--effort",
               "low",
               "--output-format",
@@ -199,7 +199,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6.1-sol",
+              "gpt-6.2-sol",
               "-c",
               "model_provider=\"rival_proxy\"",
               "-c",
@@ -239,7 +239,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6.1-sol",
+              "gpt-6.2-sol",
               "-c",
               "model_provider=\"rival_proxy\"",
               "-c",
@@ -305,15 +305,15 @@
               "owned_by": "anthropic"
             },
             {
-              "id": "emcd_/claude-fable-5-1",
+              "id": "emcd_/claude-fable-5-2",
               "owned_by": "anthropic"
             },
             {
-              "id": "gpt-6-astra",
+              "id": "gpt-6.2-astra",
               "owned_by": "openai"
             },
             {
-              "id": "gpt-6.1-sol",
+              "id": "gpt-6.2-sol",
               "owned_by": "openai"
             }
           ]
@@ -438,7 +438,7 @@
       {
         "glob": "<HOME>/.rival/sessions/*.json",
         "where": {
-          "model": "claude-fable-5-1"
+          "model": "claude-fable-5-2"
         },
         "bind": {
           "FABLE": "id"
@@ -447,11 +447,11 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "claude",
-          "model": "claude-fable-5-1",
+          "model": "claude-fable-5-2",
           "effort": "medium",
           "mode": "plan",
           "route": "proxy",
-          "wire_model": "emcd_/claude-fable-5-1",
+          "wire_model": "emcd_/claude-fable-5-2",
           "account": "proxy",
           "review_scope": "<ROOT>/work/plan.md"
         }
@@ -459,7 +459,7 @@
       {
         "glob": "<HOME>/.rival/sessions/*.json",
         "where": {
-          "model": "gpt-6.1-sol"
+          "model": "gpt-6.2-sol"
         },
         "bind": {
           "SOL": "id"
@@ -468,11 +468,11 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6.1-sol",
+          "model": "gpt-6.2-sol",
           "effort": "xhigh",
           "mode": "plan",
           "route": "proxy",
-          "wire_model": "gpt-6.1-sol",
+          "wire_model": "gpt-6.2-sol",
           "account": "proxy",
           "review_scope": "<ROOT>/work/plan.md"
         }

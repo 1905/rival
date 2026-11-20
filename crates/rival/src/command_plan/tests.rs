@@ -279,20 +279,20 @@ fn resolve_plan_path_reports_unreadable_files() {
 
 #[test]
 fn parse_plan_models() {
-    const CODEX: &str = "gpt-6-astra";
-    const SOL: &str = "gpt-6.1-sol";
+    const CODEX: &str = "gpt-6.2-astra";
+    const SOL: &str = "gpt-6.2-sol";
     const OPUS: &str = "claude-opus-5-5";
-    const FABLE: &str = "claude-fable-5-1";
+    const FABLE: &str = "claude-fable-5-2";
     let ok: &[(&str, &[&str], &[&str])] = &[
         (
             "exact models",
-            &["gpt-6-astra", "claude-opus-5-5"],
+            &["gpt-6.2-astra", "claude-opus-5-5"],
             &[CODEX, OPUS],
         ),
         ("friendly names", &["codex", "claude"], &[CODEX, OPUS]),
         (
             "codex exact id deduplicated",
-            &["codex", "gpt-6-astra"],
+            &["codex", "gpt-6.2-astra"],
             &[CODEX],
         ),
         ("comma separated", &["codex,claude"], &[CODEX, OPUS]),
@@ -303,7 +303,7 @@ fn parse_plan_models() {
         ),
         (
             "trims and lowercases",
-            &[" GPT-6-ASTRA ", "CLAUDE"],
+            &[" GPT-6.2-ASTRA ", "CLAUDE"],
             &[CODEX, OPUS],
         ),
         (
@@ -318,7 +318,7 @@ fn parse_plan_models() {
         ),
         (
             "exact new ids",
-            &["gpt-6.1-sol", "claude-fable-5-1"],
+            &["gpt-6.2-sol", "claude-fable-5-2"],
             &[SOL, FABLE],
         ),
     ];
@@ -332,6 +332,22 @@ fn parse_plan_models() {
             "old sol id rejected",
             &["gpt-5.6-sol"],
             format!("unknown plan model \"gpt-5.6-sol\"; {USE}"),
+        ),
+        // read-compat ids are labels for old sessions; nothing runs them.
+        (
+            "old astra id rejected",
+            &["gpt-6-astra"],
+            format!("unknown plan model \"gpt-6-astra\"; {USE}"),
+        ),
+        (
+            "old sol 6.1 id rejected",
+            &["gpt-6.1-sol"],
+            format!("unknown plan model \"gpt-6.1-sol\"; {USE}"),
+        ),
+        (
+            "old fable 5.1 id rejected",
+            &["claude-fable-5-1"],
+            format!("unknown plan model \"claude-fable-5-1\"; {USE}"),
         ),
         (
             "retired names rejected",

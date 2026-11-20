@@ -22,7 +22,7 @@
                 "$regex": "<ROOT>/tmp/rival-mr-[0-9]+"
               },
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -57,7 +57,7 @@
                 "$regex": "<ROOT>/tmp/rival-mr-[0-9]+"
               },
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -231,7 +231,7 @@
       "stdin": "review https://gitlab.example.com/group/sub/app%2F-%2Fmerge_requests%2F42",
       "expect": {
         "exit_code": 0,
-        "stdout": "GitLab MR: https://gitlab.example.com/group/sub/app/-/merge_requests/42\nBase: 090479deb9ac7429fee542c439eadf972316cb84\nHead: 86d7da21d369a2c43beaa522ec02d864c0250a3d\n\n\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: https://gitlab.example.com/group/sub/app%2F-%2Fmerge_requests%2F42\n\nSummary: MR patch reviewed.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "GitLab MR: https://gitlab.example.com/group/sub/app/-/merge_requests/42\nBase: 090479deb9ac7429fee542c439eadf972316cb84\nHead: 86d7da21d369a2c43beaa522ec02d864c0250a3d\n\n\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6.2-astra)\nScope: https://gitlab.example.com/group/sub/app%2F-%2Fmerge_requests%2F42\n\nSummary: MR patch reviewed.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -261,7 +261,7 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6-astra",
+          "model": "gpt-6.2-astra",
           "effort": "xhigh",
           "mode": "review",
           "review_scope": "https://gitlab.example.com/group/sub/app%2F-%2Fmerge_requests%2F42",

@@ -49,13 +49,13 @@ Windows binaries and manual downloads are available on the [releases page](https
 | `/rival security` | Look for exploitable security vulnerabilities. |
 
 By default, each host gets a review from the other vendor: `/rival` in Claude
-Code runs Sol 6.1, and `/rival` in Codex runs Opus 5.5. To pick the models,
+Code runs Sol 6.2, and `/rival` in Codex runs Opus 5.5. To pick the models,
 open the config window (`rival config`, Models), or run
 `rival config set skill.claude <model>` and `rival config set skill.codex <model>`.
 The models are `codex`, `sol`, `claude`, `fable` and `grok`. The security
 review uses the `/china` model (`china.model`, below).
 
-Codex (GPT-6 Astra) and Sol 6.1 run at the Codex fast tier by default:
+Codex (GPT-6.2 Astra) and Sol 6.2 run at the Codex fast tier by default:
 about 2x speed, using more of the plan's quota. To change it, set
 `speed.codex` or `speed.sol` to `normal`, `fast` or `ultrafast` in the config
 window or with `rival config set speed.sol normal`. Ultrafast needs the
