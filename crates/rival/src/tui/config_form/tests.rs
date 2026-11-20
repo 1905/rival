@@ -193,7 +193,7 @@ fn the_prefix_picker_lists_the_prefixes_that_serve_the_provider() {
     keys(&mut f, &["left"]);
     assert_eq!(f.draft.proxy.claude.model_prefix, "emcd_");
     assert_eq!(f.patch(), json!({"proxy.claude.model_prefix": "emcd_"}));
-    assert_eq!(f.wire(&MODELS[3]), "emcd_/claude-fable-5-1");
+    assert_eq!(f.wire(&MODELS[3]), "emcd_/claude-fable-5-2");
     // e types a prefix the proxy does not list; the trailing / goes. It is
     // kept, with a warning that does not block the save.
     keys(&mut f, &["e"]);
@@ -230,10 +230,10 @@ fn none_is_offered_only_when_the_proxy_serves_the_bare_ids() {
     assert_eq!(f.prefix_warning(ProxyProvider::Claude), None);
     let seq = f.bump_probe();
     let ids = [
-        "zz_/claude-fable-5-1",
+        "zz_/claude-fable-5-2",
         "aa_/claude-opus-5-5",
-        "x_/gpt-6-astra",
-        "gpt-6.1-sol",
+        "x_/gpt-6.2-astra",
+        "gpt-6.2-sol",
         "other/llama",
     ];
     f.probe_done(seq, Ok(ids.iter().map(|s| s.to_string()).collect()));
@@ -247,14 +247,14 @@ fn none_is_offered_only_when_the_proxy_serves_the_bare_ids() {
     assert_eq!(f.prefix_choices(ProxyProvider::Codex), ["x_", ""]);
     assert_eq!(
         f.prefix_warning(ProxyProvider::Codex).as_deref(),
-        Some("the proxy does not serve gpt-6-astra as gpt-6-astra")
+        Some("the proxy does not serve gpt-6.2-astra as gpt-6.2-astra")
     );
     // Once on a served prefix, "" is gone from the Claude picker.
     f.draft.proxy.claude.model_prefix = "aa_".into();
     assert_eq!(f.prefix_choices(ProxyProvider::Claude), ["aa_", "zz_"]);
     assert_eq!(
         f.prefix_warning(ProxyProvider::Claude).as_deref(),
-        Some("the proxy does not serve claude-fable-5-1 as aa_/claude-fable-5-1")
+        Some("the proxy does not serve claude-fable-5-2 as aa_/claude-fable-5-2")
     );
 }
 

@@ -25,7 +25,7 @@
               "-C",
               "<HOME>/.rival/check",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -51,7 +51,7 @@
               "-C",
               "<HOME>/.rival/check",
               "-m",
-              "gpt-6.1-sol",
+              "gpt-6.2-sol",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -94,7 +94,7 @@
       ],
       "expect": {
         "exit_code": 1,
-        "stdout": "proxy  off\n\n  ✓ codex   direct  gpt-6-astra             <DURATION>  ok  [fast]\n  ✓ sol     direct  gpt-6.1-sol             <DURATION>  ok  [fast]\n  ✗ claude  direct  claude-opus-5-5         —     not installed\n  ✗ fable   direct  claude-fable-5-1        —     not installed\n  ✗ china   direct  moonshot/kimi-k3.1-pro  —     not installed\n\n2 of 5 ok\n",
+        "stdout": "proxy  off\n\n  ✓ codex   direct  gpt-6.2-astra           <DURATION>  ok  [fast]\n  ✓ sol     direct  gpt-6.2-sol             <DURATION>  ok  [fast]\n  ✗ claude  direct  claude-opus-5-5         —     not installed\n  ✗ fable   direct  claude-fable-5-2        —     not installed\n  ✗ china   direct  moonshot/kimi-k3.1-pro  —     not installed\n\n2 of 5 ok\n",
         "stderr_lines": [
           "config check: 3 of 5 models failed"
         ]

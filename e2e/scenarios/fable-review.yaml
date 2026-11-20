@@ -1,6 +1,6 @@
 {
   "name": "fable-review",
-  "description": "`rival command fable` review, direct (no proxy block). The fake claude sees `--model claude-fable-5-1` at the Claude default effort (medium) for the review and low for the language repair pass. The session records the bare Fable id, cli claude and the subscription account; the output names the reviewer `fable`.",
+  "description": "`rival command fable` review, direct (no proxy block). The fake claude sees `--model claude-fable-5-2` at the Claude default effort (medium) for the review and low for the language repair pass. The session records the bare Fable id, cli claude and the subscription account; the output names the reviewer `fable`.",
   "fakes": {
     "scripts": {
       "claude": {
@@ -9,7 +9,7 @@
             "argv": [
               "-p",
               "--model",
-              "claude-fable-5-1",
+              "claude-fable-5-2",
               "--effort",
               "medium",
               "--output-format",
@@ -52,7 +52,7 @@
             "argv": [
               "-p",
               "--model",
-              "claude-fable-5-1",
+              "claude-fable-5-2",
               "--effort",
               "low",
               "--output-format",
@@ -107,7 +107,7 @@
       "stdin": "review src/",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: fable (claude-fable-5-1)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: fable (claude-fable-5-2)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -155,7 +155,7 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "claude",
-          "model": "claude-fable-5-1",
+          "model": "claude-fable-5-2",
           "mode": "native",
           "review_scope": "src/",
           "account": "subscription"

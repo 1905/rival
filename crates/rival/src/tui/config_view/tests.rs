@@ -50,8 +50,8 @@ fn check_rows_put_long_messages_under_narrow_rows() {
         CheckRow {
             name: "sol".into(),
             route: "proxy".into(),
-            wire_model: "gpt-6.1-sol".into(),
-            error: "proxy does not serve gpt-6.1-sol".into(),
+            wire_model: "gpt-6.2-sol".into(),
+            error: "proxy does not serve gpt-6.2-sol".into(),
             ..CheckRow::default()
         },
     );
@@ -64,14 +64,14 @@ fn check_rows_put_long_messages_under_narrow_rows() {
         .map(ToString::to_string)
         .collect();
     let sol = wide.iter().find(|l| l.contains("sol ")).unwrap();
-    assert!(sol.contains("—  proxy does not serve gpt-6.1-sol"), "{sol}");
+    assert!(sol.contains("—  proxy does not serve gpt-6.2-sol"), "{sol}");
     let narrow: Vec<String> = check_rows(&f, 74, 2, false, &v)
         .iter()
         .map(ToString::to_string)
         .collect();
     let i = narrow.iter().position(|l| l.contains("✗ sol")).unwrap();
     assert!(!narrow[i].contains("proxy does"), "{:?}", narrow[i]);
-    assert_eq!(narrow[i + 1], "    proxy does not serve gpt-6.1-sol");
+    assert_eq!(narrow[i + 1], "    proxy does not serve gpt-6.2-sol");
     assert!(narrow.iter().all(|l| crate::tui::text::width(l) <= 74));
 }
 
@@ -190,7 +190,7 @@ fn the_skill_picker_renders_its_model_and_help() {
         .unwrap_or_else(|| panic!("{lines:#?}"));
     assert_eq!(
         lines[row].trim_end(),
-        "▸ in Codex            ‹ fable › ←→   Fable 5.1 · Claude Code"
+        "▸ in Codex            ‹ fable › ←→   Fable 5.2 · Claude Code"
     );
     assert!(out[row].focus);
     assert!(

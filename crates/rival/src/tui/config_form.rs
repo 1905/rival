@@ -217,7 +217,7 @@ pub const MODELS: [ModelInfo; 5] = [
     ModelInfo {
         name: SOL_LABEL,
         effort_label: SOL_LABEL,
-        display: "Sol 6.1",
+        display: "Sol 6.2",
         runtime: "Codex CLI",
         provider: Some(ProxyProvider::Codex),
         model: config::SOL_MODEL,
@@ -237,7 +237,7 @@ pub const MODELS: [ModelInfo; 5] = [
     ModelInfo {
         name: FABLE_LABEL,
         effort_label: FABLE_LABEL,
-        display: "Fable 5.1",
+        display: "Fable 5.2",
         runtime: "Claude Code",
         provider: Some(ProxyProvider::Claude),
         model: config::FABLE_MODEL,

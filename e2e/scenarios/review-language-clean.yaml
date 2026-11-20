@@ -20,7 +20,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "service_tier=\"fast\"",
               "-c",
@@ -58,7 +58,7 @@
       "stdin": "review src/",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: The change is correct.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6.2-astra)\nScope: src/\n\nSummary: The change is correct.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -87,7 +87,7 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6-astra",
+          "model": "gpt-6.2-astra",
           "effort": "xhigh",
           "mode": "review",
           "work_dir": "<ROOT>/work",

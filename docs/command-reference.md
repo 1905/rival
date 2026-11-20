@@ -199,8 +199,8 @@ Install and authenticate the runtime for each model you use. Rival does not incl
 
 | Model | Runtime and authentication |
 |---|---|
-| Codex (`gpt-6-astra`), Sol (`gpt-6.1-sol`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. Through the [proxy](#proxy), no `codex login` is needed. |
-| Claude (`claude-opus-5-5`), Fable (`claude-fable-5-1`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](claude-docker-setup.md)). |
+| Codex (`gpt-6.2-astra`), Sol (`gpt-6.2-sol`) | [Codex CLI](https://github.com/openai/codex): `npm install -g @openai/codex && codex login`. Through the [proxy](#proxy), no `codex login` is needed. |
+| Claude (`claude-opus-5-5`), Fable (`claude-fable-5-2`) | [Claude Code](https://code.claude.com/docs/en/overview) CLI, authenticated with `claude auth login`. On Windows, use native Claude Code; Docker fallback has a known drive-path defect. On macOS/Linux, if `claude` is not on `PATH`, Rival uses the `rival-claude` Docker image with `RIVAL_CLAUDE_TOKEN` (see [docs/claude-docker-setup.md](claude-docker-setup.md)). |
 | Grok (`grok-4.6`) | [Grok CLI](https://docs.x.ai/) with `grok login`. `XAI_API_KEY` is not supported. |
 | China (`china.model`, default `moonshot/kimi-k3.1-pro`); also the security review | [OpenCode](https://opencode.ai/docs) v2 with the provider set up in opencode (`opencode auth login` or its config). Rival sends no key. |
 
@@ -234,13 +234,13 @@ only when you intend to overwrite your installed skill contents.
 
 | Host | Config key | Default model | Launches |
 |---|---|---|---|
-| Claude Code | `skill.claude` | `sol` (Sol 6.1) | `rival command skill --host claude` |
+| Claude Code | `skill.claude` | `sol` (Sol 6.2) | `rival command skill --host claude` |
 | Codex | `skill.codex` | `claude` (Opus 5.5) | `rival command skill --host codex` |
 
 - By default each host gets a review from the other vendor.
 - Pick a model in the config window (`rival config`, Models: `/RIVAL RUNS`) or with `rival config set skill.claude <model>`. The values are `codex`, `sol`, `claude` (or `opus`), `fable` and `grok`.
 - An omitted `-re` uses `efforts.<model>` of the resolved model. Grok clamps levels above high.
-- The review header names the model that ran (`Model: sol (gpt-6.1-sol)`).
+- The review header names the model that ran (`Model: sol (gpt-6.2-sol)`).
 - If the runtime of the configured model is missing, the preflight error is followed by `set another model: rival config set skill.<host> <model> (…)`.
 - 6.0 removes the per-model skills `/rival-codex`, `/rival-sol`, `/rival-claude`, `/rival-fable`, `/rival-k3`, `/rival-grok` and `/rival-security`. `rival command codex|sol|claude|fable|k3|grok|security|plan` stay for the CLI.
 
@@ -363,10 +363,10 @@ cat out.txt                       # the review
 
 | Label | Model id | Runtime | Built-in effort |
 |---|---|---|---|
-| `codex` | `gpt-6-astra` | Codex CLI | `xhigh` |
-| `sol` | `gpt-6.1-sol` | Codex CLI | `xhigh` |
+| `codex` | `gpt-6.2-astra` | Codex CLI | `xhigh` |
+| `sol` | `gpt-6.2-sol` | Codex CLI | `xhigh` |
 | `claude` (alias `opus`) | `claude-opus-5-5` | Claude Code CLI (native, else Docker) | `medium` |
-| `fable` | `claude-fable-5-1` | Claude Code CLI (native, else Docker) | `medium` |
+| `fable` | `claude-fable-5-2` | Claude Code CLI (native, else Docker) | `medium` |
 | `grok` | `grok-4.6` | Grok CLI | `high` |
 | the model name of `china.model` (`kimi-k3.1-pro`) | `china.model` (`moonshot/kimi-k3.1-pro`) | OpenCode v2 | `max` |
 
@@ -410,7 +410,7 @@ Rival formats the JSON for the console:
 ```
 ═══ RIVAL REVIEW ═══
 
-Model: codex (gpt-6-astra)
+Model: codex (gpt-6.2-astra)
 Scope: src/api/
 
 Summary: <summary>
@@ -525,8 +525,8 @@ claude:
 auto_fix_critical_high: false  # true: skills fix CONFIRMED critical/high findings without asking
 
 speed:                # Codex service tier, per model: normal | fast | ultrafast
-  codex: fast         # GPT-6 Astra
-  sol: fast           # Sol 6.1
+  codex: fast         # GPT-6.2 Astra
+  sol: fast           # Sol 6.2
 
 proxy:                # see Proxy
   url: http://127.0.0.1:8317

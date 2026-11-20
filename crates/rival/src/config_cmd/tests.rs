@@ -384,7 +384,7 @@ fn fake_proxy(status: u16, body: &'static str) -> (String, Arc<Mutex<Vec<String>
     (url, seen)
 }
 
-const MODEL_LIST: &str = r#"{"data":[{"id":"emcd_/claude-opus-5-5"},{"id":"gpt-6-astra"},{"id":"emcd2_/claude-opus-5-5"},{"id":"emcd_/claude-fable-5-1"}]}"#;
+const MODEL_LIST: &str = r#"{"data":[{"id":"emcd_/claude-opus-5-5"},{"id":"gpt-6.2-astra"},{"id":"emcd2_/claude-opus-5-5"},{"id":"emcd_/claude-fable-5-2"}]}"#;
 
 #[test]
 fn models_lists_the_proxy_models_by_prefix() {
@@ -401,7 +401,7 @@ fn models_lists_the_proxy_models_by_prefix() {
     assert_eq!(
         out,
         format!(
-            "proxy  {url}  4 models\n\n(no prefix)\n  gpt-6-astra\n\nemcd2_\n  claude-opus-5-5\n\nemcd_\n  claude-opus-5-5\n  claude-fable-5-1\n"
+            "proxy  {url}  4 models\n\n(no prefix)\n  gpt-6.2-astra\n\nemcd2_\n  claude-opus-5-5\n\nemcd_\n  claude-opus-5-5\n  claude-fable-5-2\n"
         )
     );
     let (code, out, _) = run(&fix, "", &["config", "models", "--json"]);
@@ -413,9 +413,9 @@ fn models_lists_the_proxy_models_by_prefix() {
     assert_eq!(v["models"][0], "emcd_/claude-opus-5-5");
     assert_eq!(
         v["prefixes"]["emcd_"],
-        serde_json::json!(["claude-opus-5-5", "claude-fable-5-1"])
+        serde_json::json!(["claude-opus-5-5", "claude-fable-5-2"])
     );
-    assert_eq!(v["prefixes"][""], serde_json::json!(["gpt-6-astra"]));
+    assert_eq!(v["prefixes"][""], serde_json::json!(["gpt-6.2-astra"]));
     // One call per process: the second command reused the list.
     assert_eq!(*seen.lock().unwrap(), vec![format!("Bearer {SECRET}")]);
 }
@@ -531,7 +531,7 @@ fn check_json_prints_one_line_per_model_then_the_summary() {
             &serde_json::json!("codex"),
             &serde_json::json!("codex"),
             &serde_json::json!("proxy"),
-            &serde_json::json!("gpt-6-astra"),
+            &serde_json::json!("gpt-6.2-astra"),
             &serde_json::json!(true),
             &serde_json::json!("ok"),
             &serde_json::json!(false),
@@ -565,7 +565,7 @@ fn check_text_and_exit_1_on_a_failed_model() {
     assert_eq!(lines[0], "proxy  off");
     assert_eq!(lines[1], "");
     assert!(
-        lines[2].starts_with("  ✓ codex   direct  gpt-6-astra             ")
+        lines[2].starts_with("  ✓ codex   direct  gpt-6.2-astra           ")
             && lines[2].ends_with("s  Sure, ok  (not ok)  [fast]"),
         "{out}"
     );

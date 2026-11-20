@@ -6,13 +6,13 @@
 │                                                                              │|
 │  proxy  ● online · 6 models                                                  │|
 │                                                                              │|
-│  ⠋ codex   proxy   gpt-6-astra                  …  checking                  │|
-│  ✗ sol     proxy   gpt-6.1-sol                  —                            │|
-│      proxy does not serve gpt-6.1-sol; it serves no gpt-6.1-sol — log in     │|
+│  ⠋ codex   proxy   gpt-6.2-astra                …  checking                  │|
+│  ✗ sol     proxy   gpt-6.2-sol                  —                            │|
+│      proxy does not serve gpt-6.2-sol; it serves no gpt-6.2-sol — log in     │|
 │      Codex on the proxy (-codex-device-login)                                │|
 │      set proxy.codex.model_prefix                                            │|
 │  ✓ claude  proxy   emcd2_/claude-opus-5-5    2.1s  ok                        │|
-│  ✓ fable   proxy   emcd2_/claude-fable-5-1   1.8s                            │|
+│  ✓ fable   proxy   emcd2_/claude-fable-5-2   1.8s                            │|
 │      Sure! ok.  (not ok)                                                     │|
 │  ✗ china   direct  moonshot/kimi-k3.1-pro    4.0s                            │|
 │      limit 429 monthly spend limit reached                                   │|

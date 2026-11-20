@@ -77,7 +77,7 @@
               "owned_by": "anthropic"
             },
             {
-              "id": "gpt-6-astra",
+              "id": "gpt-6.2-astra",
               "owned_by": "openai"
             }
           ]

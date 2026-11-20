@@ -221,11 +221,11 @@ pub const FAKE_PROCS: ProcessOps = ProcessOps {
 /// prefix.
 pub const FAKE_PROXY_IDS: [&str; 6] = [
     "emcd_/claude-opus-5-5",
-    "emcd_/claude-fable-5-1",
+    "emcd_/claude-fable-5-2",
     "emcd2_/claude-opus-5-5",
-    "emcd2_/claude-fable-5-1",
-    "gpt-6-astra",
-    "gpt-6.1-sol",
+    "emcd2_/claude-fable-5-2",
+    "gpt-6.2-astra",
+    "gpt-6.2-sol",
 ];
 
 /// The opencode models every test window sees.

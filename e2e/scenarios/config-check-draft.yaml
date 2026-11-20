@@ -1,6 +1,6 @@
 {
   "name": "config-check-draft",
-  "description": "`rival config check -m fable --json --config-stdin` checks an unsaved draft. The saved config.yaml points Claude at prefix emcd2_, which the proxy does not serve; the draft on stdin (URL <SERVER>, prefix emcd_) is validated like config.yaml and used instead. The key still comes from RIVAL_PROXY_KEY. The fake claude sees `--model emcd_/claude-fable-5-1`. One row, the summary, exit 0; config.yaml is unchanged and no session is saved. The adapters' info log lines are held back: stderr has no log event.",
+  "description": "`rival config check -m fable --json --config-stdin` checks an unsaved draft. The saved config.yaml points Claude at prefix emcd2_, which the proxy does not serve; the draft on stdin (URL <SERVER>, prefix emcd_) is validated like config.yaml and used instead. The key still comes from RIVAL_PROXY_KEY. The fake claude sees `--model emcd_/claude-fable-5-2`. One row, the summary, exit 0; config.yaml is unchanged and no session is saved. The adapters' info log lines are held back: stderr has no log event.",
   "fakes": {
     "absent": [
       "docker"
@@ -12,7 +12,7 @@
             "argv_prefix": [
               "-p",
               "--model",
-              "emcd_/claude-fable-5-1",
+              "emcd_/claude-fable-5-2",
               "--effort",
               "low",
               "--output-format",
@@ -61,15 +61,15 @@
               "owned_by": "anthropic"
             },
             {
-              "id": "emcd_/claude-fable-5-1",
+              "id": "emcd_/claude-fable-5-2",
               "owned_by": "anthropic"
             },
             {
-              "id": "gpt-6-astra",
+              "id": "gpt-6.2-astra",
               "owned_by": "openai"
             },
             {
-              "id": "gpt-6.1-sol",
+              "id": "gpt-6.2-sol",
               "owned_by": "openai"
             }
           ]
@@ -98,7 +98,7 @@
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"speed\":\"\",\"tier_omitted\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-1\"\\}\\n\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":1,\"total\":1\\}\\}\\n"
+          "$regex": "\\{\"error\":\"\",\"hint\":\"\",\"limit\":false,\"ms\":[0-9]+,\"name\":\"fable\",\"ok\":true,\"reply\":\"ok\",\"route\":\"proxy\",\"runtime\":\"claude\",\"speed\":\"\",\"tier_omitted\":false,\"unexpected\":false,\"wire_model\":\"emcd_/claude\\-fable\\-5\\-2\"\\}\\n\\{\"proxy\":\\{\"key_tail\":\"0000\",\"models\":4,\"state\":\"up\",\"url\":\"http://127\\.0\\.0\\.1:[0-9]+\"\\},\"summary\":\\{\"ok\":1,\"total\":1\\}\\}\\n"
         }
       }
     }

@@ -166,7 +166,7 @@ fn format_review_result_model_line() {
         "/tmp/l.log",
     );
     assert!(got.contains("═══ RIVAL REVIEW ═══"), "{got}");
-    assert!(got.contains("Model: codex (gpt-6-astra)\n"), "{got}");
+    assert!(got.contains("Model: codex (gpt-6.2-astra)\n"), "{got}");
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn format_unusable_layout() {
     let got = format_review_result(None, "prose", "codex", CODEX_MODEL, "a\nb", "/tmp/l.log");
     assert_eq!(
         got,
-        "\n═══ RIVAL REVIEW — UNPARSED OUTPUT ═══\n\nModel: codex (gpt-6-astra)\nScope: a, b\nProblem: no structured output\n\nThe model ran but its answer is not a structured review.\nRaw output follows.\n\nprose\n\nLog: /tmp/l.log\n"
+        "\n═══ RIVAL REVIEW — UNPARSED OUTPUT ═══\n\nModel: codex (gpt-6.2-astra)\nScope: a, b\nProblem: no structured output\n\nThe model ran but its answer is not a structured review.\nRaw output follows.\n\nprose\n\nLog: /tmp/l.log\n"
     );
     let got = format_review_result(None, "", "codex", CODEX_MODEL, "s", "");
     assert!(got.ends_with("Raw output follows.\n\n"), "{got:?}");

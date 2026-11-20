@@ -10,9 +10,9 @@
 │                    │                      │ tab ⇧tab  next / previous section                │                                           │|
 │                    │  REQUESTS GO TO      │ 1-4       jump to a section                      │                                           │|
 │                    │    codex  Codex      │ ↑↓ j k    move between fields                    │                                           │|
-│                    │    sol    Sol 6.1    │ enter     edit a field, or toggle                │                                           │|
+│                    │    sol    Sol 6.2    │ enter     edit a field, or toggle                │                                           │|
 │                    │    claude Opus 5.5   │ space     toggle                                 │                                           │|
-│                    │    fable  Fable 5.1  │ ←→ h l    pick a value (prefix, effort, model…)  │                                           │|
+│                    │    fable  Fable 5.2  │ ←→ h l    pick a value (prefix, effort, model…)  │                                           │|
 │                    │                      │ e         type a prefix or model not listed      │                                           │|
 │                    │                      │ d         import ANTHROPIC_BASE_URL into URL     │                                           │|
 │                    │                      │ c         check the default models on the draft  │                                           │|

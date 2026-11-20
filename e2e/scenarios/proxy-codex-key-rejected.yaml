@@ -20,11 +20,11 @@
           "object": "list",
           "data": [
             {
-              "id": "gpt-6-astra",
+              "id": "gpt-6.2-astra",
               "owned_by": "openai"
             },
             {
-              "id": "gpt-6.1-sol",
+              "id": "gpt-6.2-sol",
               "owned_by": "openai"
             },
             {

@@ -1,6 +1,6 @@
 {
   "name": "proxy-codex-review",
-  "description": "`rival command codex` review through the proxy. The config enables proxy.codex with no prefix; RIVAL_PROXY_URL points at the scenario server and RIVAL_PROXY_KEY holds a fixed test key. The preflight asks GET /v1/models once with `Authorization: Bearer <key>` and never runs `codex login status`. The fake codex sees `-m gpt-6-astra` followed by the two provider -c values (base_url <SERVER>/v1, env_key RIVAL_PROXY_KEY, wire_api responses), and RIVAL_PROXY_KEY in its env with the test key; the key is in no argv. The language repair pass runs on the same route. The session keeps the bare model and records route proxy, wire_model and account proxy.",
+  "description": "`rival command codex` review through the proxy. The config enables proxy.codex with no prefix; RIVAL_PROXY_URL points at the scenario server and RIVAL_PROXY_KEY holds a fixed test key. The preflight asks GET /v1/models once with `Authorization: Bearer <key>` and never runs `codex login status`. The fake codex sees `-m gpt-6.2-astra` followed by the two provider -c values (base_url <SERVER>/v1, env_key RIVAL_PROXY_KEY, wire_api responses), and RIVAL_PROXY_KEY in its env with the test key; the key is in no argv. The language repair pass runs on the same route. The session keeps the bare model and records route proxy, wire_model and account proxy.",
   "fakes": {
     "scripts": {
       "codex": {
@@ -11,7 +11,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "model_provider=\"rival_proxy\"",
               "-c",
@@ -51,7 +51,7 @@
               "-C",
               "<ROOT>/work",
               "-m",
-              "gpt-6-astra",
+              "gpt-6.2-astra",
               "-c",
               "model_provider=\"rival_proxy\"",
               "-c",
@@ -108,11 +108,11 @@
           "object": "list",
           "data": [
             {
-              "id": "gpt-6-astra",
+              "id": "gpt-6.2-astra",
               "owned_by": "openai"
             },
             {
-              "id": "gpt-6.1-sol",
+              "id": "gpt-6.2-sol",
               "owned_by": "openai"
             },
             {
@@ -133,7 +133,7 @@
       "stdin": "review src/",
       "expect": {
         "exit_code": 0,
-        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6-astra)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: codex (gpt-6.2-astra)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
         "stderr_lines": [],
         "log_events": [
           {
@@ -164,11 +164,11 @@
           "status": "completed",
           "exit_code": 0,
           "cli": "codex",
-          "model": "gpt-6-astra",
+          "model": "gpt-6.2-astra",
           "review_scope": "src/",
           "account": "proxy",
           "route": "proxy",
-          "wire_model": "gpt-6-astra"
+          "wire_model": "gpt-6.2-astra"
         }
       }
     ],
