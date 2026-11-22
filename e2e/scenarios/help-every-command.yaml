@@ -50,13 +50,43 @@
     {
       "run": [
         "command",
+        "neon",
+        "--help"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\ASkill-facing Neon executor)(?=.*Usage:\\s+rival\\s+command\\s+neon(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for neon)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
+        "consilium",
+        "--help"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\A3-judge rated review with subsection breakdown \\(normal or heavy mode\\))(?=.*Usage:\\s+rival\\s+command\\s+consilium(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for consilium)(?=.*(?<![\\w-])\\-\\-heavy(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?use heavy mode)(?=.*(?<![\\w-])\\-g,\\ \\-\\-goal(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?review goal)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "command",
         "plan",
         "--help"
       ],
       "expect": {
         "exit_code": 0,
         "stdout": {
-          "$regex": "(?s)(?=.*\\AReview a plan/spec with Codex, Sol, Claude and/or Fable)(?=.*Usage:\\s+rival\\s+command\\s+plan(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for plan)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort for every selected model)(?=.*(?<![\\w-])\\-m,\\ \\-\\-model(?![\\w-])[ =\\[<]*strings\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?plan review model\\(s\\): codex, sol, claude \\(or opus\\), fable)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
+          "$regex": "(?s)(?=.*\\AReview a plan/spec with Codex, Sol, Claude, Fable and/or Neon)(?=.*Usage:\\s+rival\\s+command\\s+plan(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for plan)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?override reasoning effort for every selected model)(?=.*(?<![\\w-])\\-m,\\ \\-\\-model(?![\\w-])[ =\\[<]*strings\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?plan review model\\(s\\): codex, sol, claude \\(or opus\\), fable, neon)(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory)(?=.*(?<![\\w-])\\-\\-detach(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?run detached in a new process session).*"
         },
         "stderr_lines": [],
         "log_events": []
@@ -131,6 +161,21 @@
         "exit_code": 0,
         "stdout": {
           "$regex": "(?s)(?=.*\\ARun Grok)(?=.*Usage:\\s+rival\\s+run\\s+grok(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for grok)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?reasoning effort override: low, medium, high \\(ultra clamps to high\\))(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-prompt\\-stdin(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?read prompt from stdin)(?=.*(?<![\\w-])\\-\\-review(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?review scope \\(enables review mode\\))(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory).*"
+        },
+        "stderr_lines": [],
+        "log_events": []
+      }
+    },
+    {
+      "run": [
+        "run",
+        "neon",
+        "--help"
+      ],
+      "expect": {
+        "exit_code": 0,
+        "stdout": {
+          "$regex": "(?s)(?=.*\\ARun Neon)(?=.*Usage:\\s+rival\\s+run\\s+neon(?![\\w-]))(?=.*(?<![\\w-])\\-h,\\ \\-\\-help(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?help for neon)(?=.*(?<![\\w-])\\-\\-effort(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?reasoning effort override \\(neon only supports xhigh; always xhigh\\))(?=.*(?<![\\w-])\\-\\-no\\-queue(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?bypass the review queue)(?=.*(?<![\\w-])\\-\\-prompt\\-stdin(?![\\w-])[^\\n]*(?:\\n\\s*)?[^\\n]*?read prompt from stdin)(?=.*(?<![\\w-])\\-\\-review(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?review scope \\(enables review mode\\))(?=.*(?<![\\w-])\\-\\-workdir(?![\\w-])[ =\\[<]*string\\b[^\\n]*(?:\\n\\s*)?[^\\n]*?working directory).*"
         },
         "stderr_lines": [],
         "log_events": []

@@ -28,8 +28,10 @@ pub enum CommandId {
     Command,
     CommandClaude,
     CommandCodex,
+    CommandConsilium,
     CommandFable,
     CommandGrok,
+    CommandNeon,
     CommandChina,
     CommandPlan,
     CommandSecurity,
@@ -50,6 +52,7 @@ pub enum CommandId {
     RunClaude,
     RunFable,
     RunGrok,
+    RunNeon,
     Sessions,
     Tui,
     Update,
@@ -71,8 +74,10 @@ impl CommandId {
             ["rival", "command"] => Command,
             ["rival", "command", "claude"] => CommandClaude,
             ["rival", "command", "codex"] => CommandCodex,
+            ["rival", "command", "consilium"] => CommandConsilium,
             ["rival", "command", "fable"] => CommandFable,
             ["rival", "command", "grok"] => CommandGrok,
+            ["rival", "command", "neon"] => CommandNeon,
             ["rival", "command", "china"] => CommandChina,
             ["rival", "command", "plan"] => CommandPlan,
             ["rival", "command", "security"] => CommandSecurity,
@@ -93,6 +98,7 @@ impl CommandId {
             ["rival", "run", "claude"] => RunClaude,
             ["rival", "run", "fable"] => RunFable,
             ["rival", "run", "grok"] => RunGrok,
+            ["rival", "run", "neon"] => RunNeon,
             ["rival", "sessions"] => Sessions,
             ["rival", "tui"] => Tui,
             ["rival", "update"] => Update,
@@ -288,12 +294,32 @@ pub fn build(defaults: &Defaults) -> Command {
         model_command("china", "Run the china.model via opencode v2"),
         model_command("claude", "Skill-facing Claude executor").visible_alias(OPUS_ALIAS),
         model_command("codex", "Skill-facing Codex executor"),
-        model_command("fable", "Skill-facing Fable executor"),
-        model_command("grok", "Skill-facing Grok executor"),
-        with_args(command("plan", "Review a plan/spec with Codex, Sol, Claude and/or Fable")).args([
+        with_args(command(
+            "consilium",
+            "3-judge rated review with subsection breakdown (normal or heavy mode)",
+        ))
+        .args([
             workdir(),
             no_queue(),
-            model_flag("codex", "plan review model(s): codex, sol, claude (or opus), fable (comma-separated; default: plan.models, else codex)"),
+            bool_flag(
+                "heavy",
+                "use heavy mode (Fable, Codex and Neon instead of Claude, Sol and Neon)",
+            ),
+            string_flag(
+                "goal",
+                "",
+                "review goal to score against (default: concrete bugs; can be design, architecture, tests, etc.)",
+            )
+            .short('g'),
+            effort("override reasoning effort for Claude/Codex judges: low, medium, high, xhigh, ultra (Neon always runs at xhigh)"),
+        ]),
+        model_command("fable", "Skill-facing Fable executor"),
+        model_command("grok", "Skill-facing Grok executor"),
+        model_command("neon", "Skill-facing Neon executor"),
+        with_args(command("plan", "Review a plan/spec with Codex, Sol, Claude, Fable and/or Neon")).args([
+            workdir(),
+            no_queue(),
+            model_flag("codex", "plan review model(s): codex, sol, claude (or opus), fable, neon (comma-separated; default: plan.models, else codex)"),
             effort("override reasoning effort for every selected model: low, medium, high, xhigh, ultra (default: each model's own)"),
         ]),
         with_args(command("security", "Security review with the configured model")).args([
@@ -337,7 +363,7 @@ pub fn build(defaults: &Defaults) -> Command {
             .arg(bool_flag("json", "print one JSON object")),
         with_args(command("check", "Send one short prompt to each model and show which answer"))
             .args([
-                model_flag("", "models to check: codex, sol, claude (or opus), fable, china, grok, or all (comma-separated; default: codex, sol, claude, fable and china)"),
+                model_flag("", "models to check: codex, sol, claude (or opus), fable, china, neon, grok, or all (comma-separated; default: codex, sol, claude, fable and china)"),
                 bool_flag("json", "print one JSON line per model as it finishes, then a summary line"),
                 bool_flag("config-stdin", "check a draft config.yaml read from stdin instead of the saved file"),
             ]),
@@ -374,6 +400,11 @@ pub fn build(defaults: &Defaults) -> Command {
                         "grok",
                         "Run Grok",
                         "reasoning effort override: low, medium, high (ultra clamps to high)",
+                    ),
+                    run_command(
+                        "neon",
+                        "Run Neon",
+                        "reasoning effort override (neon only supports xhigh; always xhigh)",
                     ),
                 ]),
             with_args(command("sessions", "List sessions")).args([

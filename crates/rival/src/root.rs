@@ -17,12 +17,13 @@ use crate::detach::{self, DetachOutcome};
 use crate::model_command::run_model_command;
 use crate::model_run::{RunOptions, run_model_run};
 use crate::model_specs::{
-    ModelSpec, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, sol_spec,
+    ModelSpec, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, neon_spec, sol_spec,
 };
 use crate::signals::{self, NotifyGuard};
 use crate::tree::{self, CommandId, Defaults, Invocation, Parsed};
 use crate::{
-    command_plan, command_security, config_cmd, install, queue_sessions, skill_command, update_cmd,
+    command_consilium, command_plan, command_security, config_cmd, install, queue_sessions,
+    skill_command, update_cmd,
 };
 use crate::{startup_fds, wait};
 
@@ -586,10 +587,12 @@ fn dispatch(
         CommandId::CommandFable => model_command(env, inv, fable_spec()),
         CommandId::CommandSol => model_command(env, inv, sol_spec()),
         CommandId::CommandGrok => model_command(env, inv, grok_spec()),
+        CommandId::CommandNeon => model_command(env, inv, neon_spec()),
         CommandId::CommandChina => {
             let spec = china_spec(env.cfg);
             model_command(env, inv, spec)
         }
+        CommandId::CommandConsilium => command_consilium::command_consilium_action(env, inv),
         CommandId::CommandPlan => command_plan::command_plan_action(env, inv),
         CommandId::CommandSecurity => command_security::command_security_action(env, inv),
         CommandId::CommandSkill => skill_command::skill_command_action(env, inv),
@@ -612,6 +615,7 @@ fn dispatch(
         CommandId::RunClaude => model_run(env, inv, claude_spec),
         CommandId::RunFable => model_run(env, inv, fable_spec),
         CommandId::RunGrok => model_run(env, inv, grok_spec),
+        CommandId::RunNeon => model_run(env, inv, neon_spec),
         CommandId::Wait => {
             let opts = wait::WaitOptions {
                 log: inv.string("log").into(),

@@ -85,11 +85,12 @@ fn plan_failure_reason(cli: &str, model: &str, reason: &str) -> String {
 }
 
 /// The model id of a plan reviewer entry: a model id as is; the runtime
-/// words `codex` and `claude` name Codex and Opus.
+/// words `codex`, `claude`, and `neon` name Codex, Opus, and Neon.
 fn plan_model(entry: &str) -> &str {
     match entry {
         "codex" => config::CODEX_MODEL,
         "claude" => config::CLAUDE_MODEL,
+        config::NEON_LABEL => config::NEON_MODEL,
         _ => entry,
     }
 }
@@ -100,6 +101,8 @@ fn plan_cli(model: &str) -> &str {
         "codex"
     } else if executor::is_claude_model(model) {
         "claude"
+    } else if executor::is_neon_model(model) {
+        config::NEON_LABEL
     } else {
         model
     }
@@ -153,6 +156,7 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
         preflight: Box::new(move |cli, model| match cli {
             "codex" => executor::codex_preflight_for(cfg, model),
             "claude" => executor::claude_preflight_model(cfg, model),
+            config::NEON_LABEL => executor::neon_preflight(cfg),
             _ => Err(anyhow!("unsupported plan cli: {cli}")),
         }),
         run: Box::new(move |ctx, sess, cli, prompt, effort, workdir, log| {
@@ -162,6 +166,9 @@ fn default_plan_executor(cfg: &Config) -> PlanExecutor<'_> {
                     ctx, cfg, sess, prompt, effort, workdir, &model, true, log, None,
                 )?,
                 "claude" => executor::run_claude(
+                    ctx, cfg, sess, prompt, effort, workdir, &model, true, log, None,
+                )?,
+                config::NEON_LABEL => executor::run_neon_model(
                     ctx, cfg, sess, prompt, effort, workdir, &model, true, log, None,
                 )?,
                 _ => bail!("unsupported plan cli: {cli}"),
@@ -319,11 +326,11 @@ fn run_doc_review_with(
             continue;
         }
         let model_fallback = match doc.fallback_effort {
-            "" if executor::is_codex_model(model) => "xhigh",
+            "" if executor::is_codex_model(model) || executor::is_neon_model(model) => "xhigh",
             "" => config::DEFAULT_PLAN_EFFORT,
             fallback => fallback,
         };
-        let effective_effort = cfg
+        let mut effective_effort = cfg
             .resolve_effort(model, batch.effort, model_fallback)
             .map_err(|e| {
                 anyhow!(
@@ -331,6 +338,14 @@ fn run_doc_review_with(
                     config::engine_label(cli, model)
                 )
             })?;
+        if cli == config::NEON_LABEL {
+            effective_effort = executor::neon_effort(&effective_effort).map_err(|e| {
+                anyhow!(
+                    "resolve {} plan effort: {e:#}",
+                    config::engine_label(cli, model)
+                )
+            })?;
+        }
         let mut sess = Session::new_queued(
             cfg.paths(),
             NewSession {
@@ -588,6 +603,11 @@ fn repair_plan_language(
     mode: &str,
     raw: String,
 ) -> String {
+    let repair_effort = if cli == config::NEON_LABEL {
+        "xhigh"
+    } else {
+        "low"
+    };
     repair_language(
         parent,
         cfg,
@@ -595,7 +615,7 @@ fn repair_plan_language(
         raw,
         PayloadKind::Plan,
         |ctx, sess, prompt, log| {
-            let ran = (ex.run)(ctx, sess, cli, prompt, "low", workdir, Some(log));
+            let ran = (ex.run)(ctx, sess, cli, prompt, repair_effort, workdir, Some(log));
             sess.mode = mode.to_string();
             ran.map(|(_, exit_code)| exit_code)
         },

@@ -326,7 +326,7 @@ fn parse_plan_models() {
         let input: Vec<String> = input.iter().map(|s| s.to_string()).collect();
         assert_eq!(super::parse_plan_models(&input).unwrap(), *want, "{name}");
     }
-    const USE: &str = "use one of: codex, sol, claude, opus, fable";
+    const USE: &str = "use one of: codex, sol, claude, opus, fable, neon";
     let bad: &[(&str, &[&str], String)] = &[
         (
             "old sol id rejected",
@@ -704,7 +704,7 @@ fn validation_errors_print_on_stdout_and_fail() {
         (
             &["-m", "gpt-5.6-sol"],
             "plan.md",
-            "unknown plan model \"gpt-5.6-sol\"; use one of: codex, sol, claude, opus, fable".into(),
+            "unknown plan model \"gpt-5.6-sol\"; use one of: codex, sol, claude, opus, fable, neon".into(),
         ),
         (&["--model", ""], "plan.md", "no plan models selected".into()),
         (

@@ -20,7 +20,7 @@ import re
 import sys
 import time
 
-NAMES = ("codex", "claude", "grok", "opencode", "glab", "docker", "brew")
+NAMES = ("codex", "claude", "grok", "agy", "opencode", "glab", "docker", "brew")
 
 EXIT_WAIT_TIMEOUT = 95
 EXIT_UNSCRIPTED = 97

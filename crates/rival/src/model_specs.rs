@@ -72,6 +72,14 @@ Reasoning effort (-re): low, medium, high (levels above high clamp to high).
 Omitted uses efforts.grok from ~/.rival/config.yaml (built-in: high).
 Review mode runs read-only sandboxed; raw prompts can edit files in the workdir.";
 
+pub const NEON_USAGE: &str = "Usage:
+  rival command neon 'explain the auth flow' — run any prompt with Neon
+  rival command neon review — bug-hunting review of the changed files (git auto-detect)
+  rival command neon review src/api/ — review specific scope
+
+Neon has a single effort level (always xhigh).
+Review mode runs read-only; raw prompts can edit files in the workdir.";
+
 pub const CHINA_USAGE: &str = "Usage:
   /china 'explain the auth flow' — run any prompt with the China model
   /china -re high 'find bugs in src/main.rs' — run with a lower reasoning effort
@@ -95,6 +103,10 @@ pub const RIVAL_USAGE: &str = "Usage:
   /rival review — bug-hunting review of the changed files (git auto-detect)
   /rival review src/api/ — review specific scope
   /rival -re high review src/api/ — review with high reasoning
+  /rival consilium — 3-judge rated review of changed files (normal mode)
+  /rival consilium src/api/ — 3-judge rated review of a specific scope
+  /rival consilium heavy src/api/ — 3-judge rated review in heavy mode
+  /rival consilium --goal 'design fixes' src/api/ — rated review for a custom goal
   /rival security — security review of the changed files (git auto-detect)
   /rival security src/api/ — security review of a specific scope
   /rival — show this usage info
@@ -130,10 +142,10 @@ pub type RunFn = Box<dyn Fn(RunCall<'_, '_>) -> anyhow::Result<RunResult>>;
 /// what genuinely differs per model. Anything a single model needs stays an
 /// explicit branch in the workflows, keyed on `command_name`.
 pub struct ModelSpec {
-    /// The command word: codex, sol, claude, fable, china, or grok.
+    /// The command word: codex, sol, claude, fable, neon, china, or grok.
     pub command_name: &'static str,
-    /// The adapter recorded on the session: codex, claude, or the china or
-    /// grok label.
+    /// The adapter recorded on the session: codex, claude, or the neon, china
+    /// or grok label.
     pub cli: &'static str,
     /// The concrete model id. The display and error label is always
     /// `config::engine_label(cli, model)`.
@@ -152,18 +164,21 @@ impl ModelSpec {
         config::engine_label(self.cli, self.model)
     }
 
-    /// china maps the ladder onto its provider's menu; grok clamps it onto
-    /// its own shorter menu.
+    /// china maps the ladder onto its provider's menu; neon always runs at
+    /// xhigh; grok clamps onto its shorter menu.
     pub fn resolve_effort(&self, cfg: &Config, requested: &str) -> Result<String, String> {
         if self.command_name == config::CHINA_LABEL {
             return executor::china_effort(requested)
                 .map(str::to_string)
                 .map_err(|e| format!("{e:#}"));
         }
-        // The Claude and codex runtimes (Opus, Fable, Codex, Sol) resolve
-        // their own configured defaults rather than the shared review one: a
-        // non-empty fallback here short-circuits the built-in model effort
-        // and would silently override Codex's xhigh.
+        if self.command_name == config::NEON_LABEL {
+            return executor::neon_effort(requested.trim()).map_err(|e| format!("{e:#}"));
+        }
+        // The Claude and codex runtimes (Opus, Fable, Codex, Sol) resolve their
+        // own configured defaults rather than the shared review one: a non-empty
+        // fallback here short-circuits the built-in model effort and would
+        // silently override Codex's xhigh.
         let fallback = if self.cli == "claude" || self.cli == "codex" {
             ""
         } else {
@@ -179,12 +194,13 @@ impl ModelSpec {
     }
 
     /// A provider-specific hint for a failed run, or "" when
-    /// the provider has none. The Claude runtime distinguishes auth
+    /// the provider has none. The Claude and Neon runtimes distinguish auth
     /// failures; the codex runtime has a hint on the proxy route only.
     pub fn auth_hint(&self, cfg: &Config, log_file: &str) -> String {
         match self.cli {
             "claude" => executor::claude_auth_hint(cfg, self.model, Path::new(log_file)),
             "codex" => executor::codex_auth_hint(cfg, self.model, Path::new(log_file)),
+            config::NEON_LABEL => executor::neon_auth_hint(Path::new(log_file)),
             _ => String::new(),
         }
     }
@@ -289,6 +305,23 @@ pub fn grok_spec() -> ModelSpec {
     }
 }
 
+/// Gemini 4 Neon on the Antigravity CLI (`agy`).
+pub fn neon_spec() -> ModelSpec {
+    ModelSpec {
+        command_name: config::NEON_LABEL,
+        cli: config::NEON_LABEL,
+        model: config::NEON_MODEL,
+        usage: NEON_USAGE,
+        parse: parser::parse_neon_args,
+        preflight: Box::new(executor::neon_preflight),
+        run: Box::new(|c| {
+            executor::run_neon(
+                c.ctx, c.cfg, c.sess, c.prompt, c.effort, c.workdir, c.review, c.log, c.out,
+            )
+        }),
+    }
+}
+
 /// The spec of a `rival command` model name (a [`config::SKILL_MODEL_NAMES`]
 /// entry), or `None` for any other name.
 pub fn spec_for_name(name: &str) -> Option<ModelSpec> {
@@ -297,6 +330,7 @@ pub fn spec_for_name(name: &str) -> Option<ModelSpec> {
         config::SOL_LABEL => sol_spec(),
         config::CLAUDE_LABEL => claude_spec(),
         config::FABLE_LABEL => fable_spec(),
+        config::NEON_LABEL => neon_spec(),
         config::GROK_LABEL => grok_spec(),
         _ => return None,
     };

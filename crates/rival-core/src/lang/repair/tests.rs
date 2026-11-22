@@ -20,6 +20,7 @@ fn review(summary: &str, findings: Vec<ReviewerFinding>) -> Review {
     Review {
         summary: summary.to_string(),
         rating: None,
+        breakdown: Vec::new(),
         findings,
     }
 }

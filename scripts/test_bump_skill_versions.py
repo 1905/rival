@@ -60,9 +60,9 @@ class BumpSkillVersionsTest(unittest.TestCase):
 
     def test_the_repo_names_parse(self):
         real = (ROOT / NAMES_FILE).read_text()
-        proc, texts = self.run_bump(real, ["rival", "china"])
+        proc, texts = self.run_bump(real, ["rival", "china", "consilium"])
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        for name in ["rival", "china"]:
+        for name in ["rival", "china", "consilium"]:
             self.assertEqual(texts[name], skill_md(name, "9.9.9"))
 
     def test_no_names_fails(self):

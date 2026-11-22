@@ -1,0 +1,163 @@
+{
+  "name": "neon-review",
+  "description": "`rival command neon` review and raw prompt. Verifies `agy` argv (`--model gemini-4-neon-xhigh`, `--disable-slash-commands`, `--output-format text`, read-only `--settings` for review, `--dangerously-skip-permissions` for raw prompts, `-p <prompt>` last with empty stdin). Also proves Neon has a single effort level (`xhigh`): both the language repair pass and an explicit `-re low` resolve to `gemini-4-neon-xhigh` and record `effort: xhigh`.",
+  "fakes": {
+    "scripts": {
+      "agy": {
+        "responses": [
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--settings",
+              "{\"agentMode\":\"\",\"toolPermission\":\"request-review\",\"allowNonWorkspaceAccess\":false,\"permissions\":{\"deny\":[\"write_file(*)\",\"command(*)\",\"read_url(*)\",\"execute_url(*)\",\"download_url(*)\",\"mcp(*)\"]}}",
+              "-p",
+              {
+                "$regex": "(?s:.*)You are working in project directory: <ROOT>/work\n(?s:.*)Review scope: src/\n(?s:.*)"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--settings",
+              "{\"agentMode\":\"\",\"toolPermission\":\"request-review\",\"allowNonWorkspaceAccess\":false,\"permissions\":{\"deny\":[\"write_file(*)\",\"command(*)\",\"read_url(*)\",\"execute_url(*)\",\"download_url(*)\",\"mcp(*)\"]}}",
+              "-p",
+              {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Looks fine.\",\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--dangerously-skip-permissions",
+              "-p",
+              {
+                "$regex": "(?s:.*)You are working in project directory: <ROOT>/work\n(?s:.*)explain the auth flow"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "Auth uses signed tokens.\n",
+            "exit": 0
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "neon"
+      ],
+      "stdin": "review src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL REVIEW ═══\n\nModel: neon (gemini-4-neon-xhigh)\nScope: src/\n\nSummary: Looks fine.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<UUID1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting neon (command mode)",
+            "fields": {
+              "session": "<UUID1>",
+              "effort": "xhigh",
+              "mode": "review"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "command",
+        "neon"
+      ],
+      "stdin": "-re low explain the auth flow",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "Auth uses signed tokens.\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting neon (command mode)",
+            "fields": {
+              "session": "<UUID2>",
+              "effort": "xhigh",
+              "mode": "raw"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<UUID1>.json",
+      ".rival/sessions/<UUID1>.log",
+      ".rival/sessions/<UUID1>.log.repair.log",
+      ".rival/sessions/<UUID2>.json",
+      ".rival/sessions/<UUID2>.log"
+    ],
+    "files": [
+      {
+        "path": "<HOME>/.rival/sessions/<UUID1>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "neon",
+          "model": "gemini-4-neon-xhigh",
+          "effort": "xhigh",
+          "mode": "review",
+          "review_scope": "src/"
+        }
+      },
+      {
+        "path": "<HOME>/.rival/sessions/<UUID2>.json",
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "neon",
+          "model": "gemini-4-neon-xhigh",
+          "effort": "xhigh",
+          "mode": "raw"
+        }
+      }
+    ],
+    "calls": {
+      "agy": 3
+    }
+  }
+}

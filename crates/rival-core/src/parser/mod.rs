@@ -38,6 +38,13 @@ pub fn parse_grok_args(raw: &str) -> Result<ParseResult> {
     parse_args_with_effort(raw, "", config::is_valid_effort, &VALID_EFFORTS)
 }
 
+/// Parses raw arguments for the neon command (gemini-4-neon). Identical grammar
+/// to Claude: an omitted effort stays empty so the command can apply Neon's
+/// configured default.
+pub fn parse_neon_args(raw: &str) -> Result<ParseResult> {
+    parse_args_with_effort(raw, "", config::is_valid_effort, &VALID_EFFORTS)
+}
+
 /// Parses raw arguments for the codex command (gpt-6.2-astra). Identical
 /// grammar to Claude: an omitted effort stays empty so the command can apply
 /// Codex's configured default.

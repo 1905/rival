@@ -211,3 +211,88 @@ Return JSON only. No prose, no markdown, no explanation outside the JSON. Your e
     clean_review_example_line!(),
     "\n"
 );
+
+/// Default review goal for a consilium review when the user does not specify one.
+pub const CONSILIUM_DEFAULT_GOAL: &str = "Find concrete code-level bugs, broken state transitions, edge-case failures, races, and data-loss risks.";
+
+/// Builds a consilium judge prompt for `scope` and `goal` (defaults to
+/// [`CONSILIUM_DEFAULT_GOAL`] when `goal` is empty). Each judge scores the
+/// target 1-10 overall, provides a subsection rating breakdown tailored to the
+/// goal, and returns actionable findings.
+pub fn build_consilium_prompt(cfg: &Config, scope: &str, goal: &str) -> String {
+    let effective_goal = match goal.trim() {
+        "" => CONSILIUM_DEFAULT_GOAL,
+        g => g,
+    };
+    let mut sb = format!("Review scope: {scope}\nReview goal: {effective_goal}\n\n");
+    match cfg.role_prompt_override("consilium") {
+        Some(over) if !over.trim().is_empty() => sb.push_str(over),
+        _ => sb.push_str(CONSILIUM_INSTRUCTIONS),
+    }
+    sb.push_str(CONSILIUM_JSON_CONTRACT);
+    sb
+}
+
+const CONSILIUM_INSTRUCTIONS: &str = concat!(
+    r#"## Role: Consilium Judge
+
+You are one of three independent judges in a Consilium review. Do not consult the other judges.
+
+Your job is to evaluate the code in the review scope against the stated Review goal, give an honest 1-10 rating with a detailed subsection breakdown, and return concrete actionable findings so the author can iterate until every judge reaches 9/10 or higher.
+
+Instructions:
+1. Read the code in the review scope thoroughly before judging.
+2. Evaluate strictly against the Review goal (whether bugs, design quality, architecture, API ergonomics, performance, security, tests, or UX).
+3. Break your evaluation into 3 to 6 concrete subsections tailored to the Review goal. Give each subsection an integer rating from 1 to 10 and concise notes tied to exact code explaining what works and what lowers the score.
+4. Assign an honest overall integer rating from 1 to 10:
+   - 10: nothing worth changing for the goal
+   - 9: passes the goal; only minor nits remain (no blocking issues)
+   - 7-8: solid base, but concrete issues materially affect the goal
+   - 4-6: significant flaws or gaps against the goal
+   - 1-3: broken, unsafe, or fails the core goal
+   Do NOT give 9 or 10 if any critical or high finding remains open.
+5. Every subsection rated below 9 must explain what lowers its score and map to concrete findings with exact file and line, failure_scenario (trigger/impact), and an actionable fix suggestion.
+6. Read-only: do not edit files, do not run mutating commands, and do not invent speculative nitpicks outside the goal. If the target already meets the goal cleanly, rate it 9 or 10 and return few or zero findings.
+7. "#,
+    failure_scenario_rule!(),
+    "\n\n",
+    severity_rubric!(),
+    "\n"
+);
+
+const CONSILIUM_JSON_CONTRACT: &str = concat!(
+    r#"## Output Format
+
+Return JSON only. No prose, no markdown, no explanation outside the JSON. Your entire response must be a single valid JSON object matching this schema:
+
+```json
+{
+  "summary": "1-3 sentence overall verdict against the goal",
+  "rating": 7,
+  "breakdown": [
+    {
+      "section": "Subsection name",
+      "rating": 7,
+      "notes": "Concrete explanation of what holds up and what lowers this score"
+    }
+  ],
+  "findings": [
+    {
+      "file": "path/to/file",
+      "line": 42,
+      "severity": "critical|high|medium|low",
+      "category": "bug|design|security|performance|concurrency|architecture|tests|ux",
+      "title": "brief title",
+      "body": "concrete explanation tied to code",
+      "failure_scenario": "input/state that triggers it → the wrong result",
+      "suggestion": "concrete fix",
+      "confidence": 8
+    }
+  ]
+}
+```
+
+"#,
+    writing_rules!(),
+    "\n"
+);

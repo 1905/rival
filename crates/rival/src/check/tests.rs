@@ -223,7 +223,7 @@ fn targets_default_all_list_and_dedupe() {
     );
     assert_eq!(
         names(&["all"]).unwrap(),
-        ["codex", "sol", "claude", "fable", "china", "grok"]
+        ["codex", "sol", "claude", "fable", "china", "neon", "grok"]
     );
     // opus is claude; rows keep the model order, whatever the list order.
     assert_eq!(
@@ -707,8 +707,8 @@ fn at_most_three_live_calls_at_once() {
     let mut fake = Fake::new();
     fake.delay = Duration::from_millis(150);
     let report = check(&fix, &["all"], &fake);
-    assert_eq!(report.rows.len(), 6);
-    assert_eq!(fake.called().len(), 6);
+    assert_eq!(report.rows.len(), 7);
+    assert_eq!(fake.called().len(), 7);
     assert_eq!(fake.max_active.load(Ordering::SeqCst), MAX_LIVE);
 }
 

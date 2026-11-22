@@ -10,10 +10,10 @@
 │    Codex prefix        ‹ none ›   route off                                  │|
 │                                                                              │|
 │  REQUESTS GO TO                                                              │|
-│    codex  Codex      direct  → gpt-6.2-astra                                 │|
-│    sol    Sol 6.2    direct  → gpt-6.2-sol                                   │|
-│    claude Opus 5.5   direct  → claude-opus-5-5                               │|
-│    fable  Fable 5.2  direct  → claude-fable-5-2                              │|
+│    codex  Codex          direct  → gpt-6.2-astra                             │|
+│    sol    Sol 6.2        direct  → gpt-6.2-sol                               │|
+│    claude Opus 5.5       direct  → claude-opus-5-5                           │|
+│    fable  Fable 5.2      direct  → claude-fable-5-2                          │|
 │                                                                              │|
 │                                                                              │|
 │                                                                              │|
@@ -35,10 +35,10 @@ d....ddddddddddddddddddddddTTTTdddddddddddddd..................................d
 d....ddddddddddddddddddddddTTTTdddddddddddddd..................................d|
 d..............................................................................d|
 d..DDDDDDDDDDDDDD..............................................................d|
-d....tttttttdddddddddddddddddddddTTTTTTTTTTTTT.................................d|
-d....tttttttdddddddddddddddddddddTTTTTTTTTTT...................................d|
-d....tttttttdddddddddddddddddddddTTTTTTTTTTTTTTT...............................d|
-d....tttttttdddddddddddddddddddddTTTTTTTTTTTTTTTT..............................d|
+d....tttttttdddddddddddddddddddddddddTTTTTTTTTTTTT.............................d|
+d....tttttttdddddddddddddddddddddddddTTTTTTTTTTT...............................d|
+d....tttttttdddddddddddddddddddddddddTTTTTTTTTTTTTTT...........................d|
+d....tttttttdddddddddddddddddddddddddTTTTTTTTTTTTTTTT..........................d|
 d..............................................................................d|
 d..............................................................................d|
 d..............................................................................d|

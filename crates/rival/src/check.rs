@@ -36,8 +36,8 @@ use rival_core::session::Session;
 use serde_json::{Value as Json, json};
 
 use crate::model_specs::{
-    ModelSpec, RunCall, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, session_mode,
-    sol_spec,
+    ModelSpec, RunCall, china_spec, claude_spec, codex_spec, fable_spec, grok_spec, neon_spec,
+    session_mode, sol_spec,
 };
 
 /// What each model is asked.
@@ -98,6 +98,7 @@ impl Target {
             "claude" => &["claude", "docker"],
             "codex" => &["codex"],
             config::CHINA_LABEL => &["opencode"],
+            config::NEON_LABEL => &["agy"],
             _ => &["grok"],
         }
     }
@@ -116,13 +117,14 @@ pub const SOL: Target = target(config::SOL_LABEL, "codex", config::SOL_MODEL);
 pub const CLAUDE: Target = target(config::CLAUDE_LABEL, "claude", config::CLAUDE_MODEL);
 pub const FABLE: Target = target(config::FABLE_LABEL, "claude", config::FABLE_MODEL);
 pub const CHINA: Target = target(config::CHINA_LABEL, config::CHINA_LABEL, "");
+pub const NEON: Target = target(config::NEON_LABEL, config::NEON_LABEL, config::NEON_MODEL);
 pub const GROK: Target = target(config::GROK_LABEL, config::GROK_LABEL, config::GROK_MODEL);
 
 /// Every model, in row order.
-pub const ALL: [Target; 6] = [CODEX, SOL, CLAUDE, FABLE, CHINA, GROK];
+pub const ALL: [Target; 7] = [CODEX, SOL, CLAUDE, FABLE, CHINA, NEON, GROK];
 
 /// The accepted `-m` words, for the error text.
-pub const NAMES_HELP: &str = "codex, sol, claude (or opus), fable, china, grok, all";
+pub const NAMES_HELP: &str = "codex, sol, claude (or opus), fable, china, neon, grok, all";
 
 /// The models to check. No names: codex, sol, claude, fable and china, the
 /// security reviewer. `all`: every model. `opus` is `claude`;
@@ -845,6 +847,7 @@ pub fn spec_for(cfg: &Config, t: &Target) -> ModelSpec {
         "claude" => claude_spec(),
         "fable" => fable_spec(),
         config::CHINA_LABEL => china_spec(cfg),
+        config::NEON_LABEL => neon_spec(),
         _ => grok_spec(),
     }
 }

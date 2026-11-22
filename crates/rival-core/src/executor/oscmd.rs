@@ -541,13 +541,28 @@ mod tests {
 
         for out in [Output::Combined, Output::Discard, Output::Stderr] {
             let _ = std::fs::remove_file(&pidfile);
-            let (ctx, _cancel) = Context::background().with_timeout(Duration::from_millis(300));
+            let (ctx, cancel) = Context::background().with_cancel();
+            let pidfile_watch = pidfile.clone();
+            let killer = std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                while Instant::now() < deadline {
+                    if std::fs::read_to_string(&pidfile_watch)
+                        .map(|s| s.contains('\n'))
+                        .unwrap_or(false)
+                    {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                cancel.cancel();
+            });
             let start = Instant::now();
             let (_, err) = retry_busy(
                 || with_context(&ctx, || run(&c, "slow", &[], out)),
                 |r| format!("{:?}", r.1),
             );
-            assert_eq!(err.unwrap_err(), "context deadline exceeded");
+            killer.join().unwrap();
+            assert_eq!(err.unwrap_err(), "context canceled");
             assert!(
                 start.elapsed() < Duration::from_secs(10),
                 "{:?}",
@@ -561,6 +576,27 @@ mod tests {
             // SAFETY: signal 0 only checks that the PID exists.
             let alive = unsafe { libc::kill(pid, 0) } == 0;
             assert!(!alive, "the command still runs");
+        }
+        // A deadline context stops the command with "context deadline exceeded".
+        let _ = std::fs::remove_file(&pidfile);
+        let (ctx, _cancel) = Context::background().with_timeout(Duration::from_millis(300));
+        let start = Instant::now();
+        let (_, err) = retry_busy(
+            || with_context(&ctx, || run(&c, "slow", &[], Output::Discard)),
+            |r| format!("{:?}", r.1),
+        );
+        assert_eq!(err.unwrap_err(), "context deadline exceeded");
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
+        if let Ok(text) = std::fs::read_to_string(&pidfile)
+            && let Ok(pid) = text.trim().parse::<i32>()
+        {
+            // SAFETY: signal 0 only checks that the PID exists.
+            let alive = unsafe { libc::kill(pid, 0) } == 0;
+            assert!(!alive, "the timed-out command still runs");
         }
         // Outside with_context, run waits as before.
         let quick = bin.path().join("quick");

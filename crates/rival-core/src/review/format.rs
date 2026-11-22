@@ -213,7 +213,13 @@ pub fn format_review_console(
 ) -> String {
     let mut sb = String::new();
     write_header(&mut sb, "RIVAL REVIEW", model_label, scope, &out.summary);
+    write_review_body(&mut sb, out, log_path);
+    sb
+}
 
+/// Writes the findings, low-confidence list, severity tally, and optional log
+/// path of a validated code review. Shared by single-model and full reviews.
+pub(crate) fn write_review_body(sb: &mut String, out: &ReviewerOutput, log_path: &str) {
     if out.findings.is_empty() {
         sb.push_str("No issues found.\n");
     } else {
@@ -227,7 +233,7 @@ pub fn format_review_console(
             );
         }
         for (i, f) in main.iter().enumerate() {
-            write_finding(&mut sb, i + 1, f);
+            write_finding(sb, i + 1, f);
         }
         if !low.is_empty() {
             let _ = writeln!(sb, "Low confidence ({}):", low.len());
@@ -248,7 +254,6 @@ pub fn format_review_console(
     if !log_path.is_empty() {
         let _ = writeln!(sb, "Log: {log_path}");
     }
-    sb
 }
 
 /// Writes the review and security console header: the title, the Model and
@@ -271,7 +276,7 @@ pub(crate) fn write_summary(sb: &mut String, summary: &str) {
 
 /// Joins a multi-line scope (the auto-detected changed-file list) so the
 /// Scope line stays one line.
-fn one_line(s: &str) -> String {
+pub(crate) fn one_line(s: &str) -> String {
     s.split('\n')
         .map(str::trim)
         .filter(|line| !line.is_empty())

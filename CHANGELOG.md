@@ -2,7 +2,18 @@
 
 All notable changes to **rival** are documented here. Versions follow [semver](https://semver.org/); every release is git-tagged.
 
-Latest binary release: [v7.1.0](https://github.com/1905/rival/releases/tag/v7.1.0) — 2026-11-20.
+Latest binary release: [v7.2.0](https://github.com/1905/rival/releases/tag/v7.2.0) — 2026-11-22.
+
+## [v7.2.0] — 2026-11-22
+
+### Added
+- **Gemini 4 Neon (`neon`, fixed `xhigh` effort).** Runs `gemini-4-neon-xhigh` through the Google Antigravity CLI (`agy`) on the same footing as the other Rival models: `rival command neon`, `rival run neon`, `skill.claude` / `skill.codex`, `rival command plan -m neon`, `rival config check -m neon` (and `-m all`), and the `rival config` Models table. Reviews enforce a read-only `--settings` profile (`allowNonWorkspaceAccess: false`, denying write/command/URL/MCP tools); raw prompts pass `--dangerously-skip-permissions`. Neon has a single effort level (`xhigh`), so there is no `efforts.neon` config key and any valid `-re`/`--effort` resolves to `xhigh`.
+- **3-judge Consilium (`rival command consilium` and `/consilium` skill).** Replaces the legacy megareview concept with an independent 3-judge rated panel that evaluates code against the requested goal (concrete bugs by default, or custom goals such as design fixes, architecture, or API ergonomics via `--goal` / `-g`):
+  - **Normal mode (default):** Opus 5.5 (`claude`) + Sol 6.2 (`sol`) + Gemini 4 Neon (`neon`, `xhigh`).
+  - **Heavy mode (`heavy` / `--heavy`):** Fable 5.2 (`fable`) + Astra 6.2 (`codex`) + Gemini 4 Neon (`neon`, `xhigh`).
+  - Each judge returns an overall 1–10 rating, a 3–6 subsection rating breakdown (`Rating breakdown:`), and actionable findings (`file:line`, failure scenario, fix). Output includes a top `Ratings: ... · min N/10` summary line and per-judge blocks under one shared `group_id` (`mode: "consilium-review"`).
+  - If Neon (or another judge) is unavailable, fails, or hits quota, Rival skips it, emits `Skipped: <judge> — <reason>` plus `rival: ⚠ <judge> failed and was skipped — <reason>` on stdout and stderr, and still delivers the remaining judges' reviews.
+- **`/consilium` skill** for Claude Code and Codex (also reachable via `/rival consilium …`). Supports both single-round reviews and iterative **hill-climbing** toward a target score (default `9/10` on every active judge, up to 5 rounds), verifying findings and fixing confirmed issues prioritized by lowest-scoring subsection and severity.
 
 ## [v7.1.0] — 2026-11-20
 

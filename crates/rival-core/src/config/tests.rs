@@ -1659,7 +1659,7 @@ fn proxy_and_plan_validation_errors() {
     assert_eq!(
         config.user_config_error().unwrap().to_string(),
         format!(
-            r#"invalid plan.models entry "gpt" in {}; use one of: codex, sol, claude, opus, fable"#,
+            r#"invalid plan.models entry "gpt" in {}; use one of: codex, sol, claude, opus, fable, neon"#,
             config_path(_home.path()).display()
         )
     );
@@ -1899,7 +1899,7 @@ fn skill_model_rejects_unknown_names() {
         assert_eq!(
             err,
             format!(
-                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, grok"#,
+                r#"invalid {key} "gpt5" in {}; use one of: codex, sol, claude, fable, neon, grok"#,
                 config_path(home.path()).display()
             )
         );

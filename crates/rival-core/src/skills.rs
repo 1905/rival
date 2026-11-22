@@ -13,7 +13,7 @@ static TREE: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/skills");
 
 /// All embedded skill directory names, in install order.
 /// `scripts/bump-skill-versions.sh` reads this list.
-pub const NAMES: [&str; 2] = ["rival", "china"];
+pub const NAMES: [&str; 3] = ["rival", "china", "consilium"];
 
 /// Retired plan skills that install archives outside the active skill tree.
 pub const RETIRED_PLAN_SKILLS: [&str; 3] = ["rival-plan", "rival-plan-codex", "rival-plan-claude"];
@@ -73,11 +73,11 @@ fn codex_workflow() -> &'static str {
 }
 
 /// The description of the Codex `/rival` skill.
-const CODEX_DESCRIPTION: &str = "Run a requested prompt, code review or security review through Rival from Codex, with the model set for Codex in rival config.";
+const CODEX_DESCRIPTION: &str = "Run a requested prompt, code review, 3-judge consilium review or security review through Rival from Codex, with the model set for Codex in rival config.";
 
 /// The input rules of the Codex `/rival` skill. Like the Claude Code skill
 /// it names no model: `skill.codex` selects it.
-const CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The model comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
+const CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `[-re level] consilium [heavy] [--goal \"<goal>\"] [scope]` for a 3-judge rated consilium review (add `heavy` when the user asks for heavy mode), `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The single-model choice comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model(s) that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
 
 /// The `rival command` arguments the Codex skill launches.
 const CODEX_COMMAND: &str = "skill --host codex";
@@ -91,6 +91,15 @@ const CHINA_CODEX_DESCRIPTION: &str = "Run a code review or a prompt with the Ch
 /// The input rules of the Codex `/china` skill.
 const CHINA_CODEX_INPUT: &str = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review or `[-re level] <prompt>` for a raw prompt. A request in words (\"review with china\") becomes `review` plus any scope it names. With no review or prompt show usage and do not launch. The model comes from `china.model` in Rival's configuration (an opencode provider/model; `rival config show` lists it); the output names the model that ran. Do not invent flags or substitute another model.";
 
+/// The `rival command` arguments the Codex `/consilium` skill launches.
+const CONSILIUM_CODEX_COMMAND: &str = "consilium";
+
+/// The description of the Codex `/consilium` skill.
+const CONSILIUM_CODEX_DESCRIPTION: &str = "Run a 3-judge consilium review (normal or heavy mode) with 1-10 ratings, subsection breakdowns, and findings for any goal (bugs by default, or design, architecture, tests, etc.), or hill-climb in rounds until every judge reaches 9/10 through Rival from Codex. Use when the user invokes $consilium or asks for a consilium review or hill-climb.";
+
+/// The input rules of the Codex `/consilium` skill.
+const CONSILIUM_CODEX_INPUT: &str = "Pass the consilium arguments: `[-re level] [heavy] [--goal \"<goal>\"] [scope]` (leave input empty for normal mode on git-detected changed files). Add `heavy` only when the user asks for heavy mode; pass `--goal \"<goal>\"` when the user asks for a goal other than bugs (such as design fixes, architecture, or tests). Each judge returns a 1-10 rating, a subsection breakdown, and findings; the output names the judges that ran and any `rival: ⚠ …` notice if a judge failed and was skipped. When the user asks to hill-climb until a target rating (default 9/10 on all judges, max 5 rounds), run a consilium round, verify every finding, fix CONFIRMED issues targeting the lowest-scoring subsections and highest severities, run focused build/tests, and repeat consilium rounds until every judge reaches the target rating or the round limit. Do not invent flags or substitute another model.";
+
 /// Builds a Codex skill: the same command and parser as the Claude Code
 /// skill, with the Codex host and Codex's process lifecycle.
 pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
@@ -100,6 +109,11 @@ pub fn codex_skill(name: &str, version: &str) -> Result<Vec<u8>, String> {
             CHINA_CODEX_DESCRIPTION,
             CHINA_CODEX_INPUT,
             CHINA_CODEX_COMMAND,
+        ),
+        "consilium" => (
+            CONSILIUM_CODEX_DESCRIPTION,
+            CONSILIUM_CODEX_INPUT,
+            CONSILIUM_CODEX_COMMAND,
         ),
         _ => return Err(format!("no Codex skill for {:?}", name)),
     };

@@ -45,7 +45,7 @@ Each scenario gets its own temp root:
 
 ## Fakes
 
-`fakes/fakecli.py` implements `codex claude grok opencode glab docker brew`. Each scenario generates `bin/<name>` with an absolute `#!<python> -IB` shebang. Each launcher calls `fakecli.main(<name>)`. A fake reads `FAKE_<NAME>_SCRIPT`, which the runner points at `.e2e/fakes/<name>.json`:
+`fakes/fakecli.py` implements `codex claude grok agy opencode glab docker brew`. Each scenario generates `bin/<name>` with an absolute `#!<python> -IB` shebang. Each launcher calls `fakecli.main(<name>)`. A fake reads `FAKE_<NAME>_SCRIPT`, which the runner points at `.e2e/fakes/<name>.json`:
 
 ```json
 {"responses": [

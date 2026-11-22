@@ -1,0 +1,513 @@
+{
+  "name": "consilium-review",
+  "description": "3-judge `rival command consilium` in both normal and heavy modes. Step 1 runs normal mode (claude Opus 5.5 + sol Sol 6.2 + neon xhigh) with a custom `--goal \"design fixes\"`, verifying concurrent execution under one group_id, Ratings summary with min score, subsection rating breakdowns, and findings. Step 2 runs `--heavy` (fable Fable 5.2 + codex Astra 6.2 + neon xhigh) when `agy` fails with exit 1: fable and codex still complete, `Skipped: neon` appears in stdout, and `rival: ⚠ neon failed and was skipped` is printed on stdout and stderr.",
+  "fakes": {
+    "scripts": {
+      "claude": {
+        "responses": [
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-opus-5-5",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: design fixes\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Claude view.\",\"rating\":8,\"breakdown\":[{\"section\":\"Structure\",\"rating\":8,\"notes\":\"Clear layers.\"},{\"section\":\"Naming\",\"rating\":9,\"notes\":\"Short names.\"}],\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "-p",
+              "--model",
+              "claude-fable-5-2",
+              "--effort",
+              "medium",
+              "--output-format",
+              "text",
+              "--no-session-persistence",
+              "--system-prompt",
+              "Answer the user's question directly. Do not offer follow-up options, menus, walkthroughs, or ask if they want more. No filler, no sign-offs. Just deliver the answer and stop.",
+              "--safe-mode",
+              "--setting-sources",
+              "",
+              "--settings",
+              "{\"disableAllHooks\":true}",
+              "--strict-mcp-config",
+              "--mcp-config",
+              "{\"mcpServers\":{}}",
+              "--tools",
+              "Read,Glob,Grep",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "mcp__*",
+              "--permission-mode",
+              "dontAsk"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: Find concrete code-level bugs(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Fable view.\",\"rating\":9,\"breakdown\":[{\"section\":\"Correctness\",\"rating\":9,\"notes\":\"Clean paths.\"}],\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      },
+      "codex": {
+        "responses": [
+          {
+            "argv": [
+              "login",
+              "status"
+            ],
+            "times": 2,
+            "stdout": "Logged in using ChatGPT\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.2-sol",
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: design fixes\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Sol view.\",\"rating\":7,\"breakdown\":[{\"section\":\"Structure\",\"rating\":7,\"notes\":\"Split handler.\"}],\"findings\":[{\"file\":\"src/api.rs\",\"line\":42,\"severity\":\"high\",\"category\":\"architecture\",\"title\":\"Mixed concerns\",\"body\":\"Handler does IO and validation.\",\"failure_scenario\":\"Callers cannot test validation alone.\",\"suggestion\":\"Move validation to a pure helper.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.2-sol",
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
+              "model_reasoning_effort=low",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Sol view.\",\"rating\":7,\"breakdown\":[{\"section\":\"Structure\",\"rating\":7,\"notes\":\"Split handler.\"}],\"findings\":[{\"file\":\"src/api.rs\",\"line\":42,\"severity\":\"high\",\"category\":\"architecture\",\"title\":\"Mixed concerns\",\"body\":\"Handler does IO and validation.\",\"failure_scenario\":\"Callers cannot test validation alone.\",\"suggestion\":\"Move validation to a pure helper.\",\"confidence\":9}]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "exec",
+              "-C",
+              "<ROOT>/work",
+              "-m",
+              "gpt-6.2-astra",
+              "-c",
+              "service_tier=\"fast\"",
+              "-c",
+              "features.fast_mode=true",
+              "-c",
+              "model_reasoning_effort=xhigh",
+              "--sandbox",
+              "read-only",
+              "--ephemeral",
+              "--skip-git-repo-check",
+              "--color",
+              "never",
+              "-"
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: Find concrete code-level bugs(?s:.*)"
+              },
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Astra view.\",\"rating\":9,\"breakdown\":[{\"section\":\"Correctness\",\"rating\":9,\"notes\":\"No bugs.\"}],\"findings\":[]}\n",
+            "exit": 0
+          }
+        ]
+      },
+      "agy": {
+        "responses": [
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--settings",
+              "{\"agentMode\":\"\",\"toolPermission\":\"request-review\",\"allowNonWorkspaceAccess\":false,\"permissions\":{\"deny\":[\"write_file(*)\",\"command(*)\",\"read_url(*)\",\"execute_url(*)\",\"download_url(*)\",\"mcp(*)\"]}}",
+              "-p",
+              {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: design fixes\n(?s:.*)"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Neon view.\",\"rating\":9,\"breakdown\":[{\"section\":\"Structure\",\"rating\":9,\"notes\":\"Clean split.\"}],\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--settings",
+              "{\"agentMode\":\"\",\"toolPermission\":\"request-review\",\"allowNonWorkspaceAccess\":false,\"permissions\":{\"deny\":[\"write_file(*)\",\"command(*)\",\"read_url(*)\",\"execute_url(*)\",\"download_url(*)\",\"mcp(*)\"]}}",
+              "-p",
+              {
+                "$regex": "(?s:.*)\n## Task: Edit the wording of a review\n(?s:.*)"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "{\"summary\":\"Neon view.\",\"rating\":9,\"breakdown\":[{\"section\":\"Structure\",\"rating\":9,\"notes\":\"Clean split.\"}],\"findings\":[]}\n",
+            "exit": 0
+          },
+          {
+            "argv": [
+              "--model",
+              "gemini-4-neon-xhigh",
+              "--disable-slash-commands",
+              "--output-format",
+              "text",
+              "--settings",
+              "{\"agentMode\":\"\",\"toolPermission\":\"request-review\",\"allowNonWorkspaceAccess\":false,\"permissions\":{\"deny\":[\"write_file(*)\",\"command(*)\",\"read_url(*)\",\"execute_url(*)\",\"download_url(*)\",\"mcp(*)\"]}}",
+              "-p",
+              {
+                "$regex": "(?s:.*)Review scope: src/\nReview goal: Find concrete code-level bugs(?s:.*)"
+              }
+            ],
+            "times": 1,
+            "expect": {
+              "stdin": "",
+              "cwd": "<ROOT>/work"
+            },
+            "stdout": "upstream error\n",
+            "exit": 1
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "command",
+        "consilium"
+      ],
+      "stdin": "--goal \"design fixes\" src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL CONSILIUM [normal] (claude + sol + neon) ═══\n\nGoal: design fixes\nScope: src/\nRatings: claude 8/10 · sol 7/10 · neon 9/10 · min 7/10\n\n── claude (claude-opus-5-5) — 8/10 ──\n\nSummary: Claude view.\n\nRating breakdown:\n- Structure: 8/10 — Clear layers.\n- Naming: 9/10 — Short names.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<ID:CLAUDE>.log\n\n\n── sol (gpt-6.2-sol) — 7/10 ──\n\nSummary: Sol view.\n\nRating breakdown:\n- Structure: 7/10 — Split handler.\n\n1. [high] Mixed concerns — src/api.rs:42\n   Handler does IO and validation.\n   Scenario: Callers cannot test validation alone.\n   Fix: Move validation to a pure helper.\n   (architecture, confidence 9)\n\nFindings: 1 total — 0 crit, 1 high, 0 med, 0 low\nLog: <HOME>/.rival/sessions/<ID:SOL>.log\n\n\n── neon (gemini-4-neon-xhigh) — 9/10 ──\n\nSummary: Neon view.\n\nRating breakdown:\n- Structure: 9/10 — Clean split.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<ID:NEON1>.log\n",
+        "stderr_lines": [],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "judge": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:CLAUDE>",
+              "auth": "subscription",
+              "model": "claude"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:SOL>",
+              "judge": "sol"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:NEON1>",
+              "judge": "neon"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "command",
+        "consilium",
+        "--heavy"
+      ],
+      "stdin": "src/",
+      "expect": {
+        "exit_code": 0,
+        "stdout": "\n═══ RIVAL CONSILIUM [heavy] (fable + codex) ═══\n\nGoal: Find concrete code-level bugs, broken state transitions, edge-case failures, races, and data-loss risks.\nScope: src/\nRatings: fable 9/10 · codex 9/10 · min 9/10\n\n── fable (claude-fable-5-2) — 9/10 ──\n\nSummary: Fable view.\n\nRating breakdown:\n- Correctness: 9/10 — Clean paths.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<ID:FABLE>.log\n\n\n── codex (gpt-6.2-astra) — 9/10 ──\n\nSummary: Astra view.\n\nRating breakdown:\n- Correctness: 9/10 — No bugs.\n\nNo issues found.\nLog: <HOME>/.rival/sessions/<ID:CODEX>.log\n\nSkipped: neon — exited with code 1\n\nrival: ⚠ neon failed and was skipped — exited with code 1\n",
+        "stderr_lines": [
+          "rival: ⚠ neon failed and was skipped — exited with code 1"
+        ],
+        "log_events": [
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:FABLE>",
+              "judge": "fable"
+            }
+          },
+          {
+            "level": "info",
+            "message": "model native auth mode",
+            "fields": {
+              "session": "<ID:FABLE>",
+              "auth": "subscription",
+              "model": "fable"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:CODEX>",
+              "judge": "codex"
+            }
+          },
+          {
+            "level": "info",
+            "message": "starting consilium judge",
+            "fields": {
+              "session": "<ID:NEON2>",
+              "judge": "neon"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "home_files": [
+      ".rival/queue/.lock",
+      ".rival/sessions/<ID:CLAUDE>.json",
+      ".rival/sessions/<ID:CLAUDE>.log",
+      ".rival/sessions/<ID:SOL>.json",
+      ".rival/sessions/<ID:SOL>.log",
+      ".rival/sessions/<ID:SOL>.log.repair.log",
+      ".rival/sessions/<ID:NEON1>.json",
+      ".rival/sessions/<ID:NEON1>.log",
+      ".rival/sessions/<ID:NEON1>.log.repair.log",
+      ".rival/sessions/<ID:FABLE>.json",
+      ".rival/sessions/<ID:FABLE>.log",
+      ".rival/sessions/<ID:CODEX>.json",
+      ".rival/sessions/<ID:CODEX>.log",
+      ".rival/sessions/<ID:NEON2>.json",
+      ".rival/sessions/<ID:NEON2>.log"
+    ],
+    "files": [
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "claude-opus-5-5"
+        },
+        "bind": {
+          "CLAUDE": "id",
+          "GROUP1": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "mode": "consilium-review",
+          "model": "claude-opus-5-5",
+          "effort": "medium",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP1>"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "gpt-6.2-sol"
+        },
+        "bind": {
+          "SOL": "id",
+          "GROUP1": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "mode": "consilium-review",
+          "model": "gpt-6.2-sol",
+          "effort": "xhigh",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP1>"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "gemini-4-neon-xhigh",
+          "status": "completed"
+        },
+        "bind": {
+          "NEON1": "id",
+          "GROUP1": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "neon",
+          "mode": "consilium-review",
+          "model": "gemini-4-neon-xhigh",
+          "effort": "xhigh",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP1>"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "claude-fable-5-2"
+        },
+        "bind": {
+          "FABLE": "id",
+          "GROUP2": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "claude",
+          "mode": "consilium-review",
+          "model": "claude-fable-5-2",
+          "effort": "medium",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP2>"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "gpt-6.2-astra"
+        },
+        "bind": {
+          "CODEX": "id",
+          "GROUP2": "group_id"
+        },
+        "json": {
+          "status": "completed",
+          "exit_code": 0,
+          "cli": "codex",
+          "mode": "consilium-review",
+          "model": "gpt-6.2-astra",
+          "effort": "xhigh",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP2>"
+        }
+      },
+      {
+        "glob": "<HOME>/.rival/sessions/*.json",
+        "where": {
+          "model": "gemini-4-neon-xhigh",
+          "status": "failed"
+        },
+        "bind": {
+          "NEON2": "id",
+          "GROUP2": "group_id"
+        },
+        "json": {
+          "status": "failed",
+          "exit_code": 1,
+          "cli": "neon",
+          "mode": "consilium-review",
+          "model": "gemini-4-neon-xhigh",
+          "effort": "xhigh",
+          "review_scope": "src/",
+          "group_id": "<ID:GROUP2>"
+        }
+      }
+    ],
+    "calls": {
+      "claude": 2,
+      "codex": 5,
+      "agy": 3
+    }
+  }
+}

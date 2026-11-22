@@ -54,6 +54,15 @@ pub const OPUS_ALIAS: &str = "opus";
 /// `efforts.fable` key (Claude ladder).
 pub const FABLE_LABEL: &str = "fable";
 pub const GROK_MODEL: &str = "grok-4.6";
+/// Gemini 4 Neon (xhigh) on the Antigravity CLI (`agy`). Neon has a single
+/// effort level (`xhigh`).
+pub const NEON_MODEL: &str = "gemini-4-neon-xhigh";
+/// The Neon label: `command neon`, `run neon`, plan `-m neon`, and full review.
+pub const NEON_LABEL: &str = "neon";
+const NEON_BASE_MODEL: &str = "gemini-4-neon";
+const NEON_LOW_MODEL: &str = "gemini-4-neon-low";
+const NEON_MEDIUM_MODEL: &str = "gemini-4-neon-medium";
+const NEON_HIGH_MODEL: &str = "gemini-4-neon-high";
 /// The `/china` model: `rival command china`, the session adapter and the
 /// `china:` config block.
 pub const CHINA_LABEL: &str = "china";
@@ -106,6 +115,8 @@ pub fn model_label(model: &str) -> &'static str {
         CLAUDE_MODEL | CLAUDE_LABEL => CLAUDE_LABEL,
         FABLE_MODEL | FABLE_LABEL => FABLE_LABEL,
         FABLE_51_MODEL => FABLE_LABEL, // read-compat
+        NEON_MODEL | NEON_BASE_MODEL | NEON_LOW_MODEL | NEON_MEDIUM_MODEL | NEON_HIGH_MODEL
+        | NEON_LABEL => NEON_LABEL,
         GROK_MODEL | GROK_LABEL => GROK_LABEL,
         _ => "retired-model",
     }
@@ -131,6 +142,9 @@ pub fn engine_label(cli: &str, model: &str) -> String {
         // runtime ids "retired-model".
         FABLE_MODEL => return FABLE_LABEL.to_string(),
         FABLE_51_MODEL => return FABLE_LABEL.to_string(), // read-compat
+        NEON_MODEL | NEON_BASE_MODEL | NEON_LOW_MODEL | NEON_MEDIUM_MODEL | NEON_HIGH_MODEL => {
+            return NEON_LABEL.to_string();
+        }
         GROK_MODEL => return GROK_LABEL.to_string(),
         _ => {}
     }
@@ -139,6 +153,7 @@ pub fn engine_label(cli: &str, model: &str) -> String {
     // releases with now-obsolete model ids.
     match cli {
         "codex" => return SOL_LABEL.to_string(), // read-compat
+        NEON_LABEL => return NEON_LABEL.to_string(),
         GROK_LABEL => return GROK_LABEL.to_string(),
         "claude" | "fable" | "opencode" => return "retired-model".to_string(),
         _ => {}
@@ -192,6 +207,19 @@ pub fn public_runtime_error(cli: &str, model: &str, message: &str) -> String {
                     ("claude exited", format!("{label} exited")),
                     ("start claude:", format!("start {title} runtime:")),
                     ("subprocess claude:", format!("{title} runtime:")),
+                ],
+            )
+        }
+        NEON_LABEL | "agy" => {
+            let title = title_label(&label);
+            replace_ordered(
+                &message,
+                &[
+                    ("Antigravity CLI", format!("{title} runtime")),
+                    ("agy CLI", format!("{title} runtime")),
+                    ("agy exited", format!("{label} exited")),
+                    ("start agy:", format!("start {title} runtime:")),
+                    ("subprocess agy:", format!("{title} runtime:")),
                 ],
             )
         }
@@ -320,6 +348,11 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
         (CODEX_MODEL, CODEX_LABEL),
         (CLAUDE_MODEL, CLAUDE_LABEL),
         (FABLE_MODEL, FABLE_LABEL),
+        (NEON_MODEL, NEON_LABEL),
+        (NEON_HIGH_MODEL, NEON_LABEL),
+        (NEON_MEDIUM_MODEL, NEON_LABEL),
+        (NEON_LOW_MODEL, NEON_LABEL),
+        (NEON_BASE_MODEL, NEON_LABEL),
         (GROK_MODEL, GROK_LABEL),
     ] {
         pairs.push((id.to_string(), label.to_string()));
@@ -338,6 +371,7 @@ fn replace_concrete_model_ids(cli: &str, model: &str, text: &str) -> String {
         SOL_LABEL,
         CLAUDE_LABEL,
         FABLE_LABEL,
+        NEON_LABEL,
         GROK_LABEL,
         CODEX_LABEL,
     ];
@@ -428,6 +462,8 @@ fn public_review_header(line: &str) -> String {
         CLAUDE_MODEL => reviewer = CLAUDE_LABEL.to_string(),
         FABLE_MODEL => reviewer = FABLE_LABEL.to_string(),
         FABLE_51_MODEL => reviewer = FABLE_LABEL.to_string(), // read-compat
+        NEON_LABEL | NEON_MODEL | NEON_BASE_MODEL | NEON_LOW_MODEL | NEON_MEDIUM_MODEL
+        | NEON_HIGH_MODEL => reviewer = NEON_LABEL.to_string(),
         GROK_LABEL | GROK_MODEL => reviewer = GROK_LABEL.to_string(),
         _ => {}
     }
@@ -572,12 +608,11 @@ pub const CLAUDE_AUTH_SUBSCRIPTION: &str = "subscription";
 pub const CLAUDE_AUTH_API: &str = "api";
 
 /// Models whose effort is a property of the model rather than of the surface
-/// invoking it. Codex defaults to
-/// xhigh for correctness and plan reviews; Claude runs at medium. Sol
-/// follows Codex and Fable follows Claude.
+/// invoking it. Codex, Sol and Neon default to
+/// xhigh for correctness and plan reviews; Claude and Fable run at medium.
 fn pinned_model_effort(label: &str) -> Option<&'static str> {
     match label {
-        CODEX_LABEL | SOL_LABEL => Some("xhigh"),
+        CODEX_LABEL | SOL_LABEL | NEON_LABEL => Some("xhigh"),
         // Claude runs Opus 5.5 at medium on every surface; Fable too.
         CLAUDE_LABEL | FABLE_LABEL => Some("medium"),
         _ => None,
@@ -586,9 +621,8 @@ fn pinned_model_effort(label: &str) -> Option<&'static str> {
 
 fn builtin_model_effort(label: &str) -> &'static str {
     match label {
-        // Codex is the deep-reasoning model and is pinned to xhigh; Sol
-        // follows Codex.
-        CODEX_LABEL | SOL_LABEL => "xhigh",
+        // Codex, Sol and Neon are deep-reasoning models pinned to xhigh.
+        CODEX_LABEL | SOL_LABEL | NEON_LABEL => "xhigh",
         CLAUDE_LABEL | FABLE_LABEL => "medium",
         // grok-4.6's menu is low/medium/high, and high is its own default.
         GROK_LABEL => "high",
@@ -806,11 +840,12 @@ impl SkillHost {
 
 /// The models a `skill.<host>` key accepts, as `rival command <model>`
 /// names. [`skill_model_name`] also takes `opus` for `claude`.
-pub const SKILL_MODEL_NAMES: [&str; 5] = [
+pub const SKILL_MODEL_NAMES: [&str; 6] = [
     CODEX_LABEL,
     SOL_LABEL,
     CLAUDE_LABEL,
     FABLE_LABEL,
+    NEON_LABEL,
     GROK_LABEL,
 ];
 
@@ -913,7 +948,7 @@ impl SkillConfig {
 }
 
 /// The names `plan.models` accepts.
-pub const PLAN_MODEL_NAMES: [&str; 5] = ["codex", "sol", "claude", "opus", "fable"];
+pub const PLAN_MODEL_NAMES: [&str; 6] = ["codex", "sol", "claude", "opus", "fable", "neon"];
 
 /// The proxy key. It wins over the key file.
 pub const PROXY_KEY_ENV: &str = "RIVAL_PROXY_KEY";
@@ -1800,6 +1835,10 @@ impl Config {
                     "invalid effort {:?} for {label}",
                     override_effort
                 )));
+            }
+            // Neon has a single effort level (xhigh).
+            if label == NEON_LABEL {
+                return Ok("xhigh".to_string());
             }
             return Ok(override_effort);
         }

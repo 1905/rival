@@ -32,12 +32,13 @@ use crate::procinfo;
 // needs its own value here rather than reusing an existing one.
 pub const MODE_PLAN: &str = "plan";
 pub const MODE_SECURITY: &str = "security";
+pub const MODE_CONSILIUM: &str = "consilium-review";
 
 /// Reports whether mode names a task rather than a transport.
 /// A task mode identifies the run in both dashboards, so a runtime must not
 /// overwrite it with a transport name such as "native" or "docker".
 pub fn is_task_mode(mode: &str) -> bool {
-    mode == MODE_PLAN || mode == MODE_SECURITY
+    mode == MODE_PLAN || mode == MODE_SECURITY || mode == MODE_CONSILIUM
 }
 
 /// One run. The JSON keys keep the order and the omit rules of the record
@@ -683,6 +684,7 @@ fn group_model_rank(s: &Session) -> i32 {
         config::SOL_LABEL => 0,
         config::CLAUDE_LABEL => 2,
         config::GROK_LABEL => 3,
+        config::NEON_LABEL => 4,
         _ => 100,
     }
 }

@@ -8,12 +8,15 @@ use crate::testutil::{
     FakeStdin, Fixture, SharedRun, execute, fake_run, fake_spec, no_mr, with_env,
 };
 
+use rival_core::review::ConsiliumMode;
+
 /// What the fake routes saw.
 #[derive(Default)]
 struct Seen {
     /// The model names asked of the spec route, in order.
     names: Vec<String>,
     security_prompt: Option<String>,
+    consilium_req: Option<(ConsiliumMode, String, String, String)>,
 }
 
 /// A security executor whose preflight passes and whose run records the
@@ -40,6 +43,19 @@ fn run_skill(
     let workdir = tempfile::tempdir().unwrap();
     let workdir = workdir.path().to_str().unwrap().to_string();
     let security = security_fake(seen);
+    let consilium = |_: &rival_core::cancel::Context,
+                     _: &rival_core::config::Config,
+                     req: &rival_core::review::ConsiliumRequest<'_>,
+                     _: &mut dyn std::io::Write|
+     -> anyhow::Result<rival_core::review::ConsiliumRunResult> {
+        seen.borrow_mut().consilium_req = Some((
+            req.mode,
+            req.scope.to_string(),
+            req.goal.to_string(),
+            req.effort.to_string(),
+        ));
+        anyhow::bail!("fake consilium run")
+    };
     let spec = |name: &str| {
         seen.borrow_mut().names.push(name.to_string());
         Some(fake_spec(f))
@@ -53,6 +69,7 @@ fn run_skill(
             &SkillRoutes {
                 spec: &spec,
                 security: &security,
+                consilium: &consilium,
             },
         )
     })
@@ -191,6 +208,13 @@ fn preflight_failure_names_the_config_key() {
     };
     let workdir = tempfile::tempdir().unwrap();
     let mut stdin = FakeStdin::new("explain");
+    let consilium = |_: &rival_core::cancel::Context,
+                     _: &rival_core::config::Config,
+                     _: &rival_core::review::ConsiliumRequest<'_>,
+                     _: &mut dyn std::io::Write|
+     -> anyhow::Result<rival_core::review::ConsiliumRunResult> {
+        panic!("consilium runner must not run")
+    };
     let out = with_env(&fix, &mut stdin, &*no_mr(), |env| {
         run_skill_command(
             env,
@@ -200,13 +224,14 @@ fn preflight_failure_names_the_config_key() {
             &SkillRoutes {
                 spec: &spec,
                 security: &security,
+                consilium: &consilium,
             },
         )
     });
     assert_eq!(
         out.result,
         Err(CmdError::plain(
-            "codex runtime is not installed\nset another model: rival config set skill.claude <model> (codex, sol, claude, fable, grok)"
+            "codex runtime is not installed\nset another model: rival config set skill.claude <model> (codex, sol, claude, fable, neon, grok)"
         ))
     );
     assert!(fix.sessions().is_empty());
@@ -234,6 +259,80 @@ fn host_must_be_claude_or_codex() {
             (code, out.as_str(), err.as_str()),
             (1, "", want),
             "{args:?}"
+        );
+    }
+}
+
+/// `consilium [heavy] [--goal ...] [scope]` and `-re <level> consilium ...`
+/// route to the 3-judge consilium review.
+#[test]
+fn consilium_goes_to_the_consilium_review() {
+    for (input, want_mode, want_scope, want_goal, want_effort) in [
+        (
+            "consilium",
+            ConsiliumMode::Normal,
+            "the entire project",
+            "",
+            "",
+        ),
+        (
+            "consilium src/api/",
+            ConsiliumMode::Normal,
+            "src/api/",
+            "",
+            "",
+        ),
+        (
+            "consilium heavy",
+            ConsiliumMode::Heavy,
+            "the entire project",
+            "",
+            "",
+        ),
+        (
+            "consilium heavy src/api/",
+            ConsiliumMode::Heavy,
+            "src/api/",
+            "",
+            "",
+        ),
+        (
+            "consilium --goal \"design fixes\" src/api/",
+            ConsiliumMode::Normal,
+            "src/api/",
+            "design fixes",
+            "",
+        ),
+        (
+            "-re high consilium heavy --goal 'API ergonomics' src/api/",
+            ConsiliumMode::Heavy,
+            "src/api/",
+            "API ergonomics",
+            "high",
+        ),
+    ] {
+        let fix = Fixture::new();
+        let f = fake_run("");
+        let seen = RefCell::new(Seen::default());
+        let mut stdin = FakeStdin::new(input);
+        let out = run_skill(&fix, SkillHost::Claude, &mut stdin, &f, &seen);
+        assert_eq!(
+            out.result,
+            Err(CmdError::plain("fake consilium run")),
+            "{input:?}"
+        );
+        let seen = seen.borrow();
+        assert!(seen.names.is_empty(), "{input:?}");
+        assert!(!f.borrow().called, "{input:?}");
+        assert_eq!(
+            seen.consilium_req,
+            Some((
+                want_mode,
+                want_scope.into(),
+                want_goal.into(),
+                want_effort.into()
+            )),
+            "{input:?}"
         );
     }
 }

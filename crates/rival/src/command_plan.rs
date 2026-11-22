@@ -1,5 +1,5 @@
-//! `rival command plan`: review a plan/spec file with Codex, Sol, Claude
-//! and/or Fable.
+//! `rival command plan`: review a plan/spec file with Codex, Sol, Claude,
+//! Fable and/or Neon.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -7,7 +7,7 @@ use std::path::Path;
 use rival_core::cancel::Context;
 use rival_core::config::{
     self, CLAUDE_LABEL, CLAUDE_MODEL, CODEX_LABEL, CODEX_MODEL, Config, FABLE_LABEL, FABLE_MODEL,
-    OPUS_ALIAS, SOL_LABEL, SOL_MODEL, VALID_EFFORTS,
+    NEON_LABEL, NEON_MODEL, OPUS_ALIAS, SOL_LABEL, SOL_MODEL, VALID_EFFORTS,
 };
 use rival_core::paths;
 use rival_core::review::{self, PlanRunResult, ReviewBatch};
@@ -25,10 +25,11 @@ pub const PLAN_USAGE: &str = "Usage:
   printf '%s\\n' 'path/to/plan.md' | rival command plan --model opus,fable,sol
   rival command plan --help — show native command options
 
-Input is a single path to a markdown plan/spec file, read from stdin. Codex
-and Sol effort defaults to xhigh, Claude and Fable to medium, unless overridden
-per model in ~/.rival/config.yaml. --model accepts codex, sol, claude (or opus)
-and fable; without it, plan.models from ~/.rival/config.yaml, else codex.
+Input is a single path to a markdown plan/spec file, read from stdin. Codex,
+Sol and Neon effort defaults to xhigh, Claude and Fable to medium, unless
+overridden per model in ~/.rival/config.yaml. --model accepts codex, sol,
+claude (or opus), fable and neon; without it, plan.models from
+~/.rival/config.yaml, else codex.
 An unavailable model is skipped, not fatal.";
 
 /// Runs the plan review; tests inject a fake.
@@ -186,10 +187,11 @@ pub(crate) fn parse_plan_models(raw: &[String]) -> Result<Vec<String>, String> {
                 SOL_LABEL | SOL_MODEL => SOL_MODEL,
                 CLAUDE_LABEL | OPUS_ALIAS | CLAUDE_MODEL => CLAUDE_MODEL,
                 FABLE_LABEL | FABLE_MODEL => FABLE_MODEL,
+                NEON_LABEL | NEON_MODEL | "gemini-4-neon" => NEON_MODEL,
                 "" => return Err("model selector cannot be empty".to_string()),
                 _ => {
                     return Err(format!(
-                        "unknown plan model {:?}; use one of: codex, sol, claude, opus, fable",
+                        "unknown plan model {:?}; use one of: codex, sol, claude, opus, fable, neon",
                         part
                     ));
                 }

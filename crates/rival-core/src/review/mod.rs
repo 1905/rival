@@ -6,6 +6,7 @@
 //! the same way, and review-shaped JSON a tool printed earlier is never taken
 //! for the answer.
 
+mod consilium;
 mod format;
 mod language;
 mod parse;
@@ -18,6 +19,10 @@ mod slots;
 mod testutil;
 mod types;
 
+pub use consilium::{
+    ConsiliumCLIResult, ConsiliumMode, ConsiliumOutput, ConsiliumRequest, ConsiliumRunResult,
+    format_consilium_result, parse_consilium_log, run_consilium_review,
+};
 pub use format::{DEFAULT_CONFIDENCE_THRESHOLD, format_review_console, format_review_result};
 pub use language::repair_language;
 pub use parse::parse_reviewer_log;
@@ -29,7 +34,7 @@ pub use planrun::{
     DocReview, ReviewBatch, run_doc_review, run_failure_reason, run_plan_review,
     run_timeout_reason, with_run_timeout,
 };
-pub use prompt::build_reviewer_prompt;
+pub use prompt::{CONSILIUM_DEFAULT_GOAL, build_consilium_prompt, build_reviewer_prompt};
 pub use security::{format_security_console, format_security_result, validate_security_result};
 pub use slots::{GroupSlot, SkippedCLI, SlotRelease, format_skipped, wait_for_group_slot};
 pub use types::{ReviewerFinding, ReviewerOutput};

@@ -16,8 +16,8 @@ use serde_json::{Map, Value as Json, json};
 use rival_core::cancel::{CancelFunc, Context};
 use rival_core::config::write::{self, Edit};
 use rival_core::config::{
-    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, ProxyProvider, SOL_LABEL,
-    SPEED_MODELS, SkillHost, Speed, UserConfig, VALID_EFFORTS,
+    self, CLAUDE_LABEL, CODEX_LABEL, Config, FABLE_LABEL, GROK_LABEL, NEON_LABEL, ProxyProvider,
+    SOL_LABEL, SPEED_MODELS, SkillHost, Speed, UserConfig, VALID_EFFORTS,
 };
 use rival_core::proxy;
 
@@ -199,11 +199,12 @@ pub struct ModelInfo {
     pub binaries: &'static [&'static str],
 }
 
+const NEON_LADDER: [&str; 1] = ["xhigh"];
 const GROK_LADDER: [&str; 3] = ["low", "medium", "high"];
 
 /// The window's models, in row order. The names are the
 /// [`config::SKILL_MODEL_NAMES`], so the skill pickers cycle through them.
-pub const MODELS: [ModelInfo; 5] = [
+pub const MODELS: [ModelInfo; 6] = [
     ModelInfo {
         name: CODEX_LABEL,
         effort_label: CODEX_LABEL,
@@ -243,6 +244,16 @@ pub const MODELS: [ModelInfo; 5] = [
         model: config::FABLE_MODEL,
         ladder: &VALID_EFFORTS,
         binaries: &["claude", "docker"],
+    },
+    ModelInfo {
+        name: NEON_LABEL,
+        effort_label: NEON_LABEL,
+        display: "Gemini 4 Neon",
+        runtime: "agy CLI",
+        provider: None,
+        model: config::NEON_MODEL,
+        ladder: &NEON_LADDER,
+        binaries: &["agy"],
     },
     ModelInfo {
         name: GROK_LABEL,
@@ -804,6 +815,9 @@ impl ConfigForm {
             }
             Field::Model(i) => {
                 let m = MODELS.get(i)?;
+                if m.ladder.len() <= 1 {
+                    return None;
+                }
                 let ladder: Vec<String> = m.ladder.iter().map(|s| s.to_string()).collect();
                 let next = cycle(&ladder, &self.effort(m), delta);
                 self.draft.efforts.insert(m.effort_label.to_string(), next);
@@ -1375,6 +1389,9 @@ fn patch_between(s: &UserConfig, d: &UserConfig) -> Map<String, Json> {
         }
     }
     for m in &MODELS {
+        if m.ladder.len() <= 1 {
+            continue;
+        }
         let effort = |u: &UserConfig| {
             u.efforts
                 .get(m.effort_label)

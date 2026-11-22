@@ -118,6 +118,7 @@ pub fn short_kind(mode: &str) -> &str {
         "megareview" | "consilium" => "mega",
         session::MODE_SECURITY => "sec",
         session::MODE_PLAN => "plan",
+        session::MODE_CONSILIUM => "consil",
         "raw" => "raw",
         "" | "review" | "native" | "docker" => "review",
         _ => mode,

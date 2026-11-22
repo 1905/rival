@@ -258,6 +258,20 @@ pub fn json_objects(s: &str) -> Vec<&str> {
 /// never carries them verbatim.
 const REVIEWER_EXAMPLE_SUMMARY: &str = "1-3 sentence reviewer summary";
 const PLAN_EXAMPLE_SUMMARY: &str = "1-3 sentence overall assessment of the plan";
+const CONSILIUM_EXAMPLE_SUMMARY: &str = "1-3 sentence overall verdict against the goal";
+
+/// One scored subsection of a consilium rating breakdown.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct RatingBreakdown {
+    pub section: String,
+    pub rating: u8,
+    pub notes: String,
+}
+
+fn is_placeholder_breakdown(b: &RatingBreakdown) -> bool {
+    b.section.trim() == "Subsection name"
+        || b.notes.trim() == "Concrete explanation of what holds up and what lowers this score"
+}
 
 pub(crate) const NO_ANSWER: &str = "no answer in the log";
 
@@ -266,19 +280,22 @@ pub(crate) const NO_ANSWER: &str = "no answer in the log";
 pub fn is_placeholder_finding(f: &Finding) -> bool {
     match f.category.as_str() {
         "bug|security|performance|concurrency|architecture|tests|ux"
+        | "bug|design|security|performance|concurrency|architecture|tests|ux"
         | "bug|gap|ambiguity|scope|verification"
         | "reuse|simplify|efficiency|altitude|compat|reinvention|slop|yagni" => true,
         _ => f.file == "path/to/file" || f.severity == "critical|high|medium|low",
     }
 }
 
-/// A decoded review or plan payload. Placeholder findings are dropped; the
-/// model's order is kept.
+/// A decoded review, plan, or consilium payload. Placeholder findings and
+/// breakdown items are dropped; the model's order is kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Payload {
     pub summary: String,
-    /// The 1..=10 rating of a plan payload; None for a code review.
+    /// The 1..=10 rating of a plan or consilium payload; None for a code review.
     pub rating: Option<u8>,
+    /// Detailed per-subsection scores of a consilium payload; empty otherwise.
+    pub breakdown: Vec<RatingBreakdown>,
     pub findings: Vec<Finding>,
 }
 
@@ -356,16 +373,17 @@ pub fn find_payload(text: &str, kind: PayloadKind) -> Result<Payload, Option<Str
 
     for (map, _) in candidates.iter().rev().filter(|(_, r)| *r) {
         let Some(p) = decode(map) else { continue };
-        // A blank summary is not a plan answer: a rating with no summary
-        // must never show as a clean plan.
+        // A blank summary is not a rated answer: a rating with no summary
+        // must never show as a clean review.
         if p.summary.trim().is_empty()
             || p.summary.trim() == PLAN_EXAMPLE_SUMMARY
+            || p.summary.trim() == CONSILIUM_EXAMPLE_SUMMARY
             || !(1..=10).contains(&p.rating)
         {
             continue;
         }
         let rating = u8::try_from(p.rating).ok();
-        return Ok(payload(p.summary, rating, p.findings));
+        return Ok(payload(p.summary, rating, p.breakdown, p.findings));
     }
     if kind == PayloadKind::Any {
         for (map, _) in candidates.iter().rev().filter(|(_, r)| !*r) {
@@ -373,16 +391,25 @@ pub fn find_payload(text: &str, kind: PayloadKind) -> Result<Payload, Option<Str
             if p.summary.trim() == REVIEWER_EXAMPLE_SUMMARY {
                 continue;
             }
-            return Ok(payload(p.summary, None, p.findings));
+            return Ok(payload(p.summary, None, p.breakdown, p.findings));
         }
     }
     Err(last_error)
 }
 
-fn payload(summary: String, rating: Option<u8>, findings: Vec<Finding>) -> Payload {
+fn payload(
+    summary: String,
+    rating: Option<u8>,
+    breakdown: Vec<RatingBreakdown>,
+    findings: Vec<Finding>,
+) -> Payload {
     Payload {
         summary,
         rating,
+        breakdown: breakdown
+            .into_iter()
+            .filter(|b| !is_placeholder_breakdown(b))
+            .collect(),
         findings: findings
             .into_iter()
             .filter(|f| !is_placeholder_finding(f))
@@ -478,6 +505,7 @@ type Fields = HashMap<String, Box<RawValue>>;
 struct RawPayload {
     summary: String,
     rating: i64,
+    breakdown: Vec<RatingBreakdown>,
     findings: Vec<Finding>,
 }
 
@@ -485,7 +513,73 @@ fn decode_payload(map: &Fields) -> Result<RawPayload, String> {
     Ok(RawPayload {
         summary: decode_str(map, "", "summary")?,
         rating: decode_int(map, "", "rating")?,
+        breakdown: decode_breakdown(map)?,
         findings: decode_findings(map)?,
+    })
+}
+
+fn decode_breakdown(map: &Fields) -> Result<Vec<RatingBreakdown>, String> {
+    let Some(t) = token(map, "breakdown") else {
+        return Ok(Vec::new());
+    };
+    if !t.starts_with('[') {
+        return Err(mismatch("breakdown", "Array<Any>", &parse(t, "breakdown")?));
+    }
+    let items: Vec<Box<RawValue>> = parse(t, "breakdown")?;
+    items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            let path = format!("breakdown.{i}");
+            let t = item.get();
+            if t.starts_with('{') {
+                decode_breakdown_item(&parse(t, &path)?, &path)
+            } else {
+                Err(mismatch(
+                    &path,
+                    "Dictionary<String, Any>",
+                    &parse(t, &path)?,
+                ))
+            }
+        })
+        .collect()
+}
+
+fn decode_breakdown_item(m: &Fields, path: &str) -> Result<RatingBreakdown, String> {
+    let mut section = String::new();
+    for key in ["section", "name", "criterion", "category"] {
+        if token(m, key).is_some() {
+            section = decode_str(m, path, key)?;
+            if !section.trim().is_empty() {
+                break;
+            }
+        }
+    }
+    let rating_val = if token(m, "rating").is_some() {
+        decode_int(m, path, "rating")?
+    } else if token(m, "score").is_some() {
+        decode_int(m, path, "score")?
+    } else {
+        0
+    };
+    if !(1..=10).contains(&rating_val) {
+        return Err(format!(
+            "{path}.rating: expected integer 1..=10, got {rating_val}"
+        ));
+    }
+    let mut notes = String::new();
+    for key in ["notes", "reason", "summary", "comment"] {
+        if token(m, key).is_some() {
+            notes = decode_str(m, path, key)?;
+            if !notes.trim().is_empty() {
+                break;
+            }
+        }
+    }
+    Ok(RatingBreakdown {
+        section,
+        rating: u8::try_from(rating_val).unwrap_or(1),
+        notes,
     })
 }
 

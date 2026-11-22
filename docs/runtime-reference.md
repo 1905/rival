@@ -12,20 +12,25 @@ Code review is single-model. Pick the model with the command:
 ```bash
 printf '%s\n' 'review src/api/' | rival command codex  --workdir .
 printf '%s\n' 'review src/api/' | rival command claude --workdir .
+printf '%s\n' 'review src/api/' | rival command neon   --workdir .
 printf '%s\n' 'review src/api/' | rival command china  --workdir .
 printf '%s\n' 'review src/api/' | rival command grok   --workdir .
+printf '%s\n' 'src/api/'        | rival command consilium --workdir .
 ```
 
 - `review` with no scope reviews the files git reports as changed.
 - `-re <level>` before `review` overrides the effort, for example
-  `-re high review src/api/`. China maps it onto Moonshot's levels.
-- An unavailable runtime fails its own run. No other model is substituted.
+  `-re high review src/api/`. China maps it onto Moonshot's levels; Neon always
+  runs at `xhigh`.
+- An unavailable runtime fails its own run. No other model is substituted
+  (in `consilium`, a failed or missing judge is skipped with a `rival: ⚠`
+  notice while the remaining judges still complete).
 
 ## Native commands
 
 `rival run` takes explicit flags. Use `--prompt-stdin` for an arbitrary direct
 prompt and `--review` for the single-model review template. It exists for
-`claude`, `fable` and `grok`; Codex and china use `rival command`.
+`claude`, `fable`, `grok`, and `neon`; Codex, Sol, and China use `rival command`.
 
 ```bash
 printf '%s\n' 'explain the auth flow' |
@@ -70,6 +75,29 @@ or `/private/tmp` stays writable. Child-process network access is not blocked on
 macOS. On macOS the applied profile, including the `enforced` flag and the
 allowlist, is appended to `~/.grok/sandbox-events.jsonl`.
 
+### Neon invocation shape
+
+Gemini 4 Neon runs through the Google Antigravity CLI (`agy`) at a single fixed
+effort level (`xhigh`, model slug `gemini-4-neon-xhigh`). The composed prompt
+is passed at the end of argv with `-p <prompt>` and empty stdin:
+
+```
+agy --model gemini-4-neon-xhigh \
+    --disable-slash-commands \
+    --output-format text \
+    [--settings '{"agentMode":"","toolPermission":"request-review","allowNonWorkspaceAccess":false,"permissions":{"deny":["write_file(*)","command(*)","read_url(*)","execute_url(*)","download_url(*)","mcp(*)"]}}'] \
+    [--dangerously-skip-permissions] \
+    -p <prompt>
+```
+
+- Review runs, plan reviews, consilium reviews, language-repair passes, and
+  `rival config check -m neon` apply the read-only `--settings` JSON so the
+  session cannot edit files, run shell commands, read URLs, or invoke MCP tools,
+  regardless of the user's saved `settings.json`.
+- Raw prompts pass `--dangerously-skip-permissions` instead of `--settings`.
+- `--effort` is intentionally omitted because `agy` selects effort via the
+  suffixed slug `gemini-4-neon-xhigh`.
+
 ### Plan review
 
 Native plan review accepts one file path on stdin. An omitted effort resolves
@@ -95,6 +123,7 @@ Rival launches installed provider CLIs; it does not replace their accounts.
 | Claude (Opus), Fable, native | Claude Code CLI. Subscription login is the default. To opt into API billing, set both `RIVAL_CLAUDE_AUTH=api` and a funded `ANTHROPIC_API_KEY`. |
 | Claude, Docker fallback | `RIVAL_CLAUDE_TOKEN` containing the OAuth access token extracted by the flow in [Claude in Docker](claude-docker-setup.md). |
 | Grok | Grok CLI. Run `grok login` for browser OAuth against grok.com. The preflight requires `grok` on `PATH` and `~/.grok/auth.json` to exist. `XAI_API_KEY` is deliberately unsupported. |
+| Neon | Google Antigravity CLI (`agy`). Preflight requires `agy` on `PATH`; authentication uses `agy`'s own cached credentials (sign in once by running `agy`). |
 
 For API-key-based Codex authentication, let Codex store the credential and then
 remove it from the immediate shell:
@@ -185,14 +214,17 @@ onto that menu rather than failing a run over a level the model does not expose:
 typo cannot silently downgrade a run. The clamp is applied before the session is
 created, so `rival sessions` and the dashboards report the level actually sent.
 
-The built-in defaults are Codex `xhigh`, Claude `medium`, China `max`, and
-Grok `high` — which is also grok-4.6's own default. Codex and Claude keep these
-defaults on plan reviews. An explicit `-re` or a configured effort still wins
-everywhere. Plan review accepts `codex` and `claude`.
+The built-in defaults are Codex `xhigh`, Sol `xhigh`, Claude `medium`, Fable
+`medium`, China `max`, Grok `high` — which is also grok-4.6's own default — and
+Neon fixed at `xhigh` (no `efforts.neon` config key). Codex, Sol, Claude, Fable,
+and Neon keep these defaults on plan reviews and consilium reviews. An explicit
+`-re` or a configured effort still wins everywhere except Neon, which always
+resolves known effort strings to `xhigh` (and still rejects unrecognized
+effort names). Plan review accepts `codex`, `sol`, `claude`/`opus`, `fable`,
+and `neon`.
 
 Invalid model labels or effort values in `~/.rival/config.yaml` stop the command
-before sessions or queue entries are created. An old `efforts.sol` entry is
-ignored.
+before sessions or queue entries are created.
 
 ## Known limits
 

@@ -114,7 +114,17 @@ fn command_subtree_matches_cli_surface() {
     assert_eq!(
         names(command),
         [
-            "china", "claude", "codex", "fable", "grok", "plan", "security", "skill", "sol"
+            "china",
+            "claude",
+            "codex",
+            "consilium",
+            "fable",
+            "grok",
+            "neon",
+            "plan",
+            "security",
+            "skill",
+            "sol"
         ]
     );
     let detach = command
@@ -126,13 +136,23 @@ fn command_subtree_matches_cli_surface() {
         detach.get_help().unwrap().to_string(),
         "run detached in a new process session; prints 'rival: detached pid=N' and exits"
     );
-    for model in ["china", "claude", "codex", "fable", "grok", "sol"] {
+    for model in ["china", "claude", "codex", "fable", "grok", "neon", "sol"] {
         assert_eq!(
             flags(node(&r, &["command", model])),
             [f("workdir", "."), f("no-queue", "false")],
             "{model}"
         );
     }
+    assert_eq!(
+        flags(node(&r, &["command", "consilium"])),
+        [
+            f("workdir", "."),
+            f("no-queue", "false"),
+            f("heavy", "false"),
+            ("goal".to_string(), Some('g'), String::new()),
+            f("effort", "")
+        ]
+    );
     let m = |default: &str| ("model".to_string(), Some('m'), default.to_string());
     assert_eq!(
         flags(node(&r, &["command", "plan"])),
@@ -170,7 +190,10 @@ fn other_commands_match_cli_surface() {
     );
     assert_eq!(names(node(&r, &["queue"])), ["clear"]);
     assert_eq!(flags(node(&r, &["queue", "clear"])), [f("force", "false")]);
-    assert_eq!(names(node(&r, &["run"])), ["claude", "fable", "grok"]);
+    assert_eq!(
+        names(node(&r, &["run"])),
+        ["claude", "fable", "grok", "neon"]
+    );
     let run_flags = [
         f("effort", ""),
         f("workdir", "."),
@@ -181,6 +204,7 @@ fn other_commands_match_cli_surface() {
     assert_eq!(flags(node(&r, &["run", "claude"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "fable"])), run_flags);
     assert_eq!(flags(node(&r, &["run", "grok"])), run_flags);
+    assert_eq!(flags(node(&r, &["run", "neon"])), run_flags);
     assert_eq!(
         flags(node(&r, &["sessions"])),
         [f("active", "false"), f("recent", "0")]

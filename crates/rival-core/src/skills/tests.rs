@@ -10,7 +10,7 @@ fn skill(name: &str) -> String {
 /// for its host and watches the run in the background.
 #[test]
 fn rival_skill_is_embedded() {
-    assert_eq!(NAMES, ["rival", "china"]);
+    assert_eq!(NAMES, ["rival", "china", "consilium"]);
     assert!(!DEPRECATED.contains(&"rival"));
     let content = skill("rival");
     for want in [
@@ -19,6 +19,8 @@ fn rival_skill_is_embedded() {
         "rival command skill --host claude --detach --workdir",
         "rival command security --which --workdir",
         "rival wait --log <rival_err>",
+        "/rival consilium",
+        "/rival consilium heavy",
         "/rival security src/api/",
         "skill.claude",
     ] {
@@ -75,7 +77,7 @@ fn skill_text_names_no_model() {
             let lower = text.to_lowercase();
             for word in [
                 "opus", "sol 6", "sol ", "astra", "gpt-", "gpt6", "fable", "kimi", "k3", "grok",
-                "sonnet",
+                "neon", "gemini", "sonnet",
             ] {
                 assert!(!lower.contains(word), "{host} {name} names {word:?}");
             }
@@ -254,6 +256,36 @@ fn china_skill_is_embedded() {
     }
 }
 
+/// `consilium` launches `rival command consilium` on both hosts and supports
+/// custom goals, normal/heavy modes, subsection breakdowns, and hill-climbing.
+#[test]
+fn consilium_skill_is_embedded() {
+    let claude = skill("consilium");
+    let codex = String::from_utf8(codex_skill("consilium", "1.2.3").unwrap()).unwrap();
+    for want in [
+        "name: consilium\n",
+        "rival command consilium --detach --workdir",
+        "rival wait --log <rival_err>",
+        "9/10",
+        "hill-climb",
+        "--goal",
+    ] {
+        assert!(claude.contains(want), "consilium skill missing {want:?}");
+    }
+    for want in [
+        "name: consilium\n",
+        "rival command consilium --detach --workdir",
+        "9/10",
+        "hill-climb",
+        "--goal",
+    ] {
+        assert!(
+            codex.contains(want),
+            "codex consilium skill missing {want:?}"
+        );
+    }
+}
+
 /// The embedded skill dirs are exactly `NAMES`.
 #[test]
 fn embedded_dirs_are_exactly_names() {
@@ -319,8 +351,8 @@ fn embedded_files_are_codex_md_and_skill_md() {
 /// The description and input of the Codex skill, pinned as golden text.
 #[test]
 fn codex_skill_text_golden() {
-    let description = "Run a requested prompt, code review or security review through Rival from Codex, with the model set for Codex in rival config.";
-    let input = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The model comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
+    let description = "Run a requested prompt, code review, 3-judge consilium review or security review through Rival from Codex, with the model set for Codex in rival config.";
+    let input = "Pass the user's arguments verbatim: `[-re level] review [scope]` for a code review, `[-re level] consilium [heavy] [--goal \"<goal>\"] [scope]` for a 3-judge rated consilium review (add `heavy` when the user asks for heavy mode), `security [scope]` for a security review, or `[-re level] <prompt>` for a raw prompt. With no arguments show usage and do not launch. The single-model choice comes from `skill.codex` in Rival's configuration (`rival config`, Models); the output names the model(s) that ran. For `security`, first run `rival command security --which --workdir <absolute-repository>` and report the resolved model. If it fails, report the error and do not launch. Do not invent flags or substitute another model.";
     let data = String::from_utf8(codex_skill("rival", "1").unwrap()).unwrap();
     let head = format!(
         "---\nname: rival\ndescription: {description}\nmetadata:\n  version: 1\n---\n\n# rival\n\n## Review input\n\n{input}\n\n"

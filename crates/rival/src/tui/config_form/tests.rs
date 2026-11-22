@@ -299,12 +299,17 @@ fn effort_pickers_step_through_each_ladder() {
     assert_eq!(f.patch(), json!({"efforts.codex": "low"}));
     keys(&mut f, &["left", "left"]);
     assert_eq!(f.patch(), json!({}), "the default again is no change");
-    // Grok steps low, medium, high.
+    // Neon has a single fixed effort level (xhigh): left/right does not change it.
     keys(&mut f, &["down", "down", "down", "down", "right"]);
     assert_eq!(f.field(), Some(Field::Model(4)));
-    assert_eq!(f.effort(&MODELS[4]), "low");
+    assert_eq!(f.effort(&MODELS[4]), "xhigh");
+    assert_eq!(f.patch(), json!({}));
+    // Grok steps low, medium, high.
+    keys(&mut f, &["down", "right"]);
+    assert_eq!(f.field(), Some(Field::Model(5)));
+    assert_eq!(f.effort(&MODELS[5]), "low");
     keys(&mut f, &["left", "left"]);
-    assert_eq!(f.effort(&MODELS[4]), "medium");
+    assert_eq!(f.effort(&MODELS[5]), "medium");
     assert_eq!(f.patch(), json!({"efforts.grok": "medium"}));
 }
 
@@ -320,13 +325,13 @@ fn space_on_a_model_row_changes_nothing() {
     assert_eq!(f.draft.plan.models, ["opus", "codex"]);
 }
 
-/// The two `/rival` pickers follow the model rows: each cycles the five
+/// The two `/rival` pickers follow the model rows: each cycles the six
 /// models from the host's default and writes its own `skill.<host>` key.
 #[test]
 fn the_skill_pickers_write_their_own_keys() {
     let (_h, mut f) = form(None);
     keys(&mut f, &["tab"]);
-    keys(&mut f, &["down"; 5]);
+    keys(&mut f, &["down"; 6]);
     assert_eq!(f.field(), Some(Field::Skill(SkillHost::Claude)));
     assert_eq!(f.skill_model(SkillHost::Claude).unwrap().name, "sol");
     assert_eq!(f.skill_model(SkillHost::Codex).unwrap().name, "claude");

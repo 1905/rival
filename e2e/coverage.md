@@ -36,6 +36,8 @@ Every command and flag of `plans/2026-10-01-rust-cli/cli-surface.md`, mapped to 
 | `command opus` (alias of `command claude`) | unit test `tree::tests::opus_is_an_alias_of_claude` | — |
 | `command grok` | executor-grok-success | executor-grok-failure, executor-grok-quota, executor-grok-missing-runtime, executor-grok-missing-auth |
 | `command grok --no-queue`, `--workdir` | command-grok-no-queue-workdir | workdir-missing |
+| `command neon` (Gemini 4 Neon via `agy`, fixed `xhigh`, read-only review settings + repair pass, raw `--dangerously-skip-permissions`, `-re` always resolves to `xhigh`) | neon-review | unit tests `executor::neon::tests`, `model_specs::tests` |
+| `command consilium` (3-judge rated review: normal `claude` + `sol` + `neon`, heavy `fable` + `codex` + `neon`, `--goal`, ratings + subsection breakdown, Neon failure skip + `rival: ⚠` notice) | consilium-review | unit tests `review::consilium::tests`, `command_consilium::tests` |
 | `command china` | executor-china-success | workdir-missing; preflight, effort map, selector: unit tests `executor::china`, `model_specs` |
 | `command plan` (default codex) | plan-codex-structured | plan-codex-quota-final-answer, plan-codex-blank-summary, plan-missing-file |
 | `command plan -m, --model` (codex,claude) | plan-dual-models | — |
@@ -64,6 +66,7 @@ Concurrent reviewers bind each session file by its `cli` field (plan-dual-models
 | `run fable`, `run opus` (alias of `run claude`) | unit tests `tree::tests::opus_is_an_alias_of_claude`, `model_specs::tests::fable_and_sol_specs_follow_their_runtimes` | — |
 | `run grok --prompt-stdin`, `--effort`, `--no-queue`, `--workdir` | run-grok-flags | workdir-missing |
 | `run grok --review` (ultra clamps to high, read-only sandbox) | run-grok-flags | — |
+| `run neon` | unit tests `tree::tests`, `model_specs::tests` | — |
 | every `run *` leaf `--help` | help-every-command (help) | — |
 
 ## install
@@ -74,7 +77,7 @@ Concurrent reviewers bind each session file by its `cli` field (plan-dual-models
 | `install --target codex --force` | install-codex-force | — |
 | `install --target all` (prompts) | install-all-prompts | — |
 | `install --target <bad>` | — | install-unknown-target |
-| one skill, `rival`, per host; the 5.2.0 per-model skills (`rival-codex`, `rival-sol`, …) are removed as deprecated | install-all-prompts, install-codex-force, update-* | unit test `install::tests::model_skills_are_removed_and_rival_is_installed` |
+| three skills (`rival`, `china`, `consilium`) per host; the 5.2.0 per-model skills (`rival-codex`, `rival-sol`, …) are removed as deprecated | install-all-prompts, install-codex-force, update-* | unit test `install::tests::model_skills_are_removed_and_rival_is_installed` |
 | `install --target auto` (default) | update-already-latest, update-brew-upgrade (child `install --force --target auto`) | — |
 
 `install` with the host's own `/Applications/Codex.app` cannot be isolated by the runner. Every scenario that reaches `auto` puts the `codex` fake on `PATH`, so detection is deterministic. The injected-applications-dir cases are unit-tested.

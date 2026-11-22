@@ -1,4 +1,5 @@
 mod check;
+mod command_consilium;
 mod command_plan;
 mod command_security;
 mod config_cmd;

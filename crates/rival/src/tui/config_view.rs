@@ -954,7 +954,7 @@ fn check_section_lines(form: &ConfigForm, w: usize, v: &ViewCtx, out: &mut Vec<B
     out.push(BodyLine::plain(fit_line(
         Line::from(vec![
             Span::styled("  a", s.accent),
-            Span::styled(" every model, Grok too", s.dim),
+            Span::styled(" every model, Neon and Grok too", s.dim),
         ]),
         w,
     )));
@@ -1289,7 +1289,10 @@ fn footer_line(form: &ConfigForm, w: usize, s: &Styles) -> Line<'static> {
         add("↑↓", if field.is_some() { "field" } else { "scroll" }, 2);
         match field {
             Some(f) if f.is_toggle() => add("space", "toggle", 7),
-            Some(Field::Model(_)) => add("←→", "effort", 7),
+            Some(Field::Model(i)) if MODELS.get(i).is_some_and(|m| m.ladder.len() > 1) => {
+                add("←→", "effort", 7)
+            }
+            Some(Field::Model(_)) => {}
             Some(f) if f.is_typeable_picker() => {
                 add("←→", "choose", 7);
                 add("e", "type", 3);

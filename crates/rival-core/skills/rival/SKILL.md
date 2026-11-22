@@ -1,8 +1,8 @@
 ---
 name: rival
-version: 7.1.0
-description: Run a prompt, a code review or a security review through the rival binary, with the model set for Claude Code in rival config. Detached and watched in the background. Use only when the user explicitly invokes /rival.
-argument-hint: "[-re low|medium|high|xhigh|ultra] [review [scope] | security [scope] | prompt]"
+version: 7.2.0
+description: Run a prompt, a code review, a 3-judge consilium review or a security review through the rival binary, with the model set for Claude Code in rival config. Detached and watched in the background. Use only when the user explicitly invokes /rival.
+argument-hint: "[-re low|medium|high|xhigh|ultra] [review [scope] | consilium [heavy] [--goal \"<goal>\"] [scope] | security [scope] | prompt]"
 allowed-tools: Bash, Read, Write
 ---
 
@@ -13,7 +13,11 @@ watched in the background, so this skill does not block your session.
 
 **Which model runs is a config choice, not a part of this skill.**
 `skill.claude` in `~/.rival/config.yaml` selects it (`rival config`, Models).
-The output names the model that ran; never guess or hardcode it.
+The output names the model(s) that ran; never guess or hardcode them.
+`consilium [heavy] [--goal "<goal>"] [scope]` runs a 3-judge consilium review
+with 1-10 ratings, subsection breakdowns, and findings (normal mode by default,
+or heavy mode when the user asks for `heavy`; use `/consilium` to hill-climb in
+rounds until every judge reaches 9/10).
 `security [scope]` runs the security review instead, on the `/china` model
 (`china.model`).
 
@@ -31,6 +35,10 @@ If `$ARGUMENTS` is empty or blank, respond with this usage message and STOP:
 > - `/rival review` — code review (auto-detects changed files via git)
 > - `/rival review src/api/` — review specific scope (bypasses git detection)
 > - `/rival -re ultra review src/api/` — review with ultra reasoning
+> - `/rival consilium` — 3-judge consilium review of changed files (normal mode, rated 1-10)
+> - `/rival consilium src/api/` — 3-judge consilium review of a specific scope
+> - `/rival consilium heavy src/api/` — 3-judge consilium review in heavy mode
+> - `/rival consilium --goal "design fixes" src/api/` — consilium review for a custom goal
 > - `/rival security` — security review of the changed files (git auto-detect)
 > - `/rival security src/api/` — security review of a specific scope
 >
@@ -131,13 +139,14 @@ partial results while you work — they belong in the final message.
      for it later): apply the fixes for every CONFIRMED finding they asked for.
    FALSE POSITIVE and UNCLEAR findings are never edited.
 5. The final message — its final text, no tool calls after it:
-   - a 2-4 line **stats summary first**: the model that ran (from the output),
+   - a 2-4 line **stats summary first**: the model(s) that ran (from the output),
      finding counts by severity (e.g. "1 HIGH, 3 MEDIUM, 0 LOW"), plus one line
      per HIGH/CRITICAL finding title,
      and the session id/runtime if visible. If the output has a
      `rival: ⚠ … not applied` line (`speed.<model>` asks for the fast or
-     ultrafast tier, but Codex used the standard tier), add that line
-     unchanged;
+     ultrafast tier, but Codex used the standard tier) or any other
+     `rival: ⚠ …` notice line (for example a reviewer that failed and was
+     skipped), add each line unchanged;
    - `Verified: N confirmed, N false positive, N unclear`;
    - a verdict table: `# | severity | title | verdict | evidence`;
    - what step 4 applied, with the build/test result, then the proposed

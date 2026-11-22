@@ -66,13 +66,17 @@ pub fn status<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
     "completed"
 }
 
-/// Classifies a GROUP, and returns exactly one of "security", "plan", or
-/// "megareview". There is no empty value. A solo row must display the
-/// session's own mode instead of calling this.
+/// Classifies a GROUP, and returns exactly one of "security", "plan",
+/// "consilium-review", or "megareview". There is no empty value. A solo row
+/// must display the session's own mode instead of calling this.
 ///
-/// Precedence: security, then plan, else megareview.
+/// Precedence: security, then plan, then consilium, else megareview.
 pub fn kind<S: Borrow<Session>>(sessions: &[S]) -> &'static str {
-    for mode in [session::MODE_SECURITY, session::MODE_PLAN] {
+    for mode in [
+        session::MODE_SECURITY,
+        session::MODE_PLAN,
+        session::MODE_CONSILIUM,
+    ] {
         if sessions.iter().any(|s| s.borrow().mode == mode) {
             return mode;
         }

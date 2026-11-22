@@ -10,10 +10,10 @@
 │                    │    Codex prefix        ‹ none ›   route off                                                                         │|
 │                    │                                                                                                                     │|
 │                    │  REQUESTS GO TO                                                                                                     │|
-│                    │    codex  Codex      direct  → gpt-6.2-astra                                                                        │|
-│                    │    sol    Sol 6.2    direct  → gpt-6.2-sol                                                                          │|
-│                    │    claude Opus 5.5   proxy   → emcd_/claude-opus-5-5                                                                │|
-│                    │    fable  Fable 5.2  proxy   → emcd_/claude-fable-5-2                                                               │|
+│                    │    codex  Codex          direct  → gpt-6.2-astra                                                                    │|
+│                    │    sol    Sol 6.2        direct  → gpt-6.2-sol                                                                      │|
+│                    │    claude Opus 5.5       proxy   → emcd_/claude-opus-5-5                                                            │|
+│                    │    fable  Fable 5.2      proxy   → emcd_/claude-fable-5-2                                                           │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
 │                    │                                                                                                                     │|
@@ -51,10 +51,10 @@ d....................d........................dddddddddddddddddddddddddddddddddd
 d....................d....ddddddddddddddddddddddTTTTdddddddddddddd.........................................................................d|
 d....................d.....................................................................................................................d|
 d....................d..DDDDDDDDDDDDDD.....................................................................................................d|
-d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTTTT........................................................................d|
-d....................d....tttttttdddddddddddddddddddddTTTTTTTTTTT..........................................................................d|
-d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT................................................................d|
-d....................d....tttttttdddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT...............................................................d|
+d....................d....tttttttdddddddddddddddddddddddddTTTTTTTTTTTTT....................................................................d|
+d....................d....tttttttdddddddddddddddddddddddddTTTTTTTTTTT......................................................................d|
+d....................d....tttttttdddddddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTT............................................................d|
+d....................d....tttttttdddddddddddddddaaaaaaddddTTTTTTTTTTTTTTTTTTTTTT...........................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|
 d....................d.....................................................................................................................d|
